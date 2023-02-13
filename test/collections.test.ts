@@ -1,7 +1,7 @@
 // Collections tests.
 
 import {describe, expect, test} from '@jest/globals';
-import { LinkedListNode, LinkedList } from '../src/collections';
+import { LinkedList, Queue } from '../src/collections';
 
 'use strict';
 
@@ -75,103 +75,96 @@ describe('LinkedList', () => {
     expect(list.length()).toBe(2);
     expect(stringify(list)).toBe('ba');
   });
+  test('remove', () => {
+    const list = new LinkedList(),
+          node1 = list.pushBack('a'),
+          node2 = list.pushBack('b'),
+          node3 = list.pushBack('c');
+    expect(list.length()).toBe(3);
+    expect(list.front()).toBe(node1);
+    expect(list.back()).toBe(node3);
+    expect(stringify(list)).toBe('abc');
+    expect(list.remove(node2)).toBe(node2);
+    expect(list.length()).toBe(2);
+    expect(node1.next).toBe(node3);
+    expect(node3.next).toBeUndefined();
+    expect(stringify(list)).toBe('ac');
+    expect(list.remove(node1)).toBe(node1);
+    expect(list.length()).toBe(1);
+    expect(list.front()).toBe(node3);
+    expect(list.back()).toBe(node3);
+    expect(stringify(list)).toBe('c');
+    expect(list.remove(node3)).toBe(node3);
+    expect(list.length()).toBe(0);
+    expect(list.front()).toBeUndefined();
+    expect(list.back()).toBeUndefined();
+    expect(stringify(list)).toBe('');
+  });
+  test('clear', () => {
+    const list = new LinkedList(),
+          node1 = list.pushBack('a'),
+          node2 = list.pushBack('b');
+    list.clear();
+    expect(list.length()).toBe(0);
+    expect(stringify(list)).toBe('');
+  });
+  test('map and mapReverse', () => {
+    const list = new LinkedList(),
+          node1 = list.pushBack('a'),
+          node2 = list.pushBack('b'),
+          node3 = list.pushBack('c');
+    let forward = '';
+    list.forEach(item => { forward += item; });
+    expect(forward).toBe('abc');
+    let reverse = '';
+    list.forEachReverse(item => { reverse += item; });
+    expect(reverse).toBe('cba');
+  });
+  test('find', () => {
+    const list = new LinkedList(),
+          node1 = list.pushBack('a'),
+          node2 = list.pushBack('b');
+    expect(list.find('b')).toBe(node2);
+  });
+});
+
+describe('Queue', () => {
+  test('constructor', () => {
+    const queue = new Queue();
+    expect(queue.length()).toBe(0);
+    expect(queue.empty());
+    expect(queue.dequeue()).toBeUndefined();
+  });
+  test('enqueue and dequeue', () => {
+    const queue = new Queue();
+    expect(queue.enqueue(1)).toBe(queue);
+    expect(queue.enqueue(2)).toBe(queue);
+    expect(queue.enqueue(3)).toBe(queue);
+    expect(queue.length()).toBe(3);
+    expect(queue.dequeue()).toBe(1);
+    expect(queue.length()).toBe(2);
+    expect(queue.enqueue(4)).toBe(queue);
+    expect(queue.length()).toBe(3);
+    expect(queue.dequeue()).toBe(2);
+    expect(queue.length()).toBe(2);
+    expect(queue.dequeue()).toBe(3);
+    expect(queue.length()).toBe(1);
+    expect(queue.dequeue()).toBe(4);
+    expect(queue.length()).toBe(0);
+  });
+  test('clear', () => {
+    const queue = new Queue();
+    queue.enqueue(1);
+    queue.enqueue(2);
+    queue.enqueue(3);
+    queue.clear();
+    expect(queue.length()).toBe(0);
+    expect(queue.empty());
+    expect(queue.dequeue()).toBeUndefined();
+  });
 });
 /*
 
-QUnit.test("LinkedList remove", function() {
-  const test = new diagrammar.collections.LinkedList(),
-        node1 = test.pushBack('a'),
-        node2 = test.pushBack('b'),
-        node3 = test.pushBack('c');
-  QUnit.assert.deepEqual(test.length, 3);
-  QUnit.assert.deepEqual(stringify(test), 'abc');
-  QUnit.assert.deepEqual(test.remove(node2), node2);
-  QUnit.assert.deepEqual(test.length, 2);
-  QUnit.assert.deepEqual(stringify(test), 'ac');
-  QUnit.assert.deepEqual(test.front, node1);
-  QUnit.assert.deepEqual(node1.next, node3);
-  QUnit.assert.deepEqual(node3.prev, node1);
-  QUnit.assert.deepEqual(test.back, node3);
-  QUnit.assert.deepEqual(test.remove(node1), node1);
-  QUnit.assert.deepEqual(test.front, node3);
-  QUnit.assert.deepEqual(test.back, node3);
-  QUnit.assert.deepEqual(test.length, 1);
-  QUnit.assert.deepEqual(stringify(test), 'c');
-  QUnit.assert.deepEqual(test.remove(node3), node3);
-  QUnit.assert.deepEqual(test.front, null);
-  QUnit.assert.deepEqual(test.back, null);
-  QUnit.assert.deepEqual(test.length, 0);
-  QUnit.assert.deepEqual(stringify(test), '');
-});
-
-QUnit.test("LinkedList clear", function() {
-  const test = new diagrammar.collections.LinkedList(),
-        node1 = test.pushBack(),
-        node2 = test.pushBack();
-  test.clear();
-  QUnit.assert.deepEqual(test.length, 0);
-  QUnit.assert.deepEqual(stringify(test), '');
-});
-
-QUnit.test("LinkedList map and mapReverse", function() {
-  const test = new diagrammar.collections.LinkedList(),
-        node1 = test.pushBack('a'),
-        node2 = test.pushBack('b'),
-        node3 = test.pushBack('c');
-
-  let forward = '';
-  test.forEach(function(item) {
-    forward += item;
-  });
-  QUnit.assert.deepEqual(forward, 'abc');
-  let reverse = '';
-  test.forEachReverse(function(item) {
-    reverse += item;
-  });
-  QUnit.assert.deepEqual(reverse, 'cba');
-});
-
-QUnit.test("LinkedList find", function() {
-  const test = new diagrammar.collections.LinkedList(),
-        node1 = test.pushBack('a'),
-        node2 = test.pushBack('b');
-
-  QUnit.assert.deepEqual(test.find('b'), node2);
-});
-
-//------------------------------------------------------------------------------
-// Queue tests, for both SimpleQueue and Queue.
-
-QUnit.test("Queue basic operation", function() {
-  const test = new diagrammar.collections.Queue();
-  QUnit.assert.ok(test.empty());
-  test.enqueue(1);
-  test.enqueue(2);
-  test.enqueue(3);
-  QUnit.assert.strictEqual(test.dequeue(), 1);
-  QUnit.assert.strictEqual(test.empty(), false);
-  test.enqueue(4);
-  QUnit.assert.strictEqual(test.dequeue(), 2);
-  test.clear();
-  QUnit.assert.strictEqual(test.empty(), true);
-});
-
-QUnit.test("Queue error operations", function() {
-  const test = new diagrammar.collections.Queue();
-  QUnit.assert.strictEqual(test.dequeue(), undefined);
-});
-
-QUnit.test("Queue enqueue dequeue", function() {
-  const test = new diagrammar.collections.Queue();
-  for (let i = 0; i < 10; i++) {
-    for (let j = 0; j < 10; j++) {
-      test.enqueue(j);
-    }
-    for (let j = 0; j < 10; j++) {
-      QUnit.assert.strictEqual(test.dequeue(), j);
-    }
-  }
-});
 
 //------------------------------------------------------------------------------
 // PriorityQueue tests.
@@ -315,21 +308,6 @@ QUnit.test("DisjointSet union find", function() {
   QUnit.assert.strictEqual(test.find(d), test.find(a));
 });
 
-QUnit.test("EmptyArray", function() {
-  const test = diagrammar.collections.EmptyArray();
-  QUnit.assert.strictEqual(test.length, 0);
-  test.push('foo');
-  QUnit.assert.strictEqual(test.length, 0);
-  test.pop();
-  QUnit.assert.strictEqual(test.length, 0);
-});
-
-QUnit.test("EmptySet", function() {
-  const test = diagrammar.collections.EmptySet();
-  QUnit.assert.strictEqual(test.size, 0);
-  test.add('foo');
-  QUnit.assert.strictEqual(test.size, 0);
-});
 
 })();
 */

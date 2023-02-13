@@ -172,7 +172,7 @@ export class Queue<T> {
     return this.array.length - this.head === 0;
   }
   length() : number {
-    return this.array.length;
+    return this.array.length - this.head;
   }
 
   clear() {
