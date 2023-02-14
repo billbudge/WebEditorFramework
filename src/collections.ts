@@ -1,5 +1,7 @@
 type VisitorFunction<T> = (value: T) => void;
-type CompareFunction<T> = (val1: T, val2: T) => -1 | 0 | 1;
+type CompareFunction<T> = (val1: T, val2: T) => number;
+
+// TODO make _ methods private.
 
 //------------------------------------------------------------------------------
 // Linked list.
@@ -271,46 +273,52 @@ export class PriorityQueue<T> {
     return this.array.length === 0;
   }
 
-  front() : T | undefined {
-    return this.empty() ? undefined : this.array[0];
+  length() : number {
+    return this.array.length;
+  }
+
+  front() : T {
+    if (this.empty())
+      throw new Error('Empty PriorityQueue');
+
+    return this.array[0];
   }
 
   push(value: T) {
     const array = this.array,
           end = array.length;;
     array.push(value);
-    [array[0], array[end]] = [array[end], array[0]];
-    this.siftDown_(0);
+    this.siftUp();
   }
 
-  pop() : T | undefined {
+  pop() : T {
     const array = this.array;
     if (!array.length)
-      return undefined;
+      throw new Error('Empty PriorityQueue');
     const result = array[0];
     const last:T = array.pop() as T;  // take the last element to avoid a hole in the last generation.
     if (array.length) {
       array[0] = last;
-      this.siftDown_(0);
+      this.siftDown(0);
     }
     return result;
   }
 
   assign(array: Array<T>) {
     this.array = array;
-    this.heapify_();
+    this.heapify();
   }
 
-  heapify_() {
+  private heapify() {
     const array = this.array;
     let parent = Math.floor((array.length - 1) / 2);  // the last parent in the heap.
     while (parent >= 0) {
-      this.siftDown_(parent);
+      this.siftDown(parent);
       parent--;
     }
   }
 
-  siftDown_(parent: number) {
+  private siftDown(parent: number) {
     const array = this.array;
     while (true) {
       const first = parent * 2 + 1;
@@ -329,7 +337,7 @@ export class PriorityQueue<T> {
     }
   }
 
-  siftUp_() {
+  private siftUp() {
     const array = this.array;
     let i = array.length - 1;
     while (i > 0) {
@@ -360,7 +368,6 @@ export class DisjointSetSubset<T> {
 }
 
 export class DisjointSet<T> {
-  constructor() {}
   private sets: Array<DisjointSetSubset<T>> = new Array();
 
   makeSet(item: T) : DisjointSetSubset<T> {

@@ -1,7 +1,8 @@
 // Collections tests.
 
 import {describe, expect, test} from '@jest/globals';
-import { LinkedList, Queue } from '../src/collections';
+import { LinkedList, Queue, PriorityQueue, SelectionSet, DisjointSet } from '../src/collections';
+import { resourceLimits } from 'worker_threads';
 
 'use strict';
 
@@ -163,151 +164,144 @@ describe('Queue', () => {
     expect(queue.dequeue()).toBeUndefined();
   });
 });
-/*
 
-
-//------------------------------------------------------------------------------
-// PriorityQueue tests.
-
-function pqCompareFn(a, b) {
+function pqCompareFn(a: number, b: number) {
   return a - b;
 }
 
-// Destroys queue.
-function pqContents(queue) {
-  const length = arguments.length - 1;
-  for (let i = 0; i < length; i++) {
-    if (queue.empty())
-      return false;
-    if (queue.pop() != arguments[i + 1])
-      return false;
+function pqInOrder(queue: PriorityQueue<number>) : string {
+  const result = new Array<number>();
+  while (!queue.empty()) {
+    result.push(queue.pop());
   }
-  return true;
+  return result.toString();
 }
 
-QUnit.test("PriorityQueue constructor", function() {
-  const test1 = new diagrammar.collections.PriorityQueue(pqCompareFn);
-  QUnit.assert.ok(test1.empty());
-
-  const test2 = new diagrammar.collections.PriorityQueue(pqCompareFn, [1, 0, 2, 3]);
-  QUnit.assert.ok(!test2.empty());
-  QUnit.assert.ok(pqContents(test2, 3, 2, 1, 0));
-});
-
-QUnit.test("PriorityQueue push", function() {
-  const test1 = new diagrammar.collections.PriorityQueue(pqCompareFn);
-  test1.push(0);
-  test1.push(2);
-  test1.push(1);
-  test1.push(3);
-  QUnit.assert.ok(pqContents(test1, 3, 2, 1, 0));
-});
-
-QUnit.test("PriorityQueue pop", function() {
-  const test1 = new diagrammar.collections.PriorityQueue(pqCompareFn);
-  test1.push(0);
-  test1.push(2);
-  test1.push(1);
-  test1.push(3);
-  let value = test1.pop();
-  QUnit.assert.strictEqual(value, 3);
-  value = test1.pop();
-  QUnit.assert.strictEqual(value, 2);
-  value = test1.pop();
-  QUnit.assert.strictEqual(value, 1);
-  value = test1.pop();
-  QUnit.assert.strictEqual(value, 0);
-  QUnit.assert.ok(test1.empty());
-});
-
-//------------------------------------------------------------------------------
-// SelectionSet tests.
-
-QUnit.test("SelectionSet constructor", function() {
-  const test = new diagrammar.collections.SelectionSet();
-  QUnit.assert.deepEqual(test.length, 0);
-  QUnit.assert.ok(test.empty());
-  QUnit.assert.deepEqual(test.lastSelected(), undefined);
-  QUnit.assert.deepEqual(stringify(test), '');
-});
-
-QUnit.test("SelectionSet add", function() {
-  const test = new diagrammar.collections.SelectionSet();
-  test.add('a');
-  test.add('b');
-  QUnit.assert.deepEqual(test.length, 2);
-  QUnit.assert.deepEqual(test.lastSelected(), 'b');
-  QUnit.assert.deepEqual(stringify(test), 'ba');
-  test.add('a');
-  QUnit.assert.deepEqual(test.length, 2);
-  QUnit.assert.deepEqual(test.lastSelected(), 'a');
-  QUnit.assert.deepEqual(stringify(test), 'ab');
-});
-
-QUnit.test("SelectionSet remove", function() {
-  const test = new diagrammar.collections.SelectionSet();
-  test.add('a');
-  test.add('b');
-  test.add('c');
-  QUnit.assert.deepEqual(test.length, 3);
-  QUnit.assert.deepEqual(test.lastSelected(), 'c');
-  QUnit.assert.deepEqual(stringify(test), 'cba');
-  test.remove('c');
-  QUnit.assert.deepEqual(test.length, 2);
-  QUnit.assert.deepEqual(test.lastSelected(), 'b');
-  QUnit.assert.deepEqual(stringify(test), 'ba');
-  test.remove('a');
-  QUnit.assert.deepEqual(test.length, 1);
-  QUnit.assert.deepEqual(test.lastSelected(), 'b');
-  QUnit.assert.deepEqual(stringify(test), 'b');
-});
-
-QUnit.test("SelectionSet toggle", function() {
-  const test = new diagrammar.collections.SelectionSet();
-  test.toggle('a');
-  QUnit.assert.deepEqual(test.length, 1);
-  QUnit.assert.deepEqual(test.lastSelected(), 'a');
-  test.toggle('a');
-  QUnit.assert.deepEqual(test.length, 0);
-  QUnit.assert.deepEqual(test.lastSelected(), undefined);
-});
-
-QUnit.test("SelectionSet map", function() {
-  const test = new diagrammar.collections.SelectionSet();
-  test.add('a');
-  test.add('b');
-
-  let forward = '';
-  test.forEach(function(item) {
-    forward += item;
+describe('PriorityQueue', () => {
+  test('constructor', () => {
+    const queue = new PriorityQueue(pqCompareFn);
+    expect(queue.length()).toBe(0);
+    expect(queue.empty());
+    expect(() => queue.pop()).toThrow(Error);
+    expect(pqInOrder(queue)).toBe([].toString());
   });
-  QUnit.assert.deepEqual(forward, 'ba');
-  let reverse = '';
-  test.forEachReverse(function(item) {
-    reverse += item;
+  test('assign', () => {
+    const queue = new PriorityQueue(pqCompareFn);
+    queue.push(0);
+    queue.push(2);
+    queue.push(1);
+    queue.push(3);
+    expect(queue.length()).toBe(4);
+    expect(queue.empty()).toBe(false);
+    expect(pqInOrder(queue)).toBe([3, 2, 1, 0].toString());
   });
-  QUnit.assert.deepEqual(reverse, 'ab');
+  test('push', () => {
+    const queue = new PriorityQueue(pqCompareFn);
+    queue.push(1);
+    expect(queue.length()).toBe(1);
+    expect(queue.empty()).toBe(false);
+    expect(queue.front()).toBe(1);
+    queue.push(3);
+    expect(queue.length()).toBe(2);
+    expect(queue.front()).toBe(3);
+    queue.push(4);
+    expect(queue.length()).toBe(3);
+    expect(queue.front()).toBe(4);
+    queue.push(2);
+    expect(queue.length()).toBe(4);
+    expect(queue.front()).toBe(4);
+    expect(pqInOrder(queue)).toBe([4, 3, 2, 1].toString());
+  });
+  test('pop', () => {
+    const queue = new PriorityQueue(pqCompareFn);
+    queue.assign([1, 4, 3, 1]);
+    expect(queue.length()).toBe(4);
+    expect(queue.empty()).toBe(false);
+    expect(pqInOrder(queue)).toBe([4, 3, 1, 1].toString());
+  });
 });
 
-QUnit.test("DisjointSet union find", function() {
-  const test = new diagrammar.collections.DisjointSet();
-  const a = test.makeSet('a'),
-        b = test.makeSet('b'),
-        c = test.makeSet('c'),
-        d = test.makeSet('d');
-  QUnit.assert.strictEqual(test.find(a), a);
-  test.union(a, b);
-  QUnit.assert.strictEqual(test.find(a), test.find(b));
-  test.union(a, c);
-  QUnit.assert.strictEqual(test.find(a), test.find(b));
-  QUnit.assert.strictEqual(test.find(a), test.find(c));
 
-  QUnit.assert.notStrictEqual(test.find(a), test.find(d));
-
-  test.union(d, a);
-  QUnit.assert.strictEqual(test.find(d), test.find(a));
+describe('SelectionSet', () => {
+  test('constructor', () => {
+    const selectionSet = new SelectionSet();
+    expect(selectionSet.length()).toBe(0);
+    expect(selectionSet.empty());
+    expect(selectionSet.lastSelected()).toBe(undefined);
+    expect(stringify(selectionSet)).toBe('')
+  });
+  test('add', () => {
+    const selectionSet = new SelectionSet();
+    selectionSet.add('a');
+    selectionSet.add('b');
+    expect(selectionSet.length()).toBe(2);
+    expect(selectionSet.empty()).toBe(false);
+    expect(selectionSet.lastSelected()).toBe('b');
+    expect(stringify(selectionSet)).toBe('ba')
+    selectionSet.add('a');
+    expect(selectionSet.length()).toBe(2);
+    expect(selectionSet.lastSelected()).toBe('a');
+    expect(stringify(selectionSet)).toBe('ab')
+  });
+  test('remove', () => {
+    const selectionSet = new SelectionSet();
+    selectionSet.add('a');
+    selectionSet.add('b');
+    selectionSet.add('c');
+    expect(selectionSet.length()).toBe(3);
+    expect(selectionSet.lastSelected()).toBe('c');
+    expect(stringify(selectionSet)).toBe('cba')
+    selectionSet.remove('c');
+    expect(selectionSet.length()).toBe(2);
+    expect(selectionSet.lastSelected()).toBe('b');
+    expect(stringify(selectionSet)).toBe('ba')
+    selectionSet.remove('c');
+    expect(stringify(selectionSet)).toBe('ba')
+    selectionSet.remove('b');
+    expect(selectionSet.length()).toBe(1);
+    expect(selectionSet.lastSelected()).toBe('a');
+    expect(stringify(selectionSet)).toBe('a')
+  });
+  test('toggle', () => {
+    const selectionSet = new SelectionSet();
+    selectionSet.toggle('a');
+    expect(selectionSet.length()).toBe(1);
+    expect(selectionSet.lastSelected()).toBe('a');
+    expect(stringify(selectionSet)).toBe('a')
+    selectionSet.toggle('a');
+    expect(selectionSet.length()).toBe(0);
+    expect(selectionSet.lastSelected()).toBe(undefined);
+    expect(stringify(selectionSet)).toBe('')
+  });
+  test('forEach, forEachReverse', () => {
+    const selectionSet = new SelectionSet();
+    selectionSet.add('a');
+    selectionSet.add('b');
+    let forward = '';
+    selectionSet.forEach(item => forward += item);
+    expect(forward).toBe('ba');
+    let reverse = '';
+    selectionSet.forEachReverse(item => reverse += item);
+    expect(reverse).toBe('ab');
+  });
 });
 
-
-})();
-*/
+describe('DisjointSet', () => {
+  test('constructor', () => {
+    const disjointSet = new DisjointSet();
+    const a = disjointSet.makeSet('a'),
+          b = disjointSet.makeSet('b'),
+          c = disjointSet.makeSet('c'),
+          d = disjointSet.makeSet('d');
+    expect(disjointSet.find(a)).toBe(a);
+    expect(disjointSet.find(a)).not.toBe(b);
+    disjointSet.union(a, b);
+    expect(disjointSet.find(b)).toBe(a);
+    disjointSet.union(a, c);
+    expect(disjointSet.find(b)).toBe(a);
+    expect(disjointSet.find(c)).toBe(a);
+    expect(disjointSet.find(d)).not.toBe(a);
+    expect(disjointSet.find(d)).not.toBe(b);
+    expect(disjointSet.find(d)).not.toBe(c);
+  });
+});

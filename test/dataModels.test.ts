@@ -1,29 +1,29 @@
-// // Collections tests.
+// Collections tests.
 
-// import {describe, expect, test} from '@jest/globals';
+import {describe, expect, test} from '@jest/globals';
 // import { Model, DataModel } from '../src/dataModels';
 
-// 'use strict';
+'use strict';
 
-// //------------------------------------------------------------------------------
-// // LinkedList tests.
+//------------------------------------------------------------------------------
+// LinkedList tests.
 
-// // describe('DataModels', () => {
-// //   test('extend', () => {
-// //     const model: Model = {
-// //             root: {},
-// //           },
-// //           dataModel = new DataModel(model);
-// //     expect(model['dataModel']).toBe(dataModel);
-// //     expect(dataModel.root).toBe(model.root);
-// //   });
-// // });
-// /*
-
-// QUnit.test("dataModel extend", function() {
-//   const model = { root: {} };
-//   const test = dataModels.dataModel.extend(model);
-//   QUnit.assert.deepEqual(test, model.dataModel);
+// describe('DataModels', () => {
+//   test('extend', () => {
+//     const model: Model = {
+//             root: {},
+//           },
+//           dataModel = new DataModel(model);
+//     expect(model['dataModel']).toBe(dataModel);
+//     expect(dataModel.root).toBe(model.root);
+//   });
 // });
+/*
 
-// */
+QUnit.test("dataModel extend", function() {
+  const model = { root: {} };
+  const test = dataModels.dataModel.extend(model);
+  QUnit.assert.deepEqual(test, model.dataModel);
+});
+
+*/
