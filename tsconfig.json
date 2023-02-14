@@ -8,7 +8,6 @@
     "strictNullChecks": true,
     "allowJs": true,
     "moduleResolution": "node",
-    "esModuleInterop": true
   },
   "modules": ["src/collections.ts", "src/geometry.ts", "src/dataModels.ts"],
   "files": ["test/collections.test.ts", "test/dataModels.test.ts"],
