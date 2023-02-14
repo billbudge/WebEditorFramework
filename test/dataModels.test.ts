@@ -158,5 +158,4 @@ describe('DataModels', () => {
     dataModel.initialize(item);
     expect(item.initialized).toBe(true);
   });
-
 });
