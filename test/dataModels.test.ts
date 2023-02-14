@@ -123,11 +123,13 @@ describe('DataModels', () => {
     expect(rootRefs.toString()).toBe('childId,fooId');
   });
   test('visitChildren, visitSubtree', () => {
-    const root: any = {
-            child: {
-              id: 1000,
-            },
-            children: new Array({ grandchild: {} }, {}),  // two unidentified children
+    const child: any = { id: 1000 },
+          grandchild: any = {},
+          child0: any = { grandchild: grandchild },
+          child1: any = {},
+          root: any = {
+            child: child,
+            children: new Array(child0, child1),  // two unidentified children and grandchild
           },
           dataModel = new DataModel(root),
           model: Model = {
@@ -137,11 +139,24 @@ describe('DataModels', () => {
     const children = new Array<object>();
     dataModel.visitChildren(root, (item) => { children.push(item)});
     expect(children).toEqual(
-        new Array<object>(root.child, root.children[0], root.children[1]));
+        new Array<object>(child, child0, child1));
     const descendants = new Array<object>();
     dataModel.visitSubtree(root, (item) => { descendants.push(item)});
     expect(descendants).toEqual(
-        new Array<object>(root, root.child, root.children[0], root.children[0].grandchild, root.children[1]));
+        new Array<object>(root, child, child0, grandchild, child1));
+  });
+  test('initializers', () => {
+    const root: any = {},
+          dataModel = new DataModel(root),
+          model: Model = {
+            root: root,
+            dataModel: dataModel,
+          },
+          initializer = (item: any) => item.initialized = true,
+          item: any = {};
+    dataModel.addInitializer(initializer);
+    dataModel.initialize(item);
+    expect(item.initialized).toBe(true);
   });
 
 });

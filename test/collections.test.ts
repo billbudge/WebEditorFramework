@@ -125,8 +125,9 @@ describe('LinkedList', () => {
     const list = new LinkedList(),
           node1 = list.pushBack('a'),
           node2 = list.pushBack('b');
-    expect(list.find('b')).toBe(node2);
-  });
+          expect(list.find('b')).toBe(node2);
+          expect(list.find('d')).toBeUndefined();
+        });
 });
 
 describe('Queue', () => {
