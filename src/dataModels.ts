@@ -9,8 +9,7 @@ export interface Model {
   observableModel?: ObservableModel;
 }
 
-// TODO add ObservableModel
-// TODO add ReferencingModel
+// TODO add ReferencingModel tests
 // TODO remove id and referencing from DataModel
 // TODO make models generic
 
@@ -25,6 +24,10 @@ export class DataModel {
 
   root() : object {
     return this.root_;
+  }
+  // TODO remove this for proper DataObject, ReferencedObject types.
+  isItem(item: any) {
+    return item instanceof Object;
   }
   // Returns true iff. item[attr] is a model property.
   isProperty(item: object, attr: DataAttr) : boolean {
@@ -226,102 +229,116 @@ export class ObservableModel extends EventBase<Change, ChangeEvents> {
   }
 }
 
-// export class ReferencingModel {
-//     // Gets the object that is referenced by item[attr]. Default is to return
-//     // item[_attr].
-//     getReference(item, attr) {
-//       return item[Symbol.for(attr)] || this.resolveReference(item, attr);
-//     }
+//------------------------------------------------------------------------------
 
-//     getReferenceFn(attr) {
-//       // this object caches the reference functions, indexed by the symbol.
-//       const self = this, symbol = Symbol.for(attr);
-//       let fn = this[symbol];
-//       if (!fn) {
-//         fn = item => { return item[symbol] || self.resolveReference(item, attr); };
-//         self[symbol] = fn;
-//       }
-//       return fn;
-//     }
+// ReferenceModel Model.
 
-//     // Resolves an id to a target item if possible.
-//     resolveId(id) {
-//       return this.targets_.get(id);
-//     }
+export class ReferenceModel {
+  private targets_ = new Map<number, object>();
+  private functions_ = new Map<string, Function>();
+  private dataModel_: DataModel;
 
-//     // Resolves a reference to a target item if possible.
-//     resolveReference(item, attr) {
-//       const newId = item[attr],
-//             newTarget = this.resolveId(newId);
-//       item[Symbol.for(attr)] = newTarget;
-//       return newTarget;
-//     }
+  // Gets the object that is referenced by item[attr]. Default is to return
+  // item[_attr].
+  getReference(item: any, attr: string) {
+    return item[Symbol.for(attr)] || this.resolveReference(item, attr);
+  }
 
-//     // Recursively adds item and sub-items as potential reference targets, and
-//     // resolves any references they contain.
-//     addTargets_(item) {
-//       const self = this, dataModel = this.model.dataModel;
-//       dataModel.visitSubtree(item, function(item) {
-//         const id = dataModel.getId(item);
-//         if (id)
-//           self.targets_.set(id, item);
-//       });
-//       dataModel.visitSubtree(item, function(item) {
-//         dataModel.visitReferences(item, function(item, attr) {
-//           self.resolveReference(item, attr);
-//         });
-//       });
-//     }
+  getReferenceFn(attr: string) {
+    // this object caches the reference functions, indexed by the symbol.
+    let fn = this.functions_.get(attr);
+    if (!fn) {
+      const self = this,
+            symbol = Symbol.for(attr);
+      fn = (item: any) => { return item[symbol] || self.resolveReference(item, attr); };
+      self.functions_.set(attr, fn);
+    }
+    return fn;
+  }
 
-//     // Recursively removes item and sub-items as potential reference targets.
-//     removeTargets_(item) {
-//       const self = this, dataModel = this.model.dataModel;
-//       dataModel.visitSubtree(item, function(item) {
-//         const id = dataModel.getId(item);
-//         if (id)
-//           self.targets_.delete(id);
-//       });
-//     }
+  // Resolves an id to a target item if possible.
+  resolveId(id: number) {
+    return this.targets_.get(id);
+  }
 
-//     onChanged_(change) {
-//       const dataModel = this.model.dataModel,
-//             item = change.item,
-//             attr = change.attr;
-//       switch (change.type) {
-//         case 'valueChanged': {
-//           if (dataModel.isReference(item, attr)) {
-//             this.resolveReference(item, attr);
-//           } else {
-//             const oldValue = change.oldValue;
-//             if (dataModel.isItem(oldValue))
-//               this.removeTargets_(oldValue);
-//             const newValue = item[attr];
-//             if (dataModel.isItem(newValue))
-//               this.addTargets_(newValue);
-//           }
-//           break;
-//         }
-//         case 'insert': {
-//           const newValue = item[attr][change.index];
-//           if (dataModel.isItem(newValue))
-//             this.addTargets_(newValue);
-//           break;
-//         }
-//         case 'remove': {
-//           const oldValue = change.oldValue;
-//           if (dataModel.isItem(oldValue))
-//             this.removeTargets_(oldValue);
-//           break;
-//         }
-//       }
-//     }
+  // Resolves a reference to a target item if possible.
+  resolveReference(item: any, attr: string) {
+    const newId = item[attr],
+          newTarget = this.resolveId(newId);
+    item[Symbol.for(attr)] = newTarget;
+    return newTarget;
+  }
 
-// }
+  // Recursively adds item and sub-items as potential reference targets, and
+  // resolves any references they contain.
+  addTargets_(item: any) {
+    const self = this, dataModel = this.dataModel_;
+    dataModel.visitSubtree(item, function(item) {
+      const id = dataModel.getId(item);
+      if (id)
+        self.targets_.set(id, item);
+    });
+    dataModel.visitSubtree(item, function(item) {
+      dataModel.visitReferences(item, function(item, attr) {
+        self.resolveReference(item, attr as string);  // TODO fix when id's managed here.
+      });
+    });
+  }
+
+  // Recursively removes item and sub-items as potential reference targets.
+  removeTargets_(item: any) {
+    const self = this, dataModel = this.dataModel_;
+    dataModel.visitSubtree(item, function(item: any) {
+      const id = dataModel.getId(item);
+      if (id)
+        self.targets_.delete(id);
+    });
+  }
+
+  onChanged_(change: Change) {
+    const dataModel = this.dataModel_,
+          item: any = change.item,
+          attr: DataAttr = change.attr;
+    switch (change.type) {
+      case 'valueChanged': {
+        if (dataModel.isReference(item, attr)) {
+          this.resolveReference(item, attr as string);  // TODO fix when id's managed here.
+        } else {
+          const oldValue = change.oldValue;
+          if (dataModel.isItem(oldValue))
+            this.removeTargets_(oldValue);
+          const newValue = item[attr];
+          if (dataModel.isItem(newValue))
+            this.addTargets_(newValue);
+        }
+        break;
+      }
+      case 'elementInserted': {
+        const newValue = item[attr][change.index];
+        if (dataModel.isItem(newValue))
+          this.addTargets_(newValue);
+        break;
+      }
+      case 'elementRemoved': {
+        const oldValue = change.oldValue;
+        if (dataModel.isItem(oldValue))
+          this.removeTargets_(oldValue);
+        break;
+      }
+    }
+  }
+  constructor(dataModel: DataModel, observableModel: ObservableModel) {
+    this.dataModel_ = dataModel;
+    this.addTargets_(dataModel.root());
+
+    observableModel.addHandler('changed', this.onChanged_.bind(this));
+  }
+}
 
 /*
 // Referencing model. It tracks reference targets in the data and resolves
 // reference properties from ids to actual references.
-const referencingModel = (function() {
+const ReferenceModel = (function() {
   const proto = {
     // Gets the object that is referenced by item[attr]. Default is to return
     // item[_attr].
