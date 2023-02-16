@@ -1,7 +1,7 @@
 // Collections tests.
 
 import {describe, expect, test} from '@jest/globals';
-import { Model, DataModel, DataAttr } from '../src/dataModels';
+import { Model, DataAttr, DataModel, EventBase, Change, ObservableModel } from '../src/dataModels';
 
 'use strict';
 
@@ -159,3 +159,55 @@ describe('DataModels', () => {
     expect(item.initialized).toBe(true);
   });
 });
+
+describe('EventBase', () => {
+  test('addHandler, removeHandler, onEvent', () => {
+    let count = 0;
+    const eventBase = new EventBase<() => void, string>(),
+          handler = () => { count++ };
+
+    eventBase.onEvent('test', handler);
+    expect(count).toBe(0);
+    eventBase.addHandler('test', handler);
+    expect(count).toBe(0);
+    eventBase.onEvent('test', handler);
+    expect(count).toBe(1);
+    eventBase.removeHandler('test', handler);
+    expect(count).toBe(1);
+    eventBase.onEvent('test', handler);
+    expect(count).toBe(1);
+  });
+});
+
+describe('ObservableModel', () => {
+  test('changeValue', () => {
+    let changes = 0,
+        valueChanges = 0,
+        elementsInserted = 0,
+        elementsRemoved = 0,
+        received = new Array<Change>();
+    const observableModel = new ObservableModel(),
+          onChange = (arg: Change) => { received.push(arg), changes++; },
+          onValueChange = (arg: Change) =>  { received.push(arg); valueChanges++; },
+          onInsertElement = (arg: Change) => { received.push(arg); elementsInserted++; },
+          onRemoveElement = (arg: Change) => { received.push(arg); elementsRemoved++; };
+    const root: any = {
+            val: 'foo',
+            child: {
+              val: 'bar',
+            },
+            children: [],
+          },
+          child2: any = {};
+
+    observableModel.addHandler('changed', onChange);
+    observableModel.addHandler('valueChanged', onValueChange);
+    observableModel.changeValue(root.child, 'val', 'baz');
+    expect(changes).toBe(1);
+    expect(valueChanges).toBe(1);
+
+  });
+});
+/*
+
+*/
