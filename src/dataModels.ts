@@ -167,10 +167,10 @@ export class EventBase<TArg, TEvents> {
 // Observable Model.
 
 // Generic change event, and more specific variants.
-type ChangeType = 'changed' | 'valueChanged' | 'elementInserted' | 'elementRemoved';
+type ChangeType = 'valueChanged' | 'elementInserted' | 'elementRemoved';
+type ChangeEvents = 'changed' | ChangeType;
 
 // Standard formats:
-// 'changed': item, attr, oldValue.
 // 'valueChanged': item, attr, oldValue.
 // 'elementInserted': item, attr, index.
 // 'elementRemoved': item, attr, index, oldValue.
@@ -185,7 +185,7 @@ export class Change {
 type ChangeHandler = EventHandler<Change>;
 type ChangeHandlers = EventHandlers<Change>;
 
-export class ObservableModel extends EventBase<Change, ChangeType> {
+export class ObservableModel extends EventBase<Change, ChangeEvents> {
   private onChanged(change: Change) {
     // console.log(change);
     super.onEvent('changed', change);
@@ -226,87 +226,214 @@ export class ObservableModel extends EventBase<Change, ChangeType> {
   }
 }
 
+// export class ReferencingModel {
+//     // Gets the object that is referenced by item[attr]. Default is to return
+//     // item[_attr].
+//     getReference(item, attr) {
+//       return item[Symbol.for(attr)] || this.resolveReference(item, attr);
+//     }
 
-// /*
-// const observableModel = (function() {
-//   const proto = {
-//     // Notifies observers that the value of a property has changed.
-//     // Standard formats:
-//     // 'change': item, attr, oldValue.
-//     // 'insert': item, attr, index.
-//     // 'remove': item, attr, index, oldValue.
-//     onChanged: function(change) {
-//       // console.log(change);
-//       this.onEvent('changed', function(handler) {
-//         handler(change);
-//       });
-//     },
-
-//     onValueChanged: function(item, attr, oldValue) {
-//       this.onChanged({
-//         type: 'change',
-//         item: item,
-//         attr: attr,
-//         oldValue: oldValue,
-//       });
-//     },
-
-//     changeValue: function(item, attr, newValue) {
-//       const oldValue = item[attr];
-//       if (newValue !== oldValue) {
-//         item[attr] = newValue;
-//         this.onValueChanged(item, attr, oldValue);
+//     getReferenceFn(attr) {
+//       // this object caches the reference functions, indexed by the symbol.
+//       const self = this, symbol = Symbol.for(attr);
+//       let fn = this[symbol];
+//       if (!fn) {
+//         fn = item => { return item[symbol] || self.resolveReference(item, attr); };
+//         self[symbol] = fn;
 //       }
-//       return oldValue;
-//     },
+//       return fn;
+//     }
 
-//     onElementInserted: function(item, attr, index) {
-//       this.onChanged({
-//         type: 'insert',
-//         item: item,
-//         attr: attr,
-//         index: index,
+//     // Resolves an id to a target item if possible.
+//     resolveId(id) {
+//       return this.targets_.get(id);
+//     }
+
+//     // Resolves a reference to a target item if possible.
+//     resolveReference(item, attr) {
+//       const newId = item[attr],
+//             newTarget = this.resolveId(newId);
+//       item[Symbol.for(attr)] = newTarget;
+//       return newTarget;
+//     }
+
+//     // Recursively adds item and sub-items as potential reference targets, and
+//     // resolves any references they contain.
+//     addTargets_(item) {
+//       const self = this, dataModel = this.model.dataModel;
+//       dataModel.visitSubtree(item, function(item) {
+//         const id = dataModel.getId(item);
+//         if (id)
+//           self.targets_.set(id, item);
 //       });
-//     },
-
-//     insertElement: function(item, attr, index, newValue) {
-//       const array = item[attr];
-//       array.splice(index, 0, newValue);
-//       this.onElementInserted(item, attr, index);
-//     },
-
-//     onElementRemoved: function(item, attr, index, oldValue) {
-//       this.onChanged({
-//         type: 'remove',
-//         item: item,
-//         attr: attr,
-//         index: index,
-//         oldValue: oldValue,
+//       dataModel.visitSubtree(item, function(item) {
+//         dataModel.visitReferences(item, function(item, attr) {
+//           self.resolveReference(item, attr);
+//         });
 //       });
-//     },
+//     }
 
-//     removeElement: function(item, attr, index) {
-//       const array = item[attr], oldValue = array[index];
-//       array.splice(index, 1);
-//       this.onElementRemoved(item, attr, index, oldValue);
-//       return oldValue;
-//     },
-//   }
+//     // Recursively removes item and sub-items as potential reference targets.
+//     removeTargets_(item) {
+//       const self = this, dataModel = this.model.dataModel;
+//       dataModel.visitSubtree(item, function(item) {
+//         const id = dataModel.getId(item);
+//         if (id)
+//           self.targets_.delete(id);
+//       });
+//     }
 
-//   function extend(model) {
-//     if (model.observableModel)
-//       return model.observableModel;
+//     onChanged_(change) {
+//       const dataModel = this.model.dataModel,
+//             item = change.item,
+//             attr = change.attr;
+//       switch (change.type) {
+//         case 'valueChanged': {
+//           if (dataModel.isReference(item, attr)) {
+//             this.resolveReference(item, attr);
+//           } else {
+//             const oldValue = change.oldValue;
+//             if (dataModel.isItem(oldValue))
+//               this.removeTargets_(oldValue);
+//             const newValue = item[attr];
+//             if (dataModel.isItem(newValue))
+//               this.addTargets_(newValue);
+//           }
+//           break;
+//         }
+//         case 'insert': {
+//           const newValue = item[attr][change.index];
+//           if (dataModel.isItem(newValue))
+//             this.addTargets_(newValue);
+//           break;
+//         }
+//         case 'remove': {
+//           const oldValue = change.oldValue;
+//           if (dataModel.isItem(oldValue))
+//             this.removeTargets_(oldValue);
+//           break;
+//         }
+//       }
+//     }
 
-//     const instance = Object.create(proto);
-//     instance.model = model;
-//     eventMixin.extend(instance);
+// }
 
-//     model.observableModel = instance;
-//     return instance;
-//   }
+/*
+// Referencing model. It tracks reference targets in the data and resolves
+// reference properties from ids to actual references.
+const referencingModel = (function() {
+  const proto = {
+    // Gets the object that is referenced by item[attr]. Default is to return
+    // item[_attr].
+    getReference: function(item, attr) {
+      return item[Symbol.for(attr)] || this.resolveReference(item, attr);
+    },
 
-//   return {
-//     extend: extend,
-//   };
-// })();
-// */
+    getReferenceFn: function(attr) {
+      // this object caches the reference functions, indexed by the symbol.
+      const self = this, symbol = Symbol.for(attr);
+      let fn = this[symbol];
+      if (!fn) {
+        fn = item => { return item[symbol] || self.resolveReference(item, attr); };
+        self[symbol] = fn;
+      }
+      return fn;
+    },
+
+    // Resolves an id to a target item if possible.
+    resolveId: function(id) {
+      return this.targets_.get(id);
+    },
+
+    // Resolves a reference to a target item if possible.
+    resolveReference: function(item, attr) {
+      const newId = item[attr],
+            newTarget = this.resolveId(newId);
+      item[Symbol.for(attr)] = newTarget;
+      return newTarget;
+    },
+
+    // Recursively adds item and sub-items as potential reference targets, and
+    // resolves any references they contain.
+    addTargets_: function(item) {
+      const self = this, dataModel = this.model.dataModel;
+      dataModel.visitSubtree(item, function(item) {
+        const id = dataModel.getId(item);
+        if (id)
+          self.targets_.set(id, item);
+      });
+      dataModel.visitSubtree(item, function(item) {
+        dataModel.visitReferences(item, function(item, attr) {
+          self.resolveReference(item, attr);
+        });
+      });
+    },
+
+    // Recursively removes item and sub-items as potential reference targets.
+    removeTargets_: function(item) {
+      const self = this, dataModel = this.model.dataModel;
+      dataModel.visitSubtree(item, function(item) {
+        const id = dataModel.getId(item);
+        if (id)
+          self.targets_.delete(id);
+      });
+    },
+
+    onChanged_: function(change) {
+      const dataModel = this.model.dataModel,
+            item = change.item,
+            attr = change.attr;
+      switch (change.type) {
+        case 'change': {
+          if (dataModel.isReference(item, attr)) {
+            this.resolveReference(item, attr);
+          } else {
+            const oldValue = change.oldValue;
+            if (dataModel.isItem(oldValue))
+              this.removeTargets_(oldValue);
+            const newValue = item[attr];
+            if (dataModel.isItem(newValue))
+              this.addTargets_(newValue);
+          }
+          break;
+        }
+        case 'insert': {
+          const newValue = item[attr][change.index];
+          if (dataModel.isItem(newValue))
+            this.addTargets_(newValue);
+          break;
+        }
+        case 'remove': {
+          const oldValue = change.oldValue;
+          if (dataModel.isItem(oldValue))
+            this.removeTargets_(oldValue);
+          break;
+        }
+      }
+    },
+  }
+
+  function extend(model) {
+    if (model.referencingModel)
+      return model.referencingModel;
+
+    dataModel.extend(model);
+
+    const instance = Object.create(proto);
+    instance.model = model;
+    if (model.observableModel) {
+      model.observableModel.addHandler('changed',
+                                       change => instance.onChanged_(change));
+    }
+    instance.targets_ = new Map();
+    instance.addTargets_(model.dataModel.root);
+
+    model.referencingModel = instance;
+    return instance;
+  }
+
+  return {
+    extend: extend,
+  };
+})();
+*/
