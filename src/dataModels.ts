@@ -3,22 +3,13 @@ export type ItemVisitor = (item: object) => void;
 export type DataAttr = string | number;
 export type PropertyVisitor = (item: object, attr: DataAttr) => void;
 
-export interface Model {
-  root: object;
-  dataModel: DataModel;
-  observableModel?: ObservableModel;
-}
-
-// TODO add ReferencingModel tests
-// TODO remove id and referencing from DataModel
-// TODO make models generic
+// TODO make DataObject and ReferenceObject types?
 
 //------------------------------------------------------------------------------
 
 // Base DataModel.
 
 export class DataModel {
-  private highestId: number = 0;  // 0 stands for no id.
   private root_: object;
   private initializers: Array<ItemVisitor> = new Array();
 
@@ -31,26 +22,11 @@ export class DataModel {
   }
   // Returns true iff. item[attr] is a model property.
   isProperty(item: object, attr: DataAttr) : boolean {
-    return attr !== 'id' &&
-           item.hasOwnProperty(attr);
+    return item.hasOwnProperty(attr);
   }
 
   getId(item: any) : number {
     return item.id as number;
-  }
-
-  assignId(item: any) : number {
-    // 0 is not a valid id in this model.
-    const id = ++this.highestId;
-    item.id = id;
-    return id;
-  }
-
-  // Returns true iff. item[attr] is a property that references an item.
-  isReference(item: object, attr: DataAttr) {
-    const attrName = attr.toString(),
-          position = attrName.lastIndexOf('Id');
-    return position === attrName.length - 2;
   }
 
   // Visits the item's top level properties.
@@ -67,15 +43,6 @@ export class DataModel {
           propFn(item, attr);
       }
     }
-  }
-
-  // Visits the item's top level reference properties.
-  visitReferences(item: object, refFn: PropertyVisitor) {
-    const self = this;
-    this.visitProperties(item, function(item, attr) {
-      if (self.isReference(item, attr))
-        refFn(item, attr);
-    });
   }
 
   // Visits the item's top level properties that are Arrays or child items.
@@ -115,17 +82,6 @@ export class DataModel {
 
   constructor(root: object) {
     this.root_ = root;
-    const self = this;
-    // Find the highest id in the model.
-    const unidentifed = new Array();
-    this.visitSubtree(root, function(item: object) {
-      const id = self.getId(item);
-      if (!id)
-        unidentifed.push(item);
-      else
-        self.highestId = Math.max(self.highestId, id);
-    });
-    unidentifed.forEach(item => self.assignId(item));
   }
 }
 
@@ -234,6 +190,7 @@ export class ObservableModel extends EventBase<Change, ChangeEvents> {
 // ReferenceModel Model.
 
 export class ReferenceModel {
+  private highestId: number = 0;  // 0 stands for no id.
   private targets_ = new Map<number, object>();
   private functions_ = new Map<string, Function>();
   private dataModel_: DataModel;
@@ -256,6 +213,28 @@ export class ReferenceModel {
     return fn;
   }
 
+  assignId(item: any) : number {
+    // 0 is not a valid id in this model.
+    const id = ++this.highestId;
+    item.id = id;
+    return id;
+  }
+
+  // Returns true iff. item[attr] is a property that references an item.
+  isReference(item: object, attr: DataAttr) {
+    const attrName = attr.toString(),
+          position = attrName.lastIndexOf('Id');
+    return position === attrName.length - 2;
+  }
+
+  // Visits the item's top level reference properties.
+  visitReferences(item: object, refFn: PropertyVisitor) {
+    const self = this;
+    this.dataModel_.visitProperties(item, function(item, attr) {
+      if (self.isReference(item, attr))
+        refFn(item, attr);
+    });
+  }
   // Resolves an id to a target item if possible.
   resolveId(id: number) {
     return this.targets_.get(id);
@@ -279,7 +258,7 @@ export class ReferenceModel {
         self.targets_.set(id, item);
     });
     dataModel.visitSubtree(item, function(item) {
-      dataModel.visitReferences(item, function(item, attr) {
+      self.visitReferences(item, function(item, attr) {
         self.resolveReference(item, attr as string);  // TODO fix when id's managed here.
       });
     });
@@ -301,7 +280,7 @@ export class ReferenceModel {
           attr: DataAttr = change.attr;
     switch (change.type) {
       case 'valueChanged': {
-        if (dataModel.isReference(item, attr)) {
+        if (this.isReference(item, attr)) {
           this.resolveReference(item, attr as string);  // TODO fix when id's managed here.
         } else {
           const oldValue = change.oldValue;
@@ -332,6 +311,18 @@ export class ReferenceModel {
     this.addTargets_(dataModel.root());
 
     observableModel.addHandler('changed', this.onChanged_.bind(this));
+
+    // Track ids and assign unique ids to any unidentified items.
+    const self = this;
+    const unidentifed = new Array();
+    dataModel.visitSubtree(dataModel.root(), function(item: object) {
+      const id = dataModel.getId(item);
+      if (!id)
+        unidentifed.push(item);
+      else
+        self.highestId = Math.max(self.highestId, id);
+    });
+    unidentifed.forEach(item => self.assignId(item));
   }
 }
 
