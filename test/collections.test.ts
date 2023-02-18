@@ -234,7 +234,10 @@ describe('SelectionSet', () => {
   test('add', () => {
     const selectionSet = new SelectionSet();
     selectionSet.add('a');
+    expect(selectionSet.has('a')).toBe(true);
     selectionSet.add('b');
+    expect(selectionSet.has('a')).toBe(true);
+    expect(selectionSet.has('b')).toBe(true);
     expect(selectionSet.length()).toBe(2);
     expect(selectionSet.empty()).toBe(false);
     expect(selectionSet.lastSelected()).toBe('b');
@@ -244,7 +247,7 @@ describe('SelectionSet', () => {
     expect(selectionSet.lastSelected()).toBe('a');
     expect(stringify(selectionSet)).toBe('ab')
   });
-  test('remove', () => {
+  test('delete', () => {
     const selectionSet = new SelectionSet();
     selectionSet.add('a');
     selectionSet.add('b');
@@ -252,13 +255,13 @@ describe('SelectionSet', () => {
     expect(selectionSet.length()).toBe(3);
     expect(selectionSet.lastSelected()).toBe('c');
     expect(stringify(selectionSet)).toBe('cba')
-    selectionSet.remove('c');
+    selectionSet.delete('c');
     expect(selectionSet.length()).toBe(2);
     expect(selectionSet.lastSelected()).toBe('b');
     expect(stringify(selectionSet)).toBe('ba')
-    selectionSet.remove('c');
+    selectionSet.delete('c');
     expect(stringify(selectionSet)).toBe('ba')
-    selectionSet.remove('b');
+    selectionSet.delete('b');
     expect(selectionSet.length()).toBe(1);
     expect(selectionSet.lastSelected()).toBe('a');
     expect(stringify(selectionSet)).toBe('a')

@@ -2,7 +2,7 @@
 
 import {describe, expect, test} from '@jest/globals';
 import { DataAttr, DataModel, EventBase, Change, ObservableModel,
-         ReferenceModel } from '../src/dataModels';
+         ReferenceModel, HierarchyModel, SelectionModel } from '../src/dataModels';
 
 'use strict';
 
@@ -210,9 +210,215 @@ describe('ReferenceModel', () => {
     referenceModel.visitReferences(root, (item, attr) => { rootRefs.push(attr)});
     expect(rootRefs.toString()).toBe('childId,fooId');
   });
+  test('reference tracking', () => {
+    // Default data model references end with 'Id'.
+    const child1 = { id: 2, refId: 1 },
+          child2 = { id: 3, refId: 1 },
+          child3 = { id: 4, firstId: 1, secondId: 3 },
+          root = {
+            id: 1,
+            child: null,
+            items: [
+              child1,
+            ],
+          },
+
+          dataModel = new DataModel(root),
+          observableModel = new ObservableModel(),
+          referenceModel = new ReferenceModel(dataModel, observableModel);
+
+    expect(referenceModel.getReference(child1, 'refId')).toBe(root);
+    expect(referenceModel.getReferenceFn('refId')(child1)).toBe(root);
+    expect(referenceModel.getReference(child1, 'refId')).toBe(
+           referenceModel.resolveId(child1.refId));
+
+    observableModel.changeValue(root, 'child', child2);
+    expect(referenceModel.getReference(child2, 'refId')).toBe(root);
+
+    observableModel.changeValue(child2, 'refId', 2);
+    expect(referenceModel.getReference(child2, 'refId')).toBe(child1);
+
+    observableModel.insertElement(root, 'items', root.items.length - 1, child3);
+    expect(referenceModel.getReference(child3, 'firstId')).toBe(root);
+    expect(referenceModel.getReferenceFn('firstId')(child3)).toBe(root);
+    expect(referenceModel.getReference(child3, 'secondId')).toBe(child2);
+    expect(referenceModel.getReferenceFn('secondId')(child3)).toBe(child2);
+
+    // unresolvable id causes ref to be set to 'null'.
+    observableModel.changeValue(child2, 'refId', 88);
+    expect(referenceModel.getReference(child2, 'refId')).toBeUndefined();
+    expect(referenceModel.resolveId(child2.refId)).toBeUndefined();
+  });
+  test('getReferenceFn', () => {
+    // Default data model references end with 'Id'.
+    const root = {},
+          dataModel = new DataModel(root),
+          observableModel = new ObservableModel(),
+          referenceModel = new ReferenceModel(dataModel, observableModel);
+    // Multiple invocations return the same function (cached).
+    const fn = referenceModel.getReferenceFn('objectId');
+    // The result of invoking the function on an object without the attribute is undefined.
+    expect(fn({})).toBeUndefined();
+    const fn2 = referenceModel.getReferenceFn('objectId');
+    expect(fn).toBe(fn2);
+  });
 });
 
+describe('HierarchyModel', () => {
+  test('constructor', () => {
+    const grandchildren = new Array({}, {}),
+          child = { grandchildren },
+          root = { child },
+          dataModel = new DataModel(root),
+          observableModel = new ObservableModel(),
+          hierarchyModel = new HierarchyModel(dataModel, observableModel);
+    // Parents should be set.
+    expect(hierarchyModel.getParent(root)).toBeUndefined();
+    expect(hierarchyModel.getParent(child)).toBe(root);
+    expect(hierarchyModel.getParent(grandchildren[0])).toBe(child);
+    expect(hierarchyModel.getParent(grandchildren[1])).toBe(child);
+  });
+  test('updating', () => {
+    const child: any = {
+            children:[ {}, {} ],
+          },
+          root = {
+            item: {},
+            items: [],
+          },
+          dataModel = new DataModel(root),
+          observableModel = new ObservableModel(),
+          hierarchyModel = new HierarchyModel(dataModel, observableModel);
+
+    expect(hierarchyModel.getParent(child)).toBeUndefined();
+    expect(hierarchyModel.getParent(child.children[0])).toBeUndefined();
+    expect(hierarchyModel.getParent(child.children[1])).toBeUndefined();
+    observableModel.insertElement(root, 'items', 0, child);
+    expect(hierarchyModel.getParent(child)).toBe(root);
+    expect(hierarchyModel.getParent(child.children[0])).toBe(child);
+    expect(hierarchyModel.getParent(child.children[1])).toBe(child);
+  });
+  test('getLineage, getLowestCommonAncestor', () => {
+    const child1 = {},
+          child2 = {},
+          child3 = { items: [ child1, child2 ] },
+          root: any = {
+            items: [ child3 ]
+          },
+          dataModel = new DataModel(root),
+          observableModel = new ObservableModel(),
+          hierarchyModel = new HierarchyModel(dataModel, observableModel);
+
+    expect(hierarchyModel.getLineage(root)).toEqual([ root ]);
+    expect(hierarchyModel.getLowestCommonAncestor(root, root)).toBe(root);
+    expect(hierarchyModel.getLineage(child1)).toEqual([ child1, child3, root ]);
+    expect(hierarchyModel.getLowestCommonAncestor(root, child1)).toBe(root);
+    expect(hierarchyModel.getLowestCommonAncestor(child3, child1)).toBe(child3);
+    expect(hierarchyModel.getLowestCommonAncestor(child1, child2)).toBe(child3);
+    expect(hierarchyModel.getLowestCommonAncestor(child3, child1, root)).toBe(root);
+  });
+});
+
+describe('SelectionModel', () => {
+  test('set, has, contents', () => {
+    const child1 = {},
+          child2 = {},
+          child3 = { items: [ child1, child2 ] },
+          root: any = {
+            items: [ child3 ]
+          },
+          dataModel = new DataModel(root),
+          observableModel = new ObservableModel(),
+          hierarchyModel = new HierarchyModel(dataModel, observableModel),
+          selectionModel = new SelectionModel(hierarchyModel);
+
+    selectionModel.set(root);
+    expect(selectionModel.contents()).toEqual([ root ]);
+    expect(selectionModel.has(root)).toBe(true);
+    expect(selectionModel.has(child3)).toBe(false);
+    expect(selectionModel.lastSelected()).toBe(root);
+
+    selectionModel.set([ child1, child2, child3 ]);
+    expect(selectionModel.contents()).toEqual([ child1, child2, child3 ]);
+    expect(selectionModel.has(root)).toBe(false);
+    expect(selectionModel.has(child1)).toBe(true);
+    expect(selectionModel.has(child2)).toBe(true);
+    expect(selectionModel.has(child3)).toBe(true);
+    expect(selectionModel.lastSelected()).toBe(child3);
+  });
+});
 
 /*
 
+
+
+QUnit.test("selectionModel extend", function() {
+  const model = { root: {} };
+  const test = dataModels.selectionModel.extend(model);
+  QUnit.assert.deepEqual(test, model.selectionModel);
+  QUnit.assert.ok(test.isEmpty());
+  QUnit.assert.ok(!test.lastSelected());
+});
+
+QUnit.test("selectionModel add", function() {
+  const model = { root: {} };
+  const test = dataModels.selectionModel.extend(model);
+  test.add('a');
+  QUnit.assert.ok(!test.isEmpty());
+  QUnit.assert.ok(test.contains('a'));
+  QUnit.assert.deepEqual(test.contents(), ['a']);
+  QUnit.assert.deepEqual(test.lastSelected(), 'a');
+  test.add(['b', 'a', 'c']);
+  QUnit.assert.deepEqual(test.contents(), ['c', 'a', 'b']);
+  QUnit.assert.deepEqual(test.lastSelected(), 'c');
+});
+
+QUnit.test("selectionModel remove", function() {
+  const model = { root: {} };
+  const test = dataModels.selectionModel.extend(model);
+  test.add(['b', 'a', 'c']);
+  test.remove('c');
+  QUnit.assert.deepEqual(test.contents(), ['a', 'b']);
+  QUnit.assert.deepEqual(test.lastSelected(), 'a');
+  test.remove('d');  // not selected
+  QUnit.assert.deepEqual(test.contents(), ['a', 'b']);
+  QUnit.assert.deepEqual(test.lastSelected(), 'a');
+});
+
+QUnit.test("selectionModel toggle", function() {
+  const model = { root: {} };
+  const test = dataModels.selectionModel.extend(model);
+  test.add(['a', 'b', 'c']);
+  test.toggle('c');
+  QUnit.assert.deepEqual(test.contents(), ['b', 'a']);
+  QUnit.assert.deepEqual(test.lastSelected(), 'b');
+  test.toggle('c');
+  QUnit.assert.deepEqual(test.contents(), ['c', 'b', 'a']);
+  QUnit.assert.deepEqual(test.lastSelected(), 'c');
+});
+
+QUnit.test("selectionModel set", function() {
+  const model = { root: {} };
+  const test = dataModels.selectionModel.extend(model);
+  test.set('a');
+  QUnit.assert.deepEqual(test.contents(), ['a']);
+  QUnit.assert.deepEqual(test.lastSelected(), 'a');
+  test.set(['a', 'b', 'c']);
+  QUnit.assert.deepEqual(test.contents(), ['c', 'b', 'a']);
+  QUnit.assert.deepEqual(test.lastSelected(), 'c');
+});
+
+QUnit.test("selectionModel select", function() {
+  const model = { root: {} };
+  const test = dataModels.selectionModel.extend(model);
+  test.set(['a', 'b', 'c']);
+  test.select('d', true);
+  QUnit.assert.deepEqual(test.contents(), ['d', 'c', 'b', 'a']);
+  test.select('d', true);
+  QUnit.assert.deepEqual(test.contents(), ['c', 'b', 'a']);
+  test.select('a', false);
+  QUnit.assert.deepEqual(test.contents(), ['a', 'c', 'b']);
+  test.select('a', true);
+  QUnit.assert.deepEqual(test.contents(), ['c', 'b']);
+});
 */

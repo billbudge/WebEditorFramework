@@ -184,6 +184,7 @@ export class Queue<T> {
 }
 
 //------------------------------------------------------------------------------
+
 // Set that orders elements by the order in which they were added. Note that
 // adding an element already in the set makes it the most recently added.
 
@@ -196,11 +197,12 @@ export class SelectionSet<T> {
   empty() : boolean {
     return this.length_ === 0;
   }
+
   length() : number {
     return this.length_;
   }
 
-  contains(element: T) : boolean {
+  has(element: T) : boolean {
     return this.map.has(element);
   }
 
@@ -222,7 +224,7 @@ export class SelectionSet<T> {
     return true;
   }
 
-  remove(element: T) : boolean {
+  delete(element: T) : boolean {
     const node = this.map.get(element);
     if (node) {
       this.map.delete(element);
@@ -234,8 +236,8 @@ export class SelectionSet<T> {
   }
 
   toggle(element: T) {
-    if (this.contains(element))
-      this.remove(element);
+    if (this.has(element))
+      this.delete(element);
     else
       this.add(element);
   }
