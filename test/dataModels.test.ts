@@ -1,8 +1,7 @@
 // Collections tests.
 
 import {describe, expect, test} from '@jest/globals';
-import { DataAttr, DataModel, EventBase, Change, ObservableModel,
-         ReferenceModel, HierarchyModel, SelectionModel } from '../src/dataModels';
+import * as t from '../src/dataModels';
 
 'use strict';
 
@@ -11,7 +10,7 @@ import { DataAttr, DataModel, EventBase, Change, ObservableModel,
 describe('DataModel', () => {
   test('constructor', () => {
     const root: any = {},
-          dataModel = new DataModel(root);
+          dataModel = new t.DataModel(root);
     expect(dataModel.root()).toBe(root);
   });
   test('isProperty', () => {
@@ -22,7 +21,7 @@ describe('DataModel', () => {
               id: 2,
             }
           },
-          dataModel = new DataModel(root);
+          dataModel = new t.DataModel(root);
 
     expect(dataModel.isProperty(root, 'foo')).toBe(true);
     expect(dataModel.isProperty(root, 'bar')).toBe(false);
@@ -40,9 +39,9 @@ describe('DataModel', () => {
             },
             props: new Array(0, 1, 2),
           },
-          dataModel = new DataModel(root);
+          dataModel = new t.DataModel(root);
 
-    const rootProps = new Array<DataAttr>();
+    const rootProps = new Array<t.DataAttr>();
     dataModel.visitProperties(root, (item, attr) => { rootProps.push(attr)});
     expect(rootProps.toString()).toBe('id,childId,foo,child,props');
   });
@@ -55,7 +54,7 @@ describe('DataModel', () => {
             child: child,
             children: new Array(child0, child1),  // two unidentified children and grandchild
           },
-          dataModel = new DataModel(root);
+          dataModel = new t.DataModel(root);
     const children = new Array<object>();
     dataModel.visitChildren(root, (item) => { children.push(item)});
     expect(children).toEqual(
@@ -67,7 +66,7 @@ describe('DataModel', () => {
   });
   test('initializers', () => {
     const root: any = {},
-          dataModel = new DataModel(root),
+          dataModel = new t.DataModel(root),
           initializer = (item: any) => item.initialized = true,
           item: any = {};
     dataModel.addInitializer(initializer);
@@ -81,7 +80,7 @@ describe('DataModel', () => {
 describe('EventBase', () => {
   test('addHandler, removeHandler, onEvent', () => {
     let count = 0;
-    const eventBase = new EventBase<() => void, string>(),
+    const eventBase = new t.EventBase<() => void, string>(),
           handler = () => { count++ };
 
     eventBase.onEvent('test', handler);
@@ -100,17 +99,17 @@ describe('EventBase', () => {
 //------------------------------------------------------------------------------
 
 describe('ObservableModel', () => {
-  test('changeValue', () => {
+  test('events', () => {
     let changes = 0,
         valueChanges = 0,
         elementsInserted = 0,
         elementsRemoved = 0,
-        received = new Array<Change>();
-    const observableModel = new ObservableModel(),
-          onChange = (arg: Change) => { received.push(arg), changes++; },
-          onValueChange = (arg: Change) =>  { received.push(arg); valueChanges++; },
-          onInsertElement = (arg: Change) => { received.push(arg); elementsInserted++; },
-          onRemoveElement = (arg: Change) => { received.push(arg); elementsRemoved++; };
+        received = new Array<t.Change>();
+    const observableModel = new t.ObservableModel(),
+          onChange = (arg: t.Change) => { received.push(arg), changes++; },
+          onValueChange = (arg: t.Change) =>  { received.push(arg); valueChanges++; },
+          onInsertElement = (arg: t.Change) => { received.push(arg); elementsInserted++; },
+          onRemoveElement = (arg: t.Change) => { received.push(arg); elementsRemoved++; };
     const root: any = {
             val: 'foo',
             child: {
@@ -152,9 +151,9 @@ describe('ReferenceModel', () => {
             },
             children: new Array({}, {}),  // two unidentified children
           },
-          dataModel = new DataModel(root),
-          observableModel = new ObservableModel(),
-          referenceModel = new ReferenceModel(dataModel, observableModel);
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          referenceModel = new t.ReferenceModel(dataModel, observableModel);
     // TODO add more tests for references.
     expect(dataModel.getId(root.child)).toBe(1000);  // preserved
     expect(dataModel.getId(root)).toBe(1001);
@@ -168,9 +167,9 @@ describe('ReferenceModel', () => {
               id: 1020,
             },
           },
-          dataModel = new DataModel(root),
-          observableModel = new ObservableModel(),
-          referenceModel = new ReferenceModel(dataModel, observableModel),
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          referenceModel = new t.ReferenceModel(dataModel, observableModel),
           child2: any = {};
     expect(referenceModel.assignId(child2)).toBe(1021);
   });
@@ -183,9 +182,9 @@ describe('ReferenceModel', () => {
               id: 2,
             }
           },
-          dataModel = new DataModel(root),
-          observableModel = new ObservableModel(),
-          referenceModel = new ReferenceModel(dataModel, observableModel);
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          referenceModel = new t.ReferenceModel(dataModel, observableModel);
 
     expect(referenceModel.isReference(root, 'foo')).toBe(false);
     expect(referenceModel.isReference(root, 'bar')).toBe(false);
@@ -202,11 +201,11 @@ describe('ReferenceModel', () => {
               bar: 'baz',
             },
           },
-          dataModel = new DataModel(root),
-          observableModel = new ObservableModel(),
-          referenceModel = new ReferenceModel(dataModel, observableModel);
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          referenceModel = new t.ReferenceModel(dataModel, observableModel);
 
-    const rootRefs = new Array<DataAttr>();
+    const rootRefs = new Array<t.DataAttr>();
     referenceModel.visitReferences(root, (item, attr) => { rootRefs.push(attr)});
     expect(rootRefs.toString()).toBe('childId,fooId');
   });
@@ -223,9 +222,9 @@ describe('ReferenceModel', () => {
             ],
           },
 
-          dataModel = new DataModel(root),
-          observableModel = new ObservableModel(),
-          referenceModel = new ReferenceModel(dataModel, observableModel);
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          referenceModel = new t.ReferenceModel(dataModel, observableModel);
 
     expect(referenceModel.getReference(child1, 'refId')).toBe(root);
     expect(referenceModel.getReferenceFn('refId')(child1)).toBe(root);
@@ -252,9 +251,9 @@ describe('ReferenceModel', () => {
   test('getReferenceFn', () => {
     // Default data model references end with 'Id'.
     const root = {},
-          dataModel = new DataModel(root),
-          observableModel = new ObservableModel(),
-          referenceModel = new ReferenceModel(dataModel, observableModel);
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          referenceModel = new t.ReferenceModel(dataModel, observableModel);
     // Multiple invocations return the same function (cached).
     const fn = referenceModel.getReferenceFn('objectId');
     // The result of invoking the function on an object without the attribute is undefined.
@@ -269,9 +268,9 @@ describe('HierarchyModel', () => {
     const grandchildren = new Array({}, {}),
           child = { grandchildren },
           root = { child },
-          dataModel = new DataModel(root),
-          observableModel = new ObservableModel(),
-          hierarchyModel = new HierarchyModel(dataModel, observableModel);
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          hierarchyModel = new t.HierarchyModel(dataModel, observableModel);
     // Parents should be set.
     expect(hierarchyModel.getParent(root)).toBeUndefined();
     expect(hierarchyModel.getParent(child)).toBe(root);
@@ -286,9 +285,9 @@ describe('HierarchyModel', () => {
             item: {},
             items: [],
           },
-          dataModel = new DataModel(root),
-          observableModel = new ObservableModel(),
-          hierarchyModel = new HierarchyModel(dataModel, observableModel);
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          hierarchyModel = new t.HierarchyModel(dataModel, observableModel);
 
     expect(hierarchyModel.getParent(child)).toBeUndefined();
     expect(hierarchyModel.getParent(child.children[0])).toBeUndefined();
@@ -305,9 +304,9 @@ describe('HierarchyModel', () => {
           root: any = {
             items: [ child3 ]
           },
-          dataModel = new DataModel(root),
-          observableModel = new ObservableModel(),
-          hierarchyModel = new HierarchyModel(dataModel, observableModel);
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          hierarchyModel = new t.HierarchyModel(dataModel, observableModel);
 
     expect(hierarchyModel.getLineage(root)).toEqual([ root ]);
     expect(hierarchyModel.getLowestCommonAncestor(root, root)).toBe(root);
@@ -327,10 +326,7 @@ describe('SelectionModel', () => {
           root: any = {
             items: [ child3 ]
           },
-          dataModel = new DataModel(root),
-          observableModel = new ObservableModel(),
-          hierarchyModel = new HierarchyModel(dataModel, observableModel),
-          selectionModel = new SelectionModel(hierarchyModel);
+          selectionModel = new t.SelectionModel();
 
     selectionModel.set(root);
     expect(selectionModel.contents()).toEqual([ root ]);
@@ -348,7 +344,215 @@ describe('SelectionModel', () => {
   });
 });
 
+describe('selection adjustment functions', () => {
+  test('isAncestorSelected', () => {
+    const child1 = {},
+          child2 = {},
+          child3 = { items: [ child1, child2 ] },
+          root: any = {
+            items: [ child3 ]
+          },
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          hierarchyModel = new t.HierarchyModel(dataModel, observableModel),
+          selectionModel = new t.SelectionModel();
+
+    selectionModel.set(root);
+    expect(t.isAncestorSelected(root, selectionModel, hierarchyModel)).toBe(true);
+    expect(t.isAncestorSelected(child1, selectionModel, hierarchyModel)).toBe(true);
+
+    selectionModel.set(child3);
+    expect(t.isAncestorSelected(root, selectionModel, hierarchyModel)).toBe(false);
+    expect(t.isAncestorSelected(child1, selectionModel, hierarchyModel)).toBe(true);
+    expect(t.isAncestorSelected(child3, selectionModel, hierarchyModel)).toBe(true);
+  });
+  test('reduceSelection', () => {
+    const child1 = {},
+          child2 = {},
+          child3 = { items: [ child1, child2 ] },
+          root: any = {
+            items: [ child3 ]
+          },
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          hierarchyModel = new t.HierarchyModel(dataModel, observableModel),
+          selectionModel = new t.SelectionModel();
+
+    selectionModel.set([ child1, child2, child3 ]);
+    t.reduceSelection(selectionModel, hierarchyModel)
+    expect(selectionModel.contents()).toEqual([ child3 ]);
+  });
+});
+
+// describe('TransactionModel', () => {
+//   test('events', () => {
+
+//   const transactionModel = new t.TransactionModel()
+//   test.addHandler('transactionBegan', function(transaction) {
+//     QUnit.assert.ok(!started);
+//     QUnit.assert.ok(test.transaction);
+//     started = transaction;
+//   });
+//   test.addHandler('transactionEnding', function(transaction) {
+//     QUnit.assert.ok(started && !ending && !ended);
+//     ending = transaction;
+//   });
+//   test.addHandler('transactionEnded', function(transaction) {
+//     QUnit.assert.ok(started && ending && !ended);
+//     QUnit.assert.ok(!test.transaction);
+//     ended = transaction;
+//   });
+
+
+//     let transactions = 0,
+//         received = new Array<t.Change>();
+//     const observableModel = new t.ObservableModel(),
+//           onTransactionEnded = (arg: t.Transaction) => { received.push(arg), transactions++; },
+//           onValueChange = (arg: t.Change) =>  { received.push(arg); valueChanges++; },
+//           onInsertElement = (arg: t.Change) => { received.push(arg); elementsInserted++; },
+//           onRemoveElement = (arg: t.Change) => { received.push(arg); elementsRemoved++; };
+//     const root: any = {
+//             val: 'foo',
+//             child: {
+//               val: 'bar',
+//             },
+//             children: [],
+//           },
+//           child2: any = {};
+
+//     observableModel.addHandler('changed', onChange);
+//     observableModel.addHandler('valueChanged', onValueChange);
+//     observableModel.changeValue(root.child, 'val', 'baz');
+//     expect(changes).toBe(1);
+//     expect(valueChanges).toBe(1);
+
+//     observableModel.addHandler('elementInserted', onInsertElement);
+//     observableModel.insertElement(root, 'children', 0, child2);
+//     expect(changes).toBe(2);
+//     expect(valueChanges).toBe(1);
+//     expect(elementsInserted).toBe(1);
+//     expect(elementsRemoved).toBe(0);
+
+//     observableModel.addHandler('elementRemoved', onRemoveElement);
+//     expect(observableModel.removeElement(root, 'children', 0)).toBe(child2);
+//     expect(changes).toBe(3);
+//     expect(valueChanges).toBe(1);
+//     expect(elementsInserted).toBe(1);
+//     expect(elementsRemoved).toBe(1);
+//   });
+// });
+
 /*
+QUnit.test("transactionModel events", function() {
+  const model = {
+    root: {},
+  };
+  const test = dataModels.transactionModel.extend(model);
+  let started, ending, ended;
+  test.addHandler('transactionBegan', function(transaction) {
+    QUnit.assert.ok(!started);
+    QUnit.assert.ok(test.transaction);
+    started = transaction;
+  });
+  test.addHandler('transactionEnding', function(transaction) {
+    QUnit.assert.ok(started && !ending && !ended);
+    ending = transaction;
+  });
+  test.addHandler('transactionEnded', function(transaction) {
+    QUnit.assert.ok(started && ending && !ended);
+    QUnit.assert.ok(!test.transaction);
+    ended = transaction;
+  });
+
+  QUnit.assert.ok(!test.transaction);
+  test.beginTransaction('test trans');
+  QUnit.assert.ok(started);
+  QUnit.assert.deepEqual(started.name, 'test trans');
+  QUnit.assert.ok(test.transaction);
+  QUnit.assert.deepEqual(test.transaction.name, 'test trans');
+
+  test.endTransaction();
+  QUnit.assert.ok(!test.transaction);
+  QUnit.assert.ok(ending);
+  QUnit.assert.ok(ended);
+
+  let didUndo;
+  test.addHandler('didUndo', function(transaction) {
+    QUnit.assert.ok(!didUndo);
+    didUndo = transaction;
+  });
+  test.undo(ended);
+  QUnit.assert.deepEqual(didUndo, ended);
+
+  let didRedo;
+  test.addHandler('didRedo', function(transaction) {
+    QUnit.assert.ok(!didRedo);
+    didRedo = transaction;
+  });
+  test.redo(ended);
+  QUnit.assert.deepEqual(didRedo, ended);
+});
+
+QUnit.test("transactionModel transaction", function() {
+  const model = {
+    root: {
+      prop1: 'foo',
+      array: [],
+    },
+  };
+  const test = dataModels.transactionModel.extend(model);
+  let ended;
+  test.addHandler('transactionEnded', function(transaction) {
+    ended = transaction;
+  });
+
+  test.beginTransaction('test trans');
+  model.root.prop1 = 'bar';
+  model.observableModel.onValueChanged(model.root, 'prop1', 'foo');
+  model.root.array.push('a');
+  model.observableModel.onElementInserted(model.root, 'array', 0);
+  model.root.array.push('b');
+  model.observableModel.onElementInserted(model.root, 'array', 1);
+  model.root.array.push('c');
+  model.observableModel.onElementInserted(model.root, 'array', 2);
+  model.root.array.splice(1, 1);  // remove middle element.
+  model.observableModel.onElementRemoved(model.root, 'array', 1, 'b');
+  QUnit.assert.ok(!ended);
+  test.endTransaction();
+  QUnit.assert.ok(ended);
+  test.undo(ended);
+  QUnit.assert.deepEqual(model.root.prop1, 'foo');
+  QUnit.assert.deepEqual(model.root.array, []);
+  test.redo(ended);
+  QUnit.assert.deepEqual(model.root.prop1, 'bar');
+  QUnit.assert.deepEqual(model.root.array, [ 'a', 'c' ]);
+});
+
+QUnit.test("transactionModel cancel", function() {
+  const model = {
+    root: {},
+  };
+  model.prop1 = 'foo';
+  const test = dataModels.transactionModel.extend(model);
+  let ending, canceled;
+  test.addHandler('transactionEnding', function(transaction) {
+    QUnit.assert.ok(!ending);
+    ending = transaction;
+    test.cancelTransaction();
+  });
+  test.addHandler('transactionCanceled', function(transaction) {
+    QUnit.assert.ok(ending);
+    canceled = transaction;
+  });
+
+  test.beginTransaction('test trans');
+  model.prop1 = 'bar';
+  model.observableModel.onValueChanged(model, 'prop1', 'foo');
+  QUnit.assert.ok(!ending && !canceled);
+  test.endTransaction();
+  QUnit.assert.ok(ending && canceled);
+  QUnit.assert.deepEqual(model.prop1, 'foo');
+});
 
 
 
