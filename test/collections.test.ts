@@ -24,7 +24,7 @@ describe('LinkedList', () => {
     expect(list.empty());
     expect(stringify(list)).toBe('');
   });
-  test('pushBack', () => {
+  test('pushBack, popBack', () => {
     const list = new LinkedList(),
           node1 = list.pushBack('a');
     expect(list.empty()).not.toBe(true);
@@ -36,8 +36,11 @@ describe('LinkedList', () => {
     expect(list.back()).toBe(node2);
     expect(list.length()).toBe(2);
     expect(stringify(list)).toBe('ab');
+    expect(list.popBack()).toBe(node2);
+    expect(list.popBack()).toBe(node1);
+    expect(list.popBack()).toBeUndefined();
   });
-  test('pushFront', () => {
+  test('pushFront, popFront', () => {
     const list = new LinkedList(),
           node1 = list.pushFront('a');
     expect(list.empty()).not.toBe(true);
@@ -49,6 +52,9 @@ describe('LinkedList', () => {
     expect(list.back()).toBe(node1);
     expect(list.length()).toBe(2);
     expect(stringify(list)).toBe('ba');
+    expect(list.popFront()).toBe(node2);
+    expect(list.popFront()).toBe(node1);
+    expect(list.popFront()).toBeUndefined();
   });
   test('insertAfter', () => {
     const list = new LinkedList(),
@@ -138,7 +144,7 @@ describe('Queue', () => {
     expect(queue.dequeue()).toBeUndefined();
   });
   test('enqueue and dequeue', () => {
-    const queue = new Queue();
+    const queue = new Queue(3);
     expect(queue.enqueue(1)).toBe(queue);
     expect(queue.enqueue(2)).toBe(queue);
     expect(queue.enqueue(3)).toBe(queue);
@@ -173,7 +179,9 @@ function pqCompareFn(a: number, b: number) {
 function pqInOrder(queue: PriorityQueue<number>) : string {
   const result = new Array<number>();
   while (!queue.empty()) {
-    result.push(queue.pop());
+    const item = queue.pop();
+    if (item !== undefined)
+      result.push(item);
   }
   return result.toString();
 }
@@ -183,7 +191,7 @@ describe('PriorityQueue', () => {
     const queue = new PriorityQueue(pqCompareFn);
     expect(queue.length()).toBe(0);
     expect(queue.empty());
-    expect(() => queue.pop()).toThrow(Error);
+    expect(queue.pop()).toBeUndefined();
     expect(pqInOrder(queue)).toBe([].toString());
   });
   test('assign', () => {
@@ -219,9 +227,10 @@ describe('PriorityQueue', () => {
     expect(queue.length()).toBe(4);
     expect(queue.empty()).toBe(false);
     expect(pqInOrder(queue)).toBe([4, 3, 1, 1].toString());
+    expect(queue.pop()).toBeUndefined();
+    expect(queue.front()).toBeUndefined();
   });
 });
-
 
 describe('SelectionSet', () => {
   test('constructor', () => {
@@ -299,9 +308,12 @@ describe('DisjointSet', () => {
           d = disjointSet.makeSet('d');
     expect(disjointSet.find(a)).toBe(a);
     expect(disjointSet.find(a)).not.toBe(b);
+    disjointSet.union(a, a);
+    expect(disjointSet.find(a)).toBe(a);
     disjointSet.union(a, b);
     expect(disjointSet.find(b)).toBe(a);
-    disjointSet.union(a, c);
+    disjointSet.union(c, a);
+    expect(disjointSet.find(a)).toBe(a);
     expect(disjointSet.find(b)).toBe(a);
     expect(disjointSet.find(c)).toBe(a);
     expect(disjointSet.find(d)).not.toBe(a);

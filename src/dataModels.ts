@@ -9,7 +9,6 @@ export type PropertyVisitor = (item: object, attr: DataAttr) => void;
 // TODO Make DataModel and the rest generic with T = any
 // TODO SelectionModel tests.
 // TODO more ReferenceModel tests.
-// TODO move SelectionModel out of TransactionModel.
 
 //------------------------------------------------------------------------------
 
@@ -337,17 +336,17 @@ export class ReferenceModel {
 //------------------------------------------------------------------------------
 
 // HierarchyModel
+const parent_ = Symbol('HierarchyModel.parent');
 
 export class HierarchyModel {
-  private parent = Symbol('HierarchicalModel.parent');
   private dataModel_: DataModel;
 
   getParent(item: any) : any {
-    return item[this.parent];
+    return item[parent_];
   }
 
   private setParent(child: any, parent: any) {
-    child[this.parent] = parent;
+    child[parent_] = parent;
   }
 
   getLineage(item: any) {
@@ -580,205 +579,447 @@ export class Transaction {
   }
 }
 
-type TransactionEvent = 'transactionBegan' | 'transactionEnded' | 'transactionCancelled' |
-                        'didUndo' | 'didRedo';
+type TransactionEvent = 'transactionBegan' | 'transactionEnding' | 'transactionEnded' |
+                        'transactionCancelled' | 'didUndo' | 'didRedo';
 
 export class TransactionModel extends EventBase<Transaction, TransactionEvent> {
-  private transaction?: Transaction;
+  private transaction_?: Transaction;
   private snapshots: Map<any, object> = new Map();
   private observableModel: ObservableModel;
-  private selectionModel: SelectionModel;
-  private startingSelection: Array<any>;
 
-    // Notifies observers that a transaction has started.
-    beginTransaction(name: string) {
-      const transaction = new Transaction(name);
+  // Notifies observers that a transaction has started.
+  beginTransaction(name: string) {
+    const transaction = new Transaction(name);
 
-      this.transaction = transaction;
-      this.snapshots = new Map();
-      this.onBeginTransaction(transaction);
-      super.onEvent('transactionBegan', transaction);
+    this.transaction_ = transaction;
+    this.snapshots = new Map();
+    this.onBeginTransaction(transaction);
+    super.onEvent('transactionBegan', transaction);
+  }
+
+  // Returns the current transaction, or undefined if not in a transaction.
+  transaction() : Transaction | undefined { return this.transaction_; }
+
+  // Notifies observers that a transaction is ending. Observers should now
+  // do any adjustments to make data valid, or cancel the transaction if
+  // the data is in an invalid state.
+  endTransaction() {
+    const transaction = this.transaction_;
+    if (!transaction) return;
+    super.onEvent('transactionEnding', transaction);
+    this.onEndTransaction(transaction);
+    this.snapshots.clear();
+    super.onEvent('transactionEnded', transaction);
+  }
+
+  // Notifies observers that a transaction was canceled and its operations
+  // rolled back.
+  cancelTransaction() {
+    const transaction = this.transaction_;
+    if (!transaction) return;
+    this.undo(transaction);
+    this.onCancelTransaction(transaction);
+    super.onEvent('transactionCancelled', transaction);
+  }
+
+  // Undoes the operations in the transaction.
+  undo(transaction: Transaction) {
+    // Roll back operations.
+    const ops = transaction.ops, length = ops.length;
+    for (let i = length - 1; i >= 0; i--) {
+      ops[i].undo();
     }
+    // TODO consider raising transaction ended event instead.
+    super.onEvent('didUndo', transaction);
+  }
 
-    // Notifies observers that a transaction is ending. Observers should now
-    // do any adjustments to make data valid, or cancel the transaction if
-    // the data is in an invalid state.
-    endTransaction() {
-      const transaction = this.transaction;
-      if (!transaction) return;
-      this.onEndTransaction(transaction);
-      this.snapshots.clear();
-      super.onEvent('transactionEnded', transaction);
+  // Redoes the operations in the transaction.
+  redo(transaction: Transaction) {
+    // Roll forward changes.
+    const ops = transaction.ops, length = ops.length;
+    for (let i = 0; i < length; i++) {
+      ops[i].redo();
     }
+    // TODO consider raising transaction ended event instead.
+    super.onEvent('didRedo', transaction);
+  }
 
-    // Notifies observers that a transaction was canceled and its operations
-    // rolled back.
-    cancelTransaction() {
-      const transaction = this.transaction;
-      if (!transaction) return;
-      this.undo(transaction);
-      this.onCancelTransaction(transaction);
-      super.onEvent('transactionCancelled', transaction);
-    }
+  getSnapshot(item: object) : any {
+    const snapshots = this.snapshots;
+    if (!snapshots)
+      return;
+    const changedItem = snapshots.get(item);
+    return changedItem;
+  }
 
-    // Undoes the operations in the transaction.
-    undo(transaction: Transaction) {
-      // Roll back operations.
-      const ops = transaction.ops, length = ops.length;
-      for (let i = length - 1; i >= 0; i--) {
-        ops[i].undo();
-      }
-      // TODO consider raising transaction ended event instead.
-      super.onEvent('didUndo', transaction);
-    }
+  private onBeginTransaction(transaction: Transaction) {
+  }
 
-    // Redoes the operations in the transaction.
-    redo(transaction: Transaction) {
-      // Roll forward changes.
-      const ops = transaction.ops, length = ops.length;
-      for (let i = 0; i < length; i++) {
-        ops[i].redo();
-      }
-      // TODO consider raising transaction ended event instead.
-      super.onEvent('didRedo', transaction);
-    }
+  private onEndTransaction(transaction: Transaction) {
+    this.snapshots.clear();
+    this.transaction_ = undefined;
+  }
 
-    getSnapshot(item: object) : any {
+  private onCancelTransaction(transaction: Transaction) {
+    this.snapshots.clear();
+    this.transaction_ = undefined;
+  }
+
+  recordChange_(change: Change) {
+    const op = new ChangeOperation(change, this.observableModel);
+    this.transaction_!.ops.push(op);
+  }
+
+  onChanged_(change: Change) {
+    if (!this.transaction_)
+      return;
+
+    const item = change.item, attr = change.attr;
+
+    if (change.type !== 'valueChanged') {
+      // Record insert and remove element changes.
+      this.recordChange_(change);
+    } else {
+      // Coalesce value changes. Only record them the first time we observe
+      // the (item, attr) change.
       const snapshots = this.snapshots;
-      if (!snapshots)
-        return;
-      const changedItem = snapshots.get(item);
-      return changedItem;
-    }
-
-    onBeginTransaction(transaction: Transaction) {
-      const selectionModel = this.selectionModel;
-      if (!selectionModel)
-        return;
-      this.startingSelection = selectionModel.contents();
-    }
-
-    onEndTransaction(transaction: Transaction) {
-      const selectionModel = this.selectionModel;
-      if (!selectionModel)
-        return;
-      const startingSelection = this.startingSelection;
-      let endingSelection = selectionModel.contents();
-      if (startingSelection.length === endingSelection.length &&
-          startingSelection.every(function(element, i) {
-            return element === endingSelection[i];
-          })) {
-        endingSelection = startingSelection;
+      let snapshot: any = snapshots.get(item);
+      if (snapshot === undefined) {
+        // The snapshot collects the attribute changes for its corresponding item.
+        snapshot = Object.create(item);
+        snapshots.set(item, snapshot);
       }
-      const op = new SelectionOperation(selectionModel, startingSelection, endingSelection);
-      transaction.ops.push(op);
-      this.startingSelection = [];
+      // Capture the old value on the snapshot only if it hasn't already been set.
+      if (!snapshot.hasOwnProperty(attr)) {
+        snapshot[attr] = change.oldValue;
+        this.recordChange_(change);
+      }
+    }
+  }
+
+  constructor(observableModel: ObservableModel) {
+    super();
+    this.observableModel = observableModel;
+    observableModel.addHandler('changed', this.onChanged_.bind(this));
+  }
+}
+
+//------------------------------------------------------------------------------
+
+export class UndoRedoModel {
+  private done: Array<Transaction> = [];
+  private undone: Array<Transaction> = [];
+  private transactionModel: TransactionModel;
+  private selectionModel?: SelectionModel;
+  private startingSelection: Array<any> = [];
+
+  getRedo() {
+    const length = this.undone.length;
+    return length > 0 ? this.undone[length - 1] : null;
+  }
+
+  getUndo() {
+    const length = this.done.length;
+    return length > 0 ? this.done[length - 1] : null;
+  }
+
+  redo() {
+    const transaction = this.getRedo();
+    if (transaction) {
+      this.transactionModel.redo(transaction);
+      this.done.push(this.undone.pop()!);
+    }
+  }
+
+  undo() {
+    const transaction = this.getUndo();
+    if (transaction) {
+      this.transactionModel.undo(transaction);
+      this.undone.push(this.done.pop()!);
+    }
+  }
+
+  onTransactionBegan_(transaction: Transaction) {
+    const selectionModel = this.selectionModel;
+    if (!selectionModel)
+      return;
+    this.startingSelection = selectionModel.contents();
+  }
+
+  onTransactionEnding_(transaction: Transaction) {
+    const selectionModel = this.selectionModel;
+    if (!selectionModel)
+      return;
+    const startingSelection = this.startingSelection || [];
+    let endingSelection = selectionModel.contents();
+    if (startingSelection.length === endingSelection.length &&
+        startingSelection.every(function(element, i) {
+          return element === endingSelection[i];
+        })) {
+      endingSelection = startingSelection;
+    }
+    const op = new SelectionOperation(selectionModel, startingSelection, endingSelection);
+    transaction.ops.push(op);
+    this.startingSelection = [];
+  }
+
+  onTransactionEnded_(transaction: Transaction) {
+    this.startingSelection = [];
+    if (this.undone.length)
+      this.undone = [];
+    this.done.push(transaction);
+  }
+
+  onTransactionCancelled_(transaction: Transaction) {
+    this.startingSelection = [];
+  }
+
+  constructor(transactionModel: TransactionModel, selectionModel?: SelectionModel) {
+    this.transactionModel = transactionModel;
+    this.selectionModel = selectionModel;
+    transactionModel.addHandler('transactionBegan', this.onTransactionBegan_.bind(this));
+    transactionModel.addHandler('transactionEnding', this.onTransactionEnding_.bind(this));
+    transactionModel.addHandler('transactionEnded', this.onTransactionEnded_.bind(this));
+    transactionModel.addHandler('transactionCancelled', this.onTransactionCancelled_.bind(this));
+  }
+}
+
+//------------------------------------------------------------------------------
+
+class InstancingModel {
+  private dataModel: DataModel;
+  private referenceModel: ReferenceModel;
+
+  clone(item: any, map: Map<number, any>) {
+    const self = this, dataModel = this.dataModel;
+    // Return any primitive values without cloning.
+    if (!dataModel.isItem(item))
+      return item;
+
+    // Use constructor() to properly clone arrays, sets, maps, etc.
+    const copy = item.constructor();
+    dataModel.visitProperties(item, function(item: any, attr: DataAttr) {
+      copy[attr] = self.clone(item[attr], map);
+    });
+    // Assign unique id after cloning all properties.
+    if (!Array.isArray(copy)) {
+      this.referenceModel.assignId(copy);
+      dataModel.initialize(copy);
+      if (map) {
+        const id = dataModel.getId(item);
+        map.set(id, copy);
+      }
+    }
+    return copy;
+  }
+
+  cloneGraph(items: Array<any>, map: Map<number, any>) {
+    const dataModel = this.dataModel,
+          referenceModel = this.referenceModel,
+          copies: any[] = [];
+    items.forEach(function(item) {
+      copies.push(this.clone(item, map));
+    }, this);
+    copies.forEach(function(copy: any) {
+      dataModel.visitSubtree(copy, function(copy: any) {
+        if (Array.isArray(copy))
+          return;
+        for (let attr in copy) {
+          if (referenceModel.isReference(copy, attr)) {
+            const originalId: number = copy[attr],
+                  newCopy = map.get(originalId);
+            if (newCopy) {
+              const newId = dataModel.getId(newCopy);
+              copy[attr] = newId;
+            }
+          }
+        }
+      });
+    }, this);
+    return copies;
+  }
+
+  // Strict deep equality (no working up prototype chain.)
+  isomorphic(item1: any, item2: any, map: Map<number, number>) {
+    const dataModel = this.dataModel,
+          referenceModel = this.referenceModel;
+
+    // The first pass matches all items and properties except references. It
+    // builds the id mapping for the second pass.
+    function firstPass(item1: any, item2: any) {
+      if (!dataModel.isItem(item1) || !dataModel.isItem(item2))
+        return item1 === item2;
+
+      const keys1 = Object.keys(item1),
+            keys2 = Object.keys(item2);
+      if (keys1.length !== keys2.length)
+        return false;
+      for (let k of keys1) {
+        if (!item2.hasOwnProperty(k))
+          return false;
+        // Skip id's.
+        if (k === 'id')
+          continue;
+        // Skip reference properties.
+        if (referenceModel.isReference(item1, k) &&
+            referenceModel.isReference(item2, k)) {
+          continue;
+        }
+        if (!firstPass(item1[k], item2[k])) {
+          return false;
+        }
+      }
+
+      // Add item1 -> item2 id mapping.
+      const id1 = dataModel.getId(item1),
+            id2 = dataModel.getId(item2);
+      if (id1 && id2)
+        map.set(id1, id2);
+
+      return true;
     }
 
-    onCancelTransaction(transaction: Transaction) {
-      const selectionModel = this.selectionModel;
-      if (!selectionModel)
+    // The second pass makes sure all reference properties of items are
+    // to the same item, or isomorphic items.
+    function secondPass(item1: any, item2: any) {
+      if (dataModel.isItem(item1) && dataModel.isItem(item2)) {
+        const keys1 = Object.keys(item1),
+              keys2 = Object.keys(item2);
+        for (let k of keys1) {
+          // Check reference properties.
+          if (referenceModel.isReference(item1, k) &&
+              referenceModel.isReference(item2, k)) {
+            // Check for the same external reference, or to an isomorphic
+            // internal reference.
+            if (item1[k] !== item2[k] &&
+                map.get(item1[k]) !== item2[k]) {
+              return false;
+            }
+          }
+        }
+      }
+      return true;
+    }
+
+    return firstPass(item1, item2) &&
+           secondPass(item1, item2);
+  }
+
+  constructor(dataModel: DataModel, referenceModel: ReferenceModel) {
+    this.dataModel = dataModel;
+    this.referenceModel = referenceModel;
+  }
+}
+
+//------------------------------------------------------------------------------
+
+const _x = Symbol('TranslationModel.x');
+const _y = Symbol('TranslationModel.y');
+
+class TranslationModel {
+  private dataModel: DataModel;
+  private observableModel: ObservableModel;
+  private hierarchyModel: HierarchyModel;
+
+    // Getter functions which determine translation parameters. Override to
+    // fit the model.
+    getX(item: any) {
+      return item.x;
+    }
+
+    getY(item: any) {
+      return item.y;
+    }
+
+    hasTranslation(item: any) {
+      return (typeof this.getX(item) === 'number') &&
+             (typeof this.getY(item) === 'number');
+    }
+
+    globalX(item: any) {
+      return item[_x];
+    }
+
+    globalY(item: any) {
+      return item[_y];
+    }
+
+    // Gets the translation to move an item from its current parent to
+    // newParent. Handles the cases where current parent or newParent are null.
+    getToParent(item: any, newParent: any) {
+      const oldParent = this.hierarchyModel.getParent(item);
+      let dx = 0, dy = 0;
+      if (oldParent) {
+        dx += this.globalX(oldParent);
+        dy += this.globalY(oldParent);
+      }
+      if (newParent) {
+        dx -= this.globalX(newParent);
+        dy -= this.globalY(newParent);
+      }
+      return { x: dx, y: dy };
+    }
+
+    updateTranslation(item: any) {
+      if (!this.hasTranslation(item))
         return;
-      this.startingSelection = [];
+
+      const hierarchyModel = this.hierarchyModel,
+            x = this.getX(item), y = this.getY(item);
+      let parent = hierarchyModel.getParent(item);
+      while (parent && !this.hasTranslation(parent))
+        parent = hierarchyModel.getParent(parent);
+
+      if (parent) {
+        item[_x] = x + parent[_x];
+        item[_y] = y + parent[_y];
+      } else {
+        item[_x] = x;
+        item[_y] = y;
+      }
     }
 
-    recordChange_(change: Change) {
-      const op = new ChangeOperation(change, this.observableModel);
-      this.transaction!.ops.push(op);
+    update(item: any) {
+      const self = this;
+      this.updateTranslation(item);
+      this.dataModel.visitChildren(item, function(child) {
+        self.updateTranslation(child);
+      });
     }
 
     onChanged_(change: Change) {
-      if (!this.transaction)
-        return;
-
-      const item = change.item, attr = change.attr;
-
-      if (change.type !== 'valueChanged') {
-        // Record insert and remove element changes.
-        this.recordChange_(change);
-      } else {
-        // Coalesce value changes. Only record them the first time we observe
-        // the (item, attr) change.
-        const snapshots = this.snapshots;
-        let snapshot: any = snapshots.get(item);
-        if (snapshot === undefined) {
-          // The snapshot collects the attribute changes for its corresponding item.
-          snapshot = Object.create(item);
-          snapshots.set(item, snapshot);
+      const dataModel = this.dataModel,
+            item: any = change.item, attr: DataAttr = change.attr;
+      switch (change.type) {
+        case 'valueChanged': {
+          const newValue = item[attr];
+          if (dataModel.isItem(newValue))
+            this.update(newValue);
+          else
+            this.update(item);
+          break;
         }
-        // Capture the old value on the snapshot only if it hasn't already been set.
-        if (!snapshot.hasOwnProperty(attr)) {
-          snapshot[attr] = change.oldValue;
-          this.recordChange_(change);
+        case 'elementInserted': {
+          const newValue = item[attr][change.index];
+          if (dataModel.isItem(newValue))
+            this.update(newValue);
+          break;
         }
+        case 'elementRemoved':
+          break;
       }
     }
 
-    constructor(observableModel: ObservableModel, selectionModel: SelectionModel) {
-      super();
-      this.observableModel = observableModel;
-      observableModel.addHandler('changed',
-                                 change => this.onChanged_(change));
-      this.selectionModel = selectionModel;
-    }
+  constructor(
+      dataModel: DataModel, observableModel: ObservableModel,hierarchyModel: HierarchyModel) {
+    this.dataModel = dataModel;
+    this.observableModel = observableModel;
+    this.hierarchyModel = hierarchyModel;
+
+    // Track changes to x and y, and initialize new items.
+    observableModel.addHandler('changed', change => this.onChanged_.bind(this));
+
+    // Make sure new items have translations.
+    dataModel.addInitializer(item => this.updateTranslation.bind(this));
+  }
 }
-/*
-//------------------------------------------------------------------------------
-
-const transactionHistory = (function() {
-  const proto = {
-    getRedo: function() {
-      const length = this.undone.length;
-      return length > 0 ? this.undone[length - 1] : null;
-    },
-
-    getUndo: function() {
-      const length = this.done.length;
-      return length > 0 ? this.done[length - 1] : null;
-    },
-
-    redo: function() {
-      const transaction = this.getRedo();
-      if (transaction) {
-        this.model.transactionModel.redo(transaction);
-        this.done.push(this.undone.pop());
-      }
-    },
-
-    undo: function() {
-      const transaction = this.getUndo();
-      if (transaction) {
-        this.model.transactionModel.undo(transaction);
-        this.undone.push(this.done.pop());
-      }
-    },
-
-    onTransactionEnded_: function(transaction) {
-      if (this.undone.length)
-        this.undone = [];
-      this.done.push(transaction);
-    },
-  }
-
-  function extend(model) {
-    if (model.transactionHistory)
-      return model.transactionHistory;
-
-    transactionModel.extend(model);
-
-    const instance = Object.create(proto);
-    instance.model = model;
-    instance.done = [];
-    instance.undone = [];
-    model.transactionModel.addHandler('transactionEnded',
-                                      transaction => instance.onTransactionEnded_(transaction));
-
-    model.transactionHistory = instance;
-    return instance;
-  }
-
-  return {
-    extend: extend,
-  };
-})();
-*/

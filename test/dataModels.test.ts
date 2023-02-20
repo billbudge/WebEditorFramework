@@ -384,63 +384,45 @@ describe('selection adjustment functions', () => {
   });
 });
 
-// describe('TransactionModel', () => {
-//   test('events', () => {
+describe('TransactionModel', () => {
+  test('events', () => {
 
-//   const transactionModel = new t.TransactionModel()
-//   test.addHandler('transactionBegan', function(transaction) {
-//     QUnit.assert.ok(!started);
-//     QUnit.assert.ok(test.transaction);
-//     started = transaction;
-//   });
-//   test.addHandler('transactionEnding', function(transaction) {
-//     QUnit.assert.ok(started && !ending && !ended);
-//     ending = transaction;
-//   });
-//   test.addHandler('transactionEnded', function(transaction) {
-//     QUnit.assert.ok(started && ending && !ended);
-//     QUnit.assert.ok(!test.transaction);
-//     ended = transaction;
-//   });
+    const observableModel = new t.ObservableModel(),
+          transactionModel = new t.TransactionModel(observableModel);
+    let started: t.Transaction | undefined = undefined,
+        ending: t.Transaction | undefined = undefined,
+        ended: t.Transaction | undefined = undefined;
 
 
-//     let transactions = 0,
-//         received = new Array<t.Change>();
-//     const observableModel = new t.ObservableModel(),
-//           onTransactionEnded = (arg: t.Transaction) => { received.push(arg), transactions++; },
-//           onValueChange = (arg: t.Change) =>  { received.push(arg); valueChanges++; },
-//           onInsertElement = (arg: t.Change) => { received.push(arg); elementsInserted++; },
-//           onRemoveElement = (arg: t.Change) => { received.push(arg); elementsRemoved++; };
-//     const root: any = {
-//             val: 'foo',
-//             child: {
-//               val: 'bar',
-//             },
-//             children: [],
-//           },
-//           child2: any = {};
+    transactionModel.addHandler('transactionBegan', function(transaction) {
+      expect(started).toBeUndefined();
+      expect(transactionModel.transaction()).toBe(transaction);
+      started = transaction;
+    });
+    transactionModel.addHandler('transactionEnding', function(transaction) {
+      expect(ending).toBeUndefined();
+      expect(started).toBe(transaction);
+      ending = transaction;
+    });
+    transactionModel.addHandler('transactionEnded', function(transaction) {
+      expect(ended).toBeUndefined();
+      expect(started).toBe(transaction);
+      expect(ending).toBe(transaction);
+      ended = transaction;
+    });
 
-//     observableModel.addHandler('changed', onChange);
-//     observableModel.addHandler('valueChanged', onValueChange);
-//     observableModel.changeValue(root.child, 'val', 'baz');
-//     expect(changes).toBe(1);
-//     expect(valueChanges).toBe(1);
+    expect(transactionModel.transaction()).toBeUndefined();
+    transactionModel.beginTransaction('test');
+    expect(started).toBe(transactionModel.transaction());
+    expect(started!.name).toBe('test');
 
-//     observableModel.addHandler('elementInserted', onInsertElement);
-//     observableModel.insertElement(root, 'children', 0, child2);
-//     expect(changes).toBe(2);
-//     expect(valueChanges).toBe(1);
-//     expect(elementsInserted).toBe(1);
-//     expect(elementsRemoved).toBe(0);
+    transactionModel.endTransaction();
+    expect(transactionModel.transaction()).toBeUndefined();
+    expect(started).toBe(ending);
+    expect(started).toBe(ended);
+  });
 
-//     observableModel.addHandler('elementRemoved', onRemoveElement);
-//     expect(observableModel.removeElement(root, 'children', 0)).toBe(child2);
-//     expect(changes).toBe(3);
-//     expect(valueChanges).toBe(1);
-//     expect(elementsInserted).toBe(1);
-//     expect(elementsRemoved).toBe(1);
-//   });
-// });
+});
 
 /*
 QUnit.test("transactionModel events", function() {

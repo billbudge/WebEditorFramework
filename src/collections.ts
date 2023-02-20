@@ -142,32 +142,13 @@ export class LinkedList<T> {
 // headLimit.
 
 export class Queue<T> {
-  constructor() {
-    this.clear();
-  }
   private array: Array<T>;
   private head: number;
+  private sliceMin: number;
 
-  enqueue(item: T) : Queue<T> {
-    this.array.push(item);
-    return this;
-  }
-
-  dequeue() : T | undefined {
-    const headLimit = 1000, // Size limit for unused portion
-          sliceMin = 10;    // Minimum size to discard array
-
-    let result: T | undefined = undefined;
-    if (!this.empty()) {
-      result = this.array[this.head];
-      this.head++;
-      if (this.head >= headLimit
-          || this.head > sliceMin && this.head > this.array.length) {
-        this.array = this.array.slice(this.head);
-        this.head = 0;
-      }
-    }
-    return result;
+  constructor(sliceMin: number = 1000) {
+    this.sliceMin = sliceMin;
+    this.clear();
   }
 
   empty() {
@@ -175,6 +156,30 @@ export class Queue<T> {
   }
   length() : number {
     return this.array.length - this.head;
+  }
+
+  enqueue(item: T) : Queue<T> {
+    this.array.push(item);
+    this.trySlice();
+    return this;
+  }
+
+  dequeue() : T | undefined {
+    let result = undefined;
+    if (!this.empty()) {
+      result = this.array[this.head];
+      this.head++;
+      this.trySlice();
+    }
+    return result;
+  }
+
+  private trySlice() {
+    // Slice the array if there is enough empty space at the front.
+    if (this.head > this.sliceMin) {
+      this.array = this.array.slice(this.head);
+      this.head = 0;
+    }
   }
 
   clear() {
@@ -279,9 +284,9 @@ export class PriorityQueue<T> {
     return this.array.length;
   }
 
-  front() : T {
+  front() : T | undefined {
     if (this.empty())
-      throw new Error('Empty PriorityQueue');
+      return undefined;
 
     return this.array[0];
   }
@@ -293,10 +298,10 @@ export class PriorityQueue<T> {
     this.siftUp();
   }
 
-  pop() : T {
+  pop() : T | undefined {
     const array = this.array;
     if (!array.length)
-      throw new Error('Empty PriorityQueue');
+      return undefined;
     const result = array[0];
     const last:T = array.pop() as T;  // take the last element to avoid a hole in the last generation.
     if (array.length) {
