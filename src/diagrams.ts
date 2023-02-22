@@ -7,6 +7,13 @@ interface Point {
   y: number;
 }
 
+interface Rectangle {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 export function roundRectPath(
     x: number, y: number, width: number, height: number, r: number, ctx: CanvasRenderingContext2D) {
   r = Math.min(r, width * 0.5, height * 0.5);
@@ -521,7 +528,6 @@ interface CanvasLayer {
   onBeginDrag(controller: CanvasController) : void;
   onDrag(controller: CanvasController) : void;
   onEndDrag(controller: CanvasController) : void;
-  onDoubleClick(controller: CanvasController): boolean;
   onBeginHover(controller: CanvasController) : boolean;
   onEndHover(controller: CanvasController) : void;
   // TODO remove these, since they are document events.
@@ -531,19 +537,15 @@ interface CanvasLayer {
 
 class CanvasController {
   private canvas: HTMLCanvasElement;
-  private theme: Theme;
   private ctx: CanvasRenderingContext2D;
-  private canvasX: number;
-  private canvasY: number;
-  private canvasWidth: number;
-  private canvasHeight: number;
+  private canvasRect: DOMRect;
   private layers: CanvasLayer[];
   private translation: Point = { x: 0, y: 0 };
   private scale: Point = { x: 1, y: 1 };
   private transform: number[] = [1, 0, 0, 1, 0, 0];
   private inverseTransform: number[] = [1, 0, 0, 1, 0, 0];
   private pointer: Point = { x: 0, y: 0 };
-  private click: Point;
+  private clickPointer: Point;
   private clickOwner: CanvasLayer | CanvasController | undefined;
   private clientX: number;
   private clientY: number;
@@ -605,6 +607,7 @@ class CanvasController {
     function draw() {
       const size = self.getSize();
       ctx.clearRect(0, 0, size.width, size.height);
+      // Draw layers in reverse order.
       for (let i = length - 1; i >= 0; i--) {
         let layer = layers[i];
         if (layer.draw)
@@ -619,7 +622,7 @@ class CanvasController {
     this.initialClientY = e.clientY;
     const self = this,
           alt = (e.button !== 0);
-    this.pointer = this.click = this.getPointerPosition(e);
+    this.pointer = this.clickPointer = this.getPointerPosition(e);
     // this.shiftKeyDown = e.shiftKey;
     // this.cmdKeyDown = e.ctrlKey || e.metaKey;
     // Call layers until one returns true.
@@ -644,7 +647,7 @@ class CanvasController {
     e.preventDefault();
     this.clientX = e.clientX;
     this.clientY = e.clientY;
-    let pointer = this.pointer = this.getPointerPosition(e), click = this.click;
+    let pointer = this.pointer = this.getPointerPosition(e), click = this.clickPointer;
     if (this.clickOwner) {
       let dx = pointer.x - click.x, dy = pointer.y - click.y;
       if (!this.isDragging) {
@@ -680,36 +683,19 @@ class CanvasController {
   // onBeginDrag, onDrag, and onEndDrag.
   moveCanvas() {
     const canvas = this.canvas,
-          newX = this.canvasX + (this.clientX - this.initialClientX),
-          newY = this.canvasY + (this.clientY - this.initialClientY);
+          newX = this.canvasRect.x + (this.clientX - this.initialClientX),
+          newY = this.canvasRect.y + (this.clientY - this.initialClientY);
     canvas.style.left = newX + "px";
     canvas.style.top = newY + "px";
   }
   onBeginDrag() {
-    const rect = this.canvas.getBoundingClientRect();
-    this.canvasX = rect.x;
-    this.canvasY = rect.y;
+    this.canvasRect = this.canvas.getBoundingClientRect();
     this.moveCanvas();
   }
   onDrag() {
     this.moveCanvas();
   }
   onEndDrag() {
-  }
-  onDoubleClick(e: PointerEvent) {
-    const self = this;
-    this.pointer = this.click = this.getPointerPosition(e);
-    let handler: CanvasLayer | undefined;
-    // Call layers until one returns true.
-    this.layers.some(function (layer) {
-      if (!layer.onDoubleClick || !layer.onDoubleClick(self))
-        return false;
-      handler = layer;
-      return true;
-    });
-    this.cancelHover_();
-    this.draw();
-    return handler;
   }
   startHover_() {
     let self = this;
@@ -779,54 +765,50 @@ class CanvasController {
   getSize() {
     return getCanvasSize(this.canvas, this.ctx);
   }
-  setSize(width, height) {
-    this.canvasWidth = width;
-    this.canvasHeight = height;
+  setSize(width: number, height: number) {
+    this.canvasRect.width = width;
+    this.canvasRect.height = height;
     diagrams.setCanvasSize(this.canvas, this.ctx, width, height);
     this.draw();
   }
   onWindowResize() {
-    diagrams.setCanvasSize(this.canvas, this.ctx, this.canvasWidth, this.canvasHeight);
+    diagrams.setCanvasSize(this.canvas, this.ctx, this.canvasRect.width, this.canvasRect.height);
     this.draw();
   }
-  getClientRect() {
+  getClientRect() : DOMRect {
     return this.canvas.getBoundingClientRect();
   }
-  getPointerPosition(e) {
+  getPointerPosition(e: PointerEvent) {
     const rect = this.canvas.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
-  getCurrentPointerPosition() {
+  getCurrentPointerPosition() : Point {
     return this.pointer;
   }
-  getInitialPointerPosition() {
-    return this.click;
+  getClickPointerPosition() : Point {
+    return this.clickPointer;
   }
 
-  constructor(canvas: HTMLCanvasElement, theme: Theme = getDefaultTheme()) {
+  constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
-    this.theme = theme;
+    this.canvasRect = canvas.getBoundingClientRect();
 
-    const self = this;
-    canvas.addEventListener('pointerdown', e => self.onPointerDown(e));
-    canvas.addEventListener('pointermove', e => self.onPointerMove(e));
-    canvas.addEventListener('pointerup', e => self.onPointerUp(e));
-
-    canvas.addEventListener('dblclick', e=> self.onDoubleClick(e));
+    canvas.addEventListener('pointerdown', this.onPointerDown.bind(this));
+    canvas.addEventListener('pointermove', this.onPointerMove.bind(this));
+    canvas.addEventListener('pointerup', this.onPointerUp.bind(this));
   }
   configure(layers: CanvasLayer[]) {
-    layers = layers.slice(0);
-    this.layers = layers;
-    const length = layers.length;
+    this.layers = layers.slice(0);
+    const length = this.layers.length;
     for (let i = 0; i < length; i++) {
-      const layer = layers[i];
+      const layer = this.layers[i];
       if (layer.initialize)
         layer.initialize(this, i);
     }
-    // Layers are presented in draw order, but most loops are hit test order, so
+    // Layers are presented in draw order, but most loops assume hit test order, so
     // reverse the array here.
-    layers.reverse();
+    this.layers.reverse();
   }
 }
 
