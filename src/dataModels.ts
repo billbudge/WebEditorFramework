@@ -196,10 +196,12 @@ export class ObservableModel extends EventBase<Change, ChangeEvents> {
 
 // ReferenceModel
 
+type ReferenceFn = (item: any) => any;
+
 export class ReferenceModel {
   private highestId: number = 0;  // 0 stands for no id.
   private targets_ = new Map<number, object>();
-  private functions_ = new Map<string, Function>();
+  private functions_ = new Map<string, ReferenceFn>();
   private dataModel_: DataModel;
 
   // Gets the object that is referenced by item[attr]. Default is to return
@@ -208,7 +210,7 @@ export class ReferenceModel {
     return item[Symbol.for(attr)] || this.resolveReference(item, attr);
   }
 
-  getReferenceFn(attr: string) {
+  getReferenceFn(attr: string) : ReferenceFn  {
     // this object caches the reference functions, indexed by the symbol.
     let fn = this.functions_.get(attr);
     if (!fn) {

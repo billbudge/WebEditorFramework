@@ -9,6 +9,7 @@
     "allowJs": true,
     "moduleResolution": "node",
   },
-  "modules": ["src/collections.ts", "src/diagrams.ts", "src/geometry.ts", "src/dataModels.ts"],
+  "modules": ["src/collections.ts", "src/diagrams.ts", "src/geometry.ts", "src/dataModels.ts",
+              "examples/statecharts.ts"],
   "files": ["test/collections.test.ts", "test/dataModels.test.ts"],
 }
