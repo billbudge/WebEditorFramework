@@ -316,6 +316,47 @@ describe('HierarchyModel', () => {
     expect(hierarchyModel.getLowestCommonAncestor(child1, child2)).toBe(child3);
     expect(hierarchyModel.getLowestCommonAncestor(child3, child1, root)).toBe(root);
   });
+  test('isAncestorSelected', () => {
+    const child1 = {},
+          child2 = {},
+          child3 = { items: [ child1, child2 ] },
+          root: any = {
+            items: [ child3 ]
+          },
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          hierarchyModel = new t.HierarchyModel(dataModel, observableModel),
+          set: Set<any> = new Set(),
+          has = set.has.bind(set);
+
+    set.add(root);
+    expect(hierarchyModel.isAncestorIncluded(root, has)).toBe(true);
+    expect(hierarchyModel.isAncestorIncluded(child1, has)).toBe(true);
+
+    set.clear();
+    set.add(child3);
+    expect(hierarchyModel.isAncestorIncluded(root, has)).toBe(false);
+    expect(hierarchyModel.isAncestorIncluded(child1, has)).toBe(true);
+    expect(hierarchyModel.isAncestorIncluded(child3, has)).toBe(true);
+  });
+  test('reduceToRoots', () => {
+    const child1 = {},
+          child2 = {},
+          child3 = { items: [ child1, child2 ] },
+          root: any = {
+            items: [ child3 ]
+          },
+          dataModel = new t.DataModel(root),
+          observableModel = new t.ObservableModel(),
+          hierarchyModel = new t.HierarchyModel(dataModel, observableModel),
+          set: Set<any> = new Set(),
+          has = set.has.bind(set);
+
+    set.add(child1);
+    set.add(child2);
+    set.add(child3);
+    expect(hierarchyModel.reduceToRoots([child1, child2, child3], has)).toEqual([ child3 ]);
+  });
 });
 
 describe('SelectionModel', () => {
@@ -341,46 +382,6 @@ describe('SelectionModel', () => {
     expect(selectionModel.has(child2)).toBe(true);
     expect(selectionModel.has(child3)).toBe(true);
     expect(selectionModel.lastSelected()).toBe(child3);
-  });
-});
-
-describe('selection adjustment functions', () => {
-  test('isAncestorSelected', () => {
-    const child1 = {},
-          child2 = {},
-          child3 = { items: [ child1, child2 ] },
-          root: any = {
-            items: [ child3 ]
-          },
-          dataModel = new t.DataModel(root),
-          observableModel = new t.ObservableModel(),
-          hierarchyModel = new t.HierarchyModel(dataModel, observableModel),
-          selectionModel = new t.SelectionModel();
-
-    selectionModel.set(root);
-    expect(t.isAncestorSelected(root, selectionModel, hierarchyModel)).toBe(true);
-    expect(t.isAncestorSelected(child1, selectionModel, hierarchyModel)).toBe(true);
-
-    selectionModel.set(child3);
-    expect(t.isAncestorSelected(root, selectionModel, hierarchyModel)).toBe(false);
-    expect(t.isAncestorSelected(child1, selectionModel, hierarchyModel)).toBe(true);
-    expect(t.isAncestorSelected(child3, selectionModel, hierarchyModel)).toBe(true);
-  });
-  test('reduceSelection', () => {
-    const child1 = {},
-          child2 = {},
-          child3 = { items: [ child1, child2 ] },
-          root: any = {
-            items: [ child3 ]
-          },
-          dataModel = new t.DataModel(root),
-          observableModel = new t.ObservableModel(),
-          hierarchyModel = new t.HierarchyModel(dataModel, observableModel),
-          selectionModel = new t.SelectionModel();
-
-    selectionModel.set([ child1, child2, child3 ]);
-    t.reduceSelection(selectionModel, hierarchyModel)
-    expect(selectionModel.contents()).toEqual([ child3 ]);
   });
 });
 
