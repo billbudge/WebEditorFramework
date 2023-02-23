@@ -1,8 +1,6 @@
 import { SelectionSet } from './collections';
 
-type ItemVisitor = (item: object) => void;
-type HasPredicate<T> = (item: T) => boolean;
-
+export type ItemVisitor = (item: object) => void;
 
 export type DataAttr = string | number;
 export type PropertyVisitor = (item: object, attr: DataAttr) => void;
@@ -399,30 +397,6 @@ export class HierarchyModel {
     return lca;
   }
 
-  isAncestorIncluded(item: any, included: HasPredicate<any>) {
-    let ancestor: any = item;
-    while (ancestor) {
-      if (included(ancestor))
-        return true;
-      ancestor = this.getParent(ancestor);
-    }
-    return false;
-  }
-
-  // Reduces the items to the roots of the items. Thus, if a descendant
-  // and its ancestor are in |items|, remove the descendant.
-  reduceToRoots(items: Array<any>, included: HasPredicate<any>) : Array<any> {
-    const self = this,
-          roots = new Array();
-    items.forEach(function(item: any) {
-      if (!self.isAncestorIncluded(self.getParent(item), included)) {
-        roots.push(item);
-      }
-    });
-    return roots;
-  }
-
-
   // Sets the parent for each item in the subtree at |parent|.
   private setChildren(parent: any) {
     const self = this;
@@ -503,6 +477,30 @@ export class SelectionModel extends SelectionSet<any> {
     const result = new Array<any>();
     this.forEachReverse(item => result.push(item));
     return result;
+  }
+
+  hasAncestor(item: any, hierarchyModel: HierarchyModel) {
+    let ancestor: any = hierarchyModel.getParent(item);
+    while (ancestor) {
+      if (this.has(ancestor))
+        return true;
+      ancestor = hierarchyModel.getParent(ancestor);
+    }
+    return false;
+  }
+
+  // Reduces the selection to the roots of the current selection. Thus, if a
+  // child and ancestor are selected, remove the child.
+  reduceSelection(hierarchyModel: HierarchyModel) {
+    const self = this,
+          roots = new Array();
+    this.forEach(function(item: any) {
+      if (!self.hasAncestor(item, hierarchyModel)) {
+        roots.push(item);
+      }
+    });
+    // Reverse, so passing this to selectionModel.set preserves order.
+    this.set(roots.reverse());
   }
 }
 

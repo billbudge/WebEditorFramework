@@ -1,6 +1,6 @@
 
 import { ObservableModel, Change, ReferenceModel, HierarchyModel,
-         SelectionModel, reduceSelection } from '../src/dataModels'
+         SelectionModel } from '../src/dataModels'
 
 //------------------------------------------------------------------------------
 
