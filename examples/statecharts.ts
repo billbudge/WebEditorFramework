@@ -1,6 +1,6 @@
 
-import { ObservableModel, Change, ReferenceModel, HierarchyModel,
-         SelectionModel } from '../src/dataModels'
+import { DataModel, ObservableModel, Change, ReferenceModel, HierarchyModel,
+         SelectionModel, InstancingModel, TranslationModel } from '../src/dataModels'
 
 //------------------------------------------------------------------------------
 
@@ -8,29 +8,34 @@ import { ObservableModel, Change, ReferenceModel, HierarchyModel,
 // - maps from element to connected transitions.
 // - information about graphs and subgraphs.
 
-interface State {
+export interface State {
   readonly type: 'state' | 'start' | 'stop' | 'history' | 'history*';
-  readonly x: number;
-  readonly y: number;
   readonly items?: Statechart[];  // Only for type === 'state'
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
 }
 
-interface Transition {
+export interface Transition {
   readonly type: 'transition';
 }
 
-type StatechartItem = State | Transition;
+export type StatechartItem = State | Transition;
 
-interface Statechart {
-  readonly name?: string;
+export interface Statechart {
   readonly type: 'statechart';
   readonly items: StatechartItem[];
-  readonly y: number;
+  name?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
-type AllItems = Statechart | StatechartItem;
+export type AllItems = Statechart | StatechartItem;
 
-type StatechartVisitor = (item: AllItems) => void;
+export interface StatechartVisitor = (item: AllItems) => void;
 
 function visit(items: AllItems[], fn: StatechartVisitor) {
   items.forEach(function(item, i) {
@@ -41,9 +46,9 @@ function visit(items: AllItems[], fn: StatechartVisitor) {
   });
 }
 
-type TransitionVisitor = (transition: Transition) => void;
+export interface TransitionVisitor = (transition: Transition) => void;
 
-interface GraphInfo {
+export interface GraphInfo {
   states: Set<State>;
   statecharts: Set<Statechart>;
   transitions: Set<Transition>;
@@ -370,37 +375,200 @@ export class StatechartModel {
 
 //------------------------------------------------------------------------------
 
-class StatechartEditingModel {
-  private hierarchyModel_: HierarchyModel;
-  private selectionModel_: SelectionModel;
-  private statechartModel_: StatechartModel;
+interface Model {
+  dataModel: DataModel;
+  observableModel: ObservableModel;
+  referenceModel: ReferenceModel;
+  hierarchyModel: HierarchyModel;
+  selectionModel: SelectionModel;
+  instancingModel: InstancingModel;
+  translationModel: TranslationModel;
+  statechartModel: StatechartModel;
+}
 
-  // reduceSelection() {
-  //   const hierarchyModel = this.hierarchyModel_,
-  //         selectionModel = this.selectionModel_;
-  //   // First, replace statecharts by their parent state. We do this by adding parent
-  //   // states to the selection before reducing. Snapshot the selection since we will
-  //   // be modifying it.
-  //   selectionModel.contents().forEach(function(item: AllItems) {
-  //     if (item.type === 'statechart') {
-  //       const parent = hierarchyModel.getParent(item);
-  //       if (parent)
-  //         selectionModel.add(parent);
-  //     }
-  //   });
-  //   selectionModel.set(hierarchyModel.reduceToRoots());
-        // reverse the roots
-  // }
+class EditingModel {
+  private statechart_: Statechart;
+  private model_: Model;
 
-  selectInteriorTransitions(selectionModel: SelectionModel) {
-    const graphInfo = this.statechartModel_.getSubgraphInfo(selectionModel.contents());
+  reduceSelection() {
+    const model = this.model_,
+          hierarchyModel = model.hierarchyModel,
+          selectionModel = model.selectionModel;
+    // First, replace statecharts by their parent state. We do this by adding parent
+    // states to the selection before reducing. Snapshot the selection since we will
+    // be modifying it.
+    selectionModel.contents().forEach(function(item: AllItems) {
+      if (item.type === 'statechart') {
+        selectionModel.delete(item);
+        const parent = hierarchyModel.getParent(item);
+        if (parent)
+          selectionModel.add(parent);
+      }
+    });
+    selectionModel.reduceSelection(hierarchyModel);
+  }
+
+  selectInteriorTransitions() {
+    const model = this.model_,
+          selectionModel = model.selectionModel,
+          graphInfo = model.statechartModel.getSubgraphInfo(selectionModel.contents());
     selectionModel.add(graphInfo.interiorTransitions);
   }
-  constructor(hierarchyModel: HierarchyModel, selectionModel: SelectionModel,
-              statechartModel: StatechartModel) {
-    this.hierarchyModel_ = hierarchyModel;
-    this.selectionModel_ = selectionModel;
-    this.statechartModel_ = statechartModel;
+
+  newItem(item: AllItems) : AllItems {
+    const model = this.model_,
+          dataModel = model.dataModel,
+          referenceModel = model.referenceModel;
+    referenceModel.assignId(item);
+    dataModel.initialize(item);
+    return item;
+  }
+
+  newItems(items: Array<AllItems>) : Array<AllItems> {
+    const self = this,
+          result = new Array<AllItems>();
+    items.forEach(item => { result.push(self.newItem(item)); });
+    return result;
+  }
+
+  copyItems(items: Array<AllItems>, map: Map<number, AllItems>) : Array<AllItems> {
+    const statechart = this.statechart_,
+          model = this.model_,
+          dataModel = model.dataModel,
+          translationModel_ = model.translationModel,
+          copies = model.instancingModel.cloneGraph(items, map);
+
+    items.forEach(function(item) {
+      const copy = map.get(dataModel.getId(item));
+      if (copy && copy.type !== 'transition') {
+        const translation = translationModel_.getToParent(item, statechart);
+        copy.x += translation.x;
+        copy.y += translation.y;
+      }
+    });
+    return copies;
+  }
+
+  deleteItem(item: AllItems) {
+    const model = this.model_,
+          parent = model.hierarchyModel.getParent(item);
+    if (parent) {
+      const items = parent.items;
+      if (items) {
+        const index = items.indexOf(item);
+        if (index >= 0) {
+          model.observableModel.removeElement(parent, 'items', index);
+          model.selectionModel.delete(item);
+        }
+      }
+    }
+  }
+
+  deleteItems(items: Array<AllItems>) {
+    const self = this;
+    items.forEach(function(item) {
+      self.deleteItem(item);
+    }, this);
+  }
+
+  setAttr(item: AllItems, attr: string, value: any) {
+    this.model_.observableModel.changeValue(item, attr, value);
+  }
+
+  newStatechart(y: number = 0) {
+    const statechart : Statechart = {
+      type: 'statechart',
+      x: 0,
+      y: y,
+      width: 0,
+      height: 0,
+      items: new Array(),
+    };
+    return this.newItem(statechart);
+  }
+
+  findChildStatechart(state: State, child: State | Transition) {
+    const statechartModel = this.model_.statechartModel;
+    if (state.items) {
+      for (let i = 0; i < state.items.length; i++) {
+        if (child.type === 'transition' ||
+            statechartModel.canAddState(child, state.items[i])) {
+            return i;
+          }
+      }
+    }
+    return -1;
+  }
+
+  findOrCreateChildStatechart(state: State, child: State | Transition) {
+    let i = this.findChildStatechart(state, child);
+    if (i < 0) {
+      if (!state.items)
+        this.setAttr(state, 'items', new Array());
+      i = state.items!.length;
+      const y = 0;// TODO this.model_.renderer.getNextStatechartY(state);
+      const statechart = this.newStatechart(y);
+      this.model_.observableModel.insertElement(state, 'items', i, statechart);
+    }
+    return state.items![i];  // TODO check
+  }
+
+  addItem(item: State | Transition, parent: State | Statechart) {
+    const model = this.model_,
+          observableModel = model.observableModel,
+          hierarchicalModel = model.hierarchyModel,
+          statechartModel = model.statechartModel,
+          oldParent = hierarchicalModel.getParent(item);
+
+    if (!parent)
+      parent = this.statechart_;
+    if (oldParent === parent)
+      return;
+    if (parent.type === 'state') {
+      parent = this.findOrCreateChildStatechart(parent, item);
+    } else if (parent.type === 'statechart') {
+      if (item.type !== 'transition') {
+      // If adding a pseudostate to a non-root statechart, add a new statechart to hold it.
+      // We allow the exception for the root statechart so we can drag and drop between
+      // child statecharts.
+      if (!statechartModel.canAddState(item, parent) && parent !== this.statechart_) {
+        const superState = hierarchicalModel.getParent(parent);
+        parent = this.findOrCreateChildStatechart(superState, item);
+      }
+      }
+    }
+    // At this point we can add item to parent.
+    if (item.type === 'state') {
+      const translatableModel = this.model_.translationModel,
+            translation = translatableModel.getToParent(item, parent);
+      this.setAttr(item, 'x', item.x + translation.x);
+      this.setAttr(item, 'y', item.y + translation.y);
+    }
+
+    if (oldParent)
+      this.deleteItem(item);
+
+    if (parent.items) {
+      observableModel.insertElement(parent, 'items', parent.items.length, item);
+    }
+    return item;
+  }
+
+  addItems(items: AllItems[], parent: State | Statechart) {
+    // Add elements and groups first, then wires, so circuitModel can update.
+    for (let item of items) {
+      if (item.type === 'state') this.addItem(item, parent);
+    }
+    for (let item of items) {
+      if (item.type === 'transition') this.addItem(item, parent);
+    }
+  }
+
+
+
+  constructor(statechart: Statechart, model: Model) {
+    this.statechart_ = statechart;
+    this.model_ = model;
   }
 }
 
@@ -409,187 +577,10 @@ class StatechartEditingModel {
 
 const editingModel = (function() {
   const proto = {
-    getParent: function(item) {
-      return this.model.hierarchicalModel.getParent(item);
-    },
-
-    getGrandParent: function(item) {
-      const parent = this.getParent(item);
-      if (!parent) return parent;
-      return this.getParent(parent);
-    },
-
-    reduceSelection: function () {
-      const self = this,
-            model = this.model,
-            selectionModel = model.selectionModel,
-            hierarchicalModel = model.hierarchicalModel;
-      // First, replace statecharts by their parent state. We do this by adding parent
-      // states to the selection before reducing.
-      selectionModel.contents().forEach(function(item) {
-        if (isStatechart(item)) {
-          const parent = self.getParent(item);
-          if (parent)
-            selectionModel.add(parent);
-        }
-      });
-      selectionModel.set(hierarchicalModel.reduceSelection());
-    },
-
-    selectInteriorTransitions: function() {
-      const model = this.model,
-            selectionModel = model.selectionModel,
-            graphInfo = model.statechartModel.getSubgraphInfo(selectionModel.contents());
-      selectionModel.add(graphInfo.interiorTransitions);
-    },
-
-    newItem: function(item) {
-      const dataModel = this.model.dataModel;
-      dataModel.assignId(item);
-      dataModel.initialize(item);
-      return item;
-    },
-
-    newItems: function(items) {
-      const self = this;
-      items.forEach(item => self.newItem(item));
-    },
-
-    copyItems: function(items, map) {
-      const model = this.model,
-            dataModel = model.dataModel,
-            translatableModel = model.translatableModel,
-            statechart = this.statechart,
-            copies = model.copyPasteModel.cloneItems(items, map);
-
-      items.forEach(function(item) {
-        const copy = map.get(dataModel.getId(item));
-        if (isNonTransition(copy)) {
-          const translation = translatableModel.getToParent(item, statechart);
-          copy.x += translation.x;
-          copy.y += translation.y;
-        }
-      });
-      return copies;
-    },
-
-    deleteItem: function(item) {
-      const model = this.model,
-            hierarchicalModel = model.hierarchicalModel,
-            parent = hierarchicalModel.getParent(item);
-      if (parent) {
-        const items = parent.items;
-        for (let i = 0; i < items.length; i++) {
-          const subItem = items[i];
-          if (subItem === item) {
-            model.observableModel.removeElement(parent, 'items', i);
-            model.selectionModel.remove(item);
-            break;
-          }
-        }
-      }
-    },
-
-    deleteItems: function(items) {
-      const self = this;
-      items.forEach(function(item) {
-        self.deleteItem(item);
-      }, this);
-    },
-
-    isTopLevelStatechart: function(item) {
-      return isStatechart(item) && !this.getParent(item);
-    },
 
 
-    addItem: function(item, parent, paletteItem) {
-      const model = this.model,
-            observableModel = model.observableModel,
-            hierarchicalModel = model.hierarchicalModel,
-            oldParent = hierarchicalModel.getParent(item);
 
-      if (!parent)
-        parent = this.statechart;
 
-      if (isState(parent)) {
-        if (isPseudostate(parent)) return;
-        parent = this.findOrCreateChildStatechart(parent, item);
-      } else if (isStatechart(parent)) {
-        // If adding a pseudostate to a non-root statechart, add a new statechart to hold it.
-        // We allow the exception for the root statechart so we can drag and drop between
-        // child statecharts.
-        if (!this.canAddState(item, parent) && !this.isTopLevelStatechart(parent)) {
-          const superState = hierarchicalModel.getParent(parent);
-          parent = this.findOrCreateChildStatechart(superState, item);
-        }
-      }
-      // At this point we can add item to parent.
-      if (isState(item)) {
-        const translatableModel = model.translatableModel,
-              translation = translatableModel.getToParent(item, parent);
-        this.setAttr(item, 'x', item.x + translation.x);
-        this.setAttr(item, 'y', item.y + translation.y);
-      }
-
-      if (oldParent === parent)
-        return;
-      if (oldParent)
-        this.deleteItem(item);
-
-      let attr = paletteItem ? 'palette' : 'items';
-      observableModel.insertElement(parent, attr, parent[attr].length, item);
-      return item;
-    },
-
-    addItems: function(items, parent) {
-      // Add elements and groups first, then wires, so circuitModel can update.
-      for (let item of items) {
-        if (!isTransition(item)) this.addItem(item, parent);
-      }
-      for (let item of items) {
-        if (isTransition(item)) this.addItem(item, parent);
-      }
-    },
-
-    // Creates a new statechart.
-    newStatechart: function(y) {
-      const statechart = {
-        type: 'statechart',
-        x: 0,
-        y: y || 0,
-        width: 0,
-        height: 0,
-        items: new Array(),
-      };
-      return this.newItem(statechart);
-    },
-
-    setAttr: function(item, attr, value) {
-      this.model.observableModel.changeValue(item, attr, value);
-    },
-
-    findChildStatechart: function(state, newItem) {
-      if (state.items) {
-        for (let i = 0; i < state.items.length; i++) {
-          if (this.canAddState(newItem, state.items[i]))
-            return i;
-        }
-      }
-      return -1;
-    },
-
-    findOrCreateChildStatechart: function(state, newItem) {
-      let i = this.findChildStatechart(state, newItem);
-      if (i < 0) {
-        if (!state.items)
-          this.setAttr(state, 'items', new Array());
-        i = state.items.length;
-        const y = this.model.renderer.getNextStatechartY(state);
-        const statechart = this.newStatechart(y);
-        this.model.observableModel.insertElement(state, 'items', i, statechart);
-      }
-      return state.items[i];
-    },
 
     getLabel: function (item) {
       if (isTrueState(item)) return item.name;

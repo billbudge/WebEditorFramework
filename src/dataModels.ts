@@ -499,7 +499,7 @@ export class SelectionModel extends SelectionSet<any> {
         roots.push(item);
       }
     });
-    // Reverse, so passing this to selectionModel.set preserves order.
+    // Reverse, to preserve the previous order of selection.
     this.set(roots.reverse());
   }
 }
@@ -787,7 +787,7 @@ export class UndoRedoModel {
 
 //------------------------------------------------------------------------------
 
-class InstancingModel {
+export class InstancingModel {
   private dataModel: DataModel;
   private referenceModel: ReferenceModel;
 
@@ -917,7 +917,7 @@ class InstancingModel {
 const _x = Symbol('TranslationModel.x');
 const _y = Symbol('TranslationModel.y');
 
-class TranslationModel {
+export class TranslationModel {
   private dataModel: DataModel;
   private observableModel: ObservableModel;
   private hierarchyModel: HierarchyModel;

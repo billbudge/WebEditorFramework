@@ -1,9 +1,8 @@
 // Collections tests.
+'use strict';
 
 import {describe, expect, test} from '@jest/globals';
 import * as t from '../src/dataModels';
-
-'use strict';
 
 //------------------------------------------------------------------------------
 
