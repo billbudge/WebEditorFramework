@@ -16,16 +16,29 @@ function newStatechart() : Statecharts.Statechart {
   };
 }
 
-  /*
-    readonly type: 'statechart';
-  readonly items: StatechartItem[];
-  name?: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-*/
+function newState() : Statecharts.State {
+  return {
+    type: 'state',
+    x: 0,
+    y: 0,
+  };
+}
 
+function newPseudoState(type: 'start' | 'stop' | 'history' | 'history*') : Statecharts.State {
+  return {
+    type: type,
+    x: 0,
+    y: 0,
+  };
+}
+
+function newTransition(src: Statecharts.State, dst: Statecharts.State) : Statecharts.Transition {
+  return {
+    type: 'transition',
+    // srcId: getId(src),
+    // dstId: getId(dst),
+  }
+}
 
 //------------------------------------------------------------------------------
 
@@ -41,75 +54,31 @@ describe('StatechartModel', () => {
 
     expect(dataModel.root()).toBe(statechart);
   });
-  // test('isProperty', () => {
-  //   const root: any = {
-  //           id: 1,
-  //           foo: 'foo',
-  //           child: {
-  //             id: 2,
-  //           }
-  //         },
-  //         dataModel = new t.DataModel(root);
-
-  //   expect(dataModel.isProperty(root, 'foo')).toBe(true);
-  //   expect(dataModel.isProperty(root, 'bar')).toBe(false);
-  //   expect(dataModel.isProperty(root, 'id')).toBe(true);
-  //   expect(dataModel.isProperty(root, 'child')).toBe(true);
-  // });
 });
 
-const statechartTests = (function () {
-  'use strict';
+// const statechartTests = (function () {
+//   'use strict';
 
 
-  let id = 1;
-  function newState(x, y) {
-    return {
-      type: "state",
-      id: id++,
-      x: x || 0,
-      y: y || 0,
-    };
-  }
 
-  function newPseudoState(type, x, y) {
-    return {
-      type: type,
-      x: x || 0,
-      y: y || 0,
-    };
-  }
+//   // Always construct the full EditingModel to make creating test data easier.
+//   function newTest() {
+//     let statechart = newStatechart();
+//     let test = statecharts.editingModel.extend(statechart),
+//         model = test.model;
+//     statecharts.statechartModel.extend(statechart);
+//     test.model.dataModel.initialize();
 
-  function getId(item) {
-    return item.id;
-  }
-
-  function newTransition(src, dst) {
-    return {
-      type: 'transition',
-      srcId: getId(src),
-      dstId: getId(dst),
-    }
-  }
-
-  // Always construct the full EditingModel to make creating test data easier.
-  function newTest() {
-    let statechart = newStatechart();
-    let test = statecharts.editingModel.extend(statechart),
-        model = test.model;
-    statecharts.statechartModel.extend(statechart);
-    test.model.dataModel.initialize();
-
-    // Fake context, sufficient for tests.
-    const ctx = {
-      measureText: () => { return { width: 10, height: 10 }},
-      save: () => {},
-    };
-    model.renderer = new statecharts.Renderer(model);
-    model.renderer.begin(ctx);
-    return test;
-  }
-}
+//     // Fake context, sufficient for tests.
+//     const ctx = {
+//       measureText: () => { return { width: 10, height: 10 }},
+//       save: () => {},
+//     };
+//     model.renderer = new statecharts.Renderer(model);
+//     model.renderer.begin(ctx);
+//     return test;
+//   }
+// }
 
   /*
 
@@ -135,12 +104,6 @@ const statechartTests = (function () {
     QUnit.assert.ok(test.model.referencingModel);
   });
 
-  QUnit.test("statecharts.statechartModel.extend", function() {
-    let test = newTestStatechartModel();
-    QUnit.assert.ok(test);
-    QUnit.assert.ok(test.model);
-    QUnit.assert.ok(test.model.referencingModel);
-  });
 
   QUnit.test("statecharts.statechartModel.getGraphInfo", function() {
     const test = newTestStatechartModel(),

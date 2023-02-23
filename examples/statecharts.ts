@@ -4,6 +4,8 @@ import { DataModel, ObservableModel, Change, ReferenceModel, HierarchyModel,
 
 //------------------------------------------------------------------------------
 
+// TODO fix (* as any) casts.
+
 // Maintains:
 // - maps from element to connected transitions.
 // - information about graphs and subgraphs.
@@ -35,7 +37,7 @@ export interface Statechart {
 
 export type AllItems = Statechart | StatechartItem;
 
-export interface StatechartVisitor = (item: AllItems) => void;
+export type StatechartVisitor = (item: AllItems) => void;
 
 function visit(items: AllItems[], fn: StatechartVisitor) {
   items.forEach(function(item, i) {
@@ -46,7 +48,7 @@ function visit(items: AllItems[], fn: StatechartVisitor) {
   });
 }
 
-export interface TransitionVisitor = (transition: Transition) => void;
+export type TransitionVisitor = (transition: Transition) => void;
 
 export interface GraphInfo {
   states: Set<State>;
@@ -83,25 +85,25 @@ export class StatechartModel {
   }
 
   getInTransitions(state: State) : Transition[] {
-    return state[_inTransitions];
+    return (state as any)[_inTransitions];
   }
 
   getOutTransitions(state: State) : Transition[] {
-    return state[_outTransitions];
+    return (state as any)[_outTransitions];
   }
 
   forInTransitions(state: State, fn: TransitionVisitor) {
     const inputs = this.getInTransitions(state);
     if (!inputs)
       return;
-    inputs.forEach((input, i) => fn(input, i));
+    inputs.forEach((input, i) => fn(input));
   }
 
   forOutTransitions(state: State, fn: TransitionVisitor) {
     const outputs = this.getOutTransitions(state);
     if (!outputs)
       return;
-    outputs.forEach((output, i) => fn(output, i));
+    outputs.forEach((output, i) => fn(output));
   }
 
   getGraphInfo() : GraphInfo {
@@ -132,7 +134,7 @@ export class StatechartModel {
     });
     // Now collect and classify transitions that connect to them.
     visit(items, function(item) {
-      function addTransition(transition) {
+      function addTransition(transition: Transition) {
         // Stop if we've already processed this transtion (handle transitions from a state to itself.)
         if (transitions.has(transition)) return;
         transitions.add(transition);
@@ -244,10 +246,10 @@ export class StatechartModel {
 
   private insertState_(state: State) {
     this.states_.add(state);
-    if (state[_inTransitions] === undefined) {
+    if ((state as any)[_inTransitions] === undefined) {
       // assert(state[_outTransitions] === undefined);
-      state[_inTransitions] = new Array<Transition>();
-      state[_outTransitions] = new Array<Transition>();
+      (state as any)[_inTransitions] = new Array<Transition>();
+      (state as any)[_outTransitions] = new Array<Transition>();
     }
     if (state.items) {
       const self = this;
@@ -340,7 +342,7 @@ export class StatechartModel {
         break;
       }
       case 'elementInserted': {
-        const newValue = item[attr][change.index];
+        const newValue = (item as any)[attr][change.index];
         this.insertItem_(newValue);
         break;
       }
