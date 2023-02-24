@@ -611,6 +611,7 @@ export class TransactionModel extends EventBase<Transaction, TransactionEvent> {
     this.onEndTransaction(transaction);
     this.snapshots.clear();
     super.onEvent('transactionEnded', transaction);
+    this.transaction_ = undefined;
   }
 
   // Notifies observers that a transaction was canceled and its operations
@@ -621,6 +622,7 @@ export class TransactionModel extends EventBase<Transaction, TransactionEvent> {
     this.undo(transaction);
     this.onCancelTransaction(transaction);
     super.onEvent('transactionCancelled', transaction);
+    this.transaction_ = undefined;
   }
 
   // Undoes the operations in the transaction.
