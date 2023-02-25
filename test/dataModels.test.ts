@@ -323,6 +323,31 @@ describe('SelectionModel', () => {
     expect(selectionModel.contents()).toEqual([]);
     expect(selectionModel.lastSelected()).toBeUndefined();
   });
+  test('add', () => {
+    const root = {};
+    const selectionModel = new Data.SelectionModel();
+    selectionModel.add('a');
+    expect(selectionModel.empty()).toBe(false);
+    expect(selectionModel.has('a')).toBe(true);
+    expect(selectionModel.contents()).toEqual(['a']);
+    expect(selectionModel.lastSelected()).toBe('a');
+    selectionModel.add('b');
+    selectionModel.add('a');
+    selectionModel.add('c');
+    expect(selectionModel.contents()).toEqual(['b', 'a', 'c']);
+    expect(selectionModel.lastSelected()).toBe('c');
+  });
+  test('delete', () => {
+    const root = {};
+    const selectionModel = new Data.SelectionModel();
+    selectionModel.set(['b', 'a', 'c']);
+    selectionModel.delete('c');
+    expect(selectionModel.contents()).toEqual(['b', 'a']);
+    expect(selectionModel.lastSelected()).toBe('a');
+    selectionModel.delete('d');  // not selected
+    expect(selectionModel.contents()).toEqual(['b', 'a']);
+    expect(selectionModel.lastSelected()).toBe('a');
+  });
   test('set, has, contents', () => {
     const child1 = {},
           child2 = {},
@@ -505,29 +530,8 @@ describe('TransactionModel', () => {
 /*
 
 
-QUnit.test("selectionModel add", function() {
-  const model = { root: {} };
-  const test = dataModels.selectionModel.extend(model);
-  test.add('a');
-  QUnit.assert.ok(!test.isEmpty());
-  QUnit.assert.ok(test.contains('a'));
-  QUnit.assert.deepEqual(test.contents(), ['a']);
-  QUnit.assert.deepEqual(test.lastSelected(), 'a');
-  test.add(['b', 'a', 'c']);
-  QUnit.assert.deepEqual(test.contents(), ['c', 'a', 'b']);
-  QUnit.assert.deepEqual(test.lastSelected(), 'c');
-});
 
 QUnit.test("selectionModel remove", function() {
-  const model = { root: {} };
-  const test = dataModels.selectionModel.extend(model);
-  test.add(['b', 'a', 'c']);
-  test.remove('c');
-  QUnit.assert.deepEqual(test.contents(), ['a', 'b']);
-  QUnit.assert.deepEqual(test.lastSelected(), 'a');
-  test.remove('d');  // not selected
-  QUnit.assert.deepEqual(test.contents(), ['a', 'b']);
-  QUnit.assert.deepEqual(test.lastSelected(), 'a');
 });
 
 QUnit.test("selectionModel toggle", function() {
