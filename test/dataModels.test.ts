@@ -154,10 +154,10 @@ describe('ReferenceModel', () => {
           observableModel = new Data.ObservableModel(),
           referenceModel = new Data.ReferenceModel(dataModel, observableModel);
     // TODO add more tests for references.
-    expect(dataModel.getId(root.child)).toBe(1000);  // preserved
-    expect(dataModel.getId(root)).toBe(1001);
-    expect(dataModel.getId(root.children[0])).toBe(1002);
-    expect(dataModel.getId(root.children[1])).toBe(1003);
+    expect(referenceModel.getId(root.child)).toBe(1000);  // preserved
+    expect(referenceModel.getId(root)).toBe(1001);
+    expect(referenceModel.getId(root.children[0])).toBe(1002);
+    expect(referenceModel.getId(root.children[1])).toBe(1003);
   });
   test('assignId', () => {
     const root: any = {
@@ -570,4 +570,37 @@ QUnit.test("selectionModel select", function() {
   test.select('a', true);
   QUnit.assert.deepEqual(test.contents(), ['c', 'b']);
 });
+
+QUnit.test("instancingModel isomorphic", function() {
+  // TODO add some references.
+  const test_data = {
+    id: 1,
+    item: { id: 2, },
+    items: [
+      {
+        id: 3,
+        items: [
+          { id: 4, x: 0 },
+          { id: 5, x: 1 },
+        ],
+      },
+      {
+        id: 6,
+        items: [
+          { id: 7, x: 0 },
+          { id: 8, x: 1 },
+        ],
+      },
+      { id: 9, foo: 'bar' },
+    ],
+  }
+  const model = { root: test_data };
+  const test = dataModels.instancingModel.extend(model);
+  QUnit.assert.ok(test.isomorphic(test_data, test_data, new Map()));
+  const test_data_clone = test.cloneGraph([test_data])[0];
+  QUnit.assert.ok(test.isomorphic(test_data, test_data_clone, new Map()));
+  QUnit.assert.ok(test.isomorphic(test_data.items[0], test_data.items[1], new Map()));
+  QUnit.assert.ok(!test.isomorphic(test_data.item, test_data.items[2], new Map()));
+});
+
 */

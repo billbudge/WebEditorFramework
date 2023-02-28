@@ -4,6 +4,8 @@ import * as Statecharts from '../examples/statecharts';
 
 // Statechart unit tests
 
+let id = 1;
+
 function newStatechart() : Statecharts.Statechart {
   return {
     type: 'statechart',
@@ -19,6 +21,7 @@ function newStatechart() : Statecharts.Statechart {
 function newState() : Statecharts.State {
   return {
     type: 'state',
+    id: id++,
     x: 0,
     y: 0,
   };
@@ -27,6 +30,7 @@ function newState() : Statecharts.State {
 function newPseudoState(type: 'start' | 'stop' | 'history' | 'history*') : Statecharts.State {
   return {
     type: type,
+    id: id++,
     x: 0,
     y: 0,
   };
@@ -35,24 +39,100 @@ function newPseudoState(type: 'start' | 'stop' | 'history' | 'history*') : State
 function newTransition(src: Statecharts.State, dst: Statecharts.State) : Statecharts.Transition {
   return {
     type: 'transition',
-    // srcId: getId(src),
-    // dstId: getId(dst),
+    srcId: src.id,
+    dstId: dst.id,
   }
+}
+
+interface TestModel {
+  statechart: Statecharts.Statechart;
+  dataModel: Data.DataModel;
+  observableModel: Data.ObservableModel;
+  referenceModel: Data.ReferenceModel;
+  hierarchyModel: Data.HierarchyModel;
+  selectionModel: Data.SelectionModel;
+  instancingModel: Data.InstancingModel;
+  translationModel: Data.TranslationModel;
+  statechartModel: Statecharts.StatechartModel;
+  editingModel: Statecharts.EditingModel;
+}
+
+function NewTestModel(statechart: Statecharts.Statechart = newStatechart()) : TestModel {
+  const dataModel = new Data.DataModel(statechart),
+        observableModel = new Data.ObservableModel(),
+        referenceModel = new Data.ReferenceModel(dataModel, observableModel),
+        hierarchyModel = new Data.HierarchyModel(dataModel, observableModel),
+        selectionModel = new Data.SelectionModel(),
+        instancingModel = new Data.InstancingModel(dataModel, referenceModel),
+        translationModel = new Data.TranslationModel(dataModel, observableModel, hierarchyModel),
+        statechartModel = new Statecharts.StatechartModel(
+            statechart, observableModel, hierarchyModel, referenceModel),
+        editingModel = new Statecharts.EditingModel(
+            statechart, dataModel, observableModel, hierarchyModel, referenceModel,
+            selectionModel, instancingModel, translationModel, statechartModel);
+  return {
+    statechart,
+    dataModel,
+    observableModel,
+    referenceModel,
+    hierarchyModel,
+    selectionModel,
+    instancingModel,
+    translationModel,
+    statechartModel,
+    editingModel,
+  }
+}
+
+function addItem(model: TestModel,
+         item: Statecharts.State | Statecharts.Transition,
+         parent: Statecharts.State | Statecharts.Statechart) : Statecharts.StatechartItem {
+  const editingModel = model.editingModel,
+        newItem = editingModel.newItem(item) as Statecharts.State | Statecharts.Transition,
+        result = editingModel.addItem(newItem, parent);
+  return result;
 }
 
 //------------------------------------------------------------------------------
 
 describe('StatechartModel', () => {
-  test('constructor', () => {
+  test('getGraphInfo', () => {
     const statechart = newStatechart(),
-          dataModel = new Data.DataModel(statechart),
-          observableModel = new Data.ObservableModel(),
-          referenceModel = new Data.ReferenceModel(dataModel, observableModel),
-          hierarchyModel = new Data.HierarchyModel(dataModel, observableModel),
-          statechartModel = new Statecharts.StatechartModel(
-            statechart, observableModel, hierarchyModel, referenceModel);
+          model = NewTestModel(statechart),
+          statechartModel = model.statechartModel,
+          state1 = addItem(model, newState(), statechart) as Statecharts.State,
+          state2 = addItem(model, newState(), statechart) as Statecharts.State,
+          transition1 = addItem(model, newTransition(state1, state2), statechart);
+    let graph = statechartModel.getGraphInfo();
+    expect(graph.states.has(state1)).toBe(true);
+    expect(graph.states.has(state2)).toBe(true);
+    expect(graph.states.size).toBe(2);
+    expect(graph.statecharts.has(statechart)).toBe(true);
+    expect(graph.statecharts.size).toBe(1);
+    // QUnit.assert.deepEqual(graph.transitions.size, 1);
+    // expect(graph.interiorTransitions.has(transition1));
+    // QUnit.assert.deepEqual(graph.interiorTransitions.size, 1);
+    // QUnit.assert.deepEqual(graph.inTransitions.size, 0);
+    // QUnit.assert.deepEqual(graph.outTransitions.size, 0);
 
-    expect(dataModel.root()).toBe(statechart);
+    // const input = addItem(test, newState()),
+    //       output = addItem(test, newState()),
+    //       transition2 = addItem(test, newTransition(input, state1)),
+    //       transition3 = addItem(test, newTransition(state2, output));
+
+    // graph = test.getGraphInfo();
+    // expect(graph.statesAndStatecharts.has(state1));
+    // expect(graph.statesAndStatecharts.has(state2));
+    // expect(graph.statesAndStatecharts.has(input));
+    // expect(graph.statesAndStatecharts.has(output));
+    // QUnit.assert.deepEqual(graph.statesAndStatecharts.size, 5);
+    // expect(graph.interiorTransitions.has(transition1));
+    // expect(graph.interiorTransitions.has(transition2));
+    // expect(graph.interiorTransitions.has(transition3));
+    // QUnit.assert.deepEqual(graph.transitions.size, 3);
+    // QUnit.assert.deepEqual(graph.interiorTransitions.size, 3);
+    // QUnit.assert.deepEqual(graph.inTransitions.size, 0);
+    // QUnit.assert.deepEqual(graph.outTransitions.size, 0);
   });
 });
 
@@ -89,13 +169,6 @@ describe('StatechartModel', () => {
   function newTestStatechartModel() {
     return newTest().model.statechartModel;
   }
-
-  function addItem(test, state, parent) {
-      const editingModel = test.model.editingModel,
-            newItem = editingModel.newItem(state),
-            result = editingModel.addItem(newItem, parent);
-      return result;
-    }
 
   QUnit.test("statecharts.statechartModel.extend", function() {
     let test = newTestStatechartModel();

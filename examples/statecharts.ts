@@ -13,6 +13,7 @@ import { DataModel, ObservableModel, Change, ReferenceModel, HierarchyModel,
 export interface State {
   readonly type: 'state' | 'start' | 'stop' | 'history' | 'history*';
   readonly items?: Statechart[];  // Only for type === 'state'
+  id: number;
   x: number;
   y: number;
   width?: number;
@@ -21,6 +22,8 @@ export interface State {
 
 export interface Transition {
   readonly type: 'transition';
+  srcId: number;
+  dstId: number;
 }
 
 export type StatechartItem = State | Transition;
@@ -377,25 +380,20 @@ export class StatechartModel {
 
 //------------------------------------------------------------------------------
 
-interface Model {
-  dataModel: DataModel;
-  observableModel: ObservableModel;
-  referenceModel: ReferenceModel;
-  hierarchyModel: HierarchyModel;
-  selectionModel: SelectionModel;
-  instancingModel: InstancingModel;
-  translationModel: TranslationModel;
-  statechartModel: StatechartModel;
-}
-
-class EditingModel {
+export class EditingModel {
   private statechart_: Statechart;
-  private model_: Model;
+  private dataModel_: DataModel;
+  private hierarchyModel_: HierarchyModel;
+  private observableModel_: ObservableModel;
+  private referenceModel_: ReferenceModel;
+  private selectionModel_: SelectionModel;
+  private instancingModel_: InstancingModel;
+  private translationModel_: TranslationModel;
+  private statechartModel_: StatechartModel;
 
   reduceSelection() {
-    const model = this.model_,
-          hierarchyModel = model.hierarchyModel,
-          selectionModel = model.selectionModel;
+    const hierarchyModel = this.hierarchyModel_,
+          selectionModel = this.selectionModel_;
     // First, replace statecharts by their parent state. We do this by adding parent
     // states to the selection before reducing. Snapshot the selection since we will
     // be modifying it.
@@ -411,16 +409,14 @@ class EditingModel {
   }
 
   selectInteriorTransitions() {
-    const model = this.model_,
-          selectionModel = model.selectionModel,
-          graphInfo = model.statechartModel.getSubgraphInfo(selectionModel.contents());
+    const selectionModel = this.selectionModel_,
+          graphInfo = this.statechartModel_.getSubgraphInfo(selectionModel.contents());
     selectionModel.add(graphInfo.interiorTransitions);
   }
 
   newItem(item: AllItems) : AllItems {
-    const model = this.model_,
-          dataModel = model.dataModel,
-          referenceModel = model.referenceModel;
+    const dataModel = this.dataModel_,
+          referenceModel = this.referenceModel_;
     referenceModel.assignId(item);
     dataModel.initialize(item);
     return item;
@@ -435,13 +431,12 @@ class EditingModel {
 
   copyItems(items: Array<AllItems>, map: Map<number, AllItems>) : Array<AllItems> {
     const statechart = this.statechart_,
-          model = this.model_,
-          dataModel = model.dataModel,
-          translationModel_ = model.translationModel,
-          copies = model.instancingModel.cloneGraph(items, map);
+          referenceModel = this.referenceModel_,
+          translationModel_ = this.translationModel_,
+          copies = this.instancingModel_.cloneGraph(items, map);
 
     items.forEach(function(item) {
-      const copy = map.get(dataModel.getId(item));
+      const copy = map.get(referenceModel.getId(item));  // TODO get rid of indirection getId
       if (copy && copy.type !== 'transition') {
         const translation = translationModel_.getToParent(item, statechart);
         copy.x += translation.x;
@@ -452,15 +447,14 @@ class EditingModel {
   }
 
   deleteItem(item: AllItems) {
-    const model = this.model_,
-          parent = model.hierarchyModel.getParent(item);
+    const parent = this.hierarchyModel_.getParent(item);
     if (parent) {
       const items = parent.items;
       if (items) {
         const index = items.indexOf(item);
         if (index >= 0) {
-          model.observableModel.removeElement(parent, 'items', index);
-          model.selectionModel.delete(item);
+          this.observableModel_.removeElement(parent, 'items', index);
+          this.selectionModel_.delete(item);
         }
       }
     }
@@ -474,7 +468,7 @@ class EditingModel {
   }
 
   setAttr(item: AllItems, attr: string, value: any) {
-    this.model_.observableModel.changeValue(item, attr, value);
+    this.observableModel_.changeValue(item, attr, value);
   }
 
   newStatechart(y: number = 0) {
@@ -490,7 +484,7 @@ class EditingModel {
   }
 
   findChildStatechart(state: State, child: State | Transition) {
-    const statechartModel = this.model_.statechartModel;
+    const statechartModel = this.statechartModel_;
     if (state.items) {
       for (let i = 0; i < state.items.length; i++) {
         if (child.type === 'transition' ||
@@ -510,22 +504,21 @@ class EditingModel {
       i = state.items!.length;
       const y = 0;// TODO this.model_.renderer.getNextStatechartY(state);
       const statechart = this.newStatechart(y);
-      this.model_.observableModel.insertElement(state, 'items', i, statechart);
+      this.observableModel_.insertElement(state, 'items', i, statechart);
     }
     return state.items![i];  // TODO check
   }
 
-  addItem(item: State | Transition, parent: State | Statechart) {
-    const model = this.model_,
-          observableModel = model.observableModel,
-          hierarchicalModel = model.hierarchyModel,
-          statechartModel = model.statechartModel,
+  addItem(item: State | Transition, parent: State | Statechart) : StatechartItem {
+    const observableModel = this.observableModel_,
+          hierarchicalModel = this.hierarchyModel_,
+          statechartModel = this.statechartModel_,
           oldParent = hierarchicalModel.getParent(item);
 
     if (!parent)
       parent = this.statechart_;
     if (oldParent === parent)
-      return;
+      return item;
     if (parent.type === 'state') {
       parent = this.findOrCreateChildStatechart(parent, item);
     } else if (parent.type === 'statechart') {
@@ -541,7 +534,7 @@ class EditingModel {
     }
     // At this point we can add item to parent.
     if (item.type === 'state') {
-      const translatableModel = this.model_.translationModel,
+      const translatableModel = this.translationModel_,
             translation = translatableModel.getToParent(item, parent);
       this.setAttr(item, 'x', item.x + translation.x);
       this.setAttr(item, 'y', item.y + translation.y);
@@ -566,11 +559,24 @@ class EditingModel {
     }
   }
 
-
-
-  constructor(statechart: Statechart, model: Model) {
+  constructor(statechart: Statechart,
+              dataModel: DataModel,
+              observableModel: ObservableModel,
+              hierarchymodel: HierarchyModel,
+              referenceModel: ReferenceModel,
+              selectionModel: SelectionModel,
+              instancingModel: InstancingModel,
+              translationModel: TranslationModel,
+              statechartModel: StatechartModel) {
     this.statechart_ = statechart;
-    this.model_ = model;
+    this.dataModel_ = dataModel;
+    this.observableModel_ = observableModel;
+    this.referenceModel_ = referenceModel;
+    this.hierarchyModel_ = hierarchymodel;
+    this.selectionModel_ = selectionModel;
+    this.instancingModel_ = instancingModel;
+    this.translationModel_ = translationModel;
+    this.statechartModel_ = statechartModel;
   }
 }
 

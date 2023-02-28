@@ -21,17 +21,14 @@ export class DataModel {
   root() : object {
     return this.root_;
   }
-  // TODO remove this for proper DataObject, ReferencedObject types.
+
   isItem(item: any) {
-    return item instanceof Object;
+    return typeof item === 'object' && item !== null;
   }
+
   // Returns true iff. item[attr] is a model property.
   isProperty(item: object, attr: DataAttr) : boolean {
     return item.hasOwnProperty(attr);
-  }
-
-  getId(item: any) : number {
-    return item.id as number;
   }
 
   // Visits the item's top level properties.
@@ -204,8 +201,20 @@ export class ReferenceModel {
   private functions_ = new Map<string, ReferenceFn>();
   private dataModel_: DataModel;
 
+  // Returns the unique id of the item.
+  getId(item: any) : number {
+    return item.id as number;  // TODO ReferenceObject
+  }
+
+  assignId(item: any) : number {
+    // 0 is not a valid id in this model.
+    const id = ++this.highestId;
+    item.id = id;
+    return id;
+  }
+
   // Gets the object that is referenced by item[attr]. Default is to return
-  // item[_attr].
+  // item[Symbol(attr)].
   getReference(item: any, attr: string) {
     return item[Symbol.for(attr)] || this.resolveReference(item, attr);
   }
@@ -220,13 +229,6 @@ export class ReferenceModel {
       self.functions_.set(attr, fn);
     }
     return fn;
-  }
-
-  assignId(item: any) : number {
-    // 0 is not a valid id in this model.
-    const id = ++this.highestId;
-    item.id = id;
-    return id;
   }
 
   // Returns true iff. item[attr] is a property that references an item.
@@ -260,9 +262,10 @@ export class ReferenceModel {
   // Recursively adds item and sub-items as potential reference targets, and
   // resolves any references they contain.
   addTargets_(item: any) {
-    const self = this, dataModel = this.dataModel_;
+    const self = this,
+          dataModel = this.dataModel_;
     dataModel.visitSubtree(item, function(item) {
-      const id = dataModel.getId(item);
+      const id = self.getId(item);
       if (id)
         self.targets_.set(id, item);
     });
@@ -275,9 +278,10 @@ export class ReferenceModel {
 
   // Recursively removes item and sub-items as potential reference targets.
   removeTargets_(item: any) {
-    const self = this, dataModel = this.dataModel_;
+    const self = this,
+          dataModel = this.dataModel_;
     dataModel.visitSubtree(item, function(item: any) {
-      const id = dataModel.getId(item);
+      const id = self.getId(item);
       if (id)
         self.targets_.delete(id);
     });
@@ -325,7 +329,7 @@ export class ReferenceModel {
     const self = this;
     const unidentifed = new Array();
     dataModel.visitSubtree(dataModel.root(), function(item: object) {
-      const id = dataModel.getId(item);
+      const id = self.getId(item);
       if (!id)
         unidentifed.push(item);
       else
@@ -794,7 +798,8 @@ export class InstancingModel {
   private referenceModel: ReferenceModel;
 
   clone(item: any, map: Map<number, any>) {
-    const self = this, dataModel = this.dataModel;
+    const self = this,
+          dataModel = this.dataModel;
     // Return any primitive values without cloning.
     if (!dataModel.isItem(item))
       return item;
@@ -806,10 +811,11 @@ export class InstancingModel {
     });
     // Assign unique id after cloning all properties.
     if (!Array.isArray(copy)) {
-      this.referenceModel.assignId(copy);
+      const referenceModel = this.referenceModel;
+      referenceModel.assignId(copy);
       dataModel.initialize(copy);
       if (map) {
-        const id = dataModel.getId(item);
+        const id = referenceModel.getId(item);
         map.set(id, copy);
       }
     }
@@ -832,7 +838,7 @@ export class InstancingModel {
             const originalId: number = copy[attr],
                   newCopy = map.get(originalId);
             if (newCopy) {
-              const newId = dataModel.getId(newCopy);
+              const newId = referenceModel.getId(newCopy);
               copy[attr] = newId;
             }
           }
@@ -874,8 +880,8 @@ export class InstancingModel {
       }
 
       // Add item1 -> item2 id mapping.
-      const id1 = dataModel.getId(item1),
-            id2 = dataModel.getId(item2);
+      const id1 = referenceModel.getId(item1),
+            id2 = referenceModel.getId(item2);
       if (id1 && id2)
         map.set(id1, id2);
 
