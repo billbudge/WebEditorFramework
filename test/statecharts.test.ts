@@ -1,140 +1,200 @@
 import {describe, expect, test} from '@jest/globals';
-import * as Data from '../src/dataModels';
 import * as Statecharts from '../examples/statecharts';
+// import * as Statecharts from '../examples/statecharts';
 
 // Statechart unit tests
 
-let id = 1;
+// let id = 1;
 
-function newStatechart() : Statecharts.Statechart {
-  return {
-    type: 'statechart',
-    items: new Array<Statecharts.StatechartItem>(),
-    name: 'test',
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-  };
-}
+// function newStatechart() : Statecharts.Statechart {
+//   return {
+//     type: 'statechart',
+//     items: new Array<Statecharts.StatechartItem>(),
+//     name: 'test',
+//     x: 0,
+//     y: 0,
+//     width: 0,
+//     height: 0,
+//   };
+// }
 
-function newState() : Statecharts.State {
-  return {
-    type: 'state',
-    id: id++,
-    x: 0,
-    y: 0,
-  };
-}
+// function newState() : Statecharts.State {
+//   return {
+//     type: 'state',
+//     id: id++,
+//     x: 0,
+//     y: 0,
+//   };
+// }
 
-function newPseudoState(type: 'start' | 'stop' | 'history' | 'history*') : Statecharts.State {
-  return {
-    type: type,
-    id: id++,
-    x: 0,
-    y: 0,
-  };
-}
+// function newPseudoState(type: 'start' | 'stop' | 'history' | 'history*') : Statecharts.State {
+//   return {
+//     type: type,
+//     id: id++,
+//     x: 0,
+//     y: 0,
+//   };
+// }
 
-function newTransition(src: Statecharts.State, dst: Statecharts.State) : Statecharts.Transition {
-  return {
-    type: 'transition',
-    srcId: src.id,
-    dstId: dst.id,
-  }
-}
+// function newTransition(src: Statecharts.State, dst: Statecharts.State) : Statecharts.Transition {
+//   return {
+//     type: 'transition',
+//     srcId: src.id,
+//     dstId: dst.id,
+//   }
+// }
 
-interface TestModel {
-  statechart: Statecharts.Statechart;
-  dataModel: Data.DataModel;
-  observableModel: Data.ObservableModel;
-  referenceModel: Data.ReferenceModel;
-  hierarchyModel: Data.HierarchyModel;
-  selectionModel: Data.SelectionModel;
-  instancingModel: Data.InstancingModel;
-  translationModel: Data.TranslationModel;
-  statechartModel: Statecharts.StatechartModel;
-  editingModel: Statecharts.EditingModel;
-}
+// interface TestModel {
+//   statechart: Statecharts.Statechart;
+//   dataModel: Data.DataModel;
+//   observableModel: Data.ObservableModel;
+//   referenceModel: Data.ReferenceModel;
+//   hierarchyModel: Data.HierarchyModel;
+//   selectionModel: Data.SelectionModel;
+//   instancingModel: Data.InstancingModel;
+//   translationModel: Data.TranslationModel;
+//   statechartModel: Statecharts.StatechartModel;
+//   editingModel: Statecharts.EditingModel;
+// }
 
-function NewTestModel(statechart: Statecharts.Statechart = newStatechart()) : TestModel {
-  const dataModel = new Data.DataModel(statechart),
-        observableModel = new Data.ObservableModel(),
-        referenceModel = new Data.ReferenceModel(dataModel, observableModel),
-        hierarchyModel = new Data.HierarchyModel(dataModel, observableModel),
-        selectionModel = new Data.SelectionModel(),
-        instancingModel = new Data.InstancingModel(dataModel, referenceModel),
-        translationModel = new Data.TranslationModel(dataModel, observableModel, hierarchyModel),
-        statechartModel = new Statecharts.StatechartModel(
-            statechart, observableModel, hierarchyModel, referenceModel),
-        editingModel = new Statecharts.EditingModel(
-            statechart, dataModel, observableModel, hierarchyModel, referenceModel,
-            selectionModel, instancingModel, translationModel, statechartModel);
-  return {
-    statechart,
-    dataModel,
-    observableModel,
-    referenceModel,
-    hierarchyModel,
-    selectionModel,
-    instancingModel,
-    translationModel,
-    statechartModel,
-    editingModel,
-  }
-}
+// function NewTestModel(statechart: Statecharts.Statechart = newStatechart()) : TestModel {
+//   const dataModel = new Data.DataModel(statechart),
+//         observableModel = new Data.ObservableModel(),
+//         referenceModel = new Data.ReferenceModel(dataModel, observableModel),
+//         hierarchyModel = new Data.HierarchyModel(dataModel, observableModel),
+//         selectionModel = new Data.SelectionModel(),
+//         instancingModel = new Data.InstancingModel(dataModel, referenceModel),
+//         translationModel = new Data.TranslationModel(dataModel, observableModel, hierarchyModel),
+//         statechartModel = new Statecharts.StatechartModel(
+//             statechart, observableModel, hierarchyModel, referenceModel),
+//         editingModel = new Statecharts.EditingModel(
+//             statechart, dataModel, observableModel, hierarchyModel, referenceModel,
+//             selectionModel, instancingModel, translationModel, statechartModel);
+//   return {
+//     statechart,
+//     dataModel,
+//     observableModel,
+//     referenceModel,
+//     hierarchyModel,
+//     selectionModel,
+//     instancingModel,
+//     translationModel,
+//     statechartModel,
+//     editingModel,
+//   }
+// }
 
-function addItem(model: TestModel,
-         item: Statecharts.State | Statecharts.Transition,
-         parent: Statecharts.State | Statecharts.Statechart) : Statecharts.StatechartItem {
-  const editingModel = model.editingModel,
-        newItem = editingModel.newItem(item) as Statecharts.State | Statecharts.Transition,
-        result = editingModel.addItem(newItem, parent);
-  return result;
-}
+// function addItem(model: TestModel,
+//          item: Statecharts.State | Statecharts.Transition,
+//          parent: Statecharts.State | Statecharts.Statechart) : Statecharts.StatechartItem {
+//   const editingModel = model.editingModel,
+//         newItem = editingModel.newItem(item) as Statecharts.State | Statecharts.Transition,
+//         result = editingModel.addItem(newItem, parent);
+//   return result;
+// }
 
 //------------------------------------------------------------------------------
 
 describe('StatechartModel', () => {
-  test('getGraphInfo', () => {
-    const statechart = newStatechart(),
-          model = NewTestModel(statechart),
-          statechartModel = model.statechartModel,
-          state1 = addItem(model, newState(), statechart) as Statecharts.State,
-          state2 = addItem(model, newState(), statechart) as Statecharts.State,
-          transition1 = addItem(model, newTransition(state1, state2), statechart);
-    let graph = statechartModel.getGraphInfo();
-    expect(graph.states.has(state1)).toBe(true);
-    expect(graph.states.has(state2)).toBe(true);
-    expect(graph.states.size).toBe(2);
-    expect(graph.statecharts.has(statechart)).toBe(true);
-    expect(graph.statecharts.size).toBe(1);
-    // QUnit.assert.deepEqual(graph.transitions.size, 1);
-    // expect(graph.interiorTransitions.has(transition1));
-    // QUnit.assert.deepEqual(graph.interiorTransitions.size, 1);
-    // QUnit.assert.deepEqual(graph.inTransitions.size, 0);
-    // QUnit.assert.deepEqual(graph.outTransitions.size, 0);
+  test('state interface', () => {
+    const context = new Statecharts.StatechartContext(),  // TODO context should create items.
+          state = context.newState();
+    expect(state.type).toBe('state');
+    expect(state.name).toBe('New State');
+    state.name = 'Test State';
+    expect(state.name).toBe('Test State');
+    expect(state.id).toBe(1);
+    expect(state.x).toBe(0);
+    state.x = 10;
+    expect(state.x).toBe(10);
+  });
+  test('pseudostate interface', () => {
+    const context = new Statecharts.StatechartContext(),
+          pseudostate = context.newPseudostate('start');
 
-    // const input = addItem(test, newState()),
-    //       output = addItem(test, newState()),
-    //       transition2 = addItem(test, newTransition(input, state1)),
-    //       transition3 = addItem(test, newTransition(state2, output));
+    expect(pseudostate.type).toBe('pseudostate');
+    expect(pseudostate.id).toBe(1);
+    expect(pseudostate.subtype).toBe('start');
+    expect(pseudostate.x).toBe(0);
+    pseudostate.x = 10;
+    expect(pseudostate.x).toBe(10);
+  });
+  test('transition interface', () => {
+    const context = new Statecharts.StatechartContext(),
+          state1 = context.newState(),
+          state2 = context.newState(),
+          transition = context.newTransition(state1, state2);
 
-    // graph = test.getGraphInfo();
-    // expect(graph.statesAndStatecharts.has(state1));
-    // expect(graph.statesAndStatecharts.has(state2));
-    // expect(graph.statesAndStatecharts.has(input));
-    // expect(graph.statesAndStatecharts.has(output));
-    // QUnit.assert.deepEqual(graph.statesAndStatecharts.size, 5);
-    // expect(graph.interiorTransitions.has(transition1));
-    // expect(graph.interiorTransitions.has(transition2));
-    // expect(graph.interiorTransitions.has(transition3));
-    // QUnit.assert.deepEqual(graph.transitions.size, 3);
-    // QUnit.assert.deepEqual(graph.interiorTransitions.size, 3);
-    // QUnit.assert.deepEqual(graph.inTransitions.size, 0);
-    // QUnit.assert.deepEqual(graph.outTransitions.size, 0);
+    expect(transition.type).toBe('transition');
+    expect(transition.src).toBe(state1);
+    expect(transition.dst).toBe(state2);
+    transition.dst = state1;
+    expect(transition.dst).toBe(state1);
+    transition.dst = undefined;
+    expect(transition.dst).toBeUndefined();
+  });
+  test('statechart interface', () => {
+    const context = new Statecharts.StatechartContext(),  // TODO context should create items.
+          statechart = context.newStatechart();
+
+    expect(statechart.type).toBe('statechart');
+    expect(statechart.name).toBe('');
+    statechart.name = 'Test Statechart';
+    expect(statechart.name).toBe('Test Statechart');
+    expect(statechart.x).toBe(0);
+    statechart.x = 10;
+    expect(statechart.x).toBe(10);
+  });
+  test('parent', () => {
+    const context = new Statecharts.StatechartContext(),  // TODO context should create items.
+          statechart = context.newStatechart(),
+          state1 = context.newState();
+
+    statechart.states.append(state1);
+    expect(state1.parent).toBe(statechart);
   });
 });
+
+// describe('StatechartModel', () => {
+//   test('getGraphInfo', () => {
+//     const statechart = newStatechart(),
+//           model = NewTestModel(statechart),
+//           statechartModel = model.statechartModel,
+//           state1 = addItem(model, newState(), statechart) as Statecharts.State,
+//           state2 = addItem(model, newState(), statechart) as Statecharts.State,
+//           transition1 = addItem(model, newTransition(state1, state2), statechart);
+//     let graph = statechartModel.getGraphInfo();
+//     expect(graph.states.has(state1)).toBe(true);
+//     expect(graph.states.has(state2)).toBe(true);
+//     expect(graph.states.size).toBe(2);
+//     expect(graph.statecharts.has(statechart)).toBe(true);
+//     expect(graph.statecharts.size).toBe(1);
+//     // QUnit.assert.deepEqual(graph.transitions.size, 1);
+//     // expect(graph.interiorTransitions.has(transition1));
+//     // QUnit.assert.deepEqual(graph.interiorTransitions.size, 1);
+//     // QUnit.assert.deepEqual(graph.inTransitions.size, 0);
+//     // QUnit.assert.deepEqual(graph.outTransitions.size, 0);
+
+//     // const input = addItem(test, newState()),
+//     //       output = addItem(test, newState()),
+//     //       transition2 = addItem(test, newTransition(input, state1)),
+//     //       transition3 = addItem(test, newTransition(state2, output));
+
+//     // graph = test.getGraphInfo();
+//     // expect(graph.statesAndStatecharts.has(state1));
+//     // expect(graph.statesAndStatecharts.has(state2));
+//     // expect(graph.statesAndStatecharts.has(input));
+//     // expect(graph.statesAndStatecharts.has(output));
+//     // QUnit.assert.deepEqual(graph.statesAndStatecharts.size, 5);
+//     // expect(graph.interiorTransitions.has(transition1));
+//     // expect(graph.interiorTransitions.has(transition2));
+//     // expect(graph.interiorTransitions.has(transition3));
+//     // QUnit.assert.deepEqual(graph.transitions.size, 3);
+//     // QUnit.assert.deepEqual(graph.interiorTransitions.size, 3);
+//     // QUnit.assert.deepEqual(graph.inTransitions.size, 0);
+//     // QUnit.assert.deepEqual(graph.outTransitions.size, 0);
+//   });
+// });
 
 // const statechartTests = (function () {
 //   'use strict';

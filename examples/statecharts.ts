@@ -1,4 +1,311 @@
 
+import { ScalarProp, ArrayProp, ReferencedObject, RefProp, ParentProp,
+         DataContext, List } from '../src/dataModels'
+
+  //------------------------------------------------------------------------------
+
+class StateTemplate {
+  x = new ScalarProp<number>('x');
+  y = new ScalarProp<number>('y');
+  width = new ScalarProp<number>('width');
+  height = new ScalarProp<number>('height');
+  name = new ScalarProp<string>('name');
+
+  parent = new ParentProp<Statechart>;
+
+  statecharts = new ArrayProp<Statechart>('statecharts');
+}
+
+class PseudostateTemplate {
+  x = new ScalarProp<number>('x');
+  y = new ScalarProp<number>('y');
+
+  parent = new ParentProp<Statechart>;
+}
+
+class TransitionTemplate {
+  event = new ScalarProp<string>('event');
+  guard = new ScalarProp<string>('guard');
+  action = new ScalarProp<string>('action');
+  src = new RefProp<State | Pseudostate>('src');
+  dst = new RefProp<State | Pseudostate>('dst');
+
+  parent = new ParentProp<Statechart>;
+}
+
+class StatechartTemplate {
+  x = new ScalarProp<number>('x');
+  y = new ScalarProp<number>('y');
+  name = new ScalarProp<string>('name');
+  width = new ScalarProp<number>('width');
+  height = new ScalarProp<number>('height');
+
+  parent = new ParentProp<State>;
+
+  states = new ArrayProp<State | Pseudostate>('states');
+  transitions = new ArrayProp<Transition>('transitions');
+}
+
+const stateTemplate = new StateTemplate();
+const pseudostateTemplate = new PseudostateTemplate();
+const transitionTemplate = new TransitionTemplate();
+const statechartTemplate = new StatechartTemplate();
+
+export type StateType = 'state';
+
+export class State implements ReferencedObject {
+  private readonly template: StateTemplate = stateTemplate;
+  id: number;
+  context: DataContext;
+
+  readonly type: StateType = 'state';
+
+  get x() : number { return this.template.x.get(this, this.context) || 0; }
+  set x(value: number) { this.template.x.set(this, this.context, value); }
+  get y() : number { return this.template.y.get(this, this.context) || 0; }
+  set y(value: number) { this.template.y.set(this, this.context, value); }
+  get width() : number { return this.template.width.get(this, this.context) || 0; }
+  set width(value: number) { this.template.width.set(this, this.context, value); }
+  get height() : number { return this.template.height.get(this, this.context) || 0; }
+  set height(value: number) { this.template.height.set(this, this.context, value); }
+  get name() : string { return this.template.name.get(this, this.context) || 'New State'; }
+  set name(value: string) { this.template.name.set(this, this.context, value); }
+
+  get parent() : Statechart | undefined { return this.template.parent.get(this, this.context); };
+
+  get statecharts() : List<Statechart> { return this.template.statecharts.get(this, this.context); }
+
+  constructor(context: DataContext) {
+    this.context = context;
+  }
+}
+
+export type PseudostateType = 'pseudostate';
+export type PseudostateSubType = 'start' | 'stop' | 'history' | 'history*';
+
+export class Pseudostate implements ReferencedObject {
+  private readonly template: PseudostateTemplate = pseudostateTemplate;
+  id: number;
+  context: DataContext;
+
+  readonly type: PseudostateType = 'pseudostate';
+  readonly subtype: PseudostateSubType;
+
+  get x() : number { return this.template.x.get(this, this.context) || 0; }
+  set x(value: number) { this.template.x.set(this, this.context, value); }
+  get y() : number { return this.template.y.get(this, this.context) || 0; }
+  set y(value: number) { this.template.y.set(this, this.context, value); }
+
+  get parent() : Statechart | undefined { return this.template.parent.get(this, this.context); };
+
+  constructor(subtype: PseudostateSubType, context: DataContext) {
+    this.subtype = subtype;
+    this.context = context;
+  }
+}
+
+export type TransitionType = 'transition';
+
+export class Transition {
+  private readonly template: TransitionTemplate = transitionTemplate;
+  context: DataContext;
+
+  readonly type: TransitionType = 'transition';
+
+  get src() : State | Pseudostate | undefined { return this.template.src.get(this, this.context); }
+  set src(value: State | Pseudostate | undefined) { this.template.src.set(this, this.context, value); }
+  get dst() : State | Pseudostate | undefined { return this.template.dst.get(this, this.context); }
+  set dst(value: State | Pseudostate | undefined) { this.template.dst.set(this, this.context, value); }
+
+  get parent() : Statechart | undefined { return this.template.parent.get(this, this.context); };
+
+  constructor(context: DataContext) {
+    this.context = context;
+  }
+}
+
+export type StatechartType = 'statechart';
+
+export class Statechart {
+  private readonly template: StatechartTemplate = statechartTemplate;
+  context: DataContext;
+
+  readonly type: StatechartType = 'statechart';
+
+  get x() : number { return this.template.x.get(this, this.context) || 0; }
+  set x(value: number) { this.template.x.set(this, this.context, value); }
+  get y() : number { return this.template.y.get(this, this.context) || 0; }
+  set y(value: number) { this.template.y.set(this, this.context, value); }
+  get width() : number { return this.template.width.get(this, this.context) || 0; }
+  set width(value: number) { this.template.width.set(this, this.context, value); }
+  get height() : number { return this.template.height.get(this, this.context) || 0; }
+  set height(value: number) { this.template.height.set(this, this.context, value); }
+  get name() : string { return this.template.name.get(this, this.context) || ''; }
+  set name(value: string) { this.template.name.set(this, this.context, value); }
+
+  get parent() : State | undefined { return this.template.parent.get(this, this.context); };
+
+  get states() : List<State | Pseudostate> { return this.template.states.get(this, this.context); }
+  get transitions() : List<Transition> { return this.template.transitions.get(this, this.context); }
+
+  constructor(context: DataContext) {
+    this.context = context;
+  }
+}
+
+//------------------------------------------------------------------------------
+
+type StateTypes = State | Pseudostate;
+type ParentTypes = Statechart | State | undefined;
+type AllTypes = StateTypes | Statechart | Transition;
+
+type StateVisitor = (state: StateTypes, parent: ParentTypes) => void;
+type StatechartVisitor = (item: AllTypes, parent: ParentTypes) => void;
+
+const parent_ = Symbol('parent');
+
+export class StatechartContext implements DataContext<AllTypes, ReferencedObject, AllTypes> {
+  private highestId_: number = 0;  // 0 stands for no id.
+  private stateMap_ = new Map<number, State | Pseudostate>();
+  private root_: Statechart;
+
+  root() : Statechart { return this.root_; }
+
+  newState() : State {
+    const result: State = new State(this),
+          nextId = ++this.highestId_;
+    this.stateMap_.set(nextId, result);
+    result.id = nextId;
+    return result;
+  }
+
+  newPseudostate(subtype: PseudostateSubType) : Pseudostate {
+    const result: Pseudostate = new Pseudostate(subtype, this),
+          nextId = ++this.highestId_;
+    this.stateMap_.set(nextId, result);
+    result.id = nextId;
+    return result;
+  }
+
+  newTransition(src: StateTypes, dst: StateTypes) : Transition {
+    const result: Transition = new Transition(this);
+    result.src = src;
+    result.dst = dst;
+    return result;
+  }
+
+  newStatechart() : Statechart {
+    const result: Statechart = new Statechart(this);
+    return result;
+  }
+
+  visitStates(item: State | Pseudostate | Statechart, parent: ParentTypes, visitor: StateVisitor) : void {
+    const self = this;
+    if (item.type === 'state') {
+      visitor(item, parent);
+      item.statecharts.forEach(t => self.visitStates(t, item, visitor));
+    } else if (item.type === 'pseudostate') {
+      visitor(item, parent);
+    } else if (item.type === 'statechart') {
+      item.states.forEach(t => self.visitStates(t, item, visitor));
+    }
+  }
+  visitAll(item: AllTypes, parent: ParentTypes, visitor: StatechartVisitor) : void {
+    const self = this;
+    visitor(item, parent);
+    if (item.type === 'state') {
+      item.statecharts.forEach(t => self.visitAll(t, item, visitor));
+    } else if  (item.type === 'statechart') {
+      item.states.forEach(t => self.visitAll(t, item, visitor));
+      item.transitions.forEach(t => self.visitAll(t, item, visitor));
+    }
+  }
+
+  private addItem(item: AllTypes, parent: ParentTypes) : void {
+    if (item.type === 'statechart' || item.type === 'state') {
+      this.addSubtree(item, parent);
+    }
+  }
+  private addSubtree(item: AllTypes, parent: ParentTypes) : void {
+    const self = this;
+    const unidentified = new Array<StateTypes>();
+    this.visitAll(item, parent, (item, parent) => {
+      // Ensure unique ids. TODO - check for duplicates.
+      if (item.type === 'state' || item.type === 'pseudostate') {
+        if (item.id !== undefined) {
+          self.highestId_ = Math.max(self.highestId_, item.id);
+          self.stateMap_.set(item.id, item);
+        } else {
+          unidentified.push(item);
+        }
+      }
+      // Set parent attribute.
+      (item as any)[parent_] = parent;
+    });
+    unidentified.forEach((item: StateTypes) => {
+      item.id = ++self.highestId_;
+      self.stateMap_.set(item.id, item);
+    });
+  }
+
+  setRoot(root: Statechart) : void {
+    this.addSubtree(root, undefined);
+    this.root_ = root;
+  }
+
+  getValue(owner: AllTypes, attr: string) : any {
+    return (owner as any)[attr];
+  }
+  setValue(owner: AllTypes, attr: string, value: any) : any {
+    (owner as any)[attr] = value;
+  }
+  getReference(owner: AllTypes, attr: string) : ReferencedObject | undefined {
+    const id = (owner as any)[attr] as number;
+    return this.stateMap_.get(id);
+  }
+  setReference(owner: AllTypes, attr: string, value: ReferencedObject) : void {
+    if (value === undefined) {
+      (owner as any)[attr] = undefined;
+    } else {
+      (owner as any)[attr] = value.id;
+    }
+  }
+  getParent(owner: AllTypes) : AllTypes | undefined {
+    return (owner as any)[parent_];
+  }
+  insert(owner: AllTypes, attr: string, index: number, value: AllTypes) : void {
+    let array = (owner as any)[attr];
+    if (!array) {
+      array = [];
+      (owner as any)[attr] = array;
+    }
+    array.splice(index, 0, value);
+    this.addItem(value, owner as ParentTypes);
+  }
+  remove(owner: AllTypes, attr: string, index: number) : AllTypes {
+    const array = (owner as any)[attr], oldValue = array[index];
+    array.splice(index, 1);
+    // (oldValue as any)[parent_] = undefined;
+    return oldValue;
+  }
+}
+
+//------------------------------------------------------------------------------
+
+export interface GraphInfo {
+  states: Set<State>;
+  statecharts: Set<Statechart>;
+  transitions: Set<Transition>;
+  interiorTransitions: Set<Transition>;
+  inTransitions: Set<Transition>;
+  outTransitions: Set<Transition>;
+}
+
+const _inTransitions = Symbol('StatechartModel.inTransitions'),
+      _outTransitions = Symbol('StatechartModel.outTransitions');
+
+
+/*
 import { DataModel, ObservableModel, Change, ReferenceModel, HierarchyModel,
          SelectionModel, InstancingModel, TranslationModel } from '../src/dataModels'
 

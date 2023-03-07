@@ -2,13 +2,155 @@ import { SelectionSet } from './collections';
 
 export type ItemVisitor = (item: object) => void;
 
-export type DataAttr = string | number;
-export type PropertyVisitor = (item: object, attr: DataAttr) => void;
+export type PropertyVisitor = (item: object, attr: string) => void;
 
-// TODO DataAttr => string, PropertyKey?
-// TODO Make DataModel and the rest generic with T = any
 // TODO SelectionModel tests.
 // TODO more ReferenceModel tests.
+
+//------------------------------------------------------------------------------
+
+// Raw objects store the data as a tree. Objects have properties and children.
+// Raw object data can be traversed without writing any code.
+// Various data models add data derived from the raw data, such as change events, hierarchy, references.
+// Interfaces adapt the raw data for type safe use.
+
+export interface List<T = any> {
+  length: number;
+  at: (index: number) => T | undefined;
+  append(element: T) : void;
+  insert(element: T, index: number) : void;
+  remove(index: number) : T | undefined;
+  forEach(visitor: (element: T) => void) : void;
+  forEachReverse(visitor: (element: T) => void) : void;
+}
+
+export class DataList<T = any> implements List<T> {
+  private owner: object;
+  private name: string;
+  private dataContext: DataContext;
+
+  get length() : number {
+    let array = this.dataContext.getValue(this.owner, this.name);
+    return array ? array.length : 0;
+  }
+
+  at(index: number) : T | undefined {
+    let array = this.dataContext.getValue(this.owner, this.name);
+    return array ? array[index] : undefined;
+  }
+
+  insert(element: T, index: number) {
+    let array = this.dataContext.getValue(this.owner, this.name);
+    if (!array) {
+      array = [];
+      this.dataContext.setValue(this.owner, this.name, array);
+    }
+    this.dataContext.insert(this.owner, this.name, index, element);
+  }
+
+  append(element: T) {
+    let array = this.dataContext.getValue(this.owner, this.name);
+    let index = array ? array.length : 0;
+    this.dataContext.insert(this.owner, this.name, index, element);
+  }
+
+  remove(index: number) : T | undefined {
+    let array = this.dataContext.getValue(this.owner, this.name);
+    if (!array)
+      return undefined;
+    return this.dataContext.remove(this.owner, this.name, index);
+  }
+
+  forEach(visitor: (element: T) => void) : void {
+    let array = this.dataContext.getValue(this.owner, this.name);
+    if (!array)
+      return;
+    array.forEach(visitor);
+  };
+
+  forEachReverse(visitor: (element: T) => void) : void {
+    let array = this.dataContext.getValue(this.owner, this.name);
+    if (!array)
+      return;
+    for (let i = array.length - 1; i >= 0; --i) {
+      visitor(array[i]);
+    }
+  };
+
+  constructor(owner: object, dataContext: DataContext, name: string) {
+    this.owner = owner;
+    this.dataContext = dataContext;
+    this.name = name;
+  }
+}
+
+//------------------------------------------------------------------------------
+
+export interface DataContext<TObject extends object = object,
+                             TReferent extends object = object,
+                             TArrayElement = any> {
+  getValue(owner: TObject, attr: string) : any;
+  setValue(owner: TObject, attr: string, value: any) : any;
+  getReference(owner: TObject, attr: string) : TReferent | undefined;
+  setReference(owner: TObject, attr: string, value: TReferent | undefined) : void;
+  getParent(owner: TObject) : TObject | undefined;
+  insert(owner: TObject, attr: string, index: number, value: TArrayElement) : void;
+  remove(owner: TObject, attr: string, index: number) : TArrayElement;
+}
+
+//------------------------------------------------------------------------------
+
+export class ScalarProp<T = any> {
+  name: string;
+
+  get(owner: object, dataContext: DataContext) : T | undefined {
+    return dataContext.getValue(owner, this.name) as T | undefined;
+  }
+  set(owner: object, dataContext: DataContext, value: T) : T | undefined {
+    return dataContext.setValue(owner, this.name, value) as T | undefined;
+  }
+  constructor(name: string) {
+    this.name = name + '_';
+  }
+}
+
+export class ArrayProp<T = any> {
+  name: string;
+
+  get(owner: object, dataContext: DataContext) : List<T> {
+    return new DataList<T>(owner, dataContext, this.name);
+  }
+
+  constructor(name: string) {
+    this.name = name + '_';
+  }
+}
+
+// Only objects with 'id' field can be referenced.
+export interface ReferencedObject extends Object {
+  readonly id: number;
+}
+
+export class RefProp<T extends ReferencedObject> {
+  name: string;
+
+  get(owner: object, dataContext: DataContext) : T | undefined {
+    return dataContext.getReference(owner, this.name) as T | undefined;
+  }
+  set(owner: object, dataContext: DataContext, value: T | undefined) : T | undefined {
+    return dataContext.setReference(owner, this.name, value) as T | undefined;
+  }
+  constructor(name: string) {
+    this.name = name + '_';
+  }
+}
+
+// Parents and children must be objects.
+export class ParentProp<T extends object = object> {
+  get(owner: object, dataContext: DataContext) : T | undefined {
+    return dataContext.getParent(owner) as T;
+  }
+}
 
 //------------------------------------------------------------------------------
 
@@ -22,39 +164,31 @@ export class DataModel {
     return this.root_;
   }
 
-  isItem(item: any) {
+  isItem(item: object) {
     return typeof item === 'object' && item !== null;
   }
 
   // Returns true iff. item[attr] is a model property.
-  isProperty(item: object, attr: DataAttr) : boolean {
+  isProperty(item: object, attr: string) : boolean {
     return item.hasOwnProperty(attr);
   }
 
   // Visits the item's top level properties.
   visitProperties(item: object, propFn: PropertyVisitor) {
-    if (Array.isArray(item)) {
-      // Array item.
-      const length = item.length;
-      for (let i = 0; i < length; i++)
-        propFn(item, i);
-    } else {
-      // Object.
-      for (let attr in item) {
-        if (this.isProperty(item, attr))
-          propFn(item, attr);
-      }
+    for (let attr in item) {
+      if (this.isProperty(item, attr))
+        propFn(item, attr);
     }
-  }
+}
 
   // Visits the item's top level properties that are Arrays or child items.
   visitChildren(item: object, childFn: ItemVisitor) {
     const self = this;
-    this.visitProperties(item, function(item: object, attr: DataAttr) {
+    this.visitProperties(item, function(item: object, attr: string) {
       const value = (item as any)[attr];
       if (Array.isArray(value)) {
         self.visitChildren(value, childFn);
-      } else if (value instanceof Object) {
+      } else if (self.isItem(value)) {
         childFn(value);
       }
     });
@@ -127,8 +261,8 @@ export class EventBase<TArg, TEvents> {
 
 // Observable Model.
 
-// Generic change event, and more specific variants.
 type ChangeType = 'valueChanged' | 'elementInserted' | 'elementRemoved';
+// Generic 'change' event.
 type ChangeEvents = 'changed' | ChangeType;
 
 // Standard formats:
@@ -138,13 +272,10 @@ type ChangeEvents = 'changed' | ChangeType;
 export class Change {
   type: ChangeType;
   item: object;
-  attr: DataAttr;
+  attr: string;
   index: number;
   oldValue: any;
 }
-
-type ChangeHandler = EventHandler<Change>;
-type ChangeHandlers = EventHandlers<Change>;
 
 export class ObservableModel extends EventBase<Change, ChangeEvents> {
   private onChanged(change: Change) : Change {
@@ -152,7 +283,7 @@ export class ObservableModel extends EventBase<Change, ChangeEvents> {
     super.onEvent('changed', change);
     return change
   }
-  changeValue(item: any, attr: DataAttr, newValue: any) : any {
+  changeValue(item: any, attr: string, newValue: any) : any {
     const oldValue = item[attr];
     if (newValue !== oldValue) {
       item[attr] = newValue;
@@ -160,29 +291,29 @@ export class ObservableModel extends EventBase<Change, ChangeEvents> {
     }
     return oldValue;
   }
-  onValueChanged(item: any, attr: DataAttr, oldValue: any) : Change {
+  onValueChanged(item: any, attr: string, oldValue: any) : Change {
     const change: Change = {type: 'valueChanged', item, attr, index: 0, oldValue };
     super.onEvent('valueChanged', change);
     return this.onChanged(change);
 
   }
-  insertElement(item: any, attr: DataAttr, index: number, newValue: any) {
+  insertElement(item: any, attr: string, index: number, newValue: any) {
     const array = item[attr];
     array.splice(index, 0, newValue);
     this.onElementInserted(item, attr, index);
   }
-  onElementInserted(item: any, attr: DataAttr, index: number) : Change {
+  onElementInserted(item: any, attr: string, index: number) : Change {
     const change: Change = { type: 'elementInserted', item: item, attr: attr, index: index, oldValue: undefined };
     super.onEvent('elementInserted', change);
     return this.onChanged(change);
   }
-  removeElement(item: any, attr: DataAttr, index: number) {
+  removeElement(item: any, attr: string, index: number) {
     const array = item[attr], oldValue = array[index];
     array.splice(index, 1);
     this.onElementRemoved(item, attr, index, oldValue);
     return oldValue;
   }
-  onElementRemoved(item: any, attr: DataAttr, index: number, oldValue: any ) : Change {
+  onElementRemoved(item: any, attr: string, index: number, oldValue: any ) : Change {
     const change: Change = { type: 'elementRemoved', item: item, attr: attr, index: index, oldValue: oldValue };
     super.onEvent('elementRemoved', change);
     return this.onChanged(change);
@@ -232,7 +363,7 @@ export class ReferenceModel {
   }
 
   // Returns true iff. item[attr] is a property that references an item.
-  isReference(item: object, attr: DataAttr) {
+  isReference(item: object, attr: string) {
     const attrName = attr.toString(),
           position = attrName.lastIndexOf('Id');
     return position === attrName.length - 2;
@@ -290,7 +421,7 @@ export class ReferenceModel {
   onChanged_(change: Change) {
     const dataModel = this.dataModel_,
           item: any = change.item,
-          attr: DataAttr = change.attr;
+          attr: string = change.attr;
     switch (change.type) {
       case 'valueChanged': {
         if (this.isReference(item, attr)) {
@@ -413,7 +544,7 @@ export class HierarchyModel {
   onChanged_(change: Change) {
     const dataModel = this.dataModel_,
           item: any = change.item,
-          attr: DataAttr = change.attr;
+          attr: string = change.attr;
     switch (change.type) {
       case 'valueChanged': {
         const newValue = item[attr];
@@ -523,7 +654,7 @@ class ChangeOperation implements Operation {
   undo() {
     const change: Change = this.change,
           item: any = change.item,
-          attr: DataAttr = change.attr,
+          attr: string = change.attr,
           observableModel = this.observableModel;
     switch (change.type) {
       case 'valueChanged': {
@@ -806,7 +937,7 @@ export class InstancingModel {
 
     // Use constructor() to properly clone arrays, sets, maps, etc.
     const copy = item.constructor();
-    dataModel.visitProperties(item, function(item: any, attr: DataAttr) {
+    dataModel.visitProperties(item, function(item: any, attr: string) {
       copy[attr] = self.clone(item[attr], map);
     });
     // Assign unique id after cloning all properties.
@@ -998,7 +1129,7 @@ export class TranslationModel {
 
     onChanged_(change: Change) {
       const dataModel = this.dataModel,
-            item: any = change.item, attr: DataAttr = change.attr;
+            item: any = change.item, attr: string = change.attr;
       switch (change.type) {
         case 'valueChanged': {
           const newValue = item[attr];

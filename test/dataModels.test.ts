@@ -40,7 +40,7 @@ describe('DataModel', () => {
           },
           dataModel = new Data.DataModel(root);
 
-    const rootProps = new Array<Data.DataAttr>();
+    const rootProps = new Array<string>();
     dataModel.visitProperties(root, (item, attr) => { rootProps.push(attr)});
     expect(rootProps.toString()).toBe('id,childId,foo,child,props');
   });
@@ -204,7 +204,7 @@ describe('ReferenceModel', () => {
           observableModel = new Data.ObservableModel(),
           referenceModel = new Data.ReferenceModel(dataModel, observableModel);
 
-    const rootRefs = new Array<Data.DataAttr>();
+    const rootRefs = new Array<string>();
     referenceModel.visitReferences(root, (item, attr) => { rootRefs.push(attr)});
     expect(rootRefs.toString()).toBe('childId,fooId');
   });
