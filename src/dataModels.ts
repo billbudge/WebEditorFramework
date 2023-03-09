@@ -94,21 +94,22 @@ export class DataList<T = any> implements List<T> {
 //------------------------------------------------------------------------------
 
 export interface DataContext<TObject extends object = object,
-                             TReferent extends object = object,
+                             TReferent extends ReferencedObject = ReferencedObject,
                              TArrayElement = any> {
   getValue(owner: TObject, attr: string) : any;
   setValue(owner: TObject, attr: string, value: any) : any;
-  getReference(owner: TObject, attr: string) : TReferent | undefined;
-  setReference(owner: TObject, attr: string, value: TReferent | undefined) : void;
-  getParent(owner: TObject) : TObject | undefined;
+  getReference(owner: TObject, prop: RefProp<TReferent>) : TReferent | undefined;
+  setReference(owner: TObject, prop: RefProp<TReferent>, value: TReferent | undefined) : void;
   insert(owner: TObject, attr: string, index: number, value: TArrayElement) : void;
   remove(owner: TObject, attr: string, index: number) : TArrayElement;
 }
 
 //------------------------------------------------------------------------------
 
+// Objects with properties.
+
 export class ScalarProp<T = any> {
-  name: string;
+  readonly name: string;
 
   get(owner: object, dataContext: DataContext) : T | undefined {
     return dataContext.getValue(owner, this.name) as T | undefined;
@@ -122,7 +123,7 @@ export class ScalarProp<T = any> {
 }
 
 export class ArrayProp<T = any> {
-  name: string;
+  readonly name: string;
 
   get(owner: object, dataContext: DataContext) : List<T> {
     return new DataList<T>(owner, dataContext, this.name);
@@ -139,24 +140,87 @@ export interface ReferencedObject extends Object {
 }
 
 export class RefProp<T extends ReferencedObject> {
-  name: string;
+  readonly name: string;
+  readonly cacheKey: symbol;
 
   get(owner: object, dataContext: DataContext) : T | undefined {
-    return dataContext.getReference(owner, this.name) as T | undefined;
+    return dataContext.getReference(owner, this) as T | undefined;
   }
   set(owner: object, dataContext: DataContext, value: T | undefined) : T | undefined {
-    return dataContext.setReference(owner, this.name, value) as T | undefined;
+    return dataContext.setReference(owner, this, value) as T | undefined;
   }
   constructor(name: string) {
     this.name = name + '_';
+    this.cacheKey = Symbol.for(name);
   }
 }
 
-// Parents and children must be objects.
+//------------------------------------------------------------------------------
+
+// Hierarchical structures.
+
+// Virtual property. Parents and children must be objects.
 export class ParentProp<T extends object = object> {
-  get(owner: object, dataContext: DataContext) : T | undefined {
-    return dataContext.getParent(owner) as T;
+  static readonly key: unique symbol = Symbol.for('parent');
+  get(owner: object) : T | undefined {
+    return (owner as any)[ParentProp.key] as T | undefined;
   }
+  set (owner: object, value: T | undefined) : T | undefined {
+    const oldValue = this.get(owner);
+    (owner as any)[ParentProp.key] = value;
+    return oldValue;
+  }
+}
+
+export interface Parented<T> {
+  parent?: T
+};
+
+export function getLineage<T extends Parented<T>>(item: Parented<T> | undefined) {
+  const lineage = new Array<Parented<T>>();
+  while (item) {
+    lineage.push(item);
+    item = this.getParent(item);
+  }
+  return lineage;
+}
+
+export function getHeight<T extends Parented<T>>(item: Parented<T> | undefined) {
+  let height = 0;
+  while (item) {
+    height++;
+    item = item.parent;
+  }
+  return height;
+}
+
+export function getLowestCommonAncestor<T extends Parented<T>>(
+    ...items: Array<T>) : T | undefined {
+  let lca = items[0];
+  let heightLCA = getHeight(lca);
+  for (let i = 1; i < items.length; i++) {
+    let next = arguments[i];
+    let nextHeight = getHeight(next);
+    if (heightLCA > nextHeight) {
+      while (heightLCA > nextHeight) {
+        lca = lca.parent!;
+        heightLCA--;
+      }
+    } else {
+      while (nextHeight > heightLCA) {
+        next = next.parent;
+        nextHeight--;
+      }
+    }
+    while (heightLCA && nextHeight && lca !== next) {
+      lca = lca.parent!;
+      next = next.parent;
+      heightLCA--;
+      nextHeight--;
+    }
+    if (heightLCA == 0 || nextHeight == 0) return undefined;
+  }
+  return lca;
 }
 
 //------------------------------------------------------------------------------
@@ -586,48 +650,6 @@ export class HierarchyModel<T extends object = object> {
     this.setParent(dataModel.root(), undefined)
     this.setChildren(dataModel.root());
   }
-}
-
-interface HasParent<T> {
-  parent?: T
-};
-
-export function getHeight<T extends HasParent<T>>(item: HasParent<T> | undefined) {
-  let height = 0;
-  while (item) {
-    height++;
-    item = item.parent;
-  }
-  return height;
-}
-
-export function getLowestCommonAncestor<T extends HasParent<T>>(
-    ...items: Array<T>) : T | undefined {
-  let lca = items[0];
-  let heightLCA = getHeight(lca);
-  for (let i = 1; i < items.length; i++) {
-    let next = arguments[i];
-    let nextHeight = getHeight(next);
-    if (heightLCA > nextHeight) {
-      while (heightLCA > nextHeight) {
-        lca = lca.parent!;
-        heightLCA--;
-      }
-    } else {
-      while (nextHeight > heightLCA) {
-        next = next.parent;
-        nextHeight--;
-      }
-    }
-    while (heightLCA && nextHeight && lca !== next) {
-      lca = lca.parent!;
-      next = next.parent;
-      heightLCA--;
-      nextHeight--;
-    }
-    if (heightLCA == 0 || nextHeight == 0) return undefined;
-  }
-  return lca;
 }
 
 //------------------------------------------------------------------------------

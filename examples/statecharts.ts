@@ -3,7 +3,9 @@ import { ScalarProp, ArrayProp, ReferencedObject, RefProp, ParentProp,
          DataContext, List, EventBase, Change, ChangeEvents,
          getLowestCommonAncestor } from '../src/dataModels'
 
-  //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+// Interfaces to statechart objects.
 
 const stateTemplate = {
   x: new ScalarProp<number>('x'),
@@ -37,7 +39,8 @@ export class State implements ReferencedObject {
   get name() { return this.template.name.get(this, this.context); }
   set name(value) { this.template.name.set(this, this.context, value); }
 
-  get parent() { return this.template.parent.get(this, this.context); };
+  get parent() { return this.template.parent.get(this); };
+  set parent(parent) { this.template.parent.set(this, parent); };
 
   get statecharts() { return this.template.statecharts.get(this, this.context); }
 
@@ -69,7 +72,8 @@ export class Pseudostate implements ReferencedObject {
   get y() { return this.template.y.get(this, this.context) || 0; }
   set y(value) { this.template.y.set(this, this.context, value); }
 
-  get parent() { return this.template.parent.get(this, this.context); };
+  get parent() { return this.template.parent.get(this); };
+  set parent(parent) { this.template.parent.set(this, parent); };
 
   constructor(subtype: PseudostateSubType, context: DataContext) {
     this.subtype = subtype;
@@ -107,7 +111,8 @@ export class Transition {
   get action() { return this.template.action.get(this, this.context); }
   set action(value) { this.template.action.set(this, this.context, value); }
 
-  get parent() { return this.template.parent.get(this, this.context); };
+  get parent() { return this.template.parent.get(this); };
+  set parent(parent) { this.template.parent.set(this, parent); };
 
   constructor(context: DataContext) {
     this.context = context;
@@ -146,7 +151,8 @@ export class Statechart {
   get name() { return this.template.name.get(this, this.context) || ''; }
   set name(value) { this.template.name.set(this, this.context, value); }
 
-  get parent() { return this.template.parent.get(this, this.context); };
+  get parent() { return this.template.parent.get(this); };
+  set parent(parent) { this.template.parent.set(this, parent); };
 
   get states() { return this.template.states.get(this, this.context); }
   get transitions() { return this.template.transitions.get(this, this.context); }
@@ -158,6 +164,8 @@ export class Statechart {
 
 //------------------------------------------------------------------------------
 
+// Interface to a statechart context.
+
 type StateTypes = State | Pseudostate;
 type ParentTypes = Statechart | State | undefined;
 type AllTypes = StateTypes | Statechart | Transition;
@@ -166,12 +174,10 @@ type StateVisitor = (state: StateTypes, parent: ParentTypes) => void;
 type StatechartVisitor = (item: AllTypes, parent: ParentTypes) => void;
 type TransitionVisitor = (item: Transition) => void;
 
-const parent_ = Symbol('parent');
-
 type StatechartChange = Change<AllTypes, AllTypes | undefined>;
 
 export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
-                               implements DataContext<AllTypes, ReferencedObject, AllTypes> {
+                               implements DataContext<AllTypes, StateTypes, AllTypes> {
   private highestId_: number = 0;  // 0 stands for no id.
   private stateMap_ = new Map<number, State | Pseudostate>();
   private root_: Statechart;
@@ -217,6 +223,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       item.states.forEach(t => self.visitStates(t, item, visitor));
     }
   }
+
   visitAll(item: AllTypes, parent: ParentTypes, visitor: StatechartVisitor) : void {
     const self = this;
     visitor(item, parent);
@@ -247,7 +254,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
         }
       }
       // Set parent attribute.
-      (item as any)[parent_] = parent;
+      item.parent = parent;
     });
     unidentified.forEach((item: StateTypes) => {
       item.id = ++self.highestId_;
@@ -267,19 +274,26 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     (owner as any)[attr] = value;
     return this.onValueChanged(owner, attr, value);
   }
-  getReference(owner: AllTypes, attr: string) : ReferencedObject | undefined {
-    const id = (owner as any)[attr] as number;
-    return this.stateMap_.get(id);
-  }
-  setReference(owner: AllTypes, attr: string, value: ReferencedObject) : void {
-    if (value === undefined) {
-      (owner as any)[attr] = undefined;
-    } else {
-      (owner as any)[attr] = value.id;
+  getReference(owner: AllTypes, prop: RefProp<StateTypes>) : StateTypes | undefined {
+    // Try to get cached referent.
+    let target = (owner as any)[prop.cacheKey];
+    if (target)
+      return target;
+    const id = (owner as any)[prop.name] as number;
+    target = this.stateMap_.get(id);
+    // Cache it on the object.
+    if (target) {
+      (owner as any)[prop.cacheKey] = target;
     }
+    return target;
   }
-  getParent(owner: AllTypes) : AllTypes | undefined {
-    return (owner as any)[parent_];
+  setReference(owner: AllTypes, prop: RefProp<StateTypes>, value: StateTypes) : void {
+    if (value === undefined) {
+      (owner as any)[prop.name] = undefined;
+    } else {
+      (owner as any)[prop.name] = value.id;
+    }
+    (owner as any)[prop.cacheKey] = value;
   }
   insert(owner: AllTypes, attr: string, index: number, value: AllTypes) : void {
     let array = (owner as any)[attr];

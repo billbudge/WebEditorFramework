@@ -1,103 +1,11 @@
 import {describe, expect, test} from '@jest/globals';
 import * as Statecharts from '../examples/statecharts';
-// import * as Statecharts from '../examples/statecharts';
-
-// Statechart unit tests
-
-// let id = 1;
-
-// function newStatechart() : Statecharts.Statechart {
-//   return {
-//     type: 'statechart',
-//     items: new Array<Statecharts.StatechartItem>(),
-//     name: 'test',
-//     x: 0,
-//     y: 0,
-//     width: 0,
-//     height: 0,
-//   };
-// }
-
-// function newState() : Statecharts.State {
-//   return {
-//     type: 'state',
-//     id: id++,
-//     x: 0,
-//     y: 0,
-//   };
-// }
-
-// function newPseudoState(type: 'start' | 'stop' | 'history' | 'history*') : Statecharts.State {
-//   return {
-//     type: type,
-//     id: id++,
-//     x: 0,
-//     y: 0,
-//   };
-// }
-
-// function newTransition(src: Statecharts.State, dst: Statecharts.State) : Statecharts.Transition {
-//   return {
-//     type: 'transition',
-//     srcId: src.id,
-//     dstId: dst.id,
-//   }
-// }
-
-// interface TestModel {
-//   statechart: Statecharts.Statechart;
-//   dataModel: Data.DataModel;
-//   observableModel: Data.ObservableModel;
-//   referenceModel: Data.ReferenceModel;
-//   hierarchyModel: Data.HierarchyModel;
-//   selectionModel: Data.SelectionModel;
-//   instancingModel: Data.InstancingModel;
-//   translationModel: Data.TranslationModel;
-//   statechartModel: Statecharts.StatechartModel;
-//   editingModel: Statecharts.EditingModel;
-// }
-
-// function NewTestModel(statechart: Statecharts.Statechart = newStatechart()) : TestModel {
-//   const dataModel = new Data.DataModel(statechart),
-//         observableModel = new Data.ObservableModel(),
-//         referenceModel = new Data.ReferenceModel(dataModel, observableModel),
-//         hierarchyModel = new Data.HierarchyModel(dataModel, observableModel),
-//         selectionModel = new Data.SelectionModel(),
-//         instancingModel = new Data.InstancingModel(dataModel, referenceModel),
-//         translationModel = new Data.TranslationModel(dataModel, observableModel, hierarchyModel),
-//         statechartModel = new Statecharts.StatechartModel(
-//             statechart, observableModel, hierarchyModel, referenceModel),
-//         editingModel = new Statecharts.EditingModel(
-//             statechart, dataModel, observableModel, hierarchyModel, referenceModel,
-//             selectionModel, instancingModel, translationModel, statechartModel);
-//   return {
-//     statechart,
-//     dataModel,
-//     observableModel,
-//     referenceModel,
-//     hierarchyModel,
-//     selectionModel,
-//     instancingModel,
-//     translationModel,
-//     statechartModel,
-//     editingModel,
-//   }
-// }
-
-// function addItem(model: TestModel,
-//          item: Statecharts.State | Statecharts.Transition,
-//          parent: Statecharts.State | Statecharts.Statechart) : Statecharts.StatechartItem {
-//   const editingModel = model.editingModel,
-//         newItem = editingModel.newItem(item) as Statecharts.State | Statecharts.Transition,
-//         result = editingModel.addItem(newItem, parent);
-//   return result;
-// }
 
 //------------------------------------------------------------------------------
 
 describe('StatechartModel', () => {
   test('state interface', () => {
-    const context = new Statecharts.StatechartContext(),  // TODO context should create items.
+    const context = new Statecharts.StatechartContext(),
           state = context.newState();
     expect(state.type).toBe('state');
     expect(state.name).toBeUndefined();
@@ -127,12 +35,15 @@ describe('StatechartModel', () => {
           state2 = context.newState(),
           transition = context.newTransition(state1, state2);
 
+          console.log(transition);
+
     expect(transition.type).toBe('transition');
     transition.event = 'test event';
     expect(transition.event).toBe('test event');
     transition.event = undefined;
     expect(transition.event).toBeUndefined();
     expect(transition.src).toBe(state1);
+    expect(transition.src).toBe(state1);  // twice to exercise reference caching.
     expect(transition.dst).toBe(state2);
     transition.dst = state1;
     expect(transition.dst).toBe(state1);
@@ -140,7 +51,7 @@ describe('StatechartModel', () => {
     expect(transition.dst).toBeUndefined();
   });
   test('statechart interface', () => {
-    const context = new Statecharts.StatechartContext(),  // TODO context should create items.
+    const context = new Statecharts.StatechartContext(),
           statechart = context.newStatechart();
 
     expect(statechart.type).toBe('statechart');
@@ -152,7 +63,7 @@ describe('StatechartModel', () => {
     expect(statechart.x).toBe(10);
   });
   test('parent', () => {
-    const context = new Statecharts.StatechartContext(),  // TODO context should create items.
+    const context = new Statecharts.StatechartContext(),
           statechart = context.newStatechart(),
           state1 = context.newState(),
           childStatechart1 = context.newStatechart(),
