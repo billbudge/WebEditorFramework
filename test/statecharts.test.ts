@@ -100,9 +100,11 @@ describe('StatechartModel', () => {
     const context = new Statecharts.StatechartContext(),  // TODO context should create items.
           state = context.newState();
     expect(state.type).toBe('state');
-    expect(state.name).toBe('New State');
+    expect(state.name).toBeUndefined();
     state.name = 'Test State';
     expect(state.name).toBe('Test State');
+    state.name = undefined;
+    expect(state.name).toBeUndefined();
     expect(state.id).toBe(1);
     expect(state.x).toBe(0);
     state.x = 10;
@@ -126,6 +128,10 @@ describe('StatechartModel', () => {
           transition = context.newTransition(state1, state2);
 
     expect(transition.type).toBe('transition');
+    transition.event = 'test event';
+    expect(transition.event).toBe('test event');
+    transition.event = undefined;
+    expect(transition.event).toBeUndefined();
     expect(transition.src).toBe(state1);
     expect(transition.dst).toBe(state2);
     transition.dst = state1;
@@ -148,10 +154,22 @@ describe('StatechartModel', () => {
   test('parent', () => {
     const context = new Statecharts.StatechartContext(),  // TODO context should create items.
           statechart = context.newStatechart(),
-          state1 = context.newState();
+          state1 = context.newState(),
+          childStatechart1 = context.newStatechart(),
+          childState1 = context.newState();
 
+    expect(statechart.parent).toBeUndefined();
+    expect(state1.parent).toBeUndefined();
+    expect(childState1.parent).toBeUndefined();
+    expect(childStatechart1.parent).toBeUndefined();
+
+    state1.statecharts.append(childStatechart1);
+    childStatechart1.states.append(childState1);
     statechart.states.append(state1);
+
     expect(state1.parent).toBe(statechart);
+    expect(childStatechart1.parent).toBe(state1);
+    expect(childState1.parent).toBe(childStatechart1);
   });
 });
 

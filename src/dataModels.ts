@@ -1,8 +1,8 @@
 import { SelectionSet } from './collections';
 
-export type ItemVisitor = (item: object) => void;
+export type ItemVisitor = (item: any) => void;
 
-export type PropertyVisitor = (item: object, attr: string) => void;
+export type PropertyVisitor = (item: any, attr: string) => void;
 
 // TODO SelectionModel tests.
 // TODO more ReferenceModel tests.
@@ -22,6 +22,7 @@ export interface List<T = any> {
   remove(index: number) : T | undefined;
   forEach(visitor: (element: T) => void) : void;
   forEachReverse(visitor: (element: T) => void) : void;
+  [Symbol.iterator]() : IterableIterator<T>;
 }
 
 export class DataList<T = any> implements List<T> {
@@ -75,7 +76,13 @@ export class DataList<T = any> implements List<T> {
     for (let i = array.length - 1; i >= 0; --i) {
       visitor(array[i]);
     }
-  };
+  }
+  [Symbol.iterator]() : IterableIterator<T> {
+    let array = this.dataContext.getValue(this.owner, this.name);
+    if (!array)
+      return [][Symbol.iterator]();
+    return array[Symbol.iterator]();
+  }
 
   constructor(owner: object, dataContext: DataContext, name: string) {
     this.owner = owner;
@@ -157,24 +164,24 @@ export class ParentProp<T extends object = object> {
 // Base DataModel.
 
 export class DataModel {
-  private root_: object;
+  private root_: any;
   private initializers: Array<ItemVisitor> = new Array();
 
-  root() : object {
+  root() : any {
     return this.root_;
   }
 
-  isItem(item: object) {
+  isItem(item: any) {
     return typeof item === 'object' && item !== null;
   }
 
   // Returns true iff. item[attr] is a model property.
-  isProperty(item: object, attr: string) : boolean {
+  isProperty(item: any, attr: string) : boolean {
     return item.hasOwnProperty(attr);
   }
 
   // Visits the item's top level properties.
-  visitProperties(item: object, propFn: PropertyVisitor) {
+  visitProperties(item: any, propFn: PropertyVisitor) {
     for (let attr in item) {
       if (this.isProperty(item, attr))
         propFn(item, attr);
@@ -182,12 +189,15 @@ export class DataModel {
 }
 
   // Visits the item's top level properties that are Arrays or child items.
-  visitChildren(item: object, childFn: ItemVisitor) {
+  visitChildren(item: any, childFn: ItemVisitor) {
     const self = this;
     this.visitProperties(item, function(item: object, attr: string) {
       const value = (item as any)[attr];
       if (Array.isArray(value)) {
-        self.visitChildren(value, childFn);
+        value.forEach(item => {
+            if (self.isItem(item))
+              childFn(item);
+        });
       } else if (self.isItem(value)) {
         childFn(value);
       }
@@ -195,10 +205,10 @@ export class DataModel {
   }
 
   // Visits the item and all of its descendants.
-  visitSubtree(item: object, itemFn: ItemVisitor) {
+  visitSubtree(item: any, itemFn: ItemVisitor) {
     itemFn(item);
     const self = this;
-    this.visitChildren(item, function(child: object) {
+    this.visitChildren(item, function(child) {
       self.visitSubtree(child, itemFn);
     });
   }
@@ -207,7 +217,7 @@ export class DataModel {
     this.initializers.push(initialize);
   }
 
-  initialize(item: object) {
+  initialize(item: any) {
     const self = this;
     this.visitSubtree(item, function(subItem) {
       self.initializers.forEach(function(initializer) {
@@ -216,7 +226,7 @@ export class DataModel {
     });
   }
 
-  constructor(root: object) {
+  constructor(root: any) {
     this.root_ = root;
   }
 }
@@ -261,20 +271,20 @@ export class EventBase<TArg, TEvents> {
 
 // Observable Model.
 
-type ChangeType = 'valueChanged' | 'elementInserted' | 'elementRemoved';
+export type ChangeType = 'valueChanged' | 'elementInserted' | 'elementRemoved';
 // Generic 'change' event.
-type ChangeEvents = 'changed' | ChangeType;
+export type ChangeEvents = 'changed' | ChangeType;
 
 // Standard formats:
 // 'valueChanged': item, attr, oldValue.
 // 'elementInserted': item, attr, index.
 // 'elementRemoved': item, attr, index, oldValue.
-export class Change {
+export class Change<TOwner extends object = object, TValue = any> {
   type: ChangeType;
-  item: object;
+  item: TOwner;
   attr: string;
   index: number;
-  oldValue: any;
+  oldValue: TValue;
 }
 
 export class ObservableModel extends EventBase<Change, ChangeEvents> {
@@ -475,19 +485,19 @@ export class ReferenceModel {
 // HierarchyModel
 const parent_ = Symbol('HierarchyModel.parent');
 
-export class HierarchyModel {
+export class HierarchyModel<T extends object = object> {
   private dataModel_: DataModel;
 
-  getParent(item: any) : any {
-    return item[parent_];
+  getParent(item: T) : any {
+    return (item as any)[parent_];
   }
 
-  private setParent(child: any, parent: any) {
-    child[parent_] = parent;
+  private setParent(child: T, parent: T | undefined) {
+    (child as any)[parent_] = parent;
   }
 
-  getLineage(item: any) {
-    const lineage = new Array();
+  getLineage(item: T) {
+    const lineage = new Array<T>();
     while (item) {
       lineage.push(item);
       item = this.getParent(item);
@@ -495,7 +505,7 @@ export class HierarchyModel {
     return lineage;
   }
 
-  getHeight(item: any) {
+  getHeight(item: T) {
     let height = 0;
     while (item) {
       height++;
@@ -504,7 +514,7 @@ export class HierarchyModel {
     return height;
   }
 
-  getLowestCommonAncestor(...items: Array<any>) {
+  getLowestCommonAncestor(...items: Array<T>) {
     let lca = items[0];
     let heightLCA = this.getHeight(lca);
     for (let i = 1; i < items.length; i++) {
@@ -533,7 +543,7 @@ export class HierarchyModel {
   }
 
   // Sets the parent for each item in the subtree at |parent|.
-  private setChildren(parent: any) {
+  private setChildren(parent: T) {
     const self = this;
     this.dataModel_.visitChildren(parent, function(child: any) {
       self.setParent(child, parent);
@@ -576,6 +586,48 @@ export class HierarchyModel {
     this.setParent(dataModel.root(), undefined)
     this.setChildren(dataModel.root());
   }
+}
+
+interface HasParent<T> {
+  parent?: T
+};
+
+export function getHeight<T extends HasParent<T>>(item: HasParent<T> | undefined) {
+  let height = 0;
+  while (item) {
+    height++;
+    item = item.parent;
+  }
+  return height;
+}
+
+export function getLowestCommonAncestor<T extends HasParent<T>>(
+    ...items: Array<T>) : T | undefined {
+  let lca = items[0];
+  let heightLCA = getHeight(lca);
+  for (let i = 1; i < items.length; i++) {
+    let next = arguments[i];
+    let nextHeight = getHeight(next);
+    if (heightLCA > nextHeight) {
+      while (heightLCA > nextHeight) {
+        lca = lca.parent!;
+        heightLCA--;
+      }
+    } else {
+      while (nextHeight > heightLCA) {
+        next = next.parent;
+        nextHeight--;
+      }
+    }
+    while (heightLCA && nextHeight && lca !== next) {
+      lca = lca.parent!;
+      next = next.parent;
+      heightLCA--;
+      nextHeight--;
+    }
+    if (heightLCA == 0 || nextHeight == 0) return undefined;
+  }
+  return lca;
 }
 
 //------------------------------------------------------------------------------
