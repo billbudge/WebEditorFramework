@@ -28,15 +28,15 @@ export class State implements ReferencedObject {
 
   readonly type: StateType = 'state';
 
-  get x() { return this.template.x.get(this, this.context) || 0; }
+  get x() { return this.template.x.get(this) || 0; }
   set x(value) { this.template.x.set(this, this.context, value); }
-  get y() { return this.template.y.get(this, this.context) || 0; }
+  get y() { return this.template.y.get(this) || 0; }
   set y(value) { this.template.y.set(this, this.context, value); }
-  get width() { return this.template.width.get(this, this.context) || 0; }
+  get width() { return this.template.width.get(this) || 0; }
   set width(value) { this.template.width.set(this, this.context, value); }
-  get height() { return this.template.height.get(this, this.context) || 0; }
+  get height() { return this.template.height.get(this) || 0; }
   set height(value) { this.template.height.set(this, this.context, value); }
-  get name() { return this.template.name.get(this, this.context); }
+  get name() { return this.template.name.get(this); }
   set name(value) { this.template.name.set(this, this.context, value); }
 
   get parent() { return this.template.parent.get(this); };
@@ -67,9 +67,9 @@ export class Pseudostate implements ReferencedObject {
   readonly type: PseudostateType = 'pseudostate';
   readonly subtype: PseudostateSubType;
 
-  get x() { return this.template.x.get(this, this.context) || 0; }
+  get x() { return this.template.x.get(this) || 0; }
   set x(value) { this.template.x.set(this, this.context, value); }
-  get y() { return this.template.y.get(this, this.context) || 0; }
+  get y() { return this.template.y.get(this) || 0; }
   set y(value) { this.template.y.set(this, this.context, value); }
 
   get parent() { return this.template.parent.get(this); };
@@ -104,11 +104,11 @@ export class Transition {
   set src(value) { this.template.src.set(this, this.context, value); }
   get dst() { return this.template.dst.get(this, this.context); }
   set dst(value) { this.template.dst.set(this, this.context, value); }
-  get event() { return this.template.event.get(this, this.context); }
+  get event() { return this.template.event.get(this); }
   set event(value) { this.template.event.set(this, this.context, value); }
-  get guard() { return this.template.guard.get(this, this.context); }
+  get guard() { return this.template.guard.get(this); }
   set guard(value) { this.template.guard.set(this, this.context, value); }
-  get action() { return this.template.action.get(this, this.context); }
+  get action() { return this.template.action.get(this); }
   set action(value) { this.template.action.set(this, this.context, value); }
 
   get parent() { return this.template.parent.get(this); };
@@ -140,15 +140,15 @@ export class Statechart {
 
   readonly type: StatechartType = 'statechart';
 
-  get x() { return this.template.x.get(this, this.context) || 0; }
+  get x() { return this.template.x.get(this) || 0; }
   set x(value) { this.template.x.set(this, this.context, value); }
-  get y() { return this.template.y.get(this, this.context) || 0; }
+  get y() { return this.template.y.get(this) || 0; }
   set y(value) { this.template.y.set(this, this.context, value); }
-  get width() { return this.template.width.get(this, this.context) || 0; }
+  get width() { return this.template.width.get(this) || 0; }
   set width(value) { this.template.width.set(this, this.context, value); }
-  get height() { return this.template.height.get(this, this.context) || 0; }
+  get height() { return this.template.height.get(this) || 0; }
   set height(value) { this.template.height.set(this, this.context, value); }
-  get name() { return this.template.name.get(this, this.context) || ''; }
+  get name() { return this.template.name.get(this) || ''; }
   set name(value) { this.template.name.set(this, this.context, value); }
 
   get parent() { return this.template.parent.get(this); };
@@ -267,50 +267,28 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     this.root_ = root;
   }
 
-  getValue(owner: AllTypes, attr: string) : any {
-    return (owner as any)[attr];
+  valueChanged(owner: AllTypes, attr: string, oldValue: any) : void {
+    this.onValueChanged(owner, attr, oldValue);
   }
-  setValue(owner: AllTypes, attr: string, value: any) : StatechartChange {
-    (owner as any)[attr] = value;
-    return this.onValueChanged(owner, attr, value);
-  }
-  getReference(owner: AllTypes, prop: RefProp<StateTypes>) : StateTypes | undefined {
-    // Try to get cached referent.
-    let target = (owner as any)[prop.cacheKey];
-    if (target)
-      return target;
-    const id = (owner as any)[prop.name] as number;
-    target = this.stateMap_.get(id);
-    // Cache it on the object.
-    if (target) {
-      (owner as any)[prop.cacheKey] = target;
-    }
-    return target;
-  }
-  setReference(owner: AllTypes, prop: RefProp<StateTypes>, value: StateTypes) : void {
-    if (value === undefined) {
-      (owner as any)[prop.name] = undefined;
-    } else {
-      (owner as any)[prop.name] = value.id;
-    }
-    (owner as any)[prop.cacheKey] = value;
-  }
-  insert(owner: AllTypes, attr: string, index: number, value: AllTypes) : void {
-    let array = (owner as any)[attr];
-    if (!array) {
-      array = [];
-      (owner as any)[attr] = array;
-    }
-    array.splice(index, 0, value);
+  elementInserted(owner: AllTypes, attr: string, index: number, value: AllTypes) : void {
     this.addItem(value, owner as ParentTypes);
     this.onElementInserted(owner, attr, index);
   }
-  remove(owner: AllTypes, attr: string, index: number) : AllTypes {
-    const array = (owner as any)[attr], oldValue = array[index];
-    array.splice(index, 1);
-    // (oldValue as any)[parent_] = undefined;
+  elementRemoved(owner: AllTypes, attr: string, index: number, oldValue: AllTypes) : void {
     this.onElementRemoved(owner, attr, index, oldValue);
-    return oldValue;
+  }
+
+  resolveReference(owner: AllTypes, cacheKey: symbol, id: number) : StateTypes | undefined {
+    // Try to get cached referent.
+    let target = (owner as any)[cacheKey];
+    if (target && target.id === id)
+      return target.ref;
+    const ref = this.stateMap_.get(id);
+    // Cache it on the object.
+    if (ref) {
+      (owner as any)[cacheKey] = { id: id, ref: ref };
+    }
+    return ref;
   }
 
   onChanged(change: StatechartChange) : StatechartChange {

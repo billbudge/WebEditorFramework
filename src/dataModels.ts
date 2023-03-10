@@ -30,47 +30,54 @@ export class DataList<T = any> implements List<T> {
   private name: string;
   private dataContext: DataContext;
 
+  private get array() : T[] | undefined {
+    return (this.owner as any)[this.name];
+  }
+  private set array(value: T[] | undefined) {
+    (this.owner as any)[this.name] = value;
+  }
+
   get length() : number {
-    let array = this.dataContext.getValue(this.owner, this.name);
+    const array = this.array;
     return array ? array.length : 0;
   }
 
   at(index: number) : T | undefined {
-    let array = this.dataContext.getValue(this.owner, this.name);
+    const array = this.array;
     return array ? array[index] : undefined;
   }
 
   insert(element: T, index: number) {
-    let array = this.dataContext.getValue(this.owner, this.name);
+    let array = this.array;
     if (!array) {
-      array = [];
-      this.dataContext.setValue(this.owner, this.name, array);
+      this.array = array = [];
+      this.dataContext.valueChanged(this.owner, this.name, undefined);
     }
-    this.dataContext.insert(this.owner, this.name, index, element);
+    array.splice(index, 0, element);
+    this.dataContext.elementInserted(this.owner, this.name, index, element);
   }
 
   append(element: T) {
-    let array = this.dataContext.getValue(this.owner, this.name);
-    let index = array ? array.length : 0;
-    this.dataContext.insert(this.owner, this.name, index, element);
+    this.insert(element, this.length);
   }
 
   remove(index: number) : T | undefined {
-    let array = this.dataContext.getValue(this.owner, this.name);
+    const array = this.array;
     if (!array)
       return undefined;
-    return this.dataContext.remove(this.owner, this.name, index);
+    const oldValue = array.splice(index, 1);
+    this.dataContext.elementRemoved(this.owner, this.name, index, oldValue[0]);
   }
 
   forEach(visitor: (element: T) => void) : void {
-    let array = this.dataContext.getValue(this.owner, this.name);
+    const array = this.array;
     if (!array)
       return;
     array.forEach(visitor);
   };
 
   forEachReverse(visitor: (element: T) => void) : void {
-    let array = this.dataContext.getValue(this.owner, this.name);
+    const array = this.array;
     if (!array)
       return;
     for (let i = array.length - 1; i >= 0; --i) {
@@ -78,7 +85,7 @@ export class DataList<T = any> implements List<T> {
     }
   }
   [Symbol.iterator]() : IterableIterator<T> {
-    let array = this.dataContext.getValue(this.owner, this.name);
+    const array = this.array;
     if (!array)
       return [][Symbol.iterator]();
     return array[Symbol.iterator]();
@@ -96,12 +103,10 @@ export class DataList<T = any> implements List<T> {
 export interface DataContext<TObject extends object = object,
                              TReferent extends ReferencedObject = ReferencedObject,
                              TArrayElement = any> {
-  getValue(owner: TObject, attr: string) : any;
-  setValue(owner: TObject, attr: string, value: any) : any;
-  getReference(owner: TObject, prop: RefProp<TReferent>) : TReferent | undefined;
-  setReference(owner: TObject, prop: RefProp<TReferent>, value: TReferent | undefined) : void;
-  insert(owner: TObject, attr: string, index: number, value: TArrayElement) : void;
-  remove(owner: TObject, attr: string, index: number) : TArrayElement;
+  valueChanged(owner: TObject, attr: string, oldValue: any) : void;
+  elementInserted(owner: TObject, attr: string, index: number, value: TArrayElement) : void;
+  elementRemoved(owner: TObject, attr: string, index: number, oldValue: TArrayElement) : void;
+  resolveReference(owner: TObject, cacheKey: symbol, id: number) : TReferent | undefined;
 }
 
 //------------------------------------------------------------------------------
@@ -111,11 +116,14 @@ export interface DataContext<TObject extends object = object,
 export class ScalarProp<T = any> {
   readonly name: string;
 
-  get(owner: object, dataContext: DataContext) : T | undefined {
-    return dataContext.getValue(owner, this.name) as T | undefined;
+  get(owner: object) : T | undefined {
+    return (owner as any)[this.name];
   }
   set(owner: object, dataContext: DataContext, value: T) : T | undefined {
-    return dataContext.setValue(owner, this.name, value) as T | undefined;
+    const oldValue: T = (owner as any)[this.name];
+    (owner as any)[this.name] = value;
+    dataContext.valueChanged(owner, this.name, oldValue);
+    return oldValue;
   }
   constructor(name: string) {
     this.name = name + '_';
@@ -140,17 +148,23 @@ export interface ReferencedObject extends Object {
 }
 
 export class RefProp<T extends ReferencedObject> {
-  readonly name: string;
+  readonly prop: ScalarProp<number>;
   readonly cacheKey: symbol;
 
   get(owner: object, dataContext: DataContext) : T | undefined {
-    return dataContext.getReference(owner, this) as T | undefined;
+    const id = this.prop.get(owner);
+    if (!id)
+      return undefined;
+    return dataContext.resolveReference(owner, this.cacheKey, id) as T | undefined;
   }
   set(owner: object, dataContext: DataContext, value: T | undefined) : T | undefined {
-    return dataContext.setReference(owner, this, value) as T | undefined;
+    const oldId = this.prop.get(owner),
+          newId = value ? value.id : 0;
+    this.prop.set(owner, dataContext, newId);
+    return dataContext.resolveReference(owner, this.cacheKey, newId) as T | undefined;
   }
   constructor(name: string) {
-    this.name = name + '_';
+    this.prop = new ScalarProp<number>(name);
     this.cacheKey = Symbol.for(name);
   }
 }

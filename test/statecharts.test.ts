@@ -35,7 +35,7 @@ describe('StatechartModel', () => {
           state2 = context.newState(),
           transition = context.newTransition(state1, state2);
 
-          console.log(transition);
+    // console.log(transition);
 
     expect(transition.type).toBe('transition');
     transition.event = 'test event';
