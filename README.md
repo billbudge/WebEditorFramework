@@ -1,2 +1,2 @@
-# TSAppFramework
-Diagram editing app framework, in TypeScript.
+# WebEditorFramework
+Diagram editing framework, in TypeScript.
