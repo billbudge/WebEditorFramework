@@ -1,6 +1,32 @@
 import {describe, expect, test} from '@jest/globals';
 import * as Statecharts from '../examples/statecharts';
 
+function addState(statechart: Statecharts.Statechart) {
+  const state = statechart.context.newState();
+  statechart.states.append(state);
+  return state;
+}
+
+function addPseudostate(statechart: Statecharts.Statechart, subtype: Statecharts.PseudostateSubtype) {
+  const state = statechart.context.newPseudostate(subtype);
+  statechart.states.append(state);
+  return state;
+}
+
+function addTransition(
+    statechart: Statecharts.Statechart, state1: Statecharts.StateTypes, state2: Statecharts.StateTypes) {
+  const transition = statechart.context.newTransition(state1, state2);
+  statechart.transitions.append(transition);
+  return transition;
+}
+
+function setEquals(set1: Set<any>, set2: Array<any>) {
+  expect(set1.size).toBe(set2.length);
+  for (const item of set2) {
+    expect(set1.has(item)).toBe(true);
+  }
+}
+
 //------------------------------------------------------------------------------
 
 describe('StatechartContext', () => {
@@ -34,8 +60,6 @@ describe('StatechartContext', () => {
           state1 = context.newState(),
           state2 = context.newState(),
           transition = context.newTransition(state1, state2);
-
-    // console.log(transition);
 
     expect(transition.type).toBe('transition');
     transition.event = 'test event';
@@ -85,232 +109,86 @@ describe('StatechartContext', () => {
   test('getGraphInfo', () => {
     const context = new Statecharts.StatechartContext(),
           statechart = context.newStatechart(),
-          state1 = context.newState(),
-          state2 = context.newState(),
-          transition1 = context.newTransition(state1, state2);
+          state1 = addState(statechart),
+          state2 = addState(statechart),
+          transition1 = addTransition(statechart, state1, state2);
 
-    statechart.states.append(state1);
-    statechart.states.append(state2);
-    statechart.transitions.append(transition1);
     context.setRoot(statechart);
 
     const graph1 = context.getGraphInfo();
-    expect(graph1.states.has(state1)).toBe(true);
-    expect(graph1.states.has(state2)).toBe(true);
-    expect(graph1.states.size).toBe(2);
-    expect(graph1.statecharts.has(statechart)).toBe(true);
-    expect(graph1.statecharts.size).toBe(1);
-    expect(graph1.transitions.has(transition1)).toBe(true);
-    expect(graph1.transitions.size).toBe(1);
 
-    const input = context.newState(),
-          output = context.newState(),
-          transition2 = context.newTransition(input, state1),
-          transition3 = context.newTransition(state2, output);
+    setEquals(graph1.statecharts, [statechart]);
+    setEquals(graph1.states, [state1, state2]);
+    setEquals(graph1.transitions, [transition1]);
 
-    statechart.states.append(input);
-    statechart.states.append(output);
-    statechart.transitions.append(transition2);
-    statechart.transitions.append(transition3);
+    const input = addState(statechart),
+          output = addState(statechart),
+          transition2 = addTransition(statechart, input, state1),
+          transition3 = addTransition(statechart, state2, output);
 
     const graph2 = context.getGraphInfo();
 
-    expect(graph2.states.has(state1)).toBe(true);
-    expect(graph2.states.has(state2)).toBe(true);
-    expect(graph2.states.has(input)).toBe(true);
-    expect(graph2.states.has(output)).toBe(true);
-    expect(graph2.states.size).toBe(4);
-    expect(graph2.statecharts.size).toBe(1);
-    expect(graph2.interiorTransitions.has(transition1));
-    expect(graph2.interiorTransitions.has(transition2));
-    expect(graph2.interiorTransitions.has(transition3));
-    expect(graph2.transitions.size).toBe(3);
-    expect(graph2.interiorTransitions.size).toBe(3);
-    expect(graph2.inTransitions.size).toBe(0);
-    expect(graph2.outTransitions.size).toBe(0);
+    setEquals(graph2.statecharts, [statechart]);
+    setEquals(graph2.states, [state1, state2, input, output]);
+    setEquals(graph2.transitions, [transition1, transition2, transition3]);
+    setEquals(graph2.interiorTransitions, [transition1, transition2, transition3]);
+    setEquals(graph2.inTransitions, []);
+    setEquals(graph2.outTransitions, []);
   });
-});
+  test('getSubgraphInfo', () => {
+    const context = new Statecharts.StatechartContext(),
+          statechart = context.newStatechart(),
+          state1 = addState(statechart),
+          state2 = addState(statechart),
+          transition1 = addTransition(statechart, state1, state2);
 
-// describe('StatechartModel', () => {
-//   test('getGraphInfo', () => {
-//     const statechart = newStatechart(),
-//           model = NewTestModel(statechart),
-//           statechartModel = model.statechartModel,
-//           state1 = addItem(model, newState(), statechart) as Statecharts.State,
-//           state2 = addItem(model, newState(), statechart) as Statecharts.State,
-//           transition1 = addItem(model, newTransition(state1, state2), statechart);
-//     let graph = statechartModel.getGraphInfo();
-//     expect(graph.states.has(state1)).toBe(true);
-//     expect(graph.states.has(state2)).toBe(true);
-//     expect(graph.states.size).toBe(2);
-//     expect(graph.statecharts.has(statechart)).toBe(true);
-//     expect(graph.statecharts.size).toBe(1);
-//     // QUnit.assert.deepEqual(graph.transitions.size, 1);
-//     // expect(graph.interiorTransitions.has(transition1));
-//     // QUnit.assert.deepEqual(graph.interiorTransitions.size, 1);
-//     // QUnit.assert.deepEqual(graph.inTransitions.size, 0);
-//     // QUnit.assert.deepEqual(graph.outTransitions.size, 0);
+    context.setRoot(statechart);
 
-//     // const input = addItem(test, newState()),
-//     //       output = addItem(test, newState()),
-//     //       transition2 = addItem(test, newTransition(input, state1)),
-//     //       transition3 = addItem(test, newTransition(state2, output));
+    const subgraph1 = context.getSubgraphInfo([state1, state2]);
 
-//     // graph = test.getGraphInfo();
-//     // expect(graph.statesAndStatecharts.has(state1));
-//     // expect(graph.statesAndStatecharts.has(state2));
-//     // expect(graph.statesAndStatecharts.has(input));
-//     // expect(graph.statesAndStatecharts.has(output));
-//     // QUnit.assert.deepEqual(graph.statesAndStatecharts.size, 5);
-//     // expect(graph.interiorTransitions.has(transition1));
-//     // expect(graph.interiorTransitions.has(transition2));
-//     // expect(graph.interiorTransitions.has(transition3));
-//     // QUnit.assert.deepEqual(graph.transitions.size, 3);
-//     // QUnit.assert.deepEqual(graph.interiorTransitions.size, 3);
-//     // QUnit.assert.deepEqual(graph.inTransitions.size, 0);
-//     // QUnit.assert.deepEqual(graph.outTransitions.size, 0);
-//   });
-// });
+    setEquals(subgraph1.statecharts, []);
+    setEquals(subgraph1.states, [state1, state2]);
+    setEquals(subgraph1.transitions, [transition1]);
+    setEquals(subgraph1.interiorTransitions, [transition1]);
+    setEquals(subgraph1.inTransitions, []);
+    setEquals(subgraph1.outTransitions, []);
 
-// const statechartTests = (function () {
-//   'use strict';
+    const input = addState(statechart),
+          output = addState(statechart),
+          transition2 = addTransition(statechart, input, state1),
+          transition3 = addTransition(statechart, state2, output);
 
+    const subgraph2 = context.getSubgraphInfo([state1, state2]);
 
-
-//   // Always construct the full EditingModel to make creating test data easier.
-//   function newTest() {
-//     let statechart = newStatechart();
-//     let test = statecharts.editingModel.extend(statechart),
-//         model = test.model;
-//     statecharts.statechartModel.extend(statechart);
-//     test.model.dataModel.initialize();
-
-//     // Fake context, sufficient for tests.
-//     const ctx = {
-//       measureText: () => { return { width: 10, height: 10 }},
-//       save: () => {},
-//     };
-//     model.renderer = new statecharts.Renderer(model);
-//     model.renderer.begin(ctx);
-//     return test;
-//   }
-// }
-
-  /*
-
-  function newTestEditingModel() {
-    return newTest().model.editingModel;
-  }
-
-  function newTestStatechartModel() {
-    return newTest().model.statechartModel;
-  }
-
-  QUnit.test("statecharts.statechartModel.extend", function() {
-    let test = newTestStatechartModel();
-    QUnit.assert.ok(test);
-    QUnit.assert.ok(test.model);
-    QUnit.assert.ok(test.model.referencingModel);
+    setEquals(subgraph2.statecharts, []);
+    setEquals(subgraph2.states, [state1, state2]);
+    setEquals(subgraph2.transitions, [transition1, transition2, transition3]);
+    setEquals(subgraph2.interiorTransitions, [transition1]);
+    setEquals(subgraph2.inTransitions, [transition2]);
+    setEquals(subgraph2.outTransitions, [transition3]);
   });
+  test('iterators', () => {
+    function testIterator(
+        fn: (state: Statecharts.StateTypes, visitor: Statecharts.TransitionVisitor) => void,
+        state: Statecharts.StateTypes,
+        items: Array<Statecharts.Transition>) {
+      const iterated = new Array<Statecharts.Transition>();
+      fn(state, (t) => iterated.push(t));
+      expect(items).toEqual(iterated);
+    }
+    const context = new Statecharts.StatechartContext(),
+          statechart = context.newStatechart(),
+          state1 = addState(statechart, ),
+          state2 = addState(statechart, ),
+          transition1 = addTransition(statechart, state1, state2),
+          input = addState(statechart),
+          output = addState(statechart),
+          transition2 = addTransition(statechart, input, state1),
+          transition3 = addTransition(statechart, input, state2),
+          transition4 = addTransition(statechart, state2, output);
 
-
-  QUnit.test("statecharts.statechartModel.getGraphInfo", function() {
-    const test = newTestStatechartModel(),
-          model = test.model,
-          items = model.root.items,
-          state1 = addItem(test, newState()),
-          state2 = addItem(test, newState()),
-          transition1 = addItem(test, newTransition(state1, state2));
-    let graph;
-
-    graph = test.getGraphInfo([state1, state2]);
-    QUnit.assert.ok(graph.statesAndStatecharts.has(state1));
-    QUnit.assert.ok(graph.statesAndStatecharts.has(state2));
-    QUnit.assert.deepEqual(graph.statesAndStatecharts.size, 3);
-    QUnit.assert.deepEqual(graph.transitions.size, 1);
-    QUnit.assert.ok(graph.interiorTransitions.has(transition1));
-    QUnit.assert.deepEqual(graph.interiorTransitions.size, 1);
-    QUnit.assert.deepEqual(graph.inTransitions.size, 0);
-    QUnit.assert.deepEqual(graph.outTransitions.size, 0);
-
-    const input = addItem(test, newState()),
-          output = addItem(test, newState()),
-          transition2 = addItem(test, newTransition(input, state1)),
-          transition3 = addItem(test, newTransition(state2, output));
-
-    graph = test.getGraphInfo();
-    QUnit.assert.ok(graph.statesAndStatecharts.has(state1));
-    QUnit.assert.ok(graph.statesAndStatecharts.has(state2));
-    QUnit.assert.ok(graph.statesAndStatecharts.has(input));
-    QUnit.assert.ok(graph.statesAndStatecharts.has(output));
-    QUnit.assert.deepEqual(graph.statesAndStatecharts.size, 5);
-    QUnit.assert.ok(graph.interiorTransitions.has(transition1));
-    QUnit.assert.ok(graph.interiorTransitions.has(transition2));
-    QUnit.assert.ok(graph.interiorTransitions.has(transition3));
-    QUnit.assert.deepEqual(graph.transitions.size, 3);
-    QUnit.assert.deepEqual(graph.interiorTransitions.size, 3);
-    QUnit.assert.deepEqual(graph.inTransitions.size, 0);
-    QUnit.assert.deepEqual(graph.outTransitions.size, 0);
-  });
-
-  QUnit.test("statecharts.statechartModel.getSubgraphInfo", function() {
-    const test = newTestStatechartModel(),
-          model = test.model,
-          items = model.root.items,
-          state1 = addItem(test, newState()),
-          state2 = addItem(test, newState()),
-          transition1 = addItem(test, newTransition(state1, state2));
-    let subgraph;
-
-    subgraph = test.getSubgraphInfo([state1, state2]);
-    QUnit.assert.ok(subgraph.statesAndStatecharts.has(state1));
-    QUnit.assert.ok(subgraph.statesAndStatecharts.has(state2));
-    QUnit.assert.deepEqual(subgraph.statesAndStatecharts.size, 2);
-    QUnit.assert.ok(subgraph.interiorTransitions.has(transition1));
-    QUnit.assert.deepEqual(subgraph.transitions.size, 1);
-    QUnit.assert.deepEqual(subgraph.interiorTransitions.size, 1);
-    QUnit.assert.deepEqual(subgraph.inTransitions.size, 0);
-    QUnit.assert.deepEqual(subgraph.outTransitions.size, 0);
-
-    const input = addItem(test, newState()),
-          output = addItem(test, newState()),
-          transition2 = addItem(test, newTransition(input, state1)),
-          transition3 = addItem(test, newTransition(state2, output));
-
-    subgraph = test.getSubgraphInfo([state1, state2]);
-    QUnit.assert.ok(subgraph.statesAndStatecharts.has(state1));
-    QUnit.assert.ok(subgraph.statesAndStatecharts.has(state2));
-    QUnit.assert.deepEqual(subgraph.statesAndStatecharts.size, 2);
-    QUnit.assert.ok(subgraph.interiorTransitions.has(transition1));
-    QUnit.assert.deepEqual(subgraph.transitions.size, 3);
-    QUnit.assert.deepEqual(subgraph.interiorTransitions.size, 1);
-    QUnit.assert.ok(subgraph.inTransitions.has(transition2));
-    QUnit.assert.deepEqual(subgraph.inTransitions.size, 1);
-    QUnit.assert.ok(subgraph.outTransitions.has(transition3));
-    QUnit.assert.deepEqual(subgraph.outTransitions.size, 1);
-  });
-
-  function testIterator(fn, element, items) {
-    const iterated = [];
-    fn(element, (item) => iterated.push(item));
-    QUnit.assert.deepEqual(items, iterated);
-  }
-
-  QUnit.test("statecharts.statechartModel.iterators", function() {
-    const test = newTestStatechartModel(),
-          model = test.model,
-          items = model.root.items,
-          state1 = addItem(test, newState()),
-          state2 = addItem(test, newState()),
-          transition1 = addItem(test, newTransition(state1, state2)),
-          input = addItem(test, newState()),
-          output = addItem(test, newState()),
-          transition2 = addItem(test, newTransition(input, state1)),
-          transition3 = addItem(test, newTransition(input, state2)),
-          transition4 = addItem(test, newTransition(state2, output));
-
-    const inputFn = test.forInTransitions.bind(test),
-          outputFn = test.forOutTransitions.bind(test);
+    const inputFn = context.forInTransitions.bind(context),
+          outputFn = context.forOutTransitions.bind(context);
     testIterator(inputFn, input, []);
     testIterator(outputFn, input, [transition2, transition3]);
     testIterator(inputFn, state1, [transition2]);
@@ -318,30 +196,82 @@ describe('StatechartContext', () => {
     testIterator(inputFn, state2, [transition1, transition3]);
     testIterator(outputFn, state2, [transition4]);
   });
+  test('canAddState', () => {
+    const context = new Statecharts.StatechartContext(),
+          statechart = context.newStatechart(),
+          state1 = context.newState(),
+          state2 = context.newState(),
+          start = context.newPseudostate('start'),
+          shallowHistory = context.newPseudostate('history'),
+          deepHistory = context.newPseudostate('history*'),
+          stop = context.newPseudostate('stop');
 
-  QUnit.test("statecharts.editingModel", function() {
-    const test = newTestEditingModel(),
-          model = test.model,
-          statechart = model.root;
-    QUnit.assert.ok(test);
-    QUnit.assert.ok(model);
-    QUnit.assert.ok(model.dataModel);
-    QUnit.assert.ok(model.selectionModel);
+    expect(context.canAddState(state1, statechart)).toBe(true);
+    expect(context.canAddState(state2, statechart)).toBe(true);
+    expect(context.canAddState(start, statechart)).toBe(true);
+    expect(context.canAddState(shallowHistory, statechart)).toBe(true);
+    expect(context.canAddState(deepHistory, statechart)).toBe(true);
+    expect(context.canAddState(stop, statechart)).toBe(true);
+
+    // Test that there can be only one starting state.
+    statechart.states.append(start);
+    expect(context.canAddState(context.newPseudostate('start'), statechart)).toBe(false);
+    expect(context.canAddState(shallowHistory, statechart)).toBe(true);
+    expect(context.canAddState(deepHistory, statechart)).toBe(true);
+    statechart.states.append(shallowHistory);
+    expect(context.canAddState(deepHistory, statechart)).toBe(true);
+    // Test that there can be multiple stop states.
+    statechart.states.append(stop);
+    expect(context.canAddState(context.newPseudostate('stop'), statechart)).toBe(true);
   });
+  test('canAddTransition', () => {
+    const context = new Statecharts.StatechartContext(),
+          statechart = context.newStatechart(),
+          state1 = addState(statechart),
+          state2 = addState(statechart),
+          start = addPseudostate(statechart, 'start'),
+          stop = addPseudostate(statechart, 'stop'),
+          shallowHistory = addPseudostate(statechart, 'history'),
+          deepHistory = addPseudostate(statechart, 'history*');
 
-  function doInitialize(item) {
-    item.initalized = true;
-  }
+    context.setRoot(statechart);
 
-  QUnit.test("statecharts.editingModel.newItem", function() {
-    const test = newTestEditingModel(),
-          model = test.model,
-          statechart = model.root;
-    model.dataModel.addInitializer(doInitialize);
-    const item1 = newState();
-    test.newItem(item1);
-    QUnit.assert.ok(item1.id);
-    QUnit.assert.ok(item1.initalized);
+    // Test transitions within a statechart.
+    expect(context.isValidTransition(state1, state1)).toBe(true);
+    expect(context.isValidTransition(state1, state2)).toBe(true);
+    expect(context.isValidTransition(start, stop)).toBe(true);
+    expect(context.isValidTransition(start, start)).toBe(false);
+    expect(context.isValidTransition(stop, stop)).toBe(false);
+    expect(context.isValidTransition(shallowHistory, shallowHistory)).toBe(false);
+    expect(context.isValidTransition(deepHistory, deepHistory)).toBe(false);
+    expect(context.isValidTransition(stop, state1)).toBe(false);
+    expect(context.isValidTransition(state1, start)).toBe(false);
+    expect(context.isValidTransition(start, shallowHistory)).toBe(true);
+    expect(context.isValidTransition(start, deepHistory)).toBe(true);
+
+    // // Convert state1 to a superstate with two sub-statecharts.
+    // const start1 = addItem(test, newPseudoState('start'), state1),
+    //       statechart1 = state1.items[0],
+    //       subState1 = addItem(test, newState(), statechart1),
+    //       start2 = addItem(test, newPseudoState('start'), state1),
+    //       statechart2 = state1.items[1],
+    //       subState2 = addItem(test, newState(), statechart2),
+    //       subHistory = addItem(test, newPseudoState('history'), state1);
+    // // No transitions between sibling statecharts.
+    // QUnit.assert.notOk(test.isValidTransition(start2, subState1));
+    // QUnit.assert.notOk(test.isValidTransition(start1, subState2));
+    // // No transitions from pseudo-state outside it's parent statechart.
+    // QUnit.assert.notOk(test.isValidTransition(start1, state2));
+    // QUnit.assert.notOk(test.isValidTransition(state2, start2));
+    // // Transitions are allowed from parent state to child state.
+    // QUnit.assert.ok(test.isValidTransition(state1, subHistory));
+    // QUnit.assert.ok(test.isValidTransition(state1, subState1));
+  });
+});
+
+/*
+
+  QUnit.test("statecharts.statechartModel.getSubgraphInfo", function() {
   });
 
   QUnit.test("statecharts.editingModel.addAndDeleteItems", function() {
@@ -383,34 +313,6 @@ describe('StatechartContext', () => {
     QUnit.assert.ok(test.findChildStatechart(superState, start) === -1);
   });
 
-  QUnit.test("statecharts.editingModel.canAddState", function() {
-    const test = newTestEditingModel(),
-          statechart = test.model.root,
-          items = statechart.items,
-          state1 = addItem(test, newState()),
-          state2 = newState(),
-          start = newPseudoState('start'),
-          shallowHistory = newPseudoState('history'),
-          deepHistory = newPseudoState('history*'),
-          stop = newPseudoState('stop');
-
-    QUnit.assert.ok(test.canAddState(state1, statechart));
-    QUnit.assert.ok(test.canAddState(state2, statechart));
-    QUnit.assert.ok(test.canAddState(start, statechart));
-    QUnit.assert.ok(test.canAddState(shallowHistory, statechart));
-    QUnit.assert.ok(test.canAddState(deepHistory, statechart));
-    QUnit.assert.ok(test.canAddState(stop, statechart));
-    // Test that there can be only one starting state.
-    addItem(test, start);
-    QUnit.assert.notOk(test.canAddState(newPseudoState('start'), statechart));
-    QUnit.assert.ok(test.canAddState(shallowHistory, statechart));
-    QUnit.assert.ok(test.canAddState(deepHistory, statechart));
-    addItem(test, shallowHistory);
-    QUnit.assert.ok(test.canAddState(deepHistory, statechart));
-    // Test that there can be multiple stop states.
-    addItem(test, stop);
-    QUnit.assert.ok(test.canAddState(newPseudoState('stop'), statechart));
-  });
 
   QUnit.test("statecharts.editingModel.isValidTransition", function() {
     const test = newTestEditingModel(),

@@ -57,15 +57,15 @@ const pseudostateTemplate = {
 }
 
 export type PseudostateType = 'pseudostate';
-export type PseudostateSubType = 'start' | 'stop' | 'history' | 'history*';
+export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
 
 export class Pseudostate implements ReferencedObject {
   private readonly template = pseudostateTemplate;
   id: number;
-  readonly context: DataContext;
+  readonly context: StatechartContext;
 
   readonly type: PseudostateType = 'pseudostate';
-  readonly subtype: PseudostateSubType;
+  readonly subtype: PseudostateSubtype;
 
   get x() { return this.template.x.get(this) || 0; }
   set x(value) { this.template.x.set(this, this.context, value); }
@@ -75,7 +75,7 @@ export class Pseudostate implements ReferencedObject {
   get parent() { return this.template.parent.get(this); };
   set parent(parent) { this.template.parent.set(this, parent); };
 
-  constructor(subtype: PseudostateSubType, context: DataContext) {
+  constructor(subtype: PseudostateSubtype, context: StatechartContext) {
     this.subtype = subtype;
     this.context = context;
   }
@@ -96,7 +96,7 @@ export type TransitionType = 'transition';
 
 export class Transition {
   private readonly template = transitionTemplate;
-  readonly context: DataContext;
+  readonly context: StatechartContext;
 
   readonly type: TransitionType = 'transition';
 
@@ -114,7 +114,7 @@ export class Transition {
   get parent() { return this.template.parent.get(this); };
   set parent(parent) { this.template.parent.set(this, parent); };
 
-  constructor(context: DataContext) {
+  constructor(context: StatechartContext) {
     this.context = context;
   }
 }
@@ -136,7 +136,7 @@ export type StatechartType = 'statechart';
 
 export class Statechart {
   private readonly template = statechartTemplate;
-  readonly context: DataContext;
+  readonly context: StatechartContext;
 
   readonly type: StatechartType = 'statechart';
 
@@ -157,7 +157,7 @@ export class Statechart {
   get states() { return this.template.states.get(this, this.context); }
   get transitions() { return this.template.transitions.get(this, this.context); }
 
-  constructor(context: DataContext) {
+  constructor(context: StatechartContext) {
     this.context = context;
   }
 }
@@ -170,13 +170,13 @@ export class Statechart {
 // Manages references to states.
 // Manages graph structure, s
 
-type StateTypes = State | Pseudostate;
-type ParentTypes = Statechart | State | undefined;
-type AllTypes = StateTypes | Statechart | Transition;
+export type StateTypes = State | Pseudostate;
+export type ParentTypes = Statechart | State | undefined;
+export type AllTypes = StateTypes | Statechart | Transition;
 
-type StateVisitor = (state: StateTypes, parent: ParentTypes) => void;
-type StatechartVisitor = (item: AllTypes) => void;
-type TransitionVisitor = (item: Transition) => void;
+export type StateVisitor = (state: StateTypes, parent: ParentTypes) => void;
+export type StatechartVisitor = (item: AllTypes) => void;
+export type TransitionVisitor = (item: Transition) => void;
 
 type StatechartChange = Change<AllTypes, AllTypes | undefined>;
 
@@ -212,7 +212,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     return result;
   }
 
-  newPseudostate(subtype: PseudostateSubType) : Pseudostate {
+  newPseudostate(subtype: PseudostateSubtype) : Pseudostate {
     const result: Pseudostate = new Pseudostate(subtype, this),
           nextId = ++this.highestId_;
     this.stateMap_.set(nextId, result);
@@ -429,7 +429,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
 
   isValidTransition(src: StateTypes, dst: StateTypes) : boolean {
     // No transition to self for pseudostates.
-    if (src == dst) return src.type === 'state';
+    if (src === dst) return src.type === 'state';
     // No transitions to a start pseudostate.
     if (dst.type === 'pseudostate' && dst.subtype === 'start') return false;
     // No transitions from a stop pseudostate.
@@ -608,59 +608,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
 
 
 /*
-import { DataModel, ObservableModel, Change, ReferenceModel, HierarchyModel,
-         SelectionModel, InstancingModel, TranslationModel } from '../src/dataModels'
 
-//------------------------------------------------------------------------------
-
-
-export class StatechartModel {
-
-  private onChanged_ (change: Change) {
-    const item = change.item as AllItems,  // TODO make datamodel generic in AllItems.
-          attr = change.attr;
-    switch (change.type) {
-      case 'valueChanged': {
-        if (item.type === 'transition') {
-          // Remove and reinsert changed transitions.
-          this.removeTransition_(item);
-          this.insertTransition_(item);
-        }
-        break;
-      }
-      case 'elementInserted': {
-        const newValue = (item as any)[attr][change.index];
-        this.insertItem_(newValue);
-        break;
-      }
-      case 'elementRemoved': {
-        const oldValue = change.oldValue;
-        this.removeItem_(oldValue);
-      }
-    }
-  }
-
-  constructor(statechart: Statechart,
-              observableModel: ObservableModel,
-              hierarchymodel: HierarchyModel,
-              referenceModel: ReferenceModel) {
-
-    this.statechart_ = statechart;
-
-    observableModel.addHandler('changed', this.onChanged_.bind(this));
-
-    this.getParent_ = hierarchymodel.getParent.bind(hierarchymodel);
-    this.getLowestCommonAncestor = hierarchymodel.getLowestCommonAncestor.bind(hierarchymodel);
-    this.getTransitionSrc_ = referenceModel.getReferenceFn('srcId');
-    this.getTransitionDst_ = referenceModel.getReferenceFn('dstId');
-
-    this.states_ = new Set();
-    this.statecharts_ = new Set();
-    this.transitions_ = new Set();
-
-    this.insertItem_(statechart);
-  }
-}
 
 //------------------------------------------------------------------------------
 
