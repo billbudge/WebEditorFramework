@@ -1,6 +1,6 @@
 
 import { ScalarProp, ArrayProp, ReferencedObject, RefProp, ParentProp,
-         DataContext, List, EventBase, Change, ChangeEvents,
+         DataContext, EventBase, Change, ChangeEvents,
          getLowestCommonAncestor } from '../src/dataModels'
 
 //------------------------------------------------------------------------------
@@ -165,24 +165,44 @@ export class Statechart {
 //------------------------------------------------------------------------------
 
 // Interface to a statechart context.
+// Manages state ids.
+// Builds new statechart objects.
+// Manages references to states.
+// Manages graph structure, s
 
 type StateTypes = State | Pseudostate;
 type ParentTypes = Statechart | State | undefined;
 type AllTypes = StateTypes | Statechart | Transition;
 
 type StateVisitor = (state: StateTypes, parent: ParentTypes) => void;
-type StatechartVisitor = (item: AllTypes, parent: ParentTypes) => void;
+type StatechartVisitor = (item: AllTypes) => void;
 type TransitionVisitor = (item: Transition) => void;
 
 type StatechartChange = Change<AllTypes, AllTypes | undefined>;
+
+export interface GraphInfo {
+  states: Set<StateTypes>;
+  statecharts: Set<Statechart>;
+  transitions: Set<Transition>;
+  interiorTransitions: Set<Transition>;
+  inTransitions: Set<Transition>;
+  outTransitions: Set<Transition>;
+}
+
+const _inTransitions = Symbol('StatechartModel.inTransitions'),
+      _outTransitions = Symbol('StatechartModel.outTransitions');
 
 export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
                                implements DataContext<AllTypes, StateTypes, AllTypes> {
   private highestId_: number = 0;  // 0 stands for no id.
   private stateMap_ = new Map<number, State | Pseudostate>();
-  private root_: Statechart;
 
-  root() : Statechart { return this.root_; }
+  private statechart_: Statechart;  // The root statechart.
+  private states_ = new Set<StateTypes>;
+  private statecharts_ = new Set<Statechart>;
+  private transitions_ = new Set<Transition>;
+
+  root() : Statechart { return this.statechart_; }
 
   newState() : State {
     const result: State = new State(this),
@@ -224,26 +244,21 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     }
   }
 
-  visitAll(item: AllTypes, parent: ParentTypes, visitor: StatechartVisitor) : void {
+  visitAll(item: AllTypes, visitor: StatechartVisitor) : void {
     const self = this;
-    visitor(item, parent);
+    visitor(item);
     if (item.type === 'state') {
-      item.statecharts.forEach(t => self.visitAll(t, item, visitor));
+      item.statecharts.forEach(t => self.visitAll(t, visitor));
     } else if  (item.type === 'statechart') {
-      item.states.forEach(t => self.visitAll(t, item, visitor));
-      item.transitions.forEach(t => self.visitAll(t, item, visitor));
+      item.states.forEach(t => self.visitAll(t, visitor));
+      item.transitions.forEach(t => self.visitAll(t, visitor));
     }
   }
 
-  private addItem(item: AllTypes, parent: ParentTypes) : void {
-    if (item.type === 'statechart' || item.type === 'state') {
-      this.addSubtree(item, parent);
-    }
-  }
-  private addSubtree(item: AllTypes, parent: ParentTypes) : void {
+  private prepareSubtree(item: AllTypes) : void {
     const self = this;
     const unidentified = new Array<StateTypes>();
-    this.visitAll(item, parent, (item, parent) => {
+    this.visitAll(item, item => {
       // Ensure unique ids. TODO - check for duplicates.
       if (item.type === 'state' || item.type === 'pseudostate') {
         if (item.id !== undefined) {
@@ -253,8 +268,6 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
           unidentified.push(item);
         }
       }
-      // Set parent attribute.
-      item.parent = parent;
     });
     unidentified.forEach((item: StateTypes) => {
       item.id = ++self.highestId_;
@@ -263,82 +276,9 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
 
   setRoot(root: Statechart) : void {
-    this.addSubtree(root, undefined);
-    this.root_ = root;
-  }
-
-  valueChanged(owner: AllTypes, attr: string, oldValue: any) : void {
-    this.onValueChanged(owner, attr, oldValue);
-  }
-  elementInserted(owner: AllTypes, attr: string, index: number, value: AllTypes) : void {
-    this.addItem(value, owner as ParentTypes);
-    this.onElementInserted(owner, attr, index);
-  }
-  elementRemoved(owner: AllTypes, attr: string, index: number, oldValue: AllTypes) : void {
-    this.onElementRemoved(owner, attr, index, oldValue);
-  }
-
-  resolveReference(owner: AllTypes, cacheKey: symbol, id: number) : StateTypes | undefined {
-    // Try to get cached referent.
-    let target = (owner as any)[cacheKey];
-    if (target && target.id === id)
-      return target.ref;
-    const ref = this.stateMap_.get(id);
-    // Cache it on the object.
-    if (ref) {
-      (owner as any)[cacheKey] = { id: id, ref: ref };
-    }
-    return ref;
-  }
-
-  onChanged(change: StatechartChange) : StatechartChange {
-    // console.log(change);
-    super.onEvent('changed', change);
-    return change;
-  }
-  onValueChanged(item: AllTypes, attr: string, oldValue: any) : StatechartChange {
-    const change: StatechartChange = {type: 'valueChanged', item, attr, index: 0, oldValue };
-    super.onEvent('valueChanged', change);
-    return this.onChanged(change);
-  }
-  onElementInserted(item: AllTypes, attr: string, index: number) : StatechartChange {
-    const change: StatechartChange =
-        { type: 'elementInserted', item: item, attr: attr, index: index, oldValue: undefined };
-    super.onEvent('elementInserted', change);
-    return this.onChanged(change);
-  }
-  onElementRemoved(item: any, attr: string, index: number, oldValue: any ) : StatechartChange {
-    const change: StatechartChange =
-        { type: 'elementRemoved', item: item, attr: attr, index: index, oldValue: oldValue };
-    super.onEvent('elementRemoved', change);
-    return this.onChanged(change);
-  }
-}
-
-//------------------------------------------------------------------------------
-
-export interface GraphInfo {
-  states: Set<StateTypes>;
-  statecharts: Set<Statechart>;
-  transitions: Set<Transition>;
-  interiorTransitions: Set<Transition>;
-  inTransitions: Set<Transition>;
-  outTransitions: Set<Transition>;
-}
-
-const _inTransitions = Symbol('StatechartModel.inTransitions'),
-      _outTransitions = Symbol('StatechartModel.outTransitions');
-
-export class StatechartModel {
-  private context: StatechartContext;
-
-  private statechart_: Statechart;
-  private states_: Set<StateTypes>;
-  private statecharts_: Set<Statechart>;
-  private transitions_: Set<Transition>;
-
-  statechart() : Statechart {
-    return this.statechart_;
+    this.prepareSubtree(root);
+    this.insertItem_(root, undefined);
+    this.statechart_ = root;
   }
 
   getGrandParent(item: AllTypes) : AllTypes | undefined {
@@ -392,7 +332,7 @@ export class StatechartModel {
           outTransitions = new Set<Transition>();
     // First collect states and statecharts.
     items.forEach(item => {
-      this.context.visitAll(item, undefined, (item, parent) => {
+      this.visitAll(item, item => {
         if (item.type === 'state')
           states.add(item);
         else if (item.type === 'statechart')
@@ -511,59 +451,43 @@ export class StatechartModel {
     return lca.type === 'statechart';
   }
 
-
-}
-/*
-import { DataModel, ObservableModel, Change, ReferenceModel, HierarchyModel,
-         SelectionModel, InstancingModel, TranslationModel } from '../src/dataModels'
-
-//------------------------------------------------------------------------------
-
-
-export class StatechartModel {
-  private statechart_: Statechart;
-  private states_: Set<State>;
-  private statecharts_: Set<Statechart>;
-  private transitions_: Set<Transition>;
-
-  private getParent_: (state: any) => any;
-  private getLowestCommonAncestor: (...items: Array<any>) => any;
-  private getTransitionSrc_: (transition: any) => State;
-  private getTransitionDst_: (transition: any) => State;
-
-  private insertState_(state: State) {
+  private insertState_(state: StateTypes, parent: Statechart) {
     this.states_.add(state);
+    state.parent = parent;
     if ((state as any)[_inTransitions] === undefined) {
       // assert(state[_outTransitions] === undefined);
       (state as any)[_inTransitions] = new Array<Transition>();
       (state as any)[_outTransitions] = new Array<Transition>();
     }
-    if (state.items) {
+    if (state.type === 'state' && state.statecharts) {
       const self = this;
-      state.items.forEach(statechart => self.insertItem_(statechart));
+      state.statecharts.forEach(statechart => self.insertStatechart_(statechart, state));
     }
   }
 
-  private removeState_(state: State) {
+  private removeState_(state: StateTypes) {
     this.states_.delete(state);
   }
 
-  private insertStatechart_(statechart: Statechart) {
+  private insertStatechart_(statechart: Statechart, parent: State | undefined) {
     this.statecharts_.add(statechart);
+    statechart.parent = parent;
     const self = this;
-    statechart.items.forEach(subItem => self.insertItem_(subItem));
+    statechart.states.forEach(state => self.insertState_(state, statechart));
+    statechart.transitions.forEach(transition => self.insertTransition_(transition, statechart));
   }
 
   private removeStatechart_(stateChart: Statechart) {
     this.statecharts_.delete(stateChart);
     const self = this;
-    stateChart.items.forEach(subItem => self.removeItem_(subItem));
+    stateChart.states.forEach(state => self.removeState_(state));
   }
 
-  private insertTransition_(transition: Transition) {
+  private insertTransition_(transition: Transition, parent: Statechart) {
     this.transitions_.add(transition);
-    const src = this.getTransitionSrc_(transition),
-          dst = this.getTransitionDst_(transition);
+    transition.parent = parent;
+    const src = transition.src,
+          dst = transition.dst;
     if (src) {
       const outputs = this.getOutTransitions(src);
       if (outputs)
@@ -578,8 +502,8 @@ export class StatechartModel {
 
   private removeTransition_(transition: Transition) {
     this.transitions_.delete(transition);
-    const src = this.getTransitionSrc_(transition),
-          dst = this.getTransitionDst_(transition);
+    const src = transition.src,
+          dst = transition.dst;
     function remove(array: Array<Transition>, item: Transition) {
       const index = array.indexOf(item);
       if (index >= 0) {
@@ -598,16 +522,20 @@ export class StatechartModel {
     }
   }
 
-  private insertItem_(item: AllItems) {
-    if (item.type ==='transition')
-      this.insertTransition_(item);
-    else if (item.type === 'statechart')
-      this.insertStatechart_(item);
-    else
-      this.insertState_(item);
+  private insertItem_(item: AllTypes, parent: ParentTypes) {
+    if (item.type ==='transition') {
+      if (parent && parent.type === 'statechart')
+        this.insertTransition_(item, parent);
+    } else if (item.type === 'statechart') {
+      if (!parent || parent.type === 'state')
+        this.insertStatechart_(item, parent);
+    } else {
+      if (parent && parent.type === 'statechart')
+        this.insertState_(item, parent);
+    }
   }
 
-  private removeItem_(item: AllItems) {
+  private removeItem_(item: AllTypes) {
     if (item.type ==='transition')
       this.removeTransition_(item);
     else if (item.type === 'statechart')
@@ -615,6 +543,78 @@ export class StatechartModel {
     else
       this.removeState_(item);
   }
+
+  valueChanged(owner: AllTypes, attr: string, oldValue: any) : void {
+    if (owner.type === 'transition') {
+      // Remove and reinsert changed transitions.
+      const parent = owner.parent;
+      if (parent) {
+        this.removeTransition_(owner);
+        this.insertTransition_(owner, parent);
+      }
+    }
+    this.onValueChanged(owner, attr, oldValue);
+  }
+  elementInserted(owner: State | Statechart, attr: string, index: number, value: AllTypes) : void {
+    if (value.type !== 'transition')
+      this.prepareSubtree(value);
+
+    this.insertItem_(value, owner);
+    this.onElementInserted(owner, attr, index);
+  }
+  elementRemoved(owner: State | Statechart, attr: string, index: number, oldValue: AllTypes) : void {
+    this.removeItem_(oldValue);
+    this.onElementRemoved(owner, attr, index, oldValue);
+  }
+
+  resolveReference(owner: AllTypes, cacheKey: symbol, id: number) : StateTypes | undefined {
+    // Try to get cached referent.
+    let target = (owner as any)[cacheKey];
+    if (target && target.id === id)
+      return target.ref;
+    const ref = this.stateMap_.get(id);
+    // Cache it on the object.
+    if (ref) {
+      (owner as any)[cacheKey] = { id: id, ref: ref };
+    }
+    return ref;
+  }
+
+  private onChanged(change: StatechartChange) : StatechartChange {
+    // console.log(change);
+    super.onEvent('changed', change);
+    return change;
+  }
+  private onValueChanged(item: AllTypes, attr: string, oldValue: any) : StatechartChange {
+    const change: StatechartChange = {type: 'valueChanged', item, attr, index: 0, oldValue };
+    super.onEvent('valueChanged', change);
+    return this.onChanged(change);
+  }
+  private onElementInserted(item: State | Statechart, attr: string, index: number) : StatechartChange {
+    const change: StatechartChange =
+        { type: 'elementInserted', item: item, attr: attr, index: index, oldValue: undefined };
+    super.onEvent('elementInserted', change);
+    return this.onChanged(change);
+  }
+  private onElementRemoved(item: State | Statechart, attr: string, index: number, oldValue: AllTypes ) : StatechartChange {
+    const change: StatechartChange =
+        { type: 'elementRemoved', item: item, attr: attr, index: index, oldValue: oldValue };
+    super.onEvent('elementRemoved', change);
+    return this.onChanged(change);
+  }
+}
+
+//------------------------------------------------------------------------------
+
+
+/*
+import { DataModel, ObservableModel, Change, ReferenceModel, HierarchyModel,
+         SelectionModel, InstancingModel, TranslationModel } from '../src/dataModels'
+
+//------------------------------------------------------------------------------
+
+
+export class StatechartModel {
 
   private onChanged_ (change: Change) {
     const item = change.item as AllItems,  // TODO make datamodel generic in AllItems.

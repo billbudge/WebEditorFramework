@@ -3,7 +3,7 @@ import * as Statecharts from '../examples/statecharts';
 
 //------------------------------------------------------------------------------
 
-describe('StatechartModel', () => {
+describe('StatechartContext', () => {
   test('state interface', () => {
     const context = new Statecharts.StatechartContext(),
           state = context.newState();
@@ -81,6 +81,53 @@ describe('StatechartModel', () => {
     expect(state1.parent).toBe(statechart);
     expect(childStatechart1.parent).toBe(state1);
     expect(childState1.parent).toBe(childStatechart1);
+  });
+  test('getGraphInfo', () => {
+    const context = new Statecharts.StatechartContext(),
+          statechart = context.newStatechart(),
+          state1 = context.newState(),
+          state2 = context.newState(),
+          transition1 = context.newTransition(state1, state2);
+
+    statechart.states.append(state1);
+    statechart.states.append(state2);
+    statechart.transitions.append(transition1);
+    context.setRoot(statechart);
+
+    const graph1 = context.getGraphInfo();
+    expect(graph1.states.has(state1)).toBe(true);
+    expect(graph1.states.has(state2)).toBe(true);
+    expect(graph1.states.size).toBe(2);
+    expect(graph1.statecharts.has(statechart)).toBe(true);
+    expect(graph1.statecharts.size).toBe(1);
+    expect(graph1.transitions.has(transition1)).toBe(true);
+    expect(graph1.transitions.size).toBe(1);
+
+    const input = context.newState(),
+          output = context.newState(),
+          transition2 = context.newTransition(input, state1),
+          transition3 = context.newTransition(state2, output);
+
+    statechart.states.append(input);
+    statechart.states.append(output);
+    statechart.transitions.append(transition2);
+    statechart.transitions.append(transition3);
+
+    const graph2 = context.getGraphInfo();
+
+    expect(graph2.states.has(state1)).toBe(true);
+    expect(graph2.states.has(state2)).toBe(true);
+    expect(graph2.states.has(input)).toBe(true);
+    expect(graph2.states.has(output)).toBe(true);
+    expect(graph2.states.size).toBe(4);
+    expect(graph2.statecharts.size).toBe(1);
+    expect(graph2.interiorTransitions.has(transition1));
+    expect(graph2.interiorTransitions.has(transition2));
+    expect(graph2.interiorTransitions.has(transition3));
+    expect(graph2.transitions.size).toBe(3);
+    expect(graph2.interiorTransitions.size).toBe(3);
+    expect(graph2.inTransitions.size).toBe(0);
+    expect(graph2.outTransitions.size).toBe(0);
   });
 });
 
