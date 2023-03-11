@@ -20,6 +20,12 @@ function addTransition(
   return transition;
 }
 
+function addStatechart(state: Statecharts.State) : Statecharts.Statechart {
+  const statechart = state.context.newStatechart();
+  state.statecharts.append(statechart);
+  return statechart;
+}
+
 function setEquals(set1: Set<any>, set2: Array<any>) {
   expect(set1.size).toBe(set2.length);
   for (const item of set2) {
@@ -33,6 +39,7 @@ describe('StatechartContext', () => {
   test('state interface', () => {
     const context = new Statecharts.StatechartContext(),
           state = context.newState();
+
     expect(state.type).toBe('state');
     expect(state.name).toBeUndefined();
     state.name = 'Test State';
@@ -187,8 +194,10 @@ describe('StatechartContext', () => {
           transition3 = addTransition(statechart, input, state2),
           transition4 = addTransition(statechart, state2, output);
 
+    // context.setRoot(statechart);  TODO???
+
     const inputFn = context.forInTransitions.bind(context),
-          outputFn = context.forOutTransitions.bind(context);
+    outputFn = context.forOutTransitions.bind(context);
     testIterator(inputFn, input, []);
     testIterator(outputFn, input, [transition2, transition3]);
     testIterator(inputFn, state1, [transition2]);
@@ -205,6 +214,8 @@ describe('StatechartContext', () => {
           shallowHistory = context.newPseudostate('history'),
           deepHistory = context.newPseudostate('history*'),
           stop = context.newPseudostate('stop');
+
+    context.setRoot(statechart);
 
     expect(context.canAddState(state1, statechart)).toBe(true);
     expect(context.canAddState(state2, statechart)).toBe(true);
@@ -249,115 +260,79 @@ describe('StatechartContext', () => {
     expect(context.isValidTransition(start, shallowHistory)).toBe(true);
     expect(context.isValidTransition(start, deepHistory)).toBe(true);
 
-    // // Convert state1 to a superstate with two sub-statecharts.
-    // const start1 = addItem(test, newPseudoState('start'), state1),
-    //       statechart1 = state1.items[0],
-    //       subState1 = addItem(test, newState(), statechart1),
-    //       start2 = addItem(test, newPseudoState('start'), state1),
-    //       statechart2 = state1.items[1],
-    //       subState2 = addItem(test, newState(), statechart2),
-    //       subHistory = addItem(test, newPseudoState('history'), state1);
-    // // No transitions between sibling statecharts.
-    // QUnit.assert.notOk(test.isValidTransition(start2, subState1));
-    // QUnit.assert.notOk(test.isValidTransition(start1, subState2));
-    // // No transitions from pseudo-state outside it's parent statechart.
-    // QUnit.assert.notOk(test.isValidTransition(start1, state2));
-    // QUnit.assert.notOk(test.isValidTransition(state2, start2));
-    // // Transitions are allowed from parent state to child state.
-    // QUnit.assert.ok(test.isValidTransition(state1, subHistory));
-    // QUnit.assert.ok(test.isValidTransition(state1, subState1));
+    // Convert state1 to a superstate with two sub-statecharts.
+    const statechart1 = addStatechart(state1),
+          statechart2 = addStatechart(state1),
+          subState1 = addState(statechart1),
+          subState2 = addState(statechart2);
+
+    // No transitions between sibling statecharts.
+    expect(context.isValidTransition(subState1, subState1)).toBe(true);
+    expect(context.isValidTransition(subState2, subState2)).toBe(true);
+    expect(context.isValidTransition(subState1, subState2)).toBe(false);
+  });
+  test('addAndDelete', () => {
+    const context = new Statecharts.StatechartContext(),
+          statechart = context.newStatechart(),
+          state1 = context.newState();
+
+    context.setRoot(statechart);
+
+    expect(statechart.states.length).toBe(0);
+    statechart.states.append(state1);
+    expect(statechart.states.at(0)).toBe(state1);
+    statechart.states.removeAt(0);
+    expect(statechart.states.length).toBe(0);
+  });
+  test('findChildStatechart, findOrCreateStatechart', () => {
+    const context = new Statecharts.StatechartContext(),
+          statechart = context.newStatechart(),
+          superState = addState(statechart),
+          state = context.newState(),
+          start1 = context.newPseudostate('start'),
+          start2 = context.newPseudostate('start');
+
+    context.setRoot(statechart);
+
+    // Primitive state has no statechart.
+    expect(context.findChildStatechart(superState, state)).toBeUndefined();
+
+    // Empty child statechart can accept a state.
+    const statechart1 = addStatechart(superState);
+    expect(context.findChildStatechart(superState, state)).toBe(statechart1);
+
+    // A child statechart with a start state can accept a state but not a start state.
+    statechart1.states.append(start1);
+    expect(context.findChildStatechart(superState, state)).toBe(statechart1);
+    expect(context.findChildStatechart(superState, start2)).toBeUndefined();
+
+    const statechart2 = context.findOrCreateChildStatechart(superState, start2);
+    expect(statechart2).toBeDefined()
+    expect(statechart2).not.toBe(statechart1);
+  });
+  test('selection', () => {
+    const context = new Statecharts.StatechartContext(),
+          statechart = context.newStatechart(),
+          superState = addState(statechart),
+          statechart1 = addStatechart(superState),
+          state1 = addState(statechart1);
+
+    context.setRoot(statechart);
+
+    context.select(state1);
+    expect(context.selection()).toEqual([state1]);
+    context.select(superState);
+    expect(context.selection()).toEqual([state1, superState]);
+
+    context.reduceSelection();
+    expect(context.selection()).toEqual([superState]);
   });
 });
 
 /*
 
-  QUnit.test("statecharts.statechartModel.getSubgraphInfo", function() {
-  });
-
-  QUnit.test("statecharts.editingModel.addAndDeleteItems", function() {
-    const test = newTestEditingModel(),
-          model = test.model,
-          statechart = model.root;
-    // Add an item.
-    const item1 = newState();
-    test.newItem(item1);
-    test.addItem(item1, model.root);
-    QUnit.assert.deepEqual(model.root.items, [item1]);
-    QUnit.assert.deepEqual(model.hierarchicalModel.getParent(item1), statechart);
-    // Delete the item.
-    test.deleteItem(item1);
-    QUnit.assert.deepEqual(statechart.items, []);
-  });
-
-  QUnit.test("statecharts.editingModel.findChildStatechart", function() {
-    let test = newTestEditingModel(),
-        items = test.model.root.items,
-        superState = addItem(test, newState()),
-        state = newState(),
-        transition = newTransition(state, state),
-        start = newPseudoState('start');
-    // Primitive state has no statechart.
-    QUnit.assert.ok(test.findChildStatechart(superState, state) === -1);
-    QUnit.assert.ok(test.findChildStatechart(superState, start) === -1);
-    // Add a child statechart.
-    const statechart1 = test.findOrCreateChildStatechart(superState, state);
-    // Can add state.
-    QUnit.assert.ok(test.findChildStatechart(superState, state) === 0);
-    QUnit.assert.ok(test.findChildStatechart(superState, start) === 0);
-    statechart1.items.push(newState());
-    QUnit.assert.ok(test.findChildStatechart(superState, state) === 0);
-    QUnit.assert.ok(test.findChildStatechart(superState, start) === 0);
-    // Add a start state.
-    statechart1.items.push(newPseudoState('start'));
-    QUnit.assert.ok(test.findChildStatechart(superState, state) === 0);
-    QUnit.assert.ok(test.findChildStatechart(superState, start) === -1);
-  });
 
 
-  QUnit.test("statecharts.editingModel.isValidTransition", function() {
-    const test = newTestEditingModel(),
-          items = test.model.root.items,
-          state1 = addItem(test, newState()),
-          state2 = addItem(test, newState()),
-          start = addItem(test, newPseudoState('start')),
-          stop = addItem(test, newPseudoState('stop')),
-          shallowHistory = addItem(test, newPseudoState('history')),
-          deepHistory = addItem(test, newPseudoState('history*'));
-
-    // Test transitions within a statechart.
-    QUnit.assert.notOk(test.isValidTransition(undefined, undefined));
-    QUnit.assert.notOk(test.isValidTransition(state1, undefined));
-    QUnit.assert.notOk(test.isValidTransition(undefined, state1));
-    QUnit.assert.ok(test.isValidTransition(state1, state1));
-    QUnit.assert.ok(test.isValidTransition(state1, state2));
-    QUnit.assert.ok(test.isValidTransition(start, stop));
-    QUnit.assert.notOk(test.isValidTransition(start, start));
-    QUnit.assert.notOk(test.isValidTransition(stop, stop));
-    QUnit.assert.notOk(test.isValidTransition(shallowHistory, shallowHistory));
-    QUnit.assert.notOk(test.isValidTransition(deepHistory, deepHistory));
-    QUnit.assert.notOk(test.isValidTransition(stop, state1));
-    QUnit.assert.notOk(test.isValidTransition(state1, start));
-    QUnit.assert.ok(test.isValidTransition(start, shallowHistory));
-    QUnit.assert.ok(test.isValidTransition(start, deepHistory));
-
-    // Convert state1 to a superstate with two sub-statecharts.
-    const start1 = addItem(test, newPseudoState('start'), state1),
-          statechart1 = state1.items[0],
-          subState1 = addItem(test, newState(), statechart1),
-          start2 = addItem(test, newPseudoState('start'), state1),
-          statechart2 = state1.items[1],
-          subState2 = addItem(test, newState(), statechart2),
-          subHistory = addItem(test, newPseudoState('history'), state1);
-    // No transitions between sibling statecharts.
-    QUnit.assert.notOk(test.isValidTransition(start2, subState1));
-    QUnit.assert.notOk(test.isValidTransition(start1, subState2));
-    // No transitions from pseudo-state outside it's parent statechart.
-    QUnit.assert.notOk(test.isValidTransition(start1, state2));
-    QUnit.assert.notOk(test.isValidTransition(state2, start2));
-    // Transitions are allowed from parent state to child state.
-    QUnit.assert.ok(test.isValidTransition(state1, subHistory));
-    QUnit.assert.ok(test.isValidTransition(state1, subState1));
-  });
 
   QUnit.test("statecharts.editingModel.isValidStatechart", function() {
     const test = newTestEditingModel(),

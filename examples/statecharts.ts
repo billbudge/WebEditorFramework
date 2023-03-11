@@ -1,7 +1,9 @@
 
+import { SelectionSet } from '../src/collections'
+
 import { ScalarProp, ArrayProp, ReferencedObject, RefProp, ParentProp,
          DataContext, EventBase, Change, ChangeEvents,
-         getLowestCommonAncestor } from '../src/dataModels'
+         getLowestCommonAncestor, reduceToRoots } from '../src/dataModels'
 
 //------------------------------------------------------------------------------
 
@@ -24,7 +26,7 @@ export type StateType = 'state';
 export class State implements ReferencedObject {
   private readonly template = stateTemplate;
   id: number;
-  readonly context: DataContext;
+  readonly context: StatechartContext;
 
   readonly type: StateType = 'state';
 
@@ -44,7 +46,7 @@ export class State implements ReferencedObject {
 
   get statecharts() { return this.template.statecharts.get(this, this.context); }
 
-  constructor(context: DataContext) {
+  constructor(context: StatechartContext) {
     this.context = context;
   }
 }
@@ -201,6 +203,8 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   private states_ = new Set<StateTypes>;
   private statecharts_ = new Set<Statechart>;
   private transitions_ = new Set<Transition>;
+
+  private selection_ = new SelectionSet<AllTypes>();
 
   root() : Statechart { return this.statechart_; }
 
@@ -451,6 +455,82 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     return lca.type === 'statechart';
   }
 
+  findChildStatechart(superState: State, child: StateTypes | Transition) : Statechart | undefined {
+    for (let statechart of superState.statecharts) {
+      if (child.type === 'transition' || this.canAddState(child, statechart)) {
+        return statechart;
+      }
+    }
+    return undefined;
+  }
+
+  findOrCreateChildStatechart(state: State, child: StateTypes | Transition) : Statechart {
+    let statechart = this.findChildStatechart(state, child);
+    if (!statechart) {
+      statechart = this.newStatechart();
+      state.statecharts.append(statechart);
+    }
+    return statechart;
+  }
+
+  deleteItem(item: AllTypes) {
+    if (item.parent) {
+      if (item.type === 'transition')
+        item.parent.transitions.remove(item);
+      else if (item.type === 'statechart')
+        item.parent.statecharts.remove(item);
+      else
+        item.parent.states.remove(item);
+    }
+    // TODO update selection.
+  }
+
+  deleteItems(items: Array<AllTypes>) {
+    const self = this;
+    items.forEach(item => self.deleteItem(item));
+  }
+
+  select(item: AllTypes) {
+    this.selection_.add(item);
+  }
+
+  selection() : Array<AllTypes> {
+    return this.selection_.contents();
+  }
+
+  selectedStates() : Array<StateTypes> {
+    const result = new Array<StateTypes>();
+    this.selection().forEach(item => {
+      if (item.type === 'state' || item.type === 'pseudostate')
+        result.push(item);
+    });
+    return result;
+  }
+
+  reduceSelection() {
+    const selection = this.selection_;
+    // First, replace statecharts by their parent state. We do this by adding parent
+    // states to the selection before reducing.
+    selection.forEach(function(item: AllTypes) {
+      if (item.type === 'statechart') {
+        selection.delete(item);
+        if (item.parent)
+          selection.add(item.parent);
+      }
+    });
+
+    const roots = reduceToRoots(selection.contents(), selection);
+    // Reverse, to preserve the previous order of selection.
+    selection.set(roots.reverse());
+  }
+
+  selectInteriorTransitions() {
+    const self = this,
+          graphInfo = this.getSubgraphInfo(this.selectedStates());
+    graphInfo.interiorTransitions.forEach(transition => self.selection_.add(transition));
+  }
+
+
   private insertState_(state: StateTypes, parent: Statechart) {
     this.states_.add(state);
     state.parent = parent;
@@ -623,43 +703,7 @@ export class EditingModel {
   private translationModel_: TranslationModel;
   private statechartModel_: StatechartModel;
 
-  reduceSelection() {
-    const hierarchyModel = this.hierarchyModel_,
-          selectionModel = this.selectionModel_;
-    // First, replace statecharts by their parent state. We do this by adding parent
-    // states to the selection before reducing. Snapshot the selection since we will
-    // be modifying it.
-    selectionModel.contents().forEach(function(item: AllItems) {
-      if (item.type === 'statechart') {
-        selectionModel.delete(item);
-        const parent = hierarchyModel.getParent(item);
-        if (parent)
-          selectionModel.add(parent);
-      }
-    });
-    selectionModel.reduceSelection(hierarchyModel);
-  }
 
-  selectInteriorTransitions() {
-    const selectionModel = this.selectionModel_,
-          graphInfo = this.statechartModel_.getSubgraphInfo(selectionModel.contents());
-    selectionModel.add(graphInfo.interiorTransitions);
-  }
-
-  newItem(item: AllItems) : AllItems {
-    const dataModel = this.dataModel_,
-          referenceModel = this.referenceModel_;
-    referenceModel.assignId(item);
-    dataModel.initialize(item);
-    return item;
-  }
-
-  newItems(items: Array<AllItems>) : Array<AllItems> {
-    const self = this,
-          result = new Array<AllItems>();
-    items.forEach(item => { result.push(self.newItem(item)); });
-    return result;
-  }
 
   copyItems(items: Array<AllItems>, map: Map<number, AllItems>) : Array<AllItems> {
     const statechart = this.statechart_,
@@ -678,27 +722,6 @@ export class EditingModel {
     return copies;
   }
 
-  deleteItem(item: AllItems) {
-    const parent = this.hierarchyModel_.getParent(item);
-    if (parent) {
-      const items = parent.items;
-      if (items) {
-        const index = items.indexOf(item);
-        if (index >= 0) {
-          this.observableModel_.removeElement(parent, 'items', index);
-          this.selectionModel_.delete(item);
-        }
-      }
-    }
-  }
-
-  deleteItems(items: Array<AllItems>) {
-    const self = this;
-    items.forEach(function(item) {
-      self.deleteItem(item);
-    }, this);
-  }
-
   setAttr(item: AllItems, attr: string, value: any) {
     this.observableModel_.changeValue(item, attr, value);
   }
@@ -713,32 +736,6 @@ export class EditingModel {
       items: new Array(),
     };
     return this.newItem(statechart);
-  }
-
-  findChildStatechart(state: State, child: State | Transition) {
-    const statechartModel = this.statechartModel_;
-    if (state.items) {
-      for (let i = 0; i < state.items.length; i++) {
-        if (child.type === 'transition' ||
-            statechartModel.canAddState(child, state.items[i])) {
-            return i;
-          }
-      }
-    }
-    return -1;
-  }
-
-  findOrCreateChildStatechart(state: State, child: State | Transition) {
-    let i = this.findChildStatechart(state, child);
-    if (i < 0) {
-      if (!state.items)
-        this.setAttr(state, 'items', new Array());
-      i = state.items!.length;
-      const y = 0;// TODO this.model_.renderer.getNextStatechartY(state);
-      const statechart = this.newStatechart(y);
-      this.observableModel_.insertElement(state, 'items', i, statechart);
-    }
-    return state.items![i];  // TODO check
   }
 
   addItem(item: State | Transition, parent: State | Statechart) : StatechartItem {

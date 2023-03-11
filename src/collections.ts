@@ -247,10 +247,26 @@ export class SelectionSet<T> {
       this.add(element);
   }
 
+  set(item: T | Array<T>) {
+    this.clear();
+    if (Array.isArray(item)) {
+      for (let subItem of item)
+        this.add(subItem);
+    } else {
+      this.add(item);
+    }
+  }
+
   clear() {
     this.list.clear();
     this.map.clear();
     this.length_ = 0;
+  }
+
+  contents() : Array<T> {
+    const result = new Array<T>();
+    this.forEachReverse(item => result.push(item));
+    return result;
   }
 
   forEach(fn: VisitorFunction<T>) {

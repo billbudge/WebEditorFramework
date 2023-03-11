@@ -19,12 +19,15 @@ export interface List<T = any> {
   at: (index: number) => T | undefined;
   append(element: T) : void;
   insert(element: T, index: number) : void;
-  remove(index: number) : T | undefined;
+  indexOf(element: T) : number;
+  remove(element: T) : number;
+  removeAt(index: number) : T | undefined;
   forEach(visitor: (element: T) => void) : void;
   forEachReverse(visitor: (element: T) => void) : void;
   [Symbol.iterator]() : IterableIterator<T>;
 }
 
+// TODO work on making List<T> more ergonomic.
 export class DataList<T = any> implements List<T> {
   private owner: object;
   private name: string;
@@ -61,12 +64,24 @@ export class DataList<T = any> implements List<T> {
     this.insert(element, this.length);
   }
 
-  remove(index: number) : T | undefined {
+  indexOf(element: T) : number {
+    const array = this.array;
+    return array ? array.indexOf(element) : -1;
+  }
+
+  removeAt(index: number) : T | undefined {
     const array = this.array;
     if (!array)
       return undefined;
     const oldValue = array.splice(index, 1);
     this.dataContext.elementRemoved(this.owner, this.name, index, oldValue[0]);
+  }
+
+  remove(element: T) : number {
+    const index = this.indexOf(element);
+    if (index >= 0)
+      this.removeAt(index);
+    return index;
   }
 
   forEach(visitor: (element: T) => void) : void {
@@ -235,6 +250,30 @@ export function getLowestCommonAncestor<T extends Parented<T>>(
     if (heightLCA == 0 || nextHeight == 0) return undefined;
   }
   return lca;
+}
+
+interface SetLike<T> {
+  has(item: T) : boolean;
+}
+
+export function reduceToRoots<T extends Parented<T>>(items: Array<T>, set: SetLike<T>) : Array<T> {
+  function ancestorInSet(item: T) {
+    let ancestor = item.parent;
+    while (ancestor) {
+      if (set.has(ancestor))
+        return true;
+      ancestor = ancestor.parent;
+    }
+    return false;
+  }
+
+  const roots = new Array();
+  items.forEach(function(item: T) {
+    if (!ancestorInSet(item)) {
+      roots.push(item);
+    }
+  });
+  return roots;
 }
 
 //------------------------------------------------------------------------------

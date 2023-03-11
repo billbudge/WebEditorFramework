@@ -286,6 +286,23 @@ describe('SelectionSet', () => {
     expect(selectionSet.lastSelected()).toBe(undefined);
     expect(stringify(selectionSet)).toBe('')
   });
+  test('set', () => {
+    const selectionSet = new SelectionSet();
+    selectionSet.set('a');
+    expect(selectionSet.length()).toBe(1);
+    expect(selectionSet.lastSelected()).toBe('a');
+    expect(stringify(selectionSet)).toBe('a')
+    selectionSet.set(['a', 'b', 'c']);
+    expect(selectionSet.length()).toBe(3);
+    expect(selectionSet.lastSelected()).toBe('c');
+    expect(stringify(selectionSet)).toBe('cba')
+  });
+  test('contents', () => {
+    const selectionSet = new SelectionSet();
+    selectionSet.set(['a', 'b', 'c']);
+    expect(selectionSet.contents()).toEqual(['a', 'b', 'c']);
+    expect(selectionSet.contents().length).toBe(3);
+  });
   test('forEach, forEachReverse', () => {
     const selectionSet = new SelectionSet();
     selectionSet.add('a');
