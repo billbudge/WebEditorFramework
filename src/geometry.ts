@@ -29,6 +29,23 @@ export function matMulPt(v: Point, m: number[]) : Point {
   return v;
 }
 
+export function getExtents(
+    points: Point[]) : { xmin: number, ymin: number, xmax: number, ymax: number } {
+  const length = points.length,
+        p0 = points[0];
+  let xmin = p0.x, ymin = p0.y, xmax = p0.x, ymax = p0.y;
+  for (let i = 0; i < length; i++) {
+    const pi = points[i];
+    xmin = Math.min(xmin, pi.x);
+    ymin = Math.min(ymin, pi.y);
+    xmax = Math.max(xmax, pi.x);
+    ymax = Math.max(ymax, pi.y);
+  }
+  return { xmin: xmin, ymin: ymin, xmax: xmax, ymax: ymax };
+}
+
+
+
 export function pointToPointDist(p1: Point, p2: Point) : number {
   const dx = p2.x - p1.x, dy = p2.y - p1.y;
   return Math.sqrt(dx * dx + dy * dy);

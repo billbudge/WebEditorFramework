@@ -199,7 +199,7 @@ export function arrowPath(
 }
 
 export function lineEdgePath(
-    p1: Point, p2: Point, ctx: CanvasRenderingContext2D, arrowSize: number) {
+    p1: Point, p2: PointWithNormal, ctx: CanvasRenderingContext2D, arrowSize: number) {
   ctx.beginPath();
   ctx.moveTo(p1.x, p1.y);
   ctx.lineTo(p2.x, p2.y);
@@ -208,7 +208,7 @@ export function lineEdgePath(
 }
 
 export function bezierEdgePath(
-    bezier: Point[], ctx: CanvasRenderingContext2D, arrowSize: number) {
+    bezier: PointWithNormal[], ctx: CanvasRenderingContext2D, arrowSize: number) {
   let p1 = bezier[0], c1 = bezier[1], c2 = bezier[2], p2 = bezier[3];
   ctx.beginPath();
   ctx.moveTo(p1.x, p1.y);
@@ -354,7 +354,7 @@ export function measureNameValuePairs(
 
 //------------------------------------------------------------------------------
 
-interface Theme {
+export class Theme {
   bgColor: string;
   altBgColor: string;
   strokeColor: string;
@@ -450,7 +450,7 @@ export class PropertyGridController {
     // table.style = 'position:fixed; table-layout: fixed; top:300px; left: 0;   padding: 0; margin: 0;';
     // 'border-collapse: collapse; margin: 25px 0; font-size: 0.9em; font-family: sans-serif; ';
     // 'box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);';
-    table.style['background-color'] = this.theme.altBgColor;
+    // table.style['background-color'] = this.theme.altBgColor;  //TODO fixme
     table.style.display = 'none';
     table.style.visibility = 'hidden';
 
@@ -768,11 +768,11 @@ class CanvasController {
   setSize(width: number, height: number) {
     this.canvasRect.width = width;
     this.canvasRect.height = height;
-    diagrams.setCanvasSize(this.canvas, this.ctx, width, height);
+    setCanvasSize(this.canvas, this.ctx, width, height);
     this.draw();
   }
   onWindowResize() {
-    diagrams.setCanvasSize(this.canvas, this.ctx, this.canvasRect.width, this.canvasRect.height);
+    setCanvasSize(this.canvas, this.ctx, this.canvasRect.width, this.canvasRect.height);
     this.draw();
   }
   getClientRect() : DOMRect {

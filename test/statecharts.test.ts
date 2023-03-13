@@ -100,6 +100,8 @@ describe('StatechartContext', () => {
           childStatechart1 = context.newStatechart(),
           childState1 = context.newState();
 
+    context.setRoot(statechart);
+
     expect(statechart.parent).toBeUndefined();
     expect(state1.parent).toBeUndefined();
     expect(childState1.parent).toBeUndefined();
@@ -174,19 +176,31 @@ describe('StatechartContext', () => {
     setEquals(subgraph2.inTransitions, [transition2]);
     setEquals(subgraph2.outTransitions, [transition3]);
   });
+  test('ids', () => {
+    const context = new Statecharts.StatechartContext(),
+          statechart = context.newStatechart(),
+          state1 = addState(statechart),
+          state2 = addState(statechart);
+    expect(state1.id).not.toBe(0);
+    expect(state2.id).not.toBe(0);
+    expect(state1.id).not.toBe(state2.id);
+  });
   test('iterators', () => {
     function testIterator(
         fn: (state: Statecharts.StateTypes, visitor: Statecharts.TransitionVisitor) => void,
         state: Statecharts.StateTypes,
         items: Array<Statecharts.Transition>) {
       const iterated = new Array<Statecharts.Transition>();
-      fn(state, (t) => iterated.push(t));
-      expect(items).toEqual(iterated);
+      fn(state, t => iterated.push(t));
+      expect(items.length).toBe(iterated.length);
+      for (const item of items) {
+        expect(iterated).toContain(item);
+      }
     }
     const context = new Statecharts.StatechartContext(),
           statechart = context.newStatechart(),
-          state1 = addState(statechart, ),
-          state2 = addState(statechart, ),
+          state1 = addState(statechart),
+          state2 = addState(statechart),
           transition1 = addTransition(statechart, state1, state2),
           input = addState(statechart),
           output = addState(statechart),
@@ -194,10 +208,10 @@ describe('StatechartContext', () => {
           transition3 = addTransition(statechart, input, state2),
           transition4 = addTransition(statechart, state2, output);
 
-    // context.setRoot(statechart);  TODO???
+    context.setRoot(statechart);
 
     const inputFn = context.forInTransitions.bind(context),
-    outputFn = context.forOutTransitions.bind(context);
+          outputFn = context.forOutTransitions.bind(context);
     testIterator(inputFn, input, []);
     testIterator(outputFn, input, [transition2, transition3]);
     testIterator(inputFn, state1, [transition2]);

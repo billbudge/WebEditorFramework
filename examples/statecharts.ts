@@ -1,6 +1,11 @@
 
 import { SelectionSet } from '../src/collections'
 
+import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
+         circleParamToPoint } from '../src/diagrams'
+
+import { getExtents } from '../src/geometry'
+
 import { ScalarProp, ArrayProp, ReferencedObject, RefProp, ParentProp,
          DataContext, EventBase, Change, ChangeEvents,
          getLowestCommonAncestor, reduceToRoots } from '../src/dataModels'
@@ -8,6 +13,15 @@ import { ScalarProp, ArrayProp, ReferencedObject, RefProp, ParentProp,
 //------------------------------------------------------------------------------
 
 // Interfaces to statechart objects.
+
+// Derived properties, indexed by symbols to distinguish them from actual properties.
+const globalPosition: unique symbol = Symbol('globalPosition');
+interface Position {
+  x: number;
+  y: number;
+}
+const inTransitions: unique symbol = Symbol('inTransitions'),
+      outTransitions: unique symbol = Symbol('outTransitions');
 
 const stateTemplate = {
   x: new ScalarProp<number>('x'),
@@ -25,7 +39,7 @@ export type StateType = 'state';
 
 export class State implements ReferencedObject {
   private readonly template = stateTemplate;
-  id: number;
+  readonly id: number;
   readonly context: StatechartContext;
 
   readonly type: StateType = 'state';
@@ -46,8 +60,14 @@ export class State implements ReferencedObject {
 
   get statecharts() { return this.template.statecharts.get(this, this.context); }
 
-  constructor(context: StatechartContext) {
+  // Derived properties.
+  [globalPosition]: Position;
+  [inTransitions]: Transition[];
+  [outTransitions]: Transition[];
+
+  constructor(context: StatechartContext, id: number) {
     this.context = context;
+    this.id = id;
   }
 }
 
@@ -63,7 +83,7 @@ export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
 
 export class Pseudostate implements ReferencedObject {
   private readonly template = pseudostateTemplate;
-  id: number;
+  readonly id: number;
   readonly context: StatechartContext;
 
   readonly type: PseudostateType = 'pseudostate';
@@ -77,8 +97,14 @@ export class Pseudostate implements ReferencedObject {
   get parent() { return this.template.parent.get(this); };
   set parent(parent) { this.template.parent.set(this, parent); };
 
-  constructor(subtype: PseudostateSubtype, context: StatechartContext) {
+  // Derived properties.
+  [globalPosition]: Position;
+  [inTransitions]: Transition[];
+  [outTransitions]: Transition[];
+
+  constructor(subtype: PseudostateSubtype, id: number, context: StatechartContext) {
     this.subtype = subtype;
+    this.id = id;
     this.context = context;
   }
 }
@@ -159,6 +185,9 @@ export class Statechart {
   get states() { return this.template.states.get(this, this.context); }
   get transitions() { return this.template.transitions.get(this, this.context); }
 
+  // Derived properties.
+  [globalPosition]: Position;
+
   constructor(context: StatechartContext) {
     this.context = context;
   }
@@ -174,10 +203,11 @@ export class Statechart {
 
 export type StateTypes = State | Pseudostate;
 export type ParentTypes = Statechart | State | undefined;
+export type NonTransitionTypes = Statechart | StateTypes
 export type AllTypes = StateTypes | Statechart | Transition;
 
-export type StateVisitor = (state: StateTypes, parent: ParentTypes) => void;
 export type StatechartVisitor = (item: AllTypes) => void;
+export type NonTransitionVisitor = (item: NonTransitionTypes) => void;
 export type TransitionVisitor = (item: Transition) => void;
 
 type StatechartChange = Change<AllTypes, AllTypes | undefined>;
@@ -190,9 +220,6 @@ export interface GraphInfo {
   inTransitions: Set<Transition>;
   outTransitions: Set<Transition>;
 }
-
-const _inTransitions = Symbol('StatechartModel.inTransitions'),
-      _outTransitions = Symbol('StatechartModel.outTransitions');
 
 export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
                                implements DataContext<AllTypes, StateTypes, AllTypes> {
@@ -209,18 +236,16 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   root() : Statechart { return this.statechart_; }
 
   newState() : State {
-    const result: State = new State(this),
-          nextId = ++this.highestId_;
+    const nextId = ++this.highestId_,
+          result: State = new State(this, nextId);
     this.stateMap_.set(nextId, result);
-    result.id = nextId;
     return result;
   }
 
   newPseudostate(subtype: PseudostateSubtype) : Pseudostate {
-    const result: Pseudostate = new Pseudostate(subtype, this),
-          nextId = ++this.highestId_;
+    const nextId = ++this.highestId_,
+          result: Pseudostate = new Pseudostate(subtype, nextId, this);
     this.stateMap_.set(nextId, result);
-    result.id = nextId;
     return result;
   }
 
@@ -236,18 +261,6 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     return result;
   }
 
-  visitStates(item: State | Pseudostate | Statechart, parent: ParentTypes, visitor: StateVisitor) : void {
-    const self = this;
-    if (item.type === 'state') {
-      visitor(item, parent);
-      item.statecharts.forEach(t => self.visitStates(t, item, visitor));
-    } else if (item.type === 'pseudostate') {
-      visitor(item, parent);
-    } else if (item.type === 'statechart') {
-      item.states.forEach(t => self.visitStates(t, item, visitor));
-    }
-  }
-
   visitAll(item: AllTypes, visitor: StatechartVisitor) : void {
     const self = this;
     visitor(item);
@@ -259,28 +272,39 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     }
   }
 
-  private prepareSubtree(item: AllTypes) : void {
+  visitNonTransitions(item: NonTransitionTypes, visitor: NonTransitionVisitor) : void {
     const self = this;
-    const unidentified = new Array<StateTypes>();
-    this.visitAll(item, item => {
-      // Ensure unique ids. TODO - check for duplicates.
-      if (item.type === 'state' || item.type === 'pseudostate') {
-        if (item.id !== undefined) {
-          self.highestId_ = Math.max(self.highestId_, item.id);
-          self.stateMap_.set(item.id, item);
-        } else {
-          unidentified.push(item);
-        }
-      }
-    });
-    unidentified.forEach((item: StateTypes) => {
-      item.id = ++self.highestId_;
-      self.stateMap_.set(item.id, item);
-    });
+    if (item.type === 'state') {
+      visitor(item);
+      item.statecharts.forEach(item => self.visitNonTransitions(item, visitor));
+    } else if (item.type === 'pseudostate') {
+      visitor(item);
+    } else if (item.type === 'statechart') {
+      visitor(item);
+      item.states.forEach(item => self.visitNonTransitions(item, visitor));
+    }
   }
 
+  private initializeItem(item: AllTypes) {
+    switch (item.type) {
+      case 'state': {
+        this.setGlobalPosition(item);
+        break;
+      }
+      case 'pseudostate': {
+        this.setGlobalPosition(item);
+        break;
+      }
+      case 'statechart': {
+        this.setGlobalPosition(item);
+        break;
+      }
+      case 'transition': {
+        break;
+      }
+    }
+}
   setRoot(root: Statechart) : void {
-    this.prepareSubtree(root);
     this.insertItem_(root, undefined);
     this.statechart_ = root;
   }
@@ -293,26 +317,52 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     return result;
   }
 
-  getInTransitions(state: StateTypes) : Transition[] {
-    return (state as any)[_inTransitions];
-  }
-
-  getOutTransitions(state: StateTypes) : Transition[] {
-    return (state as any)[_outTransitions];
-  }
-
   forInTransitions(state: StateTypes, visitor: TransitionVisitor) {
-    const inputs = this.getInTransitions(state);
+    const inputs = state[inTransitions];
     if (!inputs)
       return;
     inputs.forEach((input, i) => visitor(input));
   }
 
   forOutTransitions(state: StateTypes, visitor: TransitionVisitor) {
-    const outputs = this.getOutTransitions(state);
+    const outputs = state[outTransitions];
     if (!outputs)
       return;
     outputs.forEach((output, i) => visitor(output));
+  }
+
+  // Gets the translation to move an item from its current parent to
+  // newParent. Handles the cases where current parent or newParent are null.
+  getToParent(item: NonTransitionTypes, newParent: ParentTypes) {
+    const oldParent: ParentTypes = item.parent;
+    let dx = 0, dy = 0;
+    if (oldParent) {
+      const global = oldParent[globalPosition];
+      dx += global.x;
+      dy += global.y;
+    }
+    if (newParent) {
+      const global = newParent[globalPosition];
+      dx += global.x;
+      dy += global.y;
+    }
+    return { x: dx, y: dy };
+  }
+
+  private setGlobalPosition(item: NonTransitionTypes) {
+    const x = item.x,
+          y = item.y,
+          parent: ParentTypes = item.parent;
+
+    if (parent) {
+      // console.log(item.type, parent.type, parent[globalPosition]);
+      const global = parent[globalPosition];
+      if (global) {
+        item[globalPosition] = { x: x + global.x, y: y + global.y };
+      }
+    } else {
+      item[globalPosition] = { x: x, y: y };
+    }
   }
 
   getGraphInfo() : GraphInfo {
@@ -530,15 +580,14 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     graphInfo.interiorTransitions.forEach(transition => self.selection_.add(transition));
   }
 
-
   private insertState_(state: StateTypes, parent: Statechart) {
     this.states_.add(state);
     state.parent = parent;
-    if ((state as any)[_inTransitions] === undefined) {
-      // assert(state[_outTransitions] === undefined);
-      (state as any)[_inTransitions] = new Array<Transition>();
-      (state as any)[_outTransitions] = new Array<Transition>();
-    }
+    this.initializeItem(state);
+
+    state[inTransitions] = new Array<Transition>();
+    state[outTransitions] = new Array<Transition>();
+
     if (state.type === 'state' && state.statecharts) {
       const self = this;
       state.statecharts.forEach(statechart => self.insertStatechart_(statechart, state));
@@ -552,6 +601,8 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   private insertStatechart_(statechart: Statechart, parent: State | undefined) {
     this.statecharts_.add(statechart);
     statechart.parent = parent;
+    this.initializeItem(statechart);
+
     const self = this;
     statechart.states.forEach(state => self.insertState_(state, statechart));
     statechart.transitions.forEach(transition => self.insertTransition_(transition, statechart));
@@ -566,15 +617,17 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   private insertTransition_(transition: Transition, parent: Statechart) {
     this.transitions_.add(transition);
     transition.parent = parent;
+    this.initializeItem(transition);
+
     const src = transition.src,
           dst = transition.dst;
     if (src) {
-      const outputs = this.getOutTransitions(src);
+      const outputs = src[outTransitions];
       if (outputs)
         outputs.push(transition);
     }
     if (dst) {
-      const inputs = this.getInTransitions(dst);
+      const inputs = dst[inTransitions];
       if (inputs)
         inputs.push(transition);
     }
@@ -591,12 +644,12 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       }
     }
     if (src) {
-      const outputs = this.getOutTransitions(src);
+      const outputs = src[outTransitions];
       if (outputs)
         remove(outputs, transition);
     }
     if (dst) {
-      const inputs = this.getInTransitions(dst);
+      const inputs = dst[inTransitions];
       if (inputs)
         remove(inputs, transition);
     }
@@ -632,13 +685,12 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
         this.removeTransition_(owner);
         this.insertTransition_(owner, parent);
       }
+    } else {
+      this.initializeItem(owner);
     }
     this.onValueChanged(owner, attr, oldValue);
   }
   elementInserted(owner: State | Statechart, attr: string, index: number, value: AllTypes) : void {
-    if (value.type !== 'transition')
-      this.prepareSubtree(value);
-
     this.insertItem_(value, owner);
     this.onElementInserted(owner, attr, index);
   }
@@ -686,8 +738,636 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
 
 //------------------------------------------------------------------------------
 
+class StatechartTheme extends Theme {
+  radius: number;
+  textIndent: number = 8;
+  textLeading: number = 6;
+  arrowSize: number = 8;
+  knobbyRadius: number = 4;
+  padding: number = 8;
+
+  stateMinWidth: number = 75;
+  stateMinHeight: number = 40;  // TODO make sure there's room for entry/exit action text
+
+  // Rather than try to render actual text for H and H* into the pseudostate disk,
+  // render the glyphs as moveto/lineto pairs.
+  HGlyph: Array<number>;
+  StarGlyph: Array<number>;
+
+  constructor(theme: Theme, radius: number = 8) {
+    super();
+    Object.assign(this, theme);
+
+    this.radius = radius;
+    const r = radius,
+          v = r / 2,
+          h = r / 3;
+    this.HGlyph = [-h, -v, -h, v, -h, 0, h, 0, h, -v, h, v];
+    this.StarGlyph = [-h, -v / 3, h, v / 3, -h, v / 3, h, -v / 3, 0, -v / 1.5, 0, v / 1.5];
+  }
+}
+
+enum RenderMode {
+  Normal,
+  Highlight,
+  HotTrack,
+  Print
+}
+
+interface Point {
+  x: number;
+  y: number;
+}
+interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// interface Extents {
+//   xmin: number;
+//   xmax: number;
+//   ymin: number;
+//   ymax: number;
+// }
+
+// The renderer caches derived state on the object.
+const _bezier = Symbol('bezier'),
+      _p1 = Symbol('p1'),
+      _p2 = Symbol('p2'),
+      _text = Symbol('text'),
+      _textT = Symbol('textT'),  // transition attachment parameter along curve;
+      _textWidth = Symbol('textWidth'),
+      _entryText = Symbol('entryText'),
+      _entryY = Symbol('entryY'),
+      _exitText = Symbol('exitText'),
+      _exitY = Symbol('exitY');
+
+class Renderer {
+  private theme_: StatechartTheme;
+  private ctx: CanvasRenderingContext2D | undefined;
+
+  constructor(theme: Theme) {
+    this.theme_ = new StatechartTheme(theme);
+  }
+
+  begin(ctx: CanvasRenderingContext2D) {
+    this.ctx = ctx;
+    ctx.save();
+    ctx.font = this.theme_.font;
+  }
+  end() {
+    if (this.ctx) {
+      this.ctx.restore();
+      this.ctx = undefined;
+    }
+  }
+
+  getSize(item: StateTypes | Statechart) : { width: number, height: number } {
+    let width, height;
+    switch (item.type) {
+      case 'state':
+      case 'statechart':
+        width = item.width;
+        height = item.height;
+        break;
+      case 'pseudostate':
+        width = height = 2 * this.theme_.radius;
+        break;
+    }
+    return { width: width, height: height };
+  }
+  getItemRect(item: AllTypes) : Rect {
+    let x, y, width, height;
+    if (item.type == 'transition') {
+      const extents = getExtents((item as any)[_bezier]);
+      x = extents.xmin;
+      y = extents.ymin;
+      width = extents.xmax - x;
+      height = extents.ymax - y;
+    } else {
+      const size = this.getSize(item),
+            global = item[globalPosition];
+      x = global.x;
+      y = global.y;
+      width = size.width;
+      height = size.height;
+
+      if (item.type == 'statechart') {
+        const parent = item.parent;
+        if (parent) {
+          // Statechart width comes from containing state.
+          size.width = this.getSize(parent).width;
+        }
+        width = size.width;
+        height = size.height;
+      }
+    }
+    return { x, y, width, height };
+  }
+  getBounds(items: Array<AllTypes>) : Rect {
+    if (items.length == 0)
+      return { x: 0, y: 0, width: 0, height: 0 };
+
+    const rect = this.getItemRect(items[0]);
+    let xMin = rect.x,
+        yMin = rect.y,
+        xMax = xMin + rect.width,
+        yMax = 0;
+    for (let i = 1; i < items.length; ++i) {
+      const rect = this.getItemRect(items[i]),
+            x0 = rect.x,
+            y0 = rect.y,
+            x1 = x0 + rect.width,
+            y1 = y0 + rect.height;
+      xMin = Math.min(xMin, x0);
+      yMin = Math.min(yMin, y0);
+      xMax = Math.max(xMax, x1);
+      yMax = Math.max(yMax, y1);
+    }
+    return { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
+  }
+  statePointToParam(state: StateTypes, p: Point) {
+    const r = this.theme_.radius,
+          rect = this.getItemRect(state);
+    if (state.type === 'state')
+      return rectPointToParam(rect.x, rect.y, rect.width, rect.height, p);
+
+    return circlePointToParam(rect.x + r, rect.y + r, p);
+  }
+  stateParamToPoint(state: StateTypes, t: number) {
+    const r = this.theme_.radius,
+          rect = this.getItemRect(state);
+    if (state.type === 'state')
+      return roundRectParamToPoint(rect.x, rect.y, rect.width, rect.height, r, t);
+
+    return circleParamToPoint(rect.x + r, rect.y + r, r, t);
+  }
+  getStateMinSize(state: StateTypes) {
+    const ctx = this.ctx, theme = this.theme_, r = theme.radius;
+    let width = theme.stateMinWidth, height = theme.stateMinHeight;
+    if (state.type === 'pseudostate')
+      return;
+    if (ctx && state.name) {
+      width = Math.max(width, ctx.measureText(state.name).width + 2 * r);
+    }
+    height = Math.max(height, theme.fontSize + theme.textLeading);
+    return { width: width, height: height };
+  }
+  getNextStatechartY(state: State) {
+    let y = 0;
+    if (state.statecharts.length > 0) {
+      const lastStatechart = state.statecharts.at(state.statecharts.length - 1);
+      y = lastStatechart.y + lastStatechart.height;
+    }
+    return y;
+  }
+
+}
 
 /*
+  // Statechart Renderer and helpers.
+
+
+  class Renderer {
+    constructor(theme) {
+      this.theme = extendTheme(theme);
+    }
+    // Layout a state.
+    layoutState(state) {
+      const self = this,
+            theme = this.theme,
+            textSize = theme.fontSize,
+            textLeading = theme.textLeading,
+            lineSpacing = textSize + textLeading,
+            observableModel = this.model.observableModel;
+
+      let width = 0, height = lineSpacing;
+
+      const statecharts = state.items;
+      let stateOffsetY = lineSpacing; // start at the bottom of the state label area.
+      if (statecharts && statecharts.length > 0) {
+        // Layout the child statecharts vertically within the parent state.
+        // TODO handle horizontal flow.
+        statecharts.forEach(function (statechart) {
+          const size = self.getSize(statechart);
+          width = Math.max(width, size.width);
+        });
+        statecharts.forEach(function (statechart) {
+          observableModel.changeValue(statechart, 'y', stateOffsetY);
+          observableModel.changeValue(statechart, 'width', width);
+          stateOffsetY += statechart.height;
+        });
+
+        height = Math.max(height, stateOffsetY);
+      }
+      if (state.entry) {
+        state[_entryText] = 'entry/ ' + state.entry;
+        state[_entryY] = height;
+        height += lineSpacing;
+        width = Math.max(width, this.ctx.measureText(state[_entryText]).width + 2 * this.theme.padding);
+      }
+      if (state.exit) {
+        state[_exitText] = 'exit/ ' + state.exit;
+        state[_exitY] = height;
+        height += lineSpacing;
+        width = Math.max(width, this.ctx.measureText(state[_exitText]).width + 2 * this.theme.padding);
+      }
+      width = Math.max(width, theme.stateMinWidth);
+      height = Math.max(height, theme.stateMinHeight);
+      width = Math.max(width, state.width);
+      height = Math.max(height, state.height);
+      observableModel.changeValue(state, 'width', width);
+      observableModel.changeValue(state, 'height', height);
+
+      if (statecharts && statecharts.length > 0) {
+        // Expand the last statechart to fill its parent state.
+        const lastStatechart = statecharts[statecharts.length - 1];
+        observableModel.changeValue(lastStatechart, 'height',
+          lastStatechart.height + height - stateOffsetY);
+      }
+    }
+    // Make sure a statechart is big enough to enclose its contents. Statecharts
+    // are always sized automatically to contain their contents and fit tightly in
+    // their parent state.
+    layoutStatechart(statechart) {
+      const padding = this.theme.padding, translatableModel = this.model.translatableModel, statechartX = translatableModel.globalX(statechart), statechartY = translatableModel.globalY(statechart), items = statechart.items;
+      if (items && items.length) {
+        // Get extents of child states.
+        const r = this.getBounds(items), x = r.x - statechartX, // Get position in statechart coordinates.
+          y = r.y - statechartY, observableModel = this.model.observableModel;
+        let xMin = Math.min(0, x - padding), yMin = Math.min(0, y - padding), xMax = x + r.width + padding, yMax = y + r.height + padding;
+        if (xMin < 0) {
+          xMax -= xMin;
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (isTransition(item))
+              continue;
+            observableModel.changeValue(item, 'x', item.x - xMin);
+          }
+        }
+        if (yMin < 0) {
+          yMax -= yMin;
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (isTransition(item))
+              continue;
+            observableModel.changeValue(item, 'y', item.y - yMin);
+          }
+        }
+        // Statechart position is calculated by the parent state layout.
+        observableModel.changeValue(statechart, 'width', xMax - xMin);
+        observableModel.changeValue(statechart, 'height', yMax - yMin);
+      }
+    }
+    layoutTransition(transition) {
+      const self = this,
+            src = this.getTransitionSrc(transition),
+            dst = this.getTransitionDst(transition),
+            p1 = src ? this.stateParamToPoint(src, transition.t1) : transition[_p1],
+            p2 = dst ? this.stateParamToPoint(dst, transition.t2) : transition[_p2];
+      // If we're in an intermediate state, don't layout.
+      if (!p1 || !p2)
+        return;
+      function getCenter(state) {
+        const bbox = self.getItemRect(state);
+        return {
+          x: bbox.x + bbox.width * 0.5,
+          y: bbox.y + bbox.height * 0.5,
+        }
+      }
+      // If it's an "inside" transition, flip the source normal.
+      if (src && dst) {
+        const hierarchicalModel = this.model.hierarchicalModel,
+              dstGrandParent = hierarchicalModel.getParent(hierarchicalModel.getParent(dst));
+        if (src === dstGrandParent) {
+          p1.nx = -p1.nx;
+          p1.ny = -p1.ny;
+        }
+      }
+      const scaleFactor = src === dst ? 64 : 0,
+            bezier = diagrams.getEdgeBezier(p1, p2, scaleFactor);
+      if (src && isPseudostate(src)) {
+        // Adjust the bezier's p1 and c1 to start on the boundary, towards bezier c2.
+        const to = bezier[2],
+              center = getCenter(src),
+              radius = this.theme.radius,
+              projection = geometry.projectPointToCircle(to, center, radius);
+        bezier[0] = projection;
+        bezier[1] = to;
+      }
+      if (dst && isPseudostate(dst)) {
+        // Adjust the bezier's c2 and p2 to end on the boundary, towards bezier c1.
+        const to = bezier[1],
+              center = getCenter(dst),
+              radius = this.theme.radius,
+              projection = geometry.projectPointToCircle(to, center, radius);
+        bezier[3] = projection;
+        bezier[2] = to;
+      }
+      transition[_bezier] = bezier;
+      transition[_textT] = geometry.evaluateBezier(transition[_bezier], transition.pt);
+      let text = '', textWidth = 0;
+      if (transition.event) {
+        text += transition.event;
+        textWidth += this.ctx.measureText(transition.event).width + 2 * this.theme.padding;
+      }
+      if (transition.guard) {
+        text += '[' + transition.guard + ']';
+        textWidth += this.ctx.measureText(transition.guard).width + 2 * this.theme.padding;
+      }
+      if (transition.action) {
+        text += '/' + transition.action;
+        textWidth += this.ctx.measureText(transition.action).width + 2 * this.theme.padding;
+      }
+      transition[_text] = text;
+      transition[_textWidth] = textWidth;
+    }
+    // Layout a statechart item.
+    layout(item) {
+      if (isTrueState(item)) {
+        this.layoutState(item);
+      } else if (isStatechart(item)) {
+        this.layoutStatechart(item);
+      } else if (isTransition(item))
+        this.layoutTransition(item);
+    }
+    drawArrow(x, y) {
+      const ctx = this.ctx;
+      ctx.beginPath();
+      diagrams.arrowPath({ x: x, y: y, nx: -1, ny: 0 }, ctx, this.theme.arrowSize);
+      ctx.stroke();
+    }
+    hitTestArrow(x, y, p, tol) {
+      const d = this.theme.arrowSize, r = d * 0.5;
+      return diagrams.hitTestRect(x - r, y - r, d, d, p, tol);
+    }
+
+    drawState(state, mode) {
+      const ctx = this.ctx, theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y, w = rect.width, h = rect.height, textSize = theme.fontSize, lineBase = y + textSize + theme.textLeading;
+      diagrams.roundRectPath(x, y, w, h, r, ctx);
+      switch (mode) {
+        case normalMode:
+        case printMode:
+          ctx.fillStyle = theme.bgColor;
+          ctx.fill();
+          ctx.strokeStyle = theme.strokeColor;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(x, lineBase);
+          ctx.lineTo(x + w, lineBase);
+          ctx.stroke();
+
+          ctx.fillStyle = theme.textColor;
+          ctx.fillText(state.name, x + r, y + textSize);
+          if (state.entry)
+            ctx.fillText(state[_entryText], x + r, y + state[_entryY] + textSize);
+          if (state.exit)
+            ctx.fillText(state[_exitText], x + r, y + state[_exitY] + textSize);
+
+          const items = state.items;
+          if (items) {
+            let separatorY = lineBase;
+            for (var i = 0; i < items.length - 1; i++) {
+              const statechart = items[i];
+              separatorY += statechart.height;
+              ctx.setLineDash([5]);
+              ctx.beginPath();
+              ctx.moveTo(x, separatorY);
+              ctx.lineTo(x + w, separatorY);
+              ctx.stroke();
+              ctx.setLineDash([0]);
+            }
+          }
+          // Render knobbies, faintly.
+          ctx.lineWidth = 0.25;
+          break;
+        case highlightMode:
+          ctx.strokeStyle = theme.highlightColor;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          break;
+        case hotTrackMode:
+          ctx.strokeStyle = theme.hotTrackColor;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          break;
+      }
+      if (mode !== printMode) {
+        this.drawArrow(x + w + theme.arrowSize, lineBase);
+      }
+    }
+    hitTestState(state, p, tol, mode) {
+      const theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y, w = rect.width, h = rect.height, result = diagrams.hitTestRect(x, y, w, h, p, tol); // TODO hitTestRoundRect
+      if (result) {
+        const lineBase = y + theme.fontSize + theme.textLeading;
+        if (mode !== printMode && this.hitTestArrow(x + w + theme.arrowSize, lineBase, p, tol))
+          result.arrow = true;
+      }
+      return result;
+    }
+    drawPseudoState(state, mode) {
+      const ctx = this.ctx, theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y, cx = x + r, cy = y + r;
+      function drawGlyph(glyph, cx, cy) {
+        for (let i = 0; i < glyph.length; i += 4) {
+          ctx.moveTo(cx + glyph[i], cy + glyph[i + 1]);
+          ctx.lineTo(cx + glyph[i + 2], cy + glyph[i + 3]);
+        }
+      }
+      diagrams.diskPath(cx, cy, r, ctx);
+      switch (mode) {
+        case normalMode:
+        case printMode:
+          ctx.lineWidth = 0.25;
+          switch (state.type) {
+            case 'start':
+              ctx.fillStyle = theme.strokeColor;
+              ctx.fill();
+              ctx.stroke();
+              break;
+            case 'stop':
+              ctx.fillStyle = theme.bgColor;
+              ctx.fill();
+              ctx.stroke();
+              diagrams.diskPath(cx, cy, r / 2, ctx);
+              ctx.fillStyle = theme.strokeColor;
+              ctx.fill();
+              break;
+            case 'history':
+              ctx.fillStyle = theme.bgColor;
+              ctx.fill();
+              ctx.stroke();
+              ctx.beginPath();
+              drawGlyph(theme.HGlyph, cx, cy);
+              ctx.lineWidth = 1;
+              ctx.stroke();
+              ctx.lineWidth = 0.25;
+              break;
+            case 'history*':
+              ctx.fillStyle = theme.bgColor;
+              ctx.fill();
+              ctx.stroke();
+              ctx.beginPath();
+              drawGlyph(theme.HGlyph, cx - r / 3, cy);
+              drawGlyph(theme.StarGlyph, cx + r / 2, cy);
+              ctx.lineWidth = 1;
+              ctx.stroke();
+              ctx.lineWidth = 0.25;
+              break;
+          }
+          break;
+        case highlightMode:
+          ctx.strokeStyle = theme.highlightColor;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          break;
+        case hotTrackMode:
+          ctx.strokeStyle = theme.hotTrackColor;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          break;
+      }
+      if (mode !== printMode && !isStopState(state)) {
+        this.drawArrow(x + 2 * r + theme.arrowSize, y + r);
+      }
+    }
+    hitTestPseudoState(state, p, tol, mode) {
+      const theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y;
+      if (mode !== printMode && !isStopState(state) && this.hitTestArrow(x + 2 * r + theme.arrowSize, y + r, p, tol))
+        return { arrow: true };
+
+      return diagrams.hitTestDisk(x + r, y + r, r, p, tol);
+    }
+    drawStatechart(statechart, mode) {
+      const ctx = this.ctx,
+            theme = this.theme,
+            r = theme.radius,
+            textSize = theme.fontSize,
+            rect = this.getItemRect(statechart),
+            x = rect.x, y = rect.y, w = rect.width, h = rect.height;
+      switch (mode) {
+        case normalMode:
+        case printMode:
+          if (statechart.name) {
+            ctx.fillStyle = theme.textColor;
+            ctx.fillText(statechart.name, x + r, y + textSize);
+          }
+          break;
+        case highlightMode:
+        case hotTrackMode:
+          diagrams.roundRectPath(x, y, w, h, r, ctx);
+          ctx.strokeStyle = mode === highlightMode ? theme.highlightColor : theme.hotTrackColor;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          break;
+      }
+    }
+    hitTestStatechart(statechart, p, tol, mode) {
+      const theme = this.theme, r = theme.radius, rect = this.getItemRect(statechart), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
+      return diagrams.hitTestRect(x, y, w, h, p, tol); // TODO hitTestRoundRect
+    }
+    drawTransition(transition, mode) {
+      const ctx = this.ctx, theme = this.theme, r = theme.knobbyRadius, bezier = transition[_bezier];
+      diagrams.bezierEdgePath(bezier, ctx, theme.arrowSize);
+      switch (mode) {
+        case normalMode:
+        case printMode:
+          ctx.strokeStyle = theme.strokeColor;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          const pt = transition[_textT];
+          if (mode !== printMode) {
+            const r = theme.radius / 2;
+            diagrams.roundRectPath(pt.x - r,
+              pt.y - r,
+              theme.radius, theme.radius, r, ctx);
+            ctx.fillStyle = theme.bgColor;
+            ctx.fill();
+            ctx.lineWidth = 0.25;
+            ctx.stroke();
+          }
+          ctx.fillStyle = theme.textColor;
+          ctx.fillText(transition[_text], pt.x + theme.padding, pt.y + theme.fontSize);
+          break;
+        case highlightMode:
+          ctx.strokeStyle = theme.highlightColor;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          break;
+        case hotTrackMode:
+          ctx.strokeStyle = theme.hotTrackColor;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          break;
+      }
+    }
+    hitTestTransition(transition, p, tol, mode) {
+      return diagrams.hitTestBezier(transition[_bezier], p, tol);
+    }
+    draw(item, mode) {
+      switch (item.type) {
+        case 'state':
+          this.drawState(item, mode);
+          break;
+        case 'start':
+        case 'stop':
+        case 'history':
+        case 'history*':
+          this.drawPseudoState(item, mode);
+          break;
+        case 'transition':
+          this.drawTransition(item, mode);
+          break;
+        case 'statechart':
+          this.drawStatechart(item, mode);
+          break;
+      }
+    }
+    hitTest(item, p, tol, mode) {
+      let hitInfo;
+      switch (item.type) {
+        case 'state':
+          hitInfo = this.hitTestState(item, p, tol, mode);
+          break;
+        case 'start':
+        case 'stop':
+        case 'history':
+        case 'history*':
+          hitInfo = this.hitTestPseudoState(item, p, tol, mode);
+          break;
+        case 'transition':
+          hitInfo = this.hitTestTransition(item, p, tol, mode);
+          break;
+        case 'statechart':
+          hitInfo = this.hitTestStatechart(item, p, tol, mode);
+          break;
+      }
+      if (hitInfo)
+        hitInfo.item = item;
+      return hitInfo;
+    }
+    drawHoverText(item, p, nameValuePairs) {
+      const self = this, theme = this.theme, ctx = this.ctx;
+      const textSize = theme.fontSize,
+            gap = 16,
+            border = 4,
+            height = textSize * nameValuePairs.length + 2 * border,
+            maxWidth = diagrams.measureNameValuePairs(nameValuePairs, gap, ctx) + 2 * border;
+      let x = p.x, y = p.y;
+      ctx.fillStyle = theme.hoverColor;
+      ctx.fillRect(x, y, maxWidth, height);
+      ctx.fillStyle = theme.hoverTextColor;
+      nameValuePairs.forEach(function (pair) {
+        ctx.textAlign = 'left';
+        ctx.fillText(pair.name, x + border, y + textSize);
+        ctx.textAlign = 'right';
+        ctx.fillText(pair.value, x + maxWidth - border, y + textSize);
+        y += textSize;
+      });
+    }
+  }
 
 
 //------------------------------------------------------------------------------

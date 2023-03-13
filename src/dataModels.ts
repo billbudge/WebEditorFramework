@@ -16,12 +16,12 @@ export type PropertyVisitor = (item: any, attr: string) => void;
 
 export interface List<T = any> {
   length: number;
-  at: (index: number) => T | undefined;
+  at: (index: number) => T;
   append(element: T) : void;
   insert(element: T, index: number) : void;
   indexOf(element: T) : number;
   remove(element: T) : number;
-  removeAt(index: number) : T | undefined;
+  removeAt(index: number) : T;
   forEach(visitor: (element: T) => void) : void;
   forEachReverse(visitor: (element: T) => void) : void;
   [Symbol.iterator]() : IterableIterator<T>;
@@ -45,9 +45,11 @@ export class DataList<T = any> implements List<T> {
     return array ? array.length : 0;
   }
 
-  at(index: number) : T | undefined {
+  at(index: number) : T {
     const array = this.array;
-    return array ? array[index] : undefined;
+    if (!array || array.length <= index)
+      throw new RangeError('Index out of range: ' + index);
+    return array[index];
   }
 
   insert(element: T, index: number) {
@@ -69,10 +71,10 @@ export class DataList<T = any> implements List<T> {
     return array ? array.indexOf(element) : -1;
   }
 
-  removeAt(index: number) : T | undefined {
+  removeAt(index: number) : T {
     const array = this.array;
-    if (!array)
-      return undefined;
+    if (!array || array.length <= index)
+      throw new RangeError('Index out of range: ' + index);
     const oldValue = array.splice(index, 1);
     this.dataContext.elementRemoved(this.owner, this.name, index, oldValue[0]);
   }
@@ -188,9 +190,9 @@ export class RefProp<T extends ReferencedObject> {
 
 // Hierarchical structures.
 
-// Virtual property. Parents and children must be objects.
+// Derived parent property. Parents and children must be objects.
 export class ParentProp<T extends object = object> {
-  static readonly key: unique symbol = Symbol.for('parent');
+  static readonly key: unique symbol = Symbol.for('ParentProp.parent');
   get(owner: object) : T | undefined {
     return (owner as any)[ParentProp.key] as T | undefined;
   }
@@ -202,7 +204,7 @@ export class ParentProp<T extends object = object> {
 }
 
 export interface Parented<T> {
-  parent?: T
+  readonly parent?: T
 };
 
 export function getLineage<T extends Parented<T>>(item: Parented<T> | undefined) {
@@ -276,6 +278,12 @@ export function reduceToRoots<T extends Parented<T>>(items: Array<T>, set: SetLi
   return roots;
 }
 
+
+//------------------------------------------------------------------------------
+
+
+/*
+*/
 //------------------------------------------------------------------------------
 
 // Base DataModel.
