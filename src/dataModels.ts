@@ -77,6 +77,7 @@ export class DataList<T = any> implements List<T> {
       throw new RangeError('Index out of range: ' + index);
     const oldValue = array.splice(index, 1);
     this.dataContext.elementRemoved(this.owner, this.name, index, oldValue[0]);
+    return oldValue[0];
   }
 
   remove(element: T) : number {

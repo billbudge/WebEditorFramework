@@ -21,7 +21,11 @@ interface Position {
   y: number;
 }
 const inTransitions: unique symbol = Symbol('inTransitions'),
-      outTransitions: unique symbol = Symbol('outTransitions');
+      outTransitions: unique symbol = Symbol('outTransitions'),
+      entryText: unique symbol = Symbol('entryText'),
+      entryY: unique symbol = Symbol('entryY'),
+      exitText: unique symbol = Symbol('exitText'),
+      exitY: unique symbol = Symbol('exitY');
 
 const stateTemplate = {
   x: new ScalarProp<number>('x'),
@@ -29,6 +33,8 @@ const stateTemplate = {
   width: new ScalarProp<number>('width'),
   height: new ScalarProp<number>('height'),
   name: new ScalarProp<string | undefined>('name'),
+  entry: new ScalarProp<string | undefined>('entry'),
+  exit: new ScalarProp<string | undefined>('exit'),
 
   parent: new ParentProp<Statechart>,
 
@@ -54,6 +60,10 @@ export class State implements ReferencedObject {
   set height(value) { this.template.height.set(this, this.context, value); }
   get name() { return this.template.name.get(this); }
   set name(value) { this.template.name.set(this, this.context, value); }
+  get entry() { return this.template.entry.get(this); }
+  set entry(value) { this.template.entry.set(this, this.context, value); }
+  get exit() { return this.template.exit.get(this); }
+  set exit(value) { this.template.exit.set(this, this.context, value); }
 
   get parent() { return this.template.parent.get(this); };
   set parent(parent) { this.template.parent.set(this, parent); };
@@ -64,6 +74,10 @@ export class State implements ReferencedObject {
   [globalPosition]: Position;
   [inTransitions]: Transition[];
   [outTransitions]: Transition[];
+  [entryText]: string | undefined;
+  [entryY]: number | undefined;
+  [exitText]: string | undefined;
+  [exitY]: number | undefined;
 
   constructor(context: StatechartContext, id: number) {
     this.context = context;
@@ -922,6 +936,57 @@ class Renderer {
       y = lastStatechart.y + lastStatechart.height;
     }
     return y;
+  }
+  layoutState(state: State) {
+    const self = this,
+          theme = this.theme_,
+          textSize = theme.fontSize,
+          textLeading = theme.textLeading,
+          lineSpacing = textSize + textLeading;
+
+    let width = 0, height = lineSpacing;
+
+    const statecharts = state.statecharts;
+    let stateOffsetY = lineSpacing; // start at the bottom of the state label area.
+    if (statecharts.length > 0) {
+      // Layout the child statecharts vertically within the parent state.
+      // TODO handle horizontal flow.
+      statecharts.forEach(statechart => {
+        const size = self.getSize(statechart);
+        width = Math.max(width, size.width);
+      });
+      statecharts.forEach(statechart => {
+        statechart.y = stateOffsetY;
+        statechart.width = width;
+        stateOffsetY += statechart.height;
+      });
+
+      height = Math.max(height, stateOffsetY);
+    }
+    if (state.entry && this.ctx) {
+      state[entryText] = 'entry/ ' + state.entry;
+      state[entryY] = height;
+      height += lineSpacing;
+      width = Math.max(width, this.ctx.measureText(state[entryText]).width + 2 * theme.padding);
+    }
+    if (state.exit && this.ctx) {
+      state[exitText] = 'exit/ ' + state.exit;
+      state[exitY] = height;
+      height += lineSpacing;
+      width = Math.max(width, this.ctx.measureText(state[exitText]).width + 2 * theme.padding);
+    }
+    width = Math.max(width, theme.stateMinWidth);
+    height = Math.max(height, theme.stateMinHeight);
+    width = Math.max(width, state.width);
+    height = Math.max(height, state.height);
+    state.width = width;
+    state.height = height;
+
+    if (statecharts.length > 0) {
+      // Expand the last statechart to fill its parent state.
+      const lastStatechart = statecharts.at(statecharts.length - 1);
+      lastStatechart.height = lastStatechart.height + height - stateOffsetY;
+    }
   }
 
 }
