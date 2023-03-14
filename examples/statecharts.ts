@@ -818,23 +818,34 @@ interface Rect {
   height: number;
 }
 
-interface HitResult {
-  item: AllTypes;
+interface StateHitResult {
+  type: 'state';
+  item: State;
+  inner: RectHitResult;
+  arrow?: boolean;
 }
 
-interface StateHitResult extends HitResult {
-  inner: RectHitResult,
-  arrow?: boolean,
+interface PseudostateHitResult {
+  type: 'pseudostate';
+  item: Pseudostate;
+  inner?: DiskHitResult;
+  arrow?: boolean;
 }
 
-interface PseudostateHitResult extends HitResult {
-  inner: DiskHitResult,
-  arrow: boolean,
-}
-
-interface TransitionHitResult extends HitResult {
+interface TransitionHitResult {
+  type: 'transition';
+  item: Transition;
   inner: CurveHitResult;
 }
+
+interface StatechartHitResult {
+  type: 'statechart';
+  item: Statechart;
+  inner: RectHitResult;
+}
+
+type HitResultTypes =
+  StateHitResult | PseudostateHitResult | TransitionHitResult | StatechartHitResult;
 
 enum RenderMode {
   Normal,
@@ -1213,7 +1224,7 @@ class Renderer {
           inner = hitTestRect(x, y, w, h, p, tol); // TODO hitTestRoundRect
     if (inner) {
       const lineBase = y + theme.fontSize + theme.textLeading,
-            result: StateHitResult = { item: state, inner: inner };
+            result: StateHitResult = { type: 'state', item: state, inner: inner };
       if (mode !== RenderMode.Print && this.hitTestArrow(x + w + theme.arrowSize, lineBase, p, tol))
         result.arrow = true;
       return result;
@@ -1293,13 +1304,21 @@ class Renderer {
       this.drawArrow(x + 2 * r + theme.arrowSize, y + r);
     }
   }
-  // hitTestPseudoState(state, p, tol, mode) {
-  //   const theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y;
-  //   if (mode !== printMode && !isStopState(state) && this.hitTestArrow(x + 2 * r + theme.arrowSize, y + r, p, tol))
-  //     return { arrow: true };
-
-  //   return diagrams.hitTestDisk(x + r, y + r, r, p, tol);
-  // }
+  hitTestPseudoState(
+      state: Pseudostate, p: Point, tol: number, mode: RenderMode) : PseudostateHitResult | undefined {
+    const theme = this.theme_,
+          r = theme.radius,
+          rect = this.getItemRect(state),
+          x = rect.x, y = rect.y,
+          inner = hitTestDisk(x + r, y + r, r, p, tol);
+    if (inner) {
+      return { type: 'pseudostate', item: state, inner: inner };
+    }
+    if (mode !== RenderMode.Print && state.subtype !== 'stop' &&
+        this.hitTestArrow(x + 2 * r + theme.arrowSize, y + r, p, tol)) {
+      return { type: 'pseudostate', item: state, inner: inner, arrow: true };
+    }
+  }
   drawStatechart(statechart: Statechart, mode: RenderMode) {
     const ctx = this.ctx;
     if (!ctx)
@@ -1327,12 +1346,16 @@ class Renderer {
         break;
     }
   }
-  hitTestStatechart(statechart: Statechart, p: Point, tol: number, mode: RenderMode) {
+  hitTestStatechart(
+      statechart: Statechart, p: Point, tol: number, mode: RenderMode) : StatechartHitResult | undefined {
     const theme = this.theme_,
           r = theme.radius,
           rect = this.getItemRect(statechart),
-          x = rect.x, y = rect.y, w = rect.width, h = rect.height;
-    return hitTestRect(x, y, w, h, p, tol);
+          x = rect.x, y = rect.y, w = rect.width, h = rect.height,
+          inner = hitTestRect(x, y, w, h, p, tol);
+    if (inner) {
+      return { type: 'statechart', item: statechart, inner: inner };
+    }
   }
   drawTransition(transition: Transition, mode: RenderMode) {
     const ctx = this.ctx;
@@ -1373,8 +1396,46 @@ class Renderer {
         break;
     }
   }
-  hitTestTransition(transition: Transition, p: Point, tol: number, mode: RenderMode) {
-    return hitTestBezier(transition[transitionBezier], p, tol);
+  hitTestTransition(
+      transition: Transition, p: Point, tol: number, mode: RenderMode) : TransitionHitResult | undefined {
+    const inner = hitTestBezier(transition[transitionBezier], p, tol);
+    if (inner) {
+      return { type: 'transition', item: transition, inner: inner };
+    }
+  }
+  draw(item: AllTypes, mode: RenderMode) {
+    switch (item.type) {
+      case 'state':
+        this.drawState(item, mode);
+        break;
+      case 'pseudostate':
+        this.drawPseudoState(item, mode);
+        break;
+      case 'transition':
+        this.drawTransition(item, mode);
+        break;
+      case 'statechart':
+        this.drawStatechart(item, mode);
+        break;
+    }
+  }
+  hitTest(item: AllTypes, p: Point, tol: number, mode: RenderMode) {
+    let hitInfo: HitResultTypes | undefined;
+    switch (item.type) {
+      case 'state':
+        hitInfo = this.hitTestState(item, p, tol, mode);
+        break;
+      case 'pseudostate':
+        hitInfo = this.hitTestPseudoState(item, p, tol, mode);
+        break;
+      case 'transition':
+        hitInfo = this.hitTestTransition(item, p, tol, mode);
+        break;
+      case 'statechart':
+        hitInfo = this.hitTestStatechart(item, p, tol, mode);
+        break;
+    }
+    return hitInfo;
   }
 
 }
@@ -1388,48 +1449,6 @@ class Renderer {
       this.theme = extendTheme(theme);
     }
 
-    draw(item, mode) {
-      switch (item.type) {
-        case 'state':
-          this.drawState(item, mode);
-          break;
-        case 'start':
-        case 'stop':
-        case 'history':
-        case 'history*':
-          this.drawPseudoState(item, mode);
-          break;
-        case 'transition':
-          this.drawTransition(item, mode);
-          break;
-        case 'statechart':
-          this.drawStatechart(item, mode);
-          break;
-      }
-    }
-    hitTest(item, p, tol, mode) {
-      let hitInfo;
-      switch (item.type) {
-        case 'state':
-          hitInfo = this.hitTestState(item, p, tol, mode);
-          break;
-        case 'start':
-        case 'stop':
-        case 'history':
-        case 'history*':
-          hitInfo = this.hitTestPseudoState(item, p, tol, mode);
-          break;
-        case 'transition':
-          hitInfo = this.hitTestTransition(item, p, tol, mode);
-          break;
-        case 'statechart':
-          hitInfo = this.hitTestStatechart(item, p, tol, mode);
-          break;
-      }
-      if (hitInfo)
-        hitInfo.item = item;
-      return hitInfo;
-    }
     drawHoverText(item, p, nameValuePairs) {
       const self = this, theme = this.theme, ctx = this.ctx;
       const textSize = theme.fontSize,
