@@ -2,30 +2,38 @@
 import { SelectionSet } from '../src/collections'
 
 import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
-         circleParamToPoint } from '../src/diagrams'
+         circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, RectHitResult,
+         diskPath, hitTestDisk, DiskHitResult, roundRectPath, bezierEdgePath,
+         hitTestBezier  } from '../src/diagrams'
 
-import { getExtents } from '../src/geometry'
+import { PointWithNormal, getExtents, projectPointToCircle, BezierCurve,
+         evaluateBezier, CurveHitResult } from '../src/geometry'
 
 import { ScalarProp, ArrayProp, ReferencedObject, RefProp, ParentProp,
          DataContext, EventBase, Change, ChangeEvents,
-         getLowestCommonAncestor, reduceToRoots } from '../src/dataModels'
+         getLowestCommonAncestor, reduceToRoots, List } from '../src/dataModels'
 
 //------------------------------------------------------------------------------
 
-// Interfaces to statechart objects.
-
 // Derived properties, indexed by symbols to distinguish them from actual properties.
 const globalPosition: unique symbol = Symbol('globalPosition');
-interface Position {
-  x: number;
-  y: number;
-}
+
 const inTransitions: unique symbol = Symbol('inTransitions'),
       outTransitions: unique symbol = Symbol('outTransitions'),
       entryText: unique symbol = Symbol('entryText'),
       entryY: unique symbol = Symbol('entryY'),
       exitText: unique symbol = Symbol('exitText'),
-      exitY: unique symbol = Symbol('exitY');
+      exitY: unique symbol = Symbol('exitY'),
+      pSrc: unique symbol = Symbol('pSrc'),
+      pDst: unique symbol = Symbol('pDst'),
+      transitionBezier: unique symbol = Symbol('transitionBezier'),
+      transitionTextPoint: unique symbol = Symbol('transitionTextPoint'),
+      transitionText: unique symbol = Symbol('transitionText'),
+      transitionTextWidth: unique symbol = Symbol('transitionTextWidth');
+
+//------------------------------------------------------------------------------
+
+// Interfaces to statechart objects.
 
 const stateTemplate = {
   x: new ScalarProp<number>('x'),
@@ -71,7 +79,7 @@ export class State implements ReferencedObject {
   get statecharts() { return this.template.statecharts.get(this, this.context); }
 
   // Derived properties.
-  [globalPosition]: Position;
+  [globalPosition]: Point;  // TODO move geometry interfaces to top.
   [inTransitions]: Transition[];
   [outTransitions]: Transition[];
   [entryText]: string | undefined;
@@ -112,7 +120,7 @@ export class Pseudostate implements ReferencedObject {
   set parent(parent) { this.template.parent.set(this, parent); };
 
   // Derived properties.
-  [globalPosition]: Position;
+  [globalPosition]: Point;
   [inTransitions]: Transition[];
   [outTransitions]: Transition[];
 
@@ -125,11 +133,14 @@ export class Pseudostate implements ReferencedObject {
 
 const transitionTemplate = {
   src: new RefProp<StateTypes>('src'),
+  tSrc: new ScalarProp<number>('tSrc'),
   dst: new RefProp<StateTypes>('dst'),
+  tDst: new ScalarProp<number>('tDst'),
 
   event: new ScalarProp<string | undefined>('event'),
   guard: new ScalarProp<string | undefined>('guard'),
   action: new ScalarProp<string | undefined>('action'),
+  tText: new ScalarProp<number>('tText'),
 
   parent: new ParentProp<Statechart>,
 }
@@ -144,17 +155,31 @@ export class Transition {
 
   get src() { return this.template.src.get(this, this.context); }
   set src(value) { this.template.src.set(this, this.context, value); }
+  get tSrc() { return this.template.tSrc.get(this) || 0; }
+  set tSrc(value) { this.template.tSrc.set(this, this.context, value); }
   get dst() { return this.template.dst.get(this, this.context); }
   set dst(value) { this.template.dst.set(this, this.context, value); }
+  get tDst() { return this.template.tDst.get(this) || 0; }
+  set tDst(value) { this.template.tDst.set(this, this.context, value); }
   get event() { return this.template.event.get(this); }
   set event(value) { this.template.event.set(this, this.context, value); }
   get guard() { return this.template.guard.get(this); }
   set guard(value) { this.template.guard.set(this, this.context, value); }
   get action() { return this.template.action.get(this); }
   set action(value) { this.template.action.set(this, this.context, value); }
+  get tText() { return this.template.tText.get(this) || 0; }
+  set tText(value) { this.template.tText.set(this, this.context, value); }
 
   get parent() { return this.template.parent.get(this); };
   set parent(parent) { this.template.parent.set(this, parent); };
+
+  // Derived properties.
+  [pSrc]: PointWithNormal;
+  [pDst]: PointWithNormal;
+  [transitionBezier]: BezierCurve;
+  [transitionTextPoint]: Point;
+  [transitionText]: string;
+  [transitionTextWidth]: number;
 
   constructor(context: StatechartContext) {
     this.context = context;
@@ -200,7 +225,7 @@ export class Statechart {
   get transitions() { return this.template.transitions.get(this, this.context); }
 
   // Derived properties.
-  [globalPosition]: Position;
+  [globalPosition]: Point;
 
   constructor(context: StatechartContext) {
     this.context = context;
@@ -781,17 +806,11 @@ class StatechartTheme extends Theme {
   }
 }
 
-enum RenderMode {
-  Normal,
-  Highlight,
-  HotTrack,
-  Print
-}
-
 interface Point {
   x: number;
   y: number;
 }
+
 interface Rect {
   x: number;
   y: number;
@@ -799,24 +818,30 @@ interface Rect {
   height: number;
 }
 
-// interface Extents {
-//   xmin: number;
-//   xmax: number;
-//   ymin: number;
-//   ymax: number;
-// }
+interface HitResult {
+  item: AllTypes;
+}
 
-// The renderer caches derived state on the object.
-const _bezier = Symbol('bezier'),
-      _p1 = Symbol('p1'),
-      _p2 = Symbol('p2'),
-      _text = Symbol('text'),
-      _textT = Symbol('textT'),  // transition attachment parameter along curve;
-      _textWidth = Symbol('textWidth'),
-      _entryText = Symbol('entryText'),
-      _entryY = Symbol('entryY'),
-      _exitText = Symbol('exitText'),
-      _exitY = Symbol('exitY');
+interface StateHitResult extends HitResult {
+  inner: RectHitResult,
+  arrow?: boolean,
+}
+
+interface PseudostateHitResult extends HitResult {
+  inner: DiskHitResult,
+  arrow: boolean,
+}
+
+interface TransitionHitResult extends HitResult {
+  inner: CurveHitResult;
+}
+
+enum RenderMode {
+  Normal,
+  Highlight,
+  HotTrack,
+  Print
+}
 
 class Renderer {
   private theme_: StatechartTheme;
@@ -855,7 +880,7 @@ class Renderer {
   getItemRect(item: AllTypes) : Rect {
     let x, y, width, height;
     if (item.type == 'transition') {
-      const extents = getExtents((item as any)[_bezier]);
+      const extents = getExtents(item[transitionBezier]);
       x = extents.xmin;
       y = extents.ymin;
       width = extents.xmax - x;
@@ -880,17 +905,17 @@ class Renderer {
     }
     return { x, y, width, height };
   }
-  getBounds(items: Array<AllTypes>) : Rect {
+  getBounds(items: List<AllTypes>) : Rect {
     if (items.length == 0)
       return { x: 0, y: 0, width: 0, height: 0 };
 
-    const rect = this.getItemRect(items[0]);
+    const rect = this.getItemRect(items.at(0));
     let xMin = rect.x,
         yMin = rect.y,
         xMax = xMin + rect.width,
         yMax = 0;
     for (let i = 1; i < items.length; ++i) {
-      const rect = this.getItemRect(items[i]),
+      const rect = this.getItemRect(items.at(i)),
             x0 = rect.x,
             y0 = rect.y,
             x1 = x0 + rect.width,
@@ -988,6 +1013,369 @@ class Renderer {
       lastStatechart.height = lastStatechart.height + height - stateOffsetY;
     }
   }
+  // Make sure a statechart is big enough to enclose its contents. Statecharts
+  // are always sized automatically to contain their contents and fit tightly in
+  // their parent state.
+  layoutStatechart(statechart: Statechart) {
+    const padding = this.theme_.padding,
+          global = statechart[globalPosition],
+          statechartX = global.x,
+          statechartY = global.y,
+          states = statechart.states,
+          transitions = statechart.transitions;
+    // TODO bound transitions too.
+    if (states.length) {
+      // Get extents of child states.
+      const r = this.getBounds(states),
+            x = r.x - statechartX, // Get position in statechart coordinates.
+            y = r.y - statechartY;
+      let xMin = Math.min(0, x - padding),
+          yMin = Math.min(0, y - padding),
+          xMax = x + r.width + padding,
+          yMax = y + r.height + padding;
+      if (xMin < 0) {
+        xMax -= xMin;
+        states.forEach(state => { state.x -= xMin; });
+      }
+      if (yMin < 0) {
+        yMax -= yMin;
+        states.forEach(state => { state.y -= yMin; });
+      }
+      // Statechart position is calculated by the parent state layout.
+      statechart.width = xMax - xMin;
+      statechart.height = yMax - yMin;
+    }
+  }
+  layoutTransition(transition: Transition) {
+    const self = this,
+          src = transition.src,
+          dst = transition.dst,
+          p1 = src ? this.stateParamToPoint(src, transition.tSrc) : transition[pSrc],
+          p2 = dst ? this.stateParamToPoint(dst, transition.tDst) : transition[pDst];
+    // If we're in an intermediate state, don't layout.
+    if (!p1 || !p2)
+      return;
+    function getCenter(state: StateTypes) {
+      const bbox = self.getItemRect(state);
+      return {
+        x: bbox.x + bbox.width * 0.5,
+        y: bbox.y + bbox.height * 0.5,
+      }
+    }
+    // If it's an "inside" transition, flip the source normal.
+    if (src && dst && dst.parent) {
+      const dstGrandParent = dst.parent.parent;
+      if (src === dstGrandParent) {
+        p1.nx = -p1.nx;
+        p1.ny = -p1.ny;
+      }
+    }
+    const scaleFactor = src === dst ? 64 : 0,
+          bezier = getEdgeBezier(p1, p2, scaleFactor);
+    if (src && src.type === 'pseudostate') {
+      // Adjust the bezier's p1 and c1 to start on the boundary, towards bezier c2.
+      const to = bezier[2],
+            center = getCenter(src),
+            radius = this.theme_.radius,
+            projection = projectPointToCircle(to, center, radius);
+      bezier[0] = projection;
+      bezier[1] = to;
+    }
+    if (dst && dst.type === 'pseudostate') {
+      // Adjust the bezier's c2 and p2 to end on the boundary, towards bezier c1.
+      const to = bezier[1],
+            center = getCenter(dst),
+            radius = this.theme_.radius,
+            projection = projectPointToCircle(to, center, radius);
+      bezier[3] = projection;
+      bezier[2] = to;
+    }
+    transition[transitionBezier] = bezier;
+    transition[transitionTextPoint] = evaluateBezier(bezier, transition.tText);
+    let text = '', textWidth = 0;
+    if (this.ctx) {
+      const ctx = this.ctx,
+            padding = this.theme_.padding;
+      if (transition.event) {
+        text += transition.event;
+        textWidth += ctx.measureText(transition.event).width + 2 * padding;
+      }
+      if (transition.guard) {
+        text += '[' + transition.guard + ']';
+        textWidth += ctx.measureText(transition.guard).width + 2 * padding;
+      }
+      if (transition.action) {
+        text += '/' + transition.action;
+        textWidth += ctx.measureText(transition.action).width + 2 * padding;
+      }
+    }
+    transition[transitionText] = text;
+    transition[transitionTextWidth] = textWidth;
+  }
+  // Layout a statechart item.
+  layout(item: AllTypes) {
+    switch (item.type) {
+      case 'state':
+        this.layoutState(item);
+        break;
+      case 'statechart':
+        this.layoutStatechart(item);
+        break;
+      case 'transition':
+        this.layoutTransition(item);
+        break;
+    }
+  }
+  drawArrow(x: number, y: number) {
+    const ctx = this.ctx!;
+    ctx.beginPath();
+    arrowPath({ x: x, y: y, nx: -1, ny: 0 }, ctx, this.theme_.arrowSize);
+    ctx.stroke();
+  }
+  hitTestArrow(x: number, y: number, p:  Point, tol: number) {
+    const d = this.theme_.arrowSize, r = d * 0.5;
+    return hitTestRect(x - r, y - r, d, d, p, tol);
+  }
+  drawState(state: State, mode: RenderMode) {
+    const ctx = this.ctx;
+    if (!ctx)
+      return;
+
+    const theme = this.theme_,
+          r = theme.radius,
+          rect = this.getItemRect(state),
+          x = rect.x, y = rect.y, w = rect.width, h = rect.height,
+          textSize = theme.fontSize,
+          lineBase = y + textSize + theme.textLeading;
+
+    roundRectPath(x, y, w, h, r, ctx);
+    switch (mode) {
+      case RenderMode.Normal:
+      case RenderMode.Print:
+        ctx.fillStyle = theme.bgColor;
+        ctx.fill();
+        ctx.strokeStyle = theme.strokeColor;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, lineBase);
+        ctx.lineTo(x + w, lineBase);
+        ctx.stroke();
+
+        ctx.fillStyle = theme.textColor;
+        if (state.name) {
+          ctx.fillText(state.name, x + r, y + textSize);
+        }
+        if (state.entry) {
+          ctx.fillText(state[entryText]!, x + r, y + state[entryY]! + textSize);
+        }
+        if (state.exit) {
+          ctx.fillText(state[exitText]!, x + r, y + state[exitY]! + textSize);
+        }
+
+        const statecharts = state.statecharts;
+        if (statecharts) {
+          let separatorY = lineBase;
+          for (var i = 0; i < statecharts.length - 1; i++) {
+            const statechart = statecharts.at(i);
+            separatorY += statechart.height;
+            ctx.setLineDash([5]);
+            ctx.beginPath();
+            ctx.moveTo(x, separatorY);
+            ctx.lineTo(x + w, separatorY);
+            ctx.stroke();
+            ctx.setLineDash([0]);
+          }
+        }
+        // Render knobbies, faintly.
+        ctx.lineWidth = 0.25;
+        break;
+      case RenderMode.Highlight:
+        ctx.strokeStyle = theme.highlightColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        break;
+      case RenderMode.HotTrack:
+        ctx.strokeStyle = theme.hotTrackColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        break;
+    }
+    if (mode !== RenderMode.Print) {
+      this.drawArrow(x + w + theme.arrowSize, lineBase);
+    }
+  }
+  hitTestState(state: State, p: Point, tol: number, mode: RenderMode) : StateHitResult | undefined {
+    const theme = this.theme_,
+          r = theme.radius,
+          rect = this.getItemRect(state),
+          x = rect.x, y = rect.y, w = rect.width, h = rect.height,
+          inner = hitTestRect(x, y, w, h, p, tol); // TODO hitTestRoundRect
+    if (inner) {
+      const lineBase = y + theme.fontSize + theme.textLeading,
+            result: StateHitResult = { item: state, inner: inner };
+      if (mode !== RenderMode.Print && this.hitTestArrow(x + w + theme.arrowSize, lineBase, p, tol))
+        result.arrow = true;
+      return result;
+    }
+  }
+  drawPseudoState(pseudostate: Pseudostate, mode: RenderMode) {
+    const ctx = this.ctx;
+    if (!ctx)
+      return
+
+    const theme = this.theme_,
+          r = theme.radius,
+          rect = this.getItemRect(pseudostate),
+          x = rect.x, y = rect.y,
+          cx = x + r, cy = y + r;
+
+    function drawGlyph(glyph: number[], cx: number, cy: number) {
+      for (let i = 0; i < glyph.length; i += 4) {
+        ctx!.moveTo(cx + glyph[i], cy + glyph[i + 1]);
+        ctx!.lineTo(cx + glyph[i + 2], cy + glyph[i + 3]);
+      }
+    }
+    diskPath(cx, cy, r, ctx);
+    switch (mode) {
+      case RenderMode.Normal:
+      case RenderMode.Print:
+        ctx.lineWidth = 0.25;
+        switch (pseudostate.subtype) {
+          case 'start':
+            ctx.fillStyle = theme.strokeColor;
+            ctx.fill();
+            ctx.stroke();
+            break;
+          case 'stop':
+            ctx.fillStyle = theme.bgColor;
+            ctx.fill();
+            ctx.stroke();
+            diskPath(cx, cy, r / 2, ctx);
+            ctx.fillStyle = theme.strokeColor;
+            ctx.fill();
+            break;
+          case 'history':
+            ctx.fillStyle = theme.bgColor;
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            drawGlyph(theme.HGlyph, cx, cy);
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.lineWidth = 0.25;
+            break;
+          case 'history*':
+            ctx.fillStyle = theme.bgColor;
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            drawGlyph(theme.HGlyph, cx - r / 3, cy);
+            drawGlyph(theme.StarGlyph, cx + r / 2, cy);
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.lineWidth = 0.25;
+            break;
+        }
+        break;
+      case RenderMode.Highlight:
+        ctx.strokeStyle = theme.highlightColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        break;
+      case RenderMode.HotTrack:
+        ctx.strokeStyle = theme.hotTrackColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        break;
+    }
+    if (mode !== RenderMode.Print && pseudostate.subtype !== 'stop') {
+      this.drawArrow(x + 2 * r + theme.arrowSize, y + r);
+    }
+  }
+  // hitTestPseudoState(state, p, tol, mode) {
+  //   const theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y;
+  //   if (mode !== printMode && !isStopState(state) && this.hitTestArrow(x + 2 * r + theme.arrowSize, y + r, p, tol))
+  //     return { arrow: true };
+
+  //   return diagrams.hitTestDisk(x + r, y + r, r, p, tol);
+  // }
+  drawStatechart(statechart: Statechart, mode: RenderMode) {
+    const ctx = this.ctx;
+    if (!ctx)
+      return;
+
+    const theme = this.theme_,
+          r = theme.radius,
+          textSize = theme.fontSize,
+          rect = this.getItemRect(statechart),
+          x = rect.x, y = rect.y, w = rect.width, h = rect.height;
+    switch (mode) {
+      case RenderMode.Normal:
+      case RenderMode.Print:
+        if (statechart.name) {
+          ctx.fillStyle = theme.textColor;
+          ctx.fillText(statechart.name, x + r, y + textSize);
+        }
+        break;
+      case RenderMode.Highlight:
+      case RenderMode.HotTrack:
+        roundRectPath(x, y, w, h, r, ctx);
+        ctx.strokeStyle = mode === RenderMode.Highlight ? theme.highlightColor : theme.hotTrackColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        break;
+    }
+  }
+  hitTestStatechart(statechart: Statechart, p: Point, tol: number, mode: RenderMode) {
+    const theme = this.theme_,
+          r = theme.radius,
+          rect = this.getItemRect(statechart),
+          x = rect.x, y = rect.y, w = rect.width, h = rect.height;
+    return hitTestRect(x, y, w, h, p, tol);
+  }
+  drawTransition(transition: Transition, mode: RenderMode) {
+    const ctx = this.ctx;
+    if (!ctx)
+      return;
+
+    const theme = this.theme_,
+          r = theme.knobbyRadius,
+          bezier = transition[transitionBezier];
+    bezierEdgePath(bezier, ctx, theme.arrowSize);
+    switch (mode) {
+      case RenderMode.Normal:
+      case RenderMode.Print:
+        ctx.strokeStyle = theme.strokeColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        const pt = transition[transitionTextPoint];
+        if (mode !== RenderMode.Print) {
+          const r = theme.radius / 2;
+          roundRectPath(pt.x - r, pt.y - r, theme.radius, theme.radius, r, ctx);
+          ctx.fillStyle = theme.bgColor;
+          ctx.fill();
+          ctx.lineWidth = 0.25;
+          ctx.stroke();
+        }
+        ctx.fillStyle = theme.textColor;
+        ctx.fillText(transition[transitionText], pt.x + theme.padding, pt.y + theme.fontSize);
+        break;
+      case RenderMode.Highlight:
+        ctx.strokeStyle = theme.highlightColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        break;
+      case RenderMode.HotTrack:
+        ctx.strokeStyle = theme.hotTrackColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        break;
+    }
+  }
+  hitTestTransition(transition: Transition, p: Point, tol: number, mode: RenderMode) {
+    return hitTestBezier(transition[transitionBezier], p, tol);
+  }
 
 }
 
@@ -999,378 +1387,7 @@ class Renderer {
     constructor(theme) {
       this.theme = extendTheme(theme);
     }
-    // Layout a state.
-    layoutState(state) {
-      const self = this,
-            theme = this.theme,
-            textSize = theme.fontSize,
-            textLeading = theme.textLeading,
-            lineSpacing = textSize + textLeading,
-            observableModel = this.model.observableModel;
 
-      let width = 0, height = lineSpacing;
-
-      const statecharts = state.items;
-      let stateOffsetY = lineSpacing; // start at the bottom of the state label area.
-      if (statecharts && statecharts.length > 0) {
-        // Layout the child statecharts vertically within the parent state.
-        // TODO handle horizontal flow.
-        statecharts.forEach(function (statechart) {
-          const size = self.getSize(statechart);
-          width = Math.max(width, size.width);
-        });
-        statecharts.forEach(function (statechart) {
-          observableModel.changeValue(statechart, 'y', stateOffsetY);
-          observableModel.changeValue(statechart, 'width', width);
-          stateOffsetY += statechart.height;
-        });
-
-        height = Math.max(height, stateOffsetY);
-      }
-      if (state.entry) {
-        state[_entryText] = 'entry/ ' + state.entry;
-        state[_entryY] = height;
-        height += lineSpacing;
-        width = Math.max(width, this.ctx.measureText(state[_entryText]).width + 2 * this.theme.padding);
-      }
-      if (state.exit) {
-        state[_exitText] = 'exit/ ' + state.exit;
-        state[_exitY] = height;
-        height += lineSpacing;
-        width = Math.max(width, this.ctx.measureText(state[_exitText]).width + 2 * this.theme.padding);
-      }
-      width = Math.max(width, theme.stateMinWidth);
-      height = Math.max(height, theme.stateMinHeight);
-      width = Math.max(width, state.width);
-      height = Math.max(height, state.height);
-      observableModel.changeValue(state, 'width', width);
-      observableModel.changeValue(state, 'height', height);
-
-      if (statecharts && statecharts.length > 0) {
-        // Expand the last statechart to fill its parent state.
-        const lastStatechart = statecharts[statecharts.length - 1];
-        observableModel.changeValue(lastStatechart, 'height',
-          lastStatechart.height + height - stateOffsetY);
-      }
-    }
-    // Make sure a statechart is big enough to enclose its contents. Statecharts
-    // are always sized automatically to contain their contents and fit tightly in
-    // their parent state.
-    layoutStatechart(statechart) {
-      const padding = this.theme.padding, translatableModel = this.model.translatableModel, statechartX = translatableModel.globalX(statechart), statechartY = translatableModel.globalY(statechart), items = statechart.items;
-      if (items && items.length) {
-        // Get extents of child states.
-        const r = this.getBounds(items), x = r.x - statechartX, // Get position in statechart coordinates.
-          y = r.y - statechartY, observableModel = this.model.observableModel;
-        let xMin = Math.min(0, x - padding), yMin = Math.min(0, y - padding), xMax = x + r.width + padding, yMax = y + r.height + padding;
-        if (xMin < 0) {
-          xMax -= xMin;
-          for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            if (isTransition(item))
-              continue;
-            observableModel.changeValue(item, 'x', item.x - xMin);
-          }
-        }
-        if (yMin < 0) {
-          yMax -= yMin;
-          for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            if (isTransition(item))
-              continue;
-            observableModel.changeValue(item, 'y', item.y - yMin);
-          }
-        }
-        // Statechart position is calculated by the parent state layout.
-        observableModel.changeValue(statechart, 'width', xMax - xMin);
-        observableModel.changeValue(statechart, 'height', yMax - yMin);
-      }
-    }
-    layoutTransition(transition) {
-      const self = this,
-            src = this.getTransitionSrc(transition),
-            dst = this.getTransitionDst(transition),
-            p1 = src ? this.stateParamToPoint(src, transition.t1) : transition[_p1],
-            p2 = dst ? this.stateParamToPoint(dst, transition.t2) : transition[_p2];
-      // If we're in an intermediate state, don't layout.
-      if (!p1 || !p2)
-        return;
-      function getCenter(state) {
-        const bbox = self.getItemRect(state);
-        return {
-          x: bbox.x + bbox.width * 0.5,
-          y: bbox.y + bbox.height * 0.5,
-        }
-      }
-      // If it's an "inside" transition, flip the source normal.
-      if (src && dst) {
-        const hierarchicalModel = this.model.hierarchicalModel,
-              dstGrandParent = hierarchicalModel.getParent(hierarchicalModel.getParent(dst));
-        if (src === dstGrandParent) {
-          p1.nx = -p1.nx;
-          p1.ny = -p1.ny;
-        }
-      }
-      const scaleFactor = src === dst ? 64 : 0,
-            bezier = diagrams.getEdgeBezier(p1, p2, scaleFactor);
-      if (src && isPseudostate(src)) {
-        // Adjust the bezier's p1 and c1 to start on the boundary, towards bezier c2.
-        const to = bezier[2],
-              center = getCenter(src),
-              radius = this.theme.radius,
-              projection = geometry.projectPointToCircle(to, center, radius);
-        bezier[0] = projection;
-        bezier[1] = to;
-      }
-      if (dst && isPseudostate(dst)) {
-        // Adjust the bezier's c2 and p2 to end on the boundary, towards bezier c1.
-        const to = bezier[1],
-              center = getCenter(dst),
-              radius = this.theme.radius,
-              projection = geometry.projectPointToCircle(to, center, radius);
-        bezier[3] = projection;
-        bezier[2] = to;
-      }
-      transition[_bezier] = bezier;
-      transition[_textT] = geometry.evaluateBezier(transition[_bezier], transition.pt);
-      let text = '', textWidth = 0;
-      if (transition.event) {
-        text += transition.event;
-        textWidth += this.ctx.measureText(transition.event).width + 2 * this.theme.padding;
-      }
-      if (transition.guard) {
-        text += '[' + transition.guard + ']';
-        textWidth += this.ctx.measureText(transition.guard).width + 2 * this.theme.padding;
-      }
-      if (transition.action) {
-        text += '/' + transition.action;
-        textWidth += this.ctx.measureText(transition.action).width + 2 * this.theme.padding;
-      }
-      transition[_text] = text;
-      transition[_textWidth] = textWidth;
-    }
-    // Layout a statechart item.
-    layout(item) {
-      if (isTrueState(item)) {
-        this.layoutState(item);
-      } else if (isStatechart(item)) {
-        this.layoutStatechart(item);
-      } else if (isTransition(item))
-        this.layoutTransition(item);
-    }
-    drawArrow(x, y) {
-      const ctx = this.ctx;
-      ctx.beginPath();
-      diagrams.arrowPath({ x: x, y: y, nx: -1, ny: 0 }, ctx, this.theme.arrowSize);
-      ctx.stroke();
-    }
-    hitTestArrow(x, y, p, tol) {
-      const d = this.theme.arrowSize, r = d * 0.5;
-      return diagrams.hitTestRect(x - r, y - r, d, d, p, tol);
-    }
-
-    drawState(state, mode) {
-      const ctx = this.ctx, theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y, w = rect.width, h = rect.height, textSize = theme.fontSize, lineBase = y + textSize + theme.textLeading;
-      diagrams.roundRectPath(x, y, w, h, r, ctx);
-      switch (mode) {
-        case normalMode:
-        case printMode:
-          ctx.fillStyle = theme.bgColor;
-          ctx.fill();
-          ctx.strokeStyle = theme.strokeColor;
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(x, lineBase);
-          ctx.lineTo(x + w, lineBase);
-          ctx.stroke();
-
-          ctx.fillStyle = theme.textColor;
-          ctx.fillText(state.name, x + r, y + textSize);
-          if (state.entry)
-            ctx.fillText(state[_entryText], x + r, y + state[_entryY] + textSize);
-          if (state.exit)
-            ctx.fillText(state[_exitText], x + r, y + state[_exitY] + textSize);
-
-          const items = state.items;
-          if (items) {
-            let separatorY = lineBase;
-            for (var i = 0; i < items.length - 1; i++) {
-              const statechart = items[i];
-              separatorY += statechart.height;
-              ctx.setLineDash([5]);
-              ctx.beginPath();
-              ctx.moveTo(x, separatorY);
-              ctx.lineTo(x + w, separatorY);
-              ctx.stroke();
-              ctx.setLineDash([0]);
-            }
-          }
-          // Render knobbies, faintly.
-          ctx.lineWidth = 0.25;
-          break;
-        case highlightMode:
-          ctx.strokeStyle = theme.highlightColor;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          break;
-        case hotTrackMode:
-          ctx.strokeStyle = theme.hotTrackColor;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          break;
-      }
-      if (mode !== printMode) {
-        this.drawArrow(x + w + theme.arrowSize, lineBase);
-      }
-    }
-    hitTestState(state, p, tol, mode) {
-      const theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y, w = rect.width, h = rect.height, result = diagrams.hitTestRect(x, y, w, h, p, tol); // TODO hitTestRoundRect
-      if (result) {
-        const lineBase = y + theme.fontSize + theme.textLeading;
-        if (mode !== printMode && this.hitTestArrow(x + w + theme.arrowSize, lineBase, p, tol))
-          result.arrow = true;
-      }
-      return result;
-    }
-    drawPseudoState(state, mode) {
-      const ctx = this.ctx, theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y, cx = x + r, cy = y + r;
-      function drawGlyph(glyph, cx, cy) {
-        for (let i = 0; i < glyph.length; i += 4) {
-          ctx.moveTo(cx + glyph[i], cy + glyph[i + 1]);
-          ctx.lineTo(cx + glyph[i + 2], cy + glyph[i + 3]);
-        }
-      }
-      diagrams.diskPath(cx, cy, r, ctx);
-      switch (mode) {
-        case normalMode:
-        case printMode:
-          ctx.lineWidth = 0.25;
-          switch (state.type) {
-            case 'start':
-              ctx.fillStyle = theme.strokeColor;
-              ctx.fill();
-              ctx.stroke();
-              break;
-            case 'stop':
-              ctx.fillStyle = theme.bgColor;
-              ctx.fill();
-              ctx.stroke();
-              diagrams.diskPath(cx, cy, r / 2, ctx);
-              ctx.fillStyle = theme.strokeColor;
-              ctx.fill();
-              break;
-            case 'history':
-              ctx.fillStyle = theme.bgColor;
-              ctx.fill();
-              ctx.stroke();
-              ctx.beginPath();
-              drawGlyph(theme.HGlyph, cx, cy);
-              ctx.lineWidth = 1;
-              ctx.stroke();
-              ctx.lineWidth = 0.25;
-              break;
-            case 'history*':
-              ctx.fillStyle = theme.bgColor;
-              ctx.fill();
-              ctx.stroke();
-              ctx.beginPath();
-              drawGlyph(theme.HGlyph, cx - r / 3, cy);
-              drawGlyph(theme.StarGlyph, cx + r / 2, cy);
-              ctx.lineWidth = 1;
-              ctx.stroke();
-              ctx.lineWidth = 0.25;
-              break;
-          }
-          break;
-        case highlightMode:
-          ctx.strokeStyle = theme.highlightColor;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          break;
-        case hotTrackMode:
-          ctx.strokeStyle = theme.hotTrackColor;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          break;
-      }
-      if (mode !== printMode && !isStopState(state)) {
-        this.drawArrow(x + 2 * r + theme.arrowSize, y + r);
-      }
-    }
-    hitTestPseudoState(state, p, tol, mode) {
-      const theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y;
-      if (mode !== printMode && !isStopState(state) && this.hitTestArrow(x + 2 * r + theme.arrowSize, y + r, p, tol))
-        return { arrow: true };
-
-      return diagrams.hitTestDisk(x + r, y + r, r, p, tol);
-    }
-    drawStatechart(statechart, mode) {
-      const ctx = this.ctx,
-            theme = this.theme,
-            r = theme.radius,
-            textSize = theme.fontSize,
-            rect = this.getItemRect(statechart),
-            x = rect.x, y = rect.y, w = rect.width, h = rect.height;
-      switch (mode) {
-        case normalMode:
-        case printMode:
-          if (statechart.name) {
-            ctx.fillStyle = theme.textColor;
-            ctx.fillText(statechart.name, x + r, y + textSize);
-          }
-          break;
-        case highlightMode:
-        case hotTrackMode:
-          diagrams.roundRectPath(x, y, w, h, r, ctx);
-          ctx.strokeStyle = mode === highlightMode ? theme.highlightColor : theme.hotTrackColor;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          break;
-      }
-    }
-    hitTestStatechart(statechart, p, tol, mode) {
-      const theme = this.theme, r = theme.radius, rect = this.getItemRect(statechart), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
-      return diagrams.hitTestRect(x, y, w, h, p, tol); // TODO hitTestRoundRect
-    }
-    drawTransition(transition, mode) {
-      const ctx = this.ctx, theme = this.theme, r = theme.knobbyRadius, bezier = transition[_bezier];
-      diagrams.bezierEdgePath(bezier, ctx, theme.arrowSize);
-      switch (mode) {
-        case normalMode:
-        case printMode:
-          ctx.strokeStyle = theme.strokeColor;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-          const pt = transition[_textT];
-          if (mode !== printMode) {
-            const r = theme.radius / 2;
-            diagrams.roundRectPath(pt.x - r,
-              pt.y - r,
-              theme.radius, theme.radius, r, ctx);
-            ctx.fillStyle = theme.bgColor;
-            ctx.fill();
-            ctx.lineWidth = 0.25;
-            ctx.stroke();
-          }
-          ctx.fillStyle = theme.textColor;
-          ctx.fillText(transition[_text], pt.x + theme.padding, pt.y + theme.fontSize);
-          break;
-        case highlightMode:
-          ctx.strokeStyle = theme.highlightColor;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          break;
-        case hotTrackMode:
-          ctx.strokeStyle = theme.hotTrackColor;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          break;
-      }
-    }
-    hitTestTransition(transition, p, tol, mode) {
-      return diagrams.hitTestBezier(transition[_bezier], p, tol);
-    }
     draw(item, mode) {
       switch (item.type) {
         case 'state':

@@ -176,7 +176,7 @@ interface PointWithNormal {
 }
 
 export function getEdgeBezier(
-    p1: PointWithNormal, p2: PointWithNormal, scaleFactor: number) {
+    p1: PointWithNormal, p2: PointWithNormal, scaleFactor: number) : geometry.BezierCurve {
   let dx = p1.x - p2.x, dy = p1.y - p2.y,
       nx1 = p1.nx || 0, ny1 = p1.ny || 0, nx2 = p2.nx || 0, ny2 = p2.ny || 0,
       // dot = nx1 * -nx2 + ny1 * -ny2,
@@ -208,7 +208,7 @@ export function lineEdgePath(
 }
 
 export function bezierEdgePath(
-    bezier: PointWithNormal[], ctx: CanvasRenderingContext2D, arrowSize: number) {
+    bezier: geometry.BezierCurve, ctx: CanvasRenderingContext2D, arrowSize: number) {
   let p1 = bezier[0], c1 = bezier[1], c2 = bezier[2], p2 = bezier[3];
   ctx.beginPath();
   ctx.moveTo(p1.x, p1.y);
@@ -248,12 +248,21 @@ export function closedPath(points: Point[], ctx: CanvasRenderingContext2D) {
 }
 
 // Check if p is within tolerance of (x, y). Useful for knobbies.
-export function hitPoint(x: number, y: number, p: Point, tol: number) {
+export function hitPoint(x: number, y: number, p: Point, tol: number) : boolean {
   return Math.abs(x - p.x) <= tol && Math.abs(y - p.y) <= tol;
 }
 
+export interface RectHitResult {
+  top: boolean,
+  left: boolean,
+  bottom: boolean,
+  right: boolean,
+  border: boolean,
+}
+
 export function hitTestRect(
-    x: number, y: number, width: number, height: number, p: Point, tol: number) {
+    x: number, y: number, width: number, height: number, p: Point, tol: number) :
+    RectHitResult | undefined {
   let right = x + width, bottom = y + height,
       px = p.x, py = p.y;
   if (px > x - tol && px < right + tol &&
@@ -269,23 +278,33 @@ export function hitTestRect(
       bottom: hitBottom,
       right: hitRight,
       border: hitBorder,
-      interior: !hitBorder,
     };
   }
 }
 
+export interface DiskHitResult {
+  border: boolean,
+}
+
 export function hitTestDisk(
-    x: number, y: number, r: number, p: Point, tol: number) {
+    x: number, y: number, r: number, p: Point, tol: number) : DiskHitResult | undefined {
   const dx = x - p.x, dy = y - p.y,
         dSquared = dx * dx + dy * dy,
         inner = Math.max(0, r - tol), outer = r + tol;
   if (dSquared < outer * outer) {
     const border = dSquared > inner * inner;
-    return { interior: !border, border: border };
+    return { border: border };
   }
 }
 
-export function hitTestLine(p1: Point, p2: Point, p: Point, tol: number) {
+export interface LineHitResult {
+  p1?: boolean,
+  p2?: boolean,
+  edge?: boolean,
+}
+
+export function hitTestLine(
+    p1: Point, p2: Point, p: Point, tol: number) : LineHitResult | undefined {
   if (geometry.pointToPointDist(p1, p) < tol) {
     return { p1: true };
   } else if (geometry.pointToPointDist(p2, p) < tol) {
@@ -295,17 +314,15 @@ export function hitTestLine(p1: Point, p2: Point, p: Point, tol: number) {
   }
 }
 
-export function hitTestBezier(bezier: Point[], p: Point, tol: number) {
+export function hitTestBezier(
+    bezier: geometry.BezierCurve, p: Point, tol: number) : geometry.CurveHitResult | undefined {
   const p1 = bezier[0], p2 = bezier[3];
   if (geometry.pointToPointDist(p1, p) < tol) {
-    return { p1: true, t: 0 };
+    return { x: p1.x, y: p1.y, d: 0, t: 0 };
   } else if (geometry.pointToPointDist(p2, p) < tol) {
-    return { p2: true, t: 1 };
+    return { x: p2.x, y: p2.y, d: 0, t: 1 };
   } else {
     const hit = geometry.hitTestBezier(bezier[0], bezier[1], bezier[2], bezier[3], p, tol);
-    // if (hit) {
-    //   hit.edge = true;
-    // }
     return hit;
   }
 }

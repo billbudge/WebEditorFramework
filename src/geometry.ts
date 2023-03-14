@@ -126,9 +126,25 @@ export function lineIntersection(p0: Point, p1: Point, p2: Point, p3: Point) : P
   return undefined;
 }
 
+export type BezierCurve = [
+  PointWithNormal, Point, Point, PointWithNormal
+];
+
+// Evaluate bezier segment by deCastlejau algorithm.
+export function evaluateBezier(b: BezierCurve, t: number) {
+  var tp = 1.0 - t;
+  var s11 = { x: b[0].x * tp + b[1].x * t, y: b[0].y * tp + b[1].y * t },
+      s12 = { x: b[1].x * tp + b[2].x * t, y: b[1].y * tp + b[2].y * t },
+      s13 = { x: b[2].x * tp + b[3].x * t, y: b[2].y * tp + b[3].y * t },
+      s21 = { x: s11.x * tp + s12.x * t, y: s11.y * tp + s12.y * t},
+      s22 = { x: s12.x * tp + s13.x * t, y: s12.y * tp + s13.y * t},
+      s31 = { x: s21.x * tp + s22.x * t, y: s21.y * tp + s22.y * t};
+  return s31;
+}
+
 type CurveSegment = [Point, Point, Point, Point, number, number];
 
-interface CurveHitResult {
+export interface CurveHitResult {
   x: number,
   y: number,
   d: number,
@@ -136,7 +152,8 @@ interface CurveHitResult {
 }
 
 export function hitTestBezier(
-    p1: Point, p2: Point, p3: Point, p4: Point, p: Point, tolerance: number) : CurveHitResult {
+    p1: Point, p2: Point, p3: Point, p4: Point, p: Point, tolerance: number) :
+    CurveHitResult | undefined {
   const beziers = new Queue<CurveSegment>();
   beziers.enqueue([p1, p2, p3, p4, 0, 1]);
   let dMin: number = Number.MAX_VALUE,
@@ -182,6 +199,4 @@ export function hitTestBezier(
   }
   if (dMin < tolerance)
     return { x: closestX, y: closestY, d: dMin, t: tMin };
-
-  return { x: 0, y: 0, d: 0, t: 0 };
 }
