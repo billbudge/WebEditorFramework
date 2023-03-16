@@ -1,13 +1,11 @@
 import { SelectionSet } from './collections';
 
-export type ItemVisitor = (item: any) => void;
-
-export type PropertyVisitor = (item: any, attr: string) => void;
-
-// TODO SelectionModel tests.
-// TODO more ReferenceModel tests.
-
 //------------------------------------------------------------------------------
+
+// Raw objects store data as a tree. Objects have properties and children.
+// Various data models add data derived from the raw data, such as change events,
+//   hierarchy, references.
+// Interfaces adapt the raw data for type safe use.
 
 export interface DataContext<TObject extends DataContextObject = DataContextObject,
                              TReferent extends ReferencedObject = ReferencedObject,
@@ -23,11 +21,6 @@ export interface DataContextObject {
 }
 
 //------------------------------------------------------------------------------
-
-// Raw objects store the data as a tree. Objects have properties and children.
-// Raw object data can be traversed without writing any code.
-// Various data models add data derived from the raw data, such as change events, hierarchy, references.
-// Interfaces adapt the raw data for type safe use.
 
 export interface List<T = any> {
   length: number;
@@ -511,11 +504,88 @@ export class TransactionManager<TOwner extends DataContextObject>
   }
 }
 
+export class HistoryManager<TOwner extends DataContextObject> {
+  private done: Array<CompoundOp> = [];
+  private undone: Array<CompoundOp> = [];
+  private transactionManager: TransactionManager<TOwner>;
+  private selectionSet: SelectionSet<TOwner>;
+  private startingSelection: Array<any> = [];
+
+  getRedo() {
+    const length = this.undone.length;
+    return length > 0 ? this.undone[length - 1] : null;
+  }
+
+  getUndo() {
+    const length = this.done.length;
+    return length > 0 ? this.done[length - 1] : null;
+  }
+
+  redo() {
+    const transaction = this.getRedo();
+    if (transaction) {
+      this.transactionManager.redo(transaction);
+      this.done.push(this.undone.pop()!);
+    }
+  }
+
+  undo() {
+    const transaction = this.getUndo();
+    if (transaction) {
+      this.transactionManager.undo(transaction);
+      this.undone.push(this.done.pop()!);
+    }
+  }
+
+  onTransactionBegan_(op: CompoundOp) {
+    const selectionSet = this.selectionSet;
+    this.startingSelection = selectionSet.contents();
+  }
+
+  onTransactionEnding_(op: CompoundOp) {
+    const selectionSet = this.selectionSet;
+    const startingSelection = this.startingSelection || [];
+    let endingSelection = selectionSet.contents();
+    if (startingSelection.length === endingSelection.length &&
+        startingSelection.every(function(element, i) {
+          return element === endingSelection[i];
+        })) {
+      endingSelection = startingSelection;
+    }
+    const selectionOp = new SelectionOp(selectionSet, startingSelection, endingSelection);
+    op.add(op);
+    this.startingSelection = [];
+  }
+
+  onTransactionEnded_(op: CompoundOp) {
+    this.startingSelection = [];
+    if (this.undone.length)
+      this.undone = [];
+    this.done.push(op);
+  }
+
+  onTransactionCancelled_(op: CompoundOp) {
+    this.startingSelection = [];
+  }
+
+  constructor(transactionManager: TransactionManager<TOwner>, selectionSet: SelectionSet<TOwner>) {
+    this.transactionManager = transactionManager;
+    this.selectionSet = selectionSet;
+    transactionManager.addHandler('transactionBegan', this.onTransactionBegan_.bind(this));
+    transactionManager.addHandler('transactionEnding', this.onTransactionEnding_.bind(this));
+    transactionManager.addHandler('transactionEnded', this.onTransactionEnded_.bind(this));
+    transactionManager.addHandler('transactionCancelled', this.onTransactionCancelled_.bind(this));
+  }
+}
 
 
 
-/*
-*/
+//------------------------------------------------------------------------------
+
+export type ItemVisitor = (item: any) => void;
+
+export type PropertyVisitor = (item: any, attr: string) => void;
+
 //------------------------------------------------------------------------------
 
 // Base DataModel.
