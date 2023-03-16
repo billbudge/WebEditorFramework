@@ -9,6 +9,21 @@ export type PropertyVisitor = (item: any, attr: string) => void;
 
 //------------------------------------------------------------------------------
 
+export interface DataContext<TObject extends DataContextObject = DataContextObject,
+                             TReferent extends ReferencedObject = ReferencedObject,
+                             TArrayElement = any> {
+  valueChanged(owner: TObject, attr: string, oldValue: any) : void;
+  elementInserted(owner: TObject, attr: string, index: number, value: TArrayElement) : void;
+  elementRemoved(owner: TObject, attr: string, index: number, oldValue: TArrayElement) : void;
+  resolveReference(owner: TObject, cacheKey: symbol, id: number) : TReferent | undefined;
+}
+
+export interface DataContextObject {
+  readonly context: DataContext;
+}
+
+//------------------------------------------------------------------------------
+
 // Raw objects store the data as a tree. Objects have properties and children.
 // Raw object data can be traversed without writing any code.
 // Various data models add data derived from the raw data, such as change events, hierarchy, references.
@@ -29,9 +44,8 @@ export interface List<T = any> {
 
 // TODO work on making List<T> more ergonomic.
 export class DataList<T = any> implements List<T> {
-  private owner: object;
+  private owner: DataContextObject;
   private name: string;
-  private dataContext: DataContext;
 
   private get array() : T[] | undefined {
     return (this.owner as any)[this.name];
@@ -56,10 +70,10 @@ export class DataList<T = any> implements List<T> {
     let array = this.array;
     if (!array) {
       this.array = array = [];
-      this.dataContext.valueChanged(this.owner, this.name, undefined);
+      this.owner.context.valueChanged(this.owner, this.name, undefined);
     }
     array.splice(index, 0, element);
-    this.dataContext.elementInserted(this.owner, this.name, index, element);
+    this.owner.context.elementInserted(this.owner, this.name, index, element);
   }
 
   append(element: T) {
@@ -76,7 +90,7 @@ export class DataList<T = any> implements List<T> {
     if (!array || array.length <= index)
       throw new RangeError('Index out of range: ' + index);
     const oldValue = array.splice(index, 1);
-    this.dataContext.elementRemoved(this.owner, this.name, index, oldValue[0]);
+    this.owner.context.elementRemoved(this.owner, this.name, index, oldValue[0]);
     return oldValue[0];
   }
 
@@ -109,22 +123,10 @@ export class DataList<T = any> implements List<T> {
     return array[Symbol.iterator]();
   }
 
-  constructor(owner: object, dataContext: DataContext, name: string) {
+  constructor(owner: DataContextObject, name: string) {
     this.owner = owner;
-    this.dataContext = dataContext;
     this.name = name;
   }
-}
-
-//------------------------------------------------------------------------------
-
-export interface DataContext<TObject extends object = object,
-                             TReferent extends ReferencedObject = ReferencedObject,
-                             TArrayElement = any> {
-  valueChanged(owner: TObject, attr: string, oldValue: any) : void;
-  elementInserted(owner: TObject, attr: string, index: number, value: TArrayElement) : void;
-  elementRemoved(owner: TObject, attr: string, index: number, oldValue: TArrayElement) : void;
-  resolveReference(owner: TObject, cacheKey: symbol, id: number) : TReferent | undefined;
 }
 
 //------------------------------------------------------------------------------
@@ -134,13 +136,13 @@ export interface DataContext<TObject extends object = object,
 export class ScalarProp<T = any> {
   readonly name: string;
 
-  get(owner: object) : T | undefined {
+  get(owner: DataContextObject) : T | undefined {
     return (owner as any)[this.name];
   }
-  set(owner: object, dataContext: DataContext, value: T) : T | undefined {
+  set(owner: DataContextObject, value: T) : T | undefined {
     const oldValue: T = (owner as any)[this.name];
     (owner as any)[this.name] = value;
-    dataContext.valueChanged(owner, this.name, oldValue);
+    owner.context.valueChanged(owner, this.name, oldValue);
     return oldValue;
   }
   constructor(name: string) {
@@ -151,8 +153,8 @@ export class ScalarProp<T = any> {
 export class ArrayProp<T = any> {
   readonly name: string;
 
-  get(owner: object, dataContext: DataContext) : List<T> {
-    return new DataList<T>(owner, dataContext, this.name);
+  get(owner: DataContextObject) : List<T> {
+    return new DataList<T>(owner, this.name);
   }
 
   constructor(name: string) {
@@ -169,17 +171,17 @@ export class RefProp<T extends ReferencedObject> {
   readonly prop: ScalarProp<number>;
   readonly cacheKey: symbol;
 
-  get(owner: object, dataContext: DataContext) : T | undefined {
+  get(owner: DataContextObject) : T | undefined {
     const id = this.prop.get(owner);
     if (!id)
       return undefined;
-    return dataContext.resolveReference(owner, this.cacheKey, id) as T | undefined;
+    return owner.context.resolveReference(owner, this.cacheKey, id) as T | undefined;
   }
-  set(owner: object, dataContext: DataContext, value: T | undefined) : T | undefined {
+  set(owner: DataContextObject, value: T | undefined) : T | undefined {
     const oldId = this.prop.get(owner),
           newId = value ? value.id : 0;
-    this.prop.set(owner, dataContext, newId);
-    return dataContext.resolveReference(owner, this.cacheKey, newId) as T | undefined;
+    this.prop.set(owner, newId);
+    return owner.context.resolveReference(owner, this.cacheKey, newId) as T | undefined;
   }
   constructor(name: string) {
     this.prop = new ScalarProp<number>(name);
@@ -192,7 +194,7 @@ export class RefProp<T extends ReferencedObject> {
 // Hierarchical structures.
 
 // Derived parent property. Parents and children must be objects.
-export class ParentProp<T extends object = object> {
+export class ParentProp<T extends DataContextObject> {
   static readonly key: unique symbol = Symbol.for('ParentProp.parent');
   get(owner: object) : T | undefined {
     return (owner as any)[ParentProp.key] as T | undefined;
@@ -279,8 +281,237 @@ export function reduceToRoots<T extends Parented<T>>(items: Array<T>, set: SetLi
   return roots;
 }
 
+//------------------------------------------------------------------------------
+
+// EventBase class.
+
+type EventHandler<T> = (event: T) => void;
+type EventHandlers<T> = Array<EventHandler<T>>;
+
+export class EventBase<TArg, TEvents> {
+  private events = new Map<TEvents, EventHandlers<TArg>>();
+
+  addHandler(event: TEvents, handler: EventHandler<TArg>) {
+    let list = this.events.get(event);
+    if (!list) {
+      list = new Array<EventHandler<TArg>>();
+      this.events.set(event, list);
+    }
+    // No use case for multiple copies of one handler.
+    const index = list.indexOf(handler);
+    if (index < 0)
+      list.push(handler);
+  }
+  removeHandler(event: TEvents, handler: EventHandler<TArg>) {
+    let list = this.events.get(event);
+    if (list) {
+      const index = list.indexOf(handler);
+      if (index >= 0)
+        list.splice(index, 1);
+    }
+  }
+  onEvent(event: TEvents, arg: TArg) {
+    let list = this.events.get(event);
+    if (list)
+      list.forEach((handler) => handler(arg));
+  }
+}
 
 //------------------------------------------------------------------------------
+
+// Command pattern, transactions, and undo/redo.
+
+interface Operation {
+  undo() : void;
+  redo() : void;
+}
+
+class ChangeOp<TOwner extends DataContextObject> implements Operation {
+  private change: Change<TOwner>;
+  private dataContext: DataContext;
+
+  undo() {
+    const change = this.change,
+          item: TOwner = change.item,
+          attr: string = change.attr;
+    switch (change.type) {
+      case 'valueChanged': {
+        const oldValue = (item as any)[attr];
+        (item as any)[attr] = change.oldValue;
+        change.oldValue = oldValue;
+        item.context.valueChanged(item, attr, oldValue);  // this change is its own inverse.
+        break;
+      }
+      case 'elementInserted': {
+        const array = (item as any)[attr], index = change.index;
+        change.oldValue = array[index];
+        array.splice(index, 1);
+        item.context.elementRemoved(item, attr, index, change.oldValue);
+        change.type = 'elementRemoved';
+        break;
+      }
+      case 'elementRemoved': {
+        const array = (item as any)[attr], index = change.index;
+        array.splice(index, 0, change.oldValue);
+        item.context.elementInserted(item, attr, index, change.oldValue);
+        change.type = 'elementInserted';
+        break;
+      }
+    }
+  }
+  redo() {
+    // 'valueChanged' is a toggle, and we swap 'elementInserted' and
+    // 'elementRemoved', so redo is the same as applying undo again.
+    this.undo();
+  }
+  constructor(change: Change<TOwner>) {
+    this.change = change;
+  }
+}
+
+class SelectionOp<TOwner extends DataContextObject> implements Operation {
+  private selectionSet: SelectionSet<TOwner>;
+  private startingSelection: Array<TOwner>;
+  private endingSelection: Array<TOwner>;
+
+  undo() {
+    this.selectionSet.set(this.startingSelection);
+  }
+  redo() {
+    this.selectionSet.set(this.endingSelection);
+  }
+  constructor(selectionSet: SelectionSet<TOwner>,
+              startingSelection: Array<any>,
+              endingSelection: Array<any>) {
+    this.selectionSet = selectionSet;
+    this.startingSelection = startingSelection;
+    this.endingSelection = endingSelection;
+  }
+}
+
+export class CompoundOp implements Operation {
+  readonly name: string;
+  private ops: Array<Operation>;
+
+  add(op: Operation) {
+    this.ops.push(op);
+  }
+  undo() {
+    for (let i = this.ops.length - 1; i >= 0; --i)
+      this.ops[i].undo();
+  }
+  redo() {
+    for (let op of this.ops)
+      op.redo();
+  }
+
+  constructor(name: string) {
+    this.name = name;
+    this.ops = [];
+  }
+}
+
+type TransactionEvent = 'transactionBegan' | 'transactionEnding' | 'transactionEnded' |
+                        'transactionCancelled' | 'didUndo' | 'didRedo';
+
+export class TransactionManager<TOwner extends DataContextObject>
+    extends EventBase<CompoundOp, TransactionEvent> {
+  private transaction?: CompoundOp;
+  private snapshots = new Map<TOwner, object>();
+
+  // Notifies observers that a transaction has started.
+  beginTransaction(name: string) {
+    const transaction = new CompoundOp(name);
+
+    this.transaction = transaction;
+    this.snapshots = new Map<TOwner, object>();
+    super.onEvent('transactionBegan', transaction);
+  }
+
+  // Notifies observers that a transaction is ending. Observers should now
+  // do any adjustments to make data valid, or cancel the transaction if
+  // the data is in an invalid state.
+  endTransaction() {
+    const transaction = this.transaction;
+    if (!transaction) return;
+    super.onEvent('transactionEnding', transaction);
+    this.snapshots.clear();
+    this.transaction = undefined;
+    super.onEvent('transactionEnded', transaction);
+  }
+
+  // Notifies observers that a transaction was canceled and its operations
+  // rolled back.
+  cancelTransaction() {
+    const transaction = this.transaction;
+    if (!transaction) return;
+    this.undo(transaction);
+    this.snapshots.clear();
+    this.transaction = undefined;
+    super.onEvent('transactionCancelled', transaction);
+  }
+
+  // Undoes the operations in the transaction.
+  undo(transaction: CompoundOp) {
+    // Roll back operations.
+    transaction.undo();
+    // TODO consider raising transaction ended event instead.
+    super.onEvent('didUndo', transaction);
+  }
+
+  // Redoes the operations in the transaction.
+  redo(transaction: CompoundOp) {
+    // Roll forward changes.
+    transaction.redo();
+    // TODO consider raising transaction ended event instead.
+    super.onEvent('didRedo', transaction);
+  }
+
+  getSnapshot(item: TOwner) : object | undefined {
+    const snapshots = this.snapshots;
+    if (!snapshots)
+      return;
+    const changedItem = snapshots.get(item);
+    return changedItem;
+  }
+
+  private recordChange(change: Change<TOwner>) {
+    if (!this.transaction)
+      return;
+    const op = new ChangeOp<TOwner>(change);
+    this.transaction.add(op);
+  }
+
+  onChanged(change: Change<TOwner>) {
+    if (!this.transaction)
+      return;
+
+    const item: TOwner = change.item, attr = change.attr;
+
+    if (change.type !== 'valueChanged') {
+      // Record insert and remove element changes.
+      this.recordChange(change);
+    } else {
+      // Coalesce value changes. Only record them the first time we observe
+      // the (item, attr) change.
+      const snapshots = this.snapshots;
+      let snapshot = snapshots.get(item);
+      if (snapshot === undefined) {
+        // The snapshot collects the attribute changes for its corresponding item.
+        snapshot = Object.create(item);
+        if (snapshot)
+          snapshots.set(item, snapshot);
+      }
+      // Capture the old value on the snapshot only if it hasn't already been set.
+      if (snapshot && !snapshot.hasOwnProperty(attr)) {
+        (snapshot as any)[attr] = change.oldValue;
+        this.recordChange(change);
+      }
+    }
+  }
+}
+
+
 
 
 /*
@@ -354,42 +585,6 @@ export class DataModel {
 
   constructor(root: any) {
     this.root_ = root;
-  }
-}
-
-//------------------------------------------------------------------------------
-
-// EventBase class.
-
-type EventHandler<T> = (event: T) => void;
-type EventHandlers<T> = Array<EventHandler<T>>;
-
-export class EventBase<TArg, TEvents> {
-  private events = new Map<TEvents, EventHandlers<TArg>>();
-
-  addHandler(event: TEvents, handler: EventHandler<TArg>) {
-    let list = this.events.get(event);
-    if (!list) {
-      list = new Array<EventHandler<TArg>>();
-      this.events.set(event, list);
-    }
-    // No use case for multiple copies of one handler.
-    const index = list.indexOf(handler);
-    if (index < 0)
-      list.push(handler);
-  }
-  removeHandler(event: TEvents, handler: EventHandler<TArg>) {
-    let list = this.events.get(event);
-    if (list) {
-      const index = list.indexOf(handler);
-      if (index >= 0)
-        list.splice(index, 1);
-    }
-  }
-  onEvent(event: TEvents, arg: TArg) {
-    let list = this.events.get(event);
-    if (list)
-      list.forEach((handler) => handler(arg));
   }
 }
 
@@ -850,9 +1045,6 @@ export class Transaction {
     this.ops = [];
   }
 }
-
-type TransactionEvent = 'transactionBegan' | 'transactionEnding' | 'transactionEnded' |
-                        'transactionCancelled' | 'didUndo' | 'didRedo';
 
 export class TransactionModel extends EventBase<Transaction, TransactionEvent> {
   private transaction_?: Transaction;

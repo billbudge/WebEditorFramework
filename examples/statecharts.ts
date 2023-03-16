@@ -11,8 +11,9 @@ import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
          evaluateBezier, CurveHitResult } from '../src/geometry'
 
 import { ScalarProp, ArrayProp, ReferencedObject, RefProp, ParentProp,
-         DataContext, EventBase, Change, ChangeEvents,
-         getLowestCommonAncestor, reduceToRoots, List, DataList } from '../src/dataModels'
+         DataContext, DataContextObject, EventBase, Change, ChangeEvents,
+         getLowestCommonAncestor, reduceToRoots, List, DataList,
+         TransactionManager } from '../src/dataModels'
 
 //------------------------------------------------------------------------------
 
@@ -52,7 +53,7 @@ const stateTemplate = {
 
 export type StateType = 'state';
 
-export class State implements ReferencedObject {
+export class State implements DataContextObject, ReferencedObject {
   private readonly template = stateTemplate;
   readonly id: number;
   readonly context: StatechartContext;
@@ -60,24 +61,24 @@ export class State implements ReferencedObject {
   readonly type: StateType = 'state';
 
   get x() { return this.template.x.get(this) || 0; }
-  set x(value) { this.template.x.set(this, this.context, value); }
+  set x(value) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
-  set y(value) { this.template.y.set(this, this.context, value); }
+  set y(value) { this.template.y.set(this, value); }
   get width() { return this.template.width.get(this) || 0; }
-  set width(value) { this.template.width.set(this, this.context, value); }
+  set width(value) { this.template.width.set(this, value); }
   get height() { return this.template.height.get(this) || 0; }
-  set height(value) { this.template.height.set(this, this.context, value); }
+  set height(value) { this.template.height.set(this, value); }
   get name() { return this.template.name.get(this); }
-  set name(value) { this.template.name.set(this, this.context, value); }
+  set name(value) { this.template.name.set(this, value); }
   get entry() { return this.template.entry.get(this); }
-  set entry(value) { this.template.entry.set(this, this.context, value); }
+  set entry(value) { this.template.entry.set(this, value); }
   get exit() { return this.template.exit.get(this); }
-  set exit(value) { this.template.exit.set(this, this.context, value); }
+  set exit(value) { this.template.exit.set(this, value); }
 
   get parent() { return this.template.parent.get(this); };
   set parent(parent) { this.template.parent.set(this, parent); };
 
-  get statecharts() { return this.template.statecharts.get(this, this.context); }
+  get statecharts() { return this.template.statecharts.get(this); }
 
   // Derived properties.
   [globalPosition]: Point;  // TODO move geometry interfaces to top.
@@ -104,7 +105,7 @@ const pseudostateTemplate = {
 export type PseudostateType = 'pseudostate';
 export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
 
-export class Pseudostate implements ReferencedObject {
+export class Pseudostate implements DataContextObject, ReferencedObject {
   private readonly template = pseudostateTemplate;
   readonly id: number;
   readonly context: StatechartContext;
@@ -113,9 +114,9 @@ export class Pseudostate implements ReferencedObject {
   readonly subtype: PseudostateSubtype;
 
   get x() { return this.template.x.get(this) || 0; }
-  set x(value) { this.template.x.set(this, this.context, value); }
+  set x(value) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
-  set y(value) { this.template.y.set(this, this.context, value); }
+  set y(value) { this.template.y.set(this, value); }
 
   get parent() { return this.template.parent.get(this); };
   set parent(parent) { this.template.parent.set(this, parent); };
@@ -148,28 +149,28 @@ const transitionTemplate = {
 
 export type TransitionType = 'transition';
 
-export class Transition {
+export class Transition implements DataContextObject {
   private readonly template = transitionTemplate;
   readonly context: StatechartContext;
 
   readonly type: TransitionType = 'transition';
 
-  get src() { return this.template.src.get(this, this.context); }
-  set src(value) { this.template.src.set(this, this.context, value); }
+  get src() { return this.template.src.get(this); }
+  set src(value) { this.template.src.set(this, value); }
   get tSrc() { return this.template.tSrc.get(this) || 0; }
-  set tSrc(value) { this.template.tSrc.set(this, this.context, value); }
-  get dst() { return this.template.dst.get(this, this.context); }
-  set dst(value) { this.template.dst.set(this, this.context, value); }
+  set tSrc(value) { this.template.tSrc.set(this, value); }
+  get dst() { return this.template.dst.get(this); }
+  set dst(value) { this.template.dst.set(this, value); }
   get tDst() { return this.template.tDst.get(this) || 0; }
-  set tDst(value) { this.template.tDst.set(this, this.context, value); }
+  set tDst(value) { this.template.tDst.set(this, value); }
   get event() { return this.template.event.get(this); }
-  set event(value) { this.template.event.set(this, this.context, value); }
+  set event(value) { this.template.event.set(this, value); }
   get guard() { return this.template.guard.get(this); }
-  set guard(value) { this.template.guard.set(this, this.context, value); }
+  set guard(value) { this.template.guard.set(this, value); }
   get action() { return this.template.action.get(this); }
-  set action(value) { this.template.action.set(this, this.context, value); }
+  set action(value) { this.template.action.set(this, value); }
   get tText() { return this.template.tText.get(this) || 0; }
-  set tText(value) { this.template.tText.set(this, this.context, value); }
+  set tText(value) { this.template.tText.set(this, value); }
 
   get parent() { return this.template.parent.get(this); };
   set parent(parent) { this.template.parent.set(this, parent); };
@@ -202,28 +203,28 @@ const statechartTemplate = {
 
 export type StatechartType = 'statechart';
 
-export class Statechart {
+export class Statechart implements DataContextObject {
   private readonly template = statechartTemplate;
   readonly context: StatechartContext;
 
   readonly type: StatechartType = 'statechart';
 
   get x() { return this.template.x.get(this) || 0; }
-  set x(value) { this.template.x.set(this, this.context, value); }
+  set x(value) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
-  set y(value) { this.template.y.set(this, this.context, value); }
+  set y(value) { this.template.y.set(this, value); }
   get width() { return this.template.width.get(this) || 0; }
-  set width(value) { this.template.width.set(this, this.context, value); }
+  set width(value) { this.template.width.set(this, value); }
   get height() { return this.template.height.get(this) || 0; }
-  set height(value) { this.template.height.set(this, this.context, value); }
+  set height(value) { this.template.height.set(this, value); }
   get name() { return this.template.name.get(this) || ''; }
-  set name(value) { this.template.name.set(this, this.context, value); }
+  set name(value) { this.template.name.set(this, value); }
 
   get parent() { return this.template.parent.get(this); };
   set parent(parent) { this.template.parent.set(this, parent); };
 
-  get states() { return this.template.states.get(this, this.context); }
-  get transitions() { return this.template.transitions.get(this, this.context); }
+  get states() { return this.template.states.get(this); }
+  get transitions() { return this.template.transitions.get(this); }
 
   // Derived properties.
   [globalPosition]: Point;
@@ -250,7 +251,7 @@ export type StatechartVisitor = (item: AllTypes) => void;
 export type NonTransitionVisitor = (item: NonTransitionTypes) => void;
 export type TransitionVisitor = (item: Transition) => void;
 
-type StatechartChange = Change<AllTypes, AllTypes | undefined>;
+type StatechartChange = Change<AllTypes, any>;
 
 export interface GraphInfo {
   states: Set<StateTypes>;
@@ -1600,6 +1601,7 @@ class Editor {
   private paletteController: CanvasController;
   private propertyGridController: PropertyGridController;
   private fileController: FileController;
+  private transactionManager: TransactionManager<AllTypes>;
   private hitTolerance: number;
   private changedItems_: Set<AllTypes>;
   private changedTopLevelStates_: Set<State>;
