@@ -324,7 +324,7 @@ describe('StatechartContext', () => {
     expect(statechart2).toBeDefined()
     expect(statechart2).not.toBe(statechart1);
   });
-  test('selection', () => {
+  test('selectionContents', () => {
     const context = new Statecharts.StatechartContext(),
           statechart = context.newStatechart(),
           superState = addState(statechart),
@@ -334,12 +334,12 @@ describe('StatechartContext', () => {
     context.setRoot(statechart);
 
     context.select(state1);
-    expect(context.selection()).toEqual([state1]);
+    expect(context.selectionContents()).toEqual([state1]);
     context.select(superState);
-    expect(context.selection()).toEqual([state1, superState]);
+    expect(context.selectionContents()).toEqual([state1, superState]);
 
     context.reduceSelection();
-    expect(context.selection()).toEqual([superState]);
+    expect(context.selectionContents()).toEqual([superState]);
   });
 });
 

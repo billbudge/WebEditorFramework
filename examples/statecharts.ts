@@ -13,7 +13,7 @@ import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
 import { ScalarProp, ArrayProp, ReferencedObject, RefProp, ParentProp,
          DataContext, DataContextObject, EventBase, Change, ChangeEvents,
          getLowestCommonAncestor, reduceToRoots, List, DataList,
-         TransactionManager } from '../src/dataModels'
+         TransactionManager, HistoryManager } from '../src/dataModels'
 
 //------------------------------------------------------------------------------
 
@@ -251,7 +251,7 @@ export type StatechartVisitor = (item: AllTypes) => void;
 export type NonTransitionVisitor = (item: NonTransitionTypes) => void;
 export type TransitionVisitor = (item: Transition) => void;
 
-type StatechartChange = Change<AllTypes, any>;
+type StatechartChange = Change<AllTypes>;
 
 export interface GraphInfo {
   states: Set<StateTypes>;
@@ -272,7 +272,18 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   private statecharts_ = new Set<Statechart>;
   private transitions_ = new Set<Transition>;
 
-  private selection_ = new SelectionSet<AllTypes>();
+  selection = new SelectionSet<AllTypes>();
+
+  transactionManager: TransactionManager<AllTypes>;
+  historyManager: HistoryManager<AllTypes>;
+
+  constructor() {
+    super();
+    this.transactionManager = new TransactionManager();
+    this.addHandler('changed',
+        this.transactionManager.onChanged.bind(this.transactionManager));
+    this.historyManager = new HistoryManager(this.transactionManager, this.selection);
+  }
 
   root() : Statechart { return this.statechart_; }
 
@@ -311,6 +322,17 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       item.states.forEach(t => self.visitAll(t, visitor));
       item.transitions.forEach(t => self.visitAll(t, visitor));
     }
+  }
+
+  reverseVisitAll(item: AllTypes, visitor: StatechartVisitor) : void {
+    const self = this;
+    if (item.type === 'state') {
+      item.statecharts.forEach(t => self.reverseVisitAll(t, visitor));
+    } else if  (item.type === 'statechart') {
+      item.states.forEach(t => self.reverseVisitAll(t, visitor));
+      item.transitions.forEach(t => self.reverseVisitAll(t, visitor));
+    }
+    visitor(item);
   }
 
   visitNonTransitions(item: NonTransitionTypes, visitor: NonTransitionVisitor) : void {
@@ -564,6 +586,22 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     return statechart;
   }
 
+  beginTransaction(name: string) {
+    this.transactionManager.beginTransaction(name);
+  }
+  endTransaction(name: string) {
+    this.transactionManager.endTransaction();
+  }
+  cancelTransaction(name: string) {
+    this.transactionManager.cancelTransaction();
+  }
+  undo() {
+    this.historyManager.undo();
+  }
+  redo() {
+    this.historyManager.redo();
+  }
+
   deleteItem(item: AllTypes) {
     if (item.parent) {
       if (item.type === 'transition')
@@ -582,16 +620,16 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
 
   select(item: AllTypes) {
-    this.selection_.add(item);
+    this.selection.add(item);
   }
 
-  selection() : Array<AllTypes> {
-    return this.selection_.contents();
+  selectionContents() : Array<AllTypes> {
+    return this.selection.contents();
   }
 
   selectedStates() : Array<StateTypes> {
     const result = new Array<StateTypes>();
-    this.selection().forEach(item => {
+    this.selection.forEach(item => {
       if (item.type === 'state' || item.type === 'pseudostate')
         result.push(item);
     });
@@ -599,7 +637,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
 
   reduceSelection() {
-    const selection = this.selection_;
+    const selection = this.selection;
     // First, replace statecharts by their parent state. We do this by adding parent
     // states to the selection before reducing.
     selection.forEach(function(item: AllTypes) {
@@ -618,7 +656,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   selectInteriorTransitions() {
     const self = this,
           graphInfo = this.getSubgraphInfo(this.selectedStates());
-    graphInfo.interiorTransitions.forEach(transition => self.selection_.add(transition));
+    graphInfo.interiorTransitions.forEach(transition => self.selection.add(transition));
   }
 
   addItem(item: StateTypes | Transition, parent: State | Statechart) : AllTypes {
@@ -1607,6 +1645,8 @@ class Editor {
   private changedTopLevelStates_: Set<State>;
   private renderer: Renderer;
   private palette: Statechart;  // Statechart to simplify layout of palette items.
+  private context: StatechartContext;
+  private statechart: Statechart;
 
   constructor(
       theme: Theme, canvasController: CanvasController, paletteController: CanvasController,
@@ -1736,6 +1776,217 @@ class Editor {
     propertyGridController.register('state', stateInfo);
     propertyGridController.register('transition', transitionInfo);
   }
+  initializeContext(context: StatechartContext) {
+    const self = this;
+
+    // On attribute changes and item insertions, dynamically layout affected items.
+    // This allows us to layout transitions as their src or dst states are dragged.
+    context.addHandler('changed', change => self.onChanged_(change));
+
+    // On ending transactions and undo/redo, layout the changed top level states.
+    function updateBounds() {
+      self.updateBounds_();
+    }
+    context.transactionManager.addHandler('transactionEnding', updateBounds);
+    context.transactionManager.addHandler('didUndo', updateBounds);
+    context.transactionManager.addHandler('didRedo', updateBounds);
+  }
+  setContext(context: StatechartContext) {
+    const statechart = context.root,
+          renderer = this.renderer;
+
+    this.context = context;
+    this.statechart = context.root();
+
+    this.changedItems_.clear();
+    this.changedTopLevelStates_.clear();
+
+    // renderer.setModel(model);
+
+    // Layout any items in the statechart.
+    renderer.begin(this.canvasController.getCtx());
+    context.reverseVisitAll(this.statechart, item => renderer.layout(item));
+    renderer.end();
+  }
+  initialize(canvasController: CanvasController) {
+    if (canvasController === this.canvasController) {
+    } else {
+      const renderer = this.renderer;
+      // assert(canvasController === this.paletteController);
+      renderer.begin(canvasController.getCtx());
+      // Layout the palette items and their parent statechart.
+      renderer.begin(canvasController.getCtx());
+      this.context.reverseVisitAll(this.palette, item => renderer.layout(item));
+      // Draw the palette items.
+      this.context.visitAll(this.palette, item => renderer.draw(item, RenderMode.Normal));
+      renderer.end();
+    }
+  }
+  onChanged_(change: Change<AllTypes>) {
+    const statechart = this.statechart,
+          context = this.context, changedItems = this.changedItems_,
+          changedTopLevelStates = this.changedTopLevelStates_,
+          item: AllTypes = change.item, attr = change.attr;
+
+    // Track all top level states which contain changes. On ending a transaction,
+    // update the layout of states and statecharts.
+    let ancestor: AllTypes | undefined = change.item,
+        topLevel;
+    do {
+      topLevel = ancestor;
+      ancestor = ancestor.parent;
+    } while (ancestor && ancestor !== statechart);
+
+    if (ancestor === statechart) {
+      // assert(topLevel);
+      changedTopLevelStates.add(topLevel as State);
+    }
+
+    function addItems(item: AllTypes) {
+      if (item.type === 'state' || item.type === 'pseudostate') {
+        // Layout the state's incoming and outgoing transitions.
+        context.forInTransitions(item, addItems);
+        context.forOutTransitions(item, addItems);
+      }
+      changedItems.add(item);
+    }
+
+    switch (change.type) {
+      case 'valueChanged': {
+        // For changes to x, y, width, or height, layout affected transitions.
+        if (attr == 'x' || attr == 'y' || attr == 'width' || attr == 'height') {
+          // Visit item and sub-items to layout all affected transitions.
+          context.visitAll(item, addItems);
+        } else if (item.type === 'transition') {
+          addItems(item);
+        }
+        break;
+      }
+      case 'elementInserted': {
+        // Update item subtrees as they are inserted.
+        context.reverseVisitAll((item as any)[attr][change.index] as AllTypes, addItems);
+        break;
+      }
+    }
+  }
+  updateLayout_() {
+    const renderer = this.renderer,
+          context = this.context,
+          changedItems = this.changedItems_;
+    // First layout containers, and then layout transitions which depend on states'
+    // size and location.
+    // This function is called during the draw and updateBounds_ methods, so the renderer
+    // is already started.
+    function layout(item: AllTypes) {
+      context.reverseVisitAll(item, item => renderer.layout(item));
+    }
+    changedItems.forEach(item => {
+      if (item.type !== 'transition')
+        layout(item);
+    });
+    changedItems.forEach(
+      item => {
+        if (item.type === 'transition')
+          layout(item);
+      });
+    changedItems.clear();
+  }
+  updateBounds_() {
+    const ctx = this.canvasController.getCtx(),
+          renderer = this.renderer,
+          context = this.context,
+          statechart = this.statechart,
+          changedTopLevelStates = this.changedTopLevelStates_;
+    renderer.begin(ctx);
+    // Update any changed items first.
+    this.updateLayout_();
+    changedTopLevelStates.forEach(
+      state => context.reverseVisitAll(state, item => {
+        if (item.type !== 'transition')
+          renderer.layout(item);
+    }));
+    // Finally update the root statechart's bounds.
+    renderer.layoutStatechart(statechart);
+    renderer.end();
+    changedTopLevelStates.clear();
+    // Make sure the canvas is large enough to contain the root statechart.
+    const canvasController = this.canvasController,
+          canvasSize = canvasController.getSize();
+    let width = statechart.width, height = statechart.height;
+    if (width > canvasSize.width || height > canvasSize.height) {
+      width = Math.max(width, canvasSize.width);
+      height = Math.max(height, canvasSize.height);
+      canvasController.setSize(width, height);
+    }
+  }
+  draw(canvasController: CanvasController) {
+    const renderer = this.renderer,
+          statechart = this.statechart,
+          context = this.context;
+    if (canvasController === this.canvasController) {
+      // Draw a dashed border around the canvas.
+      const ctx = canvasController.getCtx(),
+            size = canvasController.getSize();
+      ctx.strokeStyle = this.theme_.strokeColor;
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([6, 3]);
+      ctx.strokeRect(0, 0, size.width, size.height);
+      ctx.setLineDash([]);
+
+      // Now draw the statechart.
+      renderer.begin(ctx);
+      this.updateLayout_();
+      canvasController.applyTransform();
+
+      context.visitAll(statechart, item => {
+        if (item.type !== 'transition')
+          renderer.draw(item, RenderMode.Normal);
+      });
+      context.visitAll(statechart, item => {
+        if (item.type === 'transition')
+          renderer.draw(item, RenderMode.Normal);
+      });
+
+      context.selection.forEach(function (item) {
+        renderer.draw(item, RenderMode.Highlight);
+      });
+      // if (this.hotTrackInfo)
+      //   renderer.draw(this.hotTrackInfo.item, RenderMode.HotTrack);
+
+      // const hoverHitInfo = this.hoverHitInfo;
+      // if (hoverHitInfo) {
+      //   const item = hoverHitInfo.item,
+      //         nameValuePairs = [];
+      //   for (let info of hoverHitInfo.propertyInfo) {
+      //     const name = info.label,
+      //           value = info.getter(info, item);
+      //     if (value !== undefined && value !== undefined) {
+      //       nameValuePairs.push({ name, value });
+      //     }
+      //   }
+      //   renderer.drawHoverText(hoverHitInfo.item, hoverHitInfo.p, nameValuePairs);
+      // }
+      // renderer.end();
+    } else if (canvasController === this.paletteController) {
+      // Palette drawing occurs during drag and drop. If the palette has the drag,
+      // draw the canvas underneath so the new object will appear on the canvas.
+      this.canvasController.draw();
+      const ctx = this.paletteController.getCtx();
+      renderer.begin(ctx);
+      canvasController.applyTransform();
+      context.visitAll(this.palette, item => {
+        renderer.draw(item, RenderMode.Print);
+      });
+      // Draw the new object in the palette. Translate object to palette coordinates.
+      const offset = canvasController.offsetToOtherCanvas(this.canvasController);
+      ctx.translate(offset.x, offset.y);
+      context.selection.forEach(item => {
+        renderer.draw(item, RenderMode.Normal);
+        renderer.draw(item, RenderMode.Highlight);
+      });
+      renderer.end();
+    }
+  }
 }
 /*
 //------------------------------------------------------------------------------
@@ -1774,207 +2025,6 @@ class Editor {
         moveTransitionPoint = 7;
 
   class Editor {
-    initializeModel(model) {
-      const self = this;
-
-      statechartModel.extend(model);
-      editingModel.extend(model);
-
-      this.renderer.extend(model);
-
-      model.dataModel.initialize();
-
-      // On attribute changes and item insertions, dynamically layout affected items.
-      // This allows us to layout transitions as their src or dst states are dragged.
-      model.observableModel.addHandler('changed', change => self.onChanged_(change));
-
-      // On ending transactions and undo/redo, layout the changed top level states.
-      function updateBounds() {
-        self.updateBounds_();
-      }
-      model.transactionModel.addHandler('transactionEnding', updateBounds);
-      model.transactionModel.addHandler('didUndo', updateBounds);
-      model.transactionModel.addHandler('didRedo', updateBounds);
-    }
-    setModel(model) {
-      const statechart = model.root,
-            renderer = this.renderer;
-
-      this.model = model;
-      this.statechart = statechart;
-
-      this.changedItems_.clear();
-      this.changedTopLevelStates_.clear();
-
-      renderer.setModel(model);
-
-      // Layout any items in the statechart.
-      renderer.begin(this.canvasController.getCtx());
-      reverseVisitItem(statechart, item => renderer.layout(item));
-      renderer.end();
-    }
-    initialize(canvasController) {
-      if (canvasController === this.canvasController) {
-      } else {
-        const renderer = this.renderer;
-        assert(canvasController === this.paletteController);
-        renderer.begin(canvasController.getCtx());
-        // Layout the palette items and their parent statechart.
-        renderer.begin(canvasController.getCtx());
-        reverseVisitItem(this.palette, item => renderer.layout(item));
-        // Draw the palette items.
-        visitItems(this.palette.items, item => renderer.draw(item));
-        renderer.end();
-      }
-    }
-    updateLayout_() {
-      const renderer = this.renderer, changedItems = this.changedItems_;
-      // First layout containers, and then layout transitions which depend on states'
-      // size and location.
-      // This function is called during the draw and updateBounds_ methods, so the renderer
-      // is already started.
-      function layout(item) {
-        reverseVisitItem(item, item => renderer.layout(item));
-      }
-      changedItems.forEach(
-        item => {
-          if (!isTransition(item))
-            layout(item);
-        });
-      changedItems.forEach(
-        item => {
-          if (isTransition(item))
-            layout(item);
-        });
-      changedItems.clear();
-    }
-    updateBounds_() {
-      const ctx = this.canvasController.getCtx(), renderer = this.renderer, statechart = this.statechart, changedTopLevelStates = this.changedTopLevelStates_;
-      renderer.begin(ctx);
-      // Update any changed items first.
-      this.updateLayout_();
-      changedTopLevelStates.forEach(
-        state => reverseVisitItem(state, item => renderer.layout(item), isStateOrStatechart));
-      // Finally update the root statechart's bounds.
-      renderer.layoutStatechart(statechart);
-      renderer.end();
-      changedTopLevelStates.clear();
-      // Make sure the canvas is large enough to contain the root statechart.
-      const canvasController = this.canvasController, canvasSize = canvasController.getSize();
-      let width = statechart.width, height = statechart.height;
-      if (width > canvasSize.width || height > canvasSize.height) {
-        width = Math.max(width, canvasSize.width);
-        height = Math.max(height, canvasSize.height);
-        canvasController.setSize(width, height);
-      }
-    }
-    onChanged_(change) {
-      const statechart = this.statechart, statechartModel = this.model.statechartModel, hierarchicalModel = this.model.hierarchicalModel, changedItems = this.changedItems_, changedTopLevelStates = this.changedTopLevelStates_, item = change.item, attr = change.attr;
-
-      // Track all top level states which contain changes. On ending a transaction,
-      // update the layout of states and statecharts.
-      let ancestor = change.item, topLevel = ancestor;
-      do {
-        topLevel = ancestor;
-        ancestor = hierarchicalModel.getParent(ancestor);
-      } while (ancestor && ancestor !== statechart);
-
-      if (ancestor === statechart) {
-        assert(topLevel);
-        changedTopLevelStates.add(topLevel);
-      }
-
-      function addItems(item) {
-        if (isState(item)) {
-          // Layout the state's incoming and outgoing transitions.
-          statechartModel.forInTransitions(item, addItems);
-          statechartModel.forOutTransitions(item, addItems);
-        }
-        changedItems.add(item);
-      }
-
-      switch (change.type) {
-        case 'change': {
-          // For changes to x, y, width, or height, layout affected transitions.
-          if (attr == 'x' || attr == 'y' || attr == 'width' || attr == 'height') {
-            // Visit item and sub-items to layout all affected transitions.
-            visitItem(item, addItems);
-          } else if (isTransition(item)) {
-            addItems(item);
-          }
-          break;
-        }
-        case 'insert': {
-          // Update item subtrees as they are inserted.
-          reverseVisitItem(item[attr][change.index], addItems);
-          break;
-        }
-      }
-    }
-    draw(canvasController) {
-      const renderer = this.renderer, statechart = this.statechart, model = this.model;
-      if (canvasController === this.canvasController) {
-        // Draw a dashed border around the canvas.
-        const ctx = canvasController.getCtx(),
-              size = canvasController.getSize();
-        ctx.strokeStyle = this.theme.strokeColor;
-        ctx.lineWidth = 0.5;
-        ctx.setLineDash([6, 3]);
-        ctx.strokeRect(0, 0, size.width, size.height);
-        ctx.setLineDash([]);
-
-        // Now draw the statechart.
-        renderer.begin(ctx);
-        this.updateLayout_();
-        canvasController.applyTransform();
-
-        visitItem(statechart, function (item) {
-          renderer.draw(item, normalMode);
-        }, isNonTransition);
-        visitItem(statechart, function (transition) {
-          renderer.draw(transition, normalMode);
-        }, isTransition);
-
-        model.selectionModel.forEach(function (item) {
-          renderer.draw(item, highlightMode);
-        });
-        if (this.hotTrackInfo)
-          renderer.draw(this.hotTrackInfo.item, hotTrackMode);
-
-        const hoverHitInfo = this.hoverHitInfo;
-        if (hoverHitInfo) {
-          const item = hoverHitInfo.item,
-                nameValuePairs = [];
-          for (let info of hoverHitInfo.propertyInfo) {
-            const name = info.label,
-                  value = info.getter(info, item);
-            if (value !== undefined && value !== undefined) {
-              nameValuePairs.push({ name, value });
-            }
-          }
-          renderer.drawHoverText(hoverHitInfo.item, hoverHitInfo.p, nameValuePairs);
-        }
-        renderer.end();
-      } else if (canvasController === this.paletteController) {
-        // Palette drawing occurs during drag and drop. If the palette has the drag,
-        // draw the canvas underneath so the new object will appear on the canvas.
-        this.canvasController.draw();
-        const ctx = this.paletteController.getCtx();
-        renderer.begin(ctx);
-        canvasController.applyTransform();
-        visitItems(this.palette.items, function (item) {
-          renderer.draw(item, printMode);
-        });
-        // Draw the new object in the palette. Translate object to palette coordinates.
-        const offset = canvasController.offsetToOtherCanvas(this.canvasController);
-        ctx.translate(offset.x, offset.y);
-        model.selectionModel.forEach(function (item) {
-          renderer.draw(item, normalMode);
-          renderer.draw(item, highlightMode);
-        });
-        renderer.end();
-      }
-    }
     print() {
       const renderer = this.renderer,
             statechart = this.statechart,

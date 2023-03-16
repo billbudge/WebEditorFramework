@@ -312,6 +312,26 @@ export class EventBase<TArg, TEvents> {
 
 //------------------------------------------------------------------------------
 
+// Change events.
+
+export type ChangeType = 'valueChanged' | 'elementInserted' | 'elementRemoved';
+// Generic 'change' event.
+export type ChangeEvents = 'changed' | ChangeType;
+
+// Standard formats:
+// 'valueChanged': item, attr, oldValue.
+// 'elementInserted': item, attr, index.
+// 'elementRemoved': item, attr, index, oldValue.
+export class Change<TOwner extends object = object, TValue = any> {
+  type: ChangeType;
+  item: TOwner;
+  attr: string;
+  index: number;
+  oldValue: TValue;
+}
+
+//------------------------------------------------------------------------------
+
 // Command pattern, transactions, and undo/redo.
 
 interface Operation {
@@ -661,22 +681,6 @@ export class DataModel {
 //------------------------------------------------------------------------------
 
 // Observable Model.
-
-export type ChangeType = 'valueChanged' | 'elementInserted' | 'elementRemoved';
-// Generic 'change' event.
-export type ChangeEvents = 'changed' | ChangeType;
-
-// Standard formats:
-// 'valueChanged': item, attr, oldValue.
-// 'elementInserted': item, attr, index.
-// 'elementRemoved': item, attr, index, oldValue.
-export class Change<TOwner extends object = object, TValue = any> {
-  type: ChangeType;
-  item: TOwner;
-  attr: string;
-  index: number;
-  oldValue: TValue;
-}
 
 export class ObservableModel extends EventBase<Change, ChangeEvents> {
   private onChanged(change: Change) : Change {
