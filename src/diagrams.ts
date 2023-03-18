@@ -505,8 +505,9 @@ export class PropertyGridController {
     this.types.set(type, info);
     this.container.appendChild(table);
   }
-  show(type: string, item: any) {
-    const active = this.active, typeInfo = this.types.get(type);
+  show(type: string | undefined, item: any) {
+    const active = this.active,
+          typeInfo = type ? this.types.get(type) : undefined;
     // Hide the previous table if it's different.
     if (typeInfo !== active && active) {
       const table = active.table;
@@ -569,6 +570,9 @@ export class CanvasController {
   private hovering: number;
   private hoverOwner: CanvasLayer | undefined
   private keyOwner: CanvasLayer | undefined
+
+  shiftKeyDown: boolean;
+  cmdKeyDown: boolean;
 
   setTransform(translation: Point, scale: Point) {
     let tx = 0, ty = 0, sx = 1, sy = 1, sin = 0, cos = 1;
@@ -634,8 +638,8 @@ export class CanvasController {
     const self = this,
           alt = (e.button !== 0);
     this.pointer = this.clickPointer = this.getPointerPosition(e);
-    // this.shiftKeyDown = e.shiftKey;
-    // this.cmdKeyDown = e.ctrlKey || e.metaKey;
+    this.shiftKeyDown = e.shiftKey;
+    this.cmdKeyDown = e.ctrlKey || e.metaKey;
     // Call layers until one returns true.
     this.layers.some(function (layer) {
       if (!layer.onClick(self))

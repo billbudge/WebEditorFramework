@@ -10,15 +10,14 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
 import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
          evaluateBezier, CurveHitResult } from '../src/geometry'
 
-import { ScalarProp, ArrayProp, ReferencedObject, RefProp, ParentProp,
-         DataContext, DataContextObject, EventBase, Change, ChangeEvents,
-         getLowestCommonAncestor, reduceToRoots, List, DataList,
+import { PropertyTypes, ScalarProp, ArrayProp, ReferencedObject, ReferenceProp,
+         DataContext, DataContextObject, DataObjectTemplate, EventBase, Change, ChangeEvents,
+         getLowestCommonAncestor, reduceToRoots, List,
          TransactionManager, HistoryManager } from '../src/dataModels'
 
 //------------------------------------------------------------------------------
 
 // Derived properties, indexed by symbols to distinguish them from actual properties.
-const globalPosition: unique symbol = Symbol('globalPosition');
 
 const inTransitions: unique symbol = Symbol('inTransitions'),
       outTransitions: unique symbol = Symbol('outTransitions'),
@@ -37,51 +36,68 @@ const inTransitions: unique symbol = Symbol('inTransitions'),
 
 // Interfaces to statechart objects.
 
-const stateTemplate = {
-  x: new ScalarProp<number>('x'),
-  y: new ScalarProp<number>('y'),
-  width: new ScalarProp<number>('width'),
-  height: new ScalarProp<number>('height'),
-  name: new ScalarProp<string | undefined>('name'),
-  entry: new ScalarProp<string | undefined>('entry'),
-  exit: new ScalarProp<string | undefined>('exit'),
+const stateTemplate = (function() {
+  const x = new ScalarProp('x'),
+        y = new ScalarProp('y'),
+        width = new ScalarProp('width'),
+        height = new ScalarProp('height'),
+        name = new ScalarProp('name'),
+        entry = new ScalarProp('entry'),
+        exit = new ScalarProp('exit'),
+        statecharts = new ArrayProp('statecharts'),
+        properties = [x, y, width, height, name, entry, exit];
+  return { x, y, width, height, name, entry, exit, statecharts, properties };
+})();
 
-  parent: new ParentProp<Statechart>,
+// class StateTemplate implements DataObjectTemplate {
+//   x = new ScalarProp('x');
+//   y = new ScalarProp('y');
+//   width = new ScalarProp('width');
+//   height = new ScalarProp('height');
+//   name = new ScalarProp('name');
+//   entry = new ScalarProp('entry');
+//   exit = new ScalarProp('exit');
 
-  statecharts: new ArrayProp<Statechart>('statecharts'),
-}
+//   statecharts = new ArrayProp('statecharts');
+
+//   properties: Array<PropertyTypes>;
+
+//   private constructor() {
+//     this.properties = [this.x, this.y, this.width, this.height, this.name, this.entry, this.exit];
+//   }
+//   static instance = new StateTemplate();
+// }
 
 export type StateType = 'state';
 
 export class State implements DataContextObject, ReferencedObject {
-  private readonly template = stateTemplate;
-  readonly id: number;
+  readonly template = stateTemplate;
   readonly context: StatechartContext;
 
   readonly type: StateType = 'state';
+  readonly id: number;
 
   get x() { return this.template.x.get(this) || 0; }
-  set x(value) { this.template.x.set(this, value); }
+  set x(value: number) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
-  set y(value) { this.template.y.set(this, value); }
+  set y(value: number) { this.template.y.set(this, value); }
   get width() { return this.template.width.get(this) || 0; }
-  set width(value) { this.template.width.set(this, value); }
+  set width(value: number) { this.template.width.set(this, value); }
   get height() { return this.template.height.get(this) || 0; }
-  set height(value) { this.template.height.set(this, value); }
+  set height(value: number) { this.template.height.set(this, value); }
   get name() { return this.template.name.get(this); }
-  set name(value) { this.template.name.set(this, value); }
+  set name(value: string | undefined) { this.template.name.set(this, value); }
   get entry() { return this.template.entry.get(this); }
-  set entry(value) { this.template.entry.set(this, value); }
+  set entry(value: string | undefined) { this.template.entry.set(this, value); }
   get exit() { return this.template.exit.get(this); }
-  set exit(value) { this.template.exit.set(this, value); }
+  set exit(value: string | undefined) { this.template.exit.set(this, value); }
 
-  get parent() { return this.template.parent.get(this); };
-  set parent(parent) { this.template.parent.set(this, parent); };
-
-  get statecharts() { return this.template.statecharts.get(this); }
+  get statecharts() { return this.template.statecharts.get(this) as List<Statechart>; }
 
   // Derived properties.
-  [globalPosition]: Point;  // TODO move geometry interfaces to top.
+  parent: Statechart | undefined;
+
+  globalPosition: Point;  // TODO move geometry interfaces to top.
   [inTransitions]: Transition[];
   [outTransitions]: Transition[];
   [entryText]: string | undefined;
@@ -95,34 +111,38 @@ export class State implements DataContextObject, ReferencedObject {
   }
 }
 
-const pseudostateTemplate = {
-  x: new ScalarProp<number>('x'),
-  y: new ScalarProp<number>('y'),
+class PseudostateTemplate implements DataObjectTemplate {
+  x = new ScalarProp('x');
+  y = new ScalarProp('y');
 
-  parent: new ParentProp<Statechart>,
+  properties: Array<PropertyTypes>;
+
+  private constructor() {
+    this.properties = [this.x, this.y];
+  }
+  static instance = new PseudostateTemplate();
 }
 
 export type PseudostateType = 'pseudostate';
 export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
 
 export class Pseudostate implements DataContextObject, ReferencedObject {
-  private readonly template = pseudostateTemplate;
-  readonly id: number;
+  readonly template = PseudostateTemplate.instance;
   readonly context: StatechartContext;
 
   readonly type: PseudostateType = 'pseudostate';
   readonly subtype: PseudostateSubtype;
+  readonly id: number;
 
   get x() { return this.template.x.get(this) || 0; }
-  set x(value) { this.template.x.set(this, value); }
+  set x(value: number) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
-  set y(value) { this.template.y.set(this, value); }
-
-  get parent() { return this.template.parent.get(this); };
-  set parent(parent) { this.template.parent.set(this, parent); };
+  set y(value: number) { this.template.y.set(this, value); }
 
   // Derived properties.
-  [globalPosition]: Point;
+  parent: Statechart | undefined;
+
+  globalPosition: Point;
   [inTransitions]: Transition[];
   [outTransitions]: Transition[];
 
@@ -133,49 +153,54 @@ export class Pseudostate implements DataContextObject, ReferencedObject {
   }
 }
 
-const transitionTemplate = {
-  src: new RefProp<StateTypes>('src'),
-  tSrc: new ScalarProp<number>('tSrc'),
-  dst: new RefProp<StateTypes>('dst'),
-  tDst: new ScalarProp<number>('tDst'),
+class TransitionTemplate implements DataObjectTemplate {
+  src = new ReferenceProp('src');
+  tSrc = new ScalarProp('tSrc');
+  dst = new ReferenceProp('dst');
+  tDst = new ScalarProp('tDst');
 
-  event: new ScalarProp<string | undefined>('event'),
-  guard: new ScalarProp<string | undefined>('guard'),
-  action: new ScalarProp<string | undefined>('action'),
-  tText: new ScalarProp<number>('tText'),
+  event = new ScalarProp('event');
+  guard = new ScalarProp('guard');
+  action = new ScalarProp('action');
+  tText = new ScalarProp('tText');
 
-  parent: new ParentProp<Statechart>,
+  properties: Array<PropertyTypes>;
+
+  private constructor() {
+    this.properties = [
+      this.src, this.tSrc, this.dst, this.tDst, this.event, this.guard, this.action, this.tText];
+  }
+  static instance = new TransitionTemplate();
 }
 
 export type TransitionType = 'transition';
 
 export class Transition implements DataContextObject {
-  private readonly template = transitionTemplate;
+  readonly template = TransitionTemplate.instance;
   readonly context: StatechartContext;
 
   readonly type: TransitionType = 'transition';
 
-  get src() { return this.template.src.get(this); }
-  set src(value) { this.template.src.set(this, value); }
+  get src() { return this.template.src.get(this) as StateTypes | undefined; }
+  set src(value: StateTypes | undefined) { this.template.src.set(this, value); }
   get tSrc() { return this.template.tSrc.get(this) || 0; }
-  set tSrc(value) { this.template.tSrc.set(this, value); }
-  get dst() { return this.template.dst.get(this); }
-  set dst(value) { this.template.dst.set(this, value); }
+  set tSrc(value: number) { this.template.tSrc.set(this, value); }
+  get dst() { return this.template.dst.get(this) as StateTypes | undefined; }
+  set dst(value: StateTypes | undefined) { this.template.dst.set(this, value); }
   get tDst() { return this.template.tDst.get(this) || 0; }
-  set tDst(value) { this.template.tDst.set(this, value); }
+  set tDst(value: number) { this.template.tDst.set(this, value); }
   get event() { return this.template.event.get(this); }
-  set event(value) { this.template.event.set(this, value); }
+  set event(value: string | undefined) { this.template.event.set(this, value); }
   get guard() { return this.template.guard.get(this); }
-  set guard(value) { this.template.guard.set(this, value); }
+  set guard(value: string | undefined) { this.template.guard.set(this, value); }
   get action() { return this.template.action.get(this); }
-  set action(value) { this.template.action.set(this, value); }
+  set action(value: string | undefined) { this.template.action.set(this, value); }
   get tText() { return this.template.tText.get(this) || 0; }
-  set tText(value) { this.template.tText.set(this, value); }
-
-  get parent() { return this.template.parent.get(this); };
-  set parent(parent) { this.template.parent.set(this, parent); };
+  set tText(value: number) { this.template.tText.set(this, value); }
 
   // Derived properties.
+  parent: Statechart | undefined;
+
   [pSrc]: PointAndNormal;
   [pDst]: PointAndNormal;
   [transitionBezier]: BezierCurve;
@@ -188,46 +213,51 @@ export class Transition implements DataContextObject {
   }
 }
 
-const statechartTemplate = {
-  x: new ScalarProp<number>('x'),
-  y: new ScalarProp<number>('y'),
-  width: new ScalarProp<number>('width'),
-  height: new ScalarProp<number>('height'),
-  name: new ScalarProp<string | undefined>('name'),
+class StatechartTemplate implements DataObjectTemplate {
+  x = new ScalarProp('x');
+  y = new ScalarProp('y');
+  width = new ScalarProp('width');
+  height = new ScalarProp('height');
+  name = new ScalarProp('name');
 
-  parent: new ParentProp<State>,
+  states = new ArrayProp('states');
+  transitions = new ArrayProp('transitions');
 
-  states: new ArrayProp<StateTypes>('states'),
-  transitions: new ArrayProp<Transition>('transitions'),
+  properties: Array<PropertyTypes>;
+
+  private constructor() {
+    this.properties = [
+      this.x, this.y, this.width, this.height, this.name, this.states, this.transitions];
+  }
+  static instance = new StatechartTemplate();
 }
 
 export type StatechartType = 'statechart';
 
 export class Statechart implements DataContextObject {
-  private readonly template = statechartTemplate;
+  readonly template = StatechartTemplate.instance;
   readonly context: StatechartContext;
 
   readonly type: StatechartType = 'statechart';
 
   get x() { return this.template.x.get(this) || 0; }
-  set x(value) { this.template.x.set(this, value); }
+  set x(value: number) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
-  set y(value) { this.template.y.set(this, value); }
+  set y(value: number) { this.template.y.set(this, value); }
   get width() { return this.template.width.get(this) || 0; }
-  set width(value) { this.template.width.set(this, value); }
+  set width(value: number) { this.template.width.set(this, value); }
   get height() { return this.template.height.get(this) || 0; }
-  set height(value) { this.template.height.set(this, value); }
+  set height(value: number) { this.template.height.set(this, value); }
   get name() { return this.template.name.get(this) || ''; }
-  set name(value) { this.template.name.set(this, value); }
+  set name(value: string | undefined) { this.template.name.set(this, value); }
 
-  get parent() { return this.template.parent.get(this); };
-  set parent(parent) { this.template.parent.set(this, parent); };
-
-  get states() { return this.template.states.get(this); }
-  get transitions() { return this.template.transitions.get(this); }
+  get states() { return this.template.states.get(this) as List<StateTypes>; }
+  get transitions() { return this.template.transitions.get(this) as List<Transition>; }
 
   // Derived properties.
-  [globalPosition]: Point;
+  parent: State | undefined;
+
+  globalPosition: Point;
 
   constructor(context: StatechartContext) {
     this.context = context;
@@ -283,9 +313,16 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     this.addHandler('changed',
         this.transactionManager.onChanged.bind(this.transactionManager));
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
+    this.statechart_ = new Statechart(this);
   }
 
-  root() : Statechart { return this.statechart_; }
+  root() : Statechart {
+    return this.statechart_;
+  }
+  setRoot(root: Statechart) : void {
+    this.insertItem_(root, undefined);
+    this.statechart_ = root;
+  }
 
   newState() : State {
     const nextId = ++this.highestId_,
@@ -293,21 +330,18 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     this.stateMap_.set(nextId, result);
     return result;
   }
-
   newPseudostate(subtype: PseudostateSubtype) : Pseudostate {
     const nextId = ++this.highestId_,
           result: Pseudostate = new Pseudostate(subtype, nextId, this);
     this.stateMap_.set(nextId, result);
     return result;
   }
-
-  newTransition(src: StateTypes, dst: StateTypes) : Transition {
+  newTransition(src: StateTypes | undefined, dst: StateTypes | undefined) : Transition {
     const result: Transition = new Transition(this);
     result.src = src;
     result.dst = dst;
     return result;
   }
-
   newStatechart() : Statechart {
     const result: Statechart = new Statechart(this);
     return result;
@@ -323,7 +357,10 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       item.transitions.forEach(t => self.visitAll(t, visitor));
     }
   }
-
+  visitAllItems(items: List<AllTypes>, visitor: StatechartVisitor) : void {
+    const self = this;
+    items.forEach(item => self.visitAll(item, visitor));
+  }
   reverseVisitAll(item: AllTypes, visitor: StatechartVisitor) : void {
     const self = this;
     if (item.type === 'state') {
@@ -333,6 +370,10 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       item.transitions.forEach(t => self.reverseVisitAll(t, visitor));
     }
     visitor(item);
+  }
+  reverseVisitAllItems(items: List<AllTypes>, visitor: StatechartVisitor) : void {
+    const self = this;
+    items.forEachReverse(item => self.reverseVisitAll(item, visitor));
   }
 
   visitNonTransitions(item: NonTransitionTypes, visitor: NonTransitionVisitor) : void {
@@ -366,14 +407,9 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
         break;
       }
     }
-}
-  setRoot(root: Statechart) : void {
-    this.insertItem_(root, undefined);
-    this.statechart_ = root;
   }
 
   getGrandParent(item: AllTypes) : AllTypes | undefined {
-
     let result = item.parent;
     if (result)
       result = result.parent;
@@ -400,12 +436,12 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     const oldParent: ParentTypes = item.parent;
     let dx = 0, dy = 0;
     if (oldParent) {
-      const global = oldParent[globalPosition];
+      const global = oldParent.globalPosition;
       dx += global.x;
       dy += global.y;
     }
     if (newParent) {
-      const global = newParent[globalPosition];
+      const global = newParent.globalPosition;
       dx += global.x;
       dy += global.y;
     }
@@ -418,13 +454,13 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
           parent: ParentTypes = item.parent;
 
     if (parent) {
-      // console.log(item.type, parent.type, parent[globalPosition]);
-      const global = parent[globalPosition];
+      // console.log(item.type, parent.type, parent.globalPosition);
+      const global = parent.globalPosition;
       if (global) {
-        item[globalPosition] = { x: x + global.x, y: y + global.y };
+        item.globalPosition = { x: x + global.x, y: y + global.y };
       }
     } else {
-      item[globalPosition] = { x: x, y: y };
+      item.globalPosition = { x: x, y: y };
     }
   }
 
@@ -537,7 +573,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     // The only constraint is that there can't be two start states in a statechart.
     if (state.type !== 'pseudostate' || state.subtype !== 'start')
       return true;
-    for (let child of statechart.states) {
+    for (let child of statechart.states.asArray()) {
       if (child !== state && child.type === 'pseudostate' && child.subtype === 'start')
         return false;
     }
@@ -569,7 +605,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
 
   findChildStatechart(superState: State, child: StateTypes | Transition) : Statechart | undefined {
-    for (let statechart of superState.statecharts) {
+    for (let statechart of superState.statecharts.asArray()) {
       if (child.type === 'transition' || this.canAddState(child, statechart)) {
         return statechart;
       }
@@ -601,6 +637,63 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   redo() {
     this.historyManager.redo();
   }
+
+  private cloneProperties(item: AllTypes, newItem: AllTypes) {
+    for (let key in item) {
+      if (key[0] !== '_') continue;
+      (newItem as any)[key] = (item as any)[key];
+    }
+  }
+
+  copy(items: AllTypes[]) : AllTypes[] {
+      const map = new Map<number, StateTypes>();
+      function copyObject(src: AllTypes) {
+      switch (src.type) {
+        case 'state': {
+          const state = this.newState();
+          map.set(state.id, state);
+          return state;
+        }
+        case 'pseudostate':
+          return this.newPseudostate(src.subtype);
+        case 'transition':
+          return this.newTransition(undefined, undefined);
+        case 'statechart':
+          return this.newStatechart();
+      }
+
+    }
+    return [];
+  }
+  private cloneItem(item: AllTypes, map: Map<number, StateTypes>) : AllTypes {
+    switch (item.type) {
+      case 'state': {
+        const newState = this.newState();
+        this.cloneProperties(item, newState);
+        map.set(newState.id, newState);
+        return newState;
+      }
+      case 'pseudostate': {
+        let newPseudostate = this.newPseudostate(item.subtype);
+        this.cloneProperties(item, newPseudostate);
+        map.set(newPseudostate.id, newPseudostate);
+        return newPseudostate;
+      }
+      case 'transition': {
+        const src = item.src,
+              dst = item.dst,
+              newTransition = this.newTransition(src, dst);
+        return newTransition;
+      }
+      case 'statechart': {
+        const newStatechart = this.newStatechart();
+        this.cloneProperties(item, newStatechart);
+        return newStatechart;
+      }
+    }
+  }
+  // cloneItems(items: AllTypes[]) : AllTypes[] {
+  // }
 
   deleteItem(item: AllTypes) {
     if (item.parent) {
@@ -1057,7 +1150,7 @@ class Renderer {
       height = extents.ymax - y;
     } else {
       const size = this.getSize(item),
-            global = item[globalPosition];
+            global = item.globalPosition;
       x = global.x;
       y = global.y;
       width = size.width;
@@ -1075,27 +1168,25 @@ class Renderer {
     }
     return { x, y, width, height };
   }
-  getBounds(items: List<AllTypes>) : Rect {
-    if (items.length == 0)
-      return { x: 0, y: 0, width: 0, height: 0 };
-
-    const rect = this.getItemRect(items.at(0));
-    let xMin = rect.x,
-        yMin = rect.y,
-        xMax = xMin + rect.width,
-        yMax = 0;
-    for (let i = 1; i < items.length; ++i) {
-      const rect = this.getItemRect(items.at(i)),
-            x0 = rect.x,
-            y0 = rect.y,
-            x1 = x0 + rect.width,
-            y1 = y0 + rect.height;
-      xMin = Math.min(xMin, x0);
-      yMin = Math.min(yMin, y0);
-      xMax = Math.max(xMax, x1);
-      yMax = Math.max(yMax, y1);
+  getBounds(items: Array<AllTypes>) : Rect {
+    let first = true,
+        xmin = 0, ymin = 0, xmax = 0, ymax = 0;
+    for (let item of items) {
+      const rect = this.getItemRect(item);
+      if (first) {
+        xmin = rect.x;
+        xmax = rect.x + rect.width;
+        ymin = rect.y;
+        ymax = rect.y + rect.height;
+        first = false;
+      } else {
+        xmin = Math.min(xmin, rect.x);
+        ymin = Math.min(ymin, rect.y);
+        xmax = Math.max(xmax, rect.x + rect.width);
+        ymax = Math.max(ymax, rect.y + rect.height);
+      }
     }
-    return { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
+    return { x: xmin, y: ymin, width: xmax - xmin, height: ymax - ymin };
   }
   statePointToParam(state: StateTypes, p: Point) {
     const r = this.theme_.radius,
@@ -1188,7 +1279,7 @@ class Renderer {
   // their parent state.
   layoutStatechart(statechart: Statechart) {
     const padding = this.theme_.padding,
-          global = statechart[globalPosition],
+          global = statechart.globalPosition,
           statechartX = global.x,
           statechartY = global.y,
           states = statechart.states,
@@ -1196,7 +1287,7 @@ class Renderer {
     // TODO bound transitions too.
     if (states.length) {
       // Get extents of child states.
-      const r = this.getBounds(states),
+      const r = this.getBounds(states.asArray()),
             x = r.x - statechartX, // Get position in statechart coordinates.
             y = r.y - statechartY;
       let xMin = Math.min(0, x - padding),
@@ -1623,15 +1714,39 @@ class Renderer {
 
 //------------------------------------------------------------------------------
 
-enum DragTypes {
-  connectTransitionSrc,
-  connectTransitionDst,
-  copyPaletteItem,
-  moveSelection,
-  moveCopySelection,
-  resizeState,
-  moveTransitionPoint,
+function isStateBorder(hitInfo: HitResultTypes) : boolean {
+  return hitInfo.type === 'state' && hitInfo.inner.border;
 }
+
+function isDropTarget(hitInfo: HitResultTypes) : boolean {
+  const item = hitInfo.item;
+  return (hitInfo.type === 'state' || hitInfo.type === 'statechart') &&
+          !item.context.selection.has(item);
+}
+
+function isClickable(hitInfo: HitResultTypes) : boolean {
+  return true;
+}
+
+function isDraggable(hitInfo: HitResultTypes) : boolean {
+  return hitInfo.type === 'state' || hitInfo.type === 'pseudostate';
+}
+
+function hasProperties(hitInfo: HitResultTypes) : boolean {
+  return (hitInfo.type !== 'transition')
+}
+
+type DragTypes = 'connectTransitionSrc' | 'connectTransitionDst' | 'copyPaletteItem' |
+                  'moveSelection' | 'moveCopySelection' | 'resizeState' | 'moveTransitionPoint';
+
+interface DragInfo {
+  type: DragTypes;
+  name: string;
+  items?: Array<AllTypes>;
+  moveCopy?: boolean;
+  palette?: boolean;
+  newItem?: boolean;
+};
 
 class Editor {
   private theme_: StatechartTheme;
@@ -1647,6 +1762,12 @@ class Editor {
   private palette: Statechart;  // Statechart to simplify layout of palette items.
   private context: StatechartContext;
   private statechart: Statechart;
+
+  private pointerHitInfo_: HitResultTypes | undefined;
+  private draggableHitInfo_: HitResultTypes | undefined;
+  private clickInPalette_: boolean = false;
+  private moveCopy_: boolean = false;
+  private dragInfo_: DragInfo | undefined;
 
   constructor(
       theme: Theme, canvasController: CanvasController, paletteController: CanvasController,
@@ -1792,11 +1913,11 @@ class Editor {
     context.transactionManager.addHandler('didRedo', updateBounds);
   }
   setContext(context: StatechartContext) {
-    const statechart = context.root,
+    const statechart = context.root(),
           renderer = this.renderer;
 
     this.context = context;
-    this.statechart = context.root();
+    this.statechart = statechart;
 
     this.changedItems_.clear();
     this.changedTopLevelStates_.clear();
@@ -1987,304 +2108,270 @@ class Editor {
       renderer.end();
     }
   }
+  print() {
+    // const renderer = this.renderer,
+    //       context = this.context,
+    //       statechart = this.statechart,
+    //       canvasController = this.canvasController;
+
+    // // Calculate document bounds.
+    // const items = new Array<AllTypes>();
+    // context.visitAll(statechart, function (item) {
+    //   items.push(item);
+    // });
+
+    // const bounds = renderer.getBounds(items);
+    // // Adjust all edges 1 pixel out.
+    // const ctx = new C2S(bounds.width + 2, bounds.height + 2);
+    // ctx.translate(-bounds.x + 1, -bounds.y + 1);
+
+    // renderer.begin(ctx);
+    // // We shouldn't need to layout any changed items here.
+    // assert(!this.changedItems_.size);
+    // canvasController.applyTransform();
+
+    // visitItems(statechart.items, function (item) {
+    //   renderer.draw(item, printMode);
+    // }, isNonTransition);
+    // visitItems(statechart.items, function (transition) {
+    //   renderer.draw(transition, printMode);
+    // }, isTransition);
+
+    // renderer.end();
+
+    // // Write out the SVG file.
+    // const serializedSVG = ctx.getSerializedSvg();
+    // const blob = new Blob([serializedSVG], {
+    //   type: 'text/plain'
+    // });
+    // saveAs(blob, 'statechart.svg', true);
+  }
+  getCanvasPosition(canvasController: CanvasController, p: Point) {
+    // When dragging from the palette, convert the position from pointer events
+    // into the canvas space to render the drag and drop.
+    return this.canvasController.viewToOtherCanvasView(canvasController, p);
+  }
+  hitTestCanvas(p: Point) {
+    const renderer = this.renderer,
+          context = this.context,
+          tol = this.hitTolerance,
+          statechart = this.statechart,
+          canvasController = this.canvasController,
+          cp = this.getCanvasPosition(canvasController, p),
+          ctx = canvasController.getCtx(),
+          hitList: Array<HitResultTypes> = [];
+    function pushInfo(info: HitResultTypes | undefined) {
+      if (info)
+        hitList.push(info);
+    }
+    renderer.begin(ctx);
+    this.updateLayout_();
+    // TODO hit test selection first, in highlight, first.
+    // Skip the root statechart, as hits there should go to the underlying canvas controller.
+    context.reverseVisitAllItems(statechart.transitions, transition => {
+      pushInfo(renderer.hitTest(transition, cp, tol, RenderMode.Normal));
+    });
+    context.reverseVisitAllItems(statechart.states, state => {
+      pushInfo(renderer.hitTest(state, cp, tol, RenderMode.Normal));
+    });
+    renderer.end();
+    return hitList;
+  }
+  hitTestPalette(p: Point) {
+    const renderer = this.renderer,
+          context = this.context,
+          tol = this.hitTolerance,
+          ctx = this.paletteController.getCtx(),
+          hitList: Array<HitResultTypes> = [];
+    function pushInfo(info: HitResultTypes | undefined) {
+      if (info)
+        hitList.push(info);
+    }
+    renderer.begin(ctx);
+    context.reverseVisitAllItems(this.palette.states, state => {
+      pushInfo(renderer.hitTest(state, p, tol, RenderMode.Normal));
+    });
+    renderer.end();
+    return hitList;
+  }
+  getFirstHit(
+      hitList: Array<HitResultTypes>, filterFn: (hitInfo: HitResultTypes) => boolean):
+      HitResultTypes | undefined {
+    for (let hitInfo of hitList) {
+      if (filterFn(hitInfo))
+        return hitInfo;
+    }
+  }
+  getDraggableAncestor(hitList: Array<HitResultTypes>, hitInfo: HitResultTypes | undefined) {
+    while (hitInfo && !isDraggable(hitInfo)) {
+      const parent = hitInfo.item.parent;
+      hitInfo = this.getFirstHit(hitList, info => { return info.item === parent; })
+    }
+    return hitInfo;
+  }
+  setPropertyGrid() {
+    const context = this.context,
+          item = context.selection.lastSelected(),
+          type = item ? item.type.toString() : undefined;
+    this.propertyGridController.show(type, item);
+  }
+  onClick(canvasController: CanvasController, alt: boolean) {
+    const context = this.context,
+          selection = context.selection,
+          shiftKeyDown = this.canvasController.shiftKeyDown,
+          cmdKeyDown = this.canvasController.cmdKeyDown,
+          p = canvasController.getClickPointerPosition(),
+          cp = canvasController.viewToCanvas(p);
+    let hitList, inPalette;
+    if (canvasController === this.paletteController) {
+      hitList = this.hitTestPalette(cp);
+      inPalette = true;
+    } else {
+      // assert(canvasController === this.canvasController);
+      hitList = this.hitTestCanvas(cp);
+      inPalette = false;
+    }
+    const pointerHitInfo = this.pointerHitInfo_ = this.getFirstHit(hitList, isClickable);
+    if (pointerHitInfo) {
+      this.draggableHitInfo_ = this.getDraggableAncestor(hitList, pointerHitInfo);
+      const item = pointerHitInfo.item;
+      if (inPalette) {
+        this.clickInPalette_ = true;
+        selection.clear();
+      } else if (cmdKeyDown) {
+        this.moveCopy_ = true;
+        selection.set(item);
+      } else if (shiftKeyDown) {
+        selection.add(item);
+      } else {
+        selection.set(item);
+      }
+    } else {
+      if (!shiftKeyDown) {
+        selection.clear();
+      }
+    }
+    this.setPropertyGrid();
+    return pointerHitInfo !== null;
+  }
+  onBeginDrag(canvasController: CanvasController) {
+    let pointerHitInfo = this.pointerHitInfo_;
+    if (!pointerHitInfo)
+      return false;
+
+    const context = this.context,
+          selection = context.selection,
+          p0 = canvasController.getClickPointerPosition();
+    let dragItem = pointerHitInfo.item;
+    let drag: DragInfo, newTransition: Transition | undefined;
+    // First check for a drag that creates a new transition.
+    if ((pointerHitInfo.type === 'state' || pointerHitInfo.type === 'pseudostate') &&
+         pointerHitInfo.arrow) {
+      const state = (dragItem as State | Pseudostate),
+            cp0 = this.getCanvasPosition(canvasController, p0);
+      // Start the new transition as connecting the src state to itself.
+      newTransition = context.newTransition(state, undefined);
+      newTransition[pSrc] = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };
+      newTransition.tText = 0.5; // initial property attachment at midpoint.
+      drag = {
+        type: 'connectTransitionSrc',
+        name: 'Add new transition',
+        items: [newTransition],
+        newItem: true,
+      }
+    } else {
+      switch (pointerHitInfo.type) {
+        case 'statechart':
+        case 'state':
+        case 'pseudostate':
+          pointerHitInfo = this.draggableHitInfo_!;  // TODO check
+          dragItem = pointerHitInfo.item;
+          if (this.clickInPalette_) {
+            drag = {
+              type: 'copyPaletteItem',
+              name: 'Add palette item',
+              items: [dragItem],
+              newItem: true
+            };
+          } else if (this.moveCopy_) {
+            drag = {
+              type: 'moveCopySelection',
+              name: 'Move copy of selection',
+              items: selection.contents(),
+              newItem: true
+            };
+          } else {
+            if (pointerHitInfo.type === 'state' && pointerHitInfo.inner.border) {
+              drag = {
+                type: 'resizeState',
+                name: 'Resize state',
+              };
+            } else {
+              drag = {
+                type: 'moveSelection',
+                name: 'Move selection',
+              };
+            }
+          }
+          break;
+        case 'transition':
+          if (pointerHitInfo.inner.t === 0)
+            drag = {
+              type: 'connectTransitionSrc',
+              name: 'Edit transition'
+            };
+          else if (pointerHitInfo.inner.t === 1)
+            drag = {
+              type: 'connectTransitionDst',
+              name: 'Edit transition'
+            };
+          else {
+            drag = {
+              type: 'moveTransitionPoint',
+              name: 'Drag transition attachment point'
+            };
+          }
+          break;
+      }
+      // drag.items = [dragItem];
+    }
+
+    this.dragInfo_ = drag;
+    if (drag) {
+      if (drag.type === 'moveSelection' || drag.type === 'moveCopySelection') {
+        context.reduceSelection();
+        // let items = selectionModel.contents();
+        // drag.isSingleElement = items.length === 1 && isState(items[0]);
+      }
+      context.transactionManager.beginTransaction(drag.name);
+      if (newTransition) {
+        // drag.item = newTransition;
+        // editingModel.newItem(newTransition);
+        context.addItem(newTransition, this.statechart);
+        selection.set(newTransition);
+      } else {
+        // if (drag.type == 'copyPaletteItem' || drag.type == 'moveCopySelection') {
+        //   const map = new Map(), copies = context.copyItems(drag.items, map);
+        //   // Transform palette items into the canvas coordinate system.
+        //   if (drag.type == 'copyPaletteItem') {
+        //     const offset = this.paletteController.offsetToOtherCanvas(this.canvasController);
+        //     copies.forEach(function transform(item) {
+        //       item.x -= offset.x; item.y -= offset.y;
+        //     });
+        //   }
+        //   context.addItems(copies, this.statechart);
+        //   selection.set(copies);
+        // }
+      }
+    }
+  }
 }
 /*
 //------------------------------------------------------------------------------
 
   // Statechart Editor and helpers.
 
-  function isStateBorder(hitInfo, model) {
-    return isState(hitInfo.item) && hitInfo.border;
-  }
-
-  function isStateDropTarget(hitInfo, model) {
-    const item = hitInfo.item;
-    return isTrueStateOrStatechart(item) &&
-          !model.hierarchicalModel.isItemInSelection(item);
-  }
-
-  function isClickable(hitInfo, model) {
-    return true;
-  }
-
-  function isDraggable(hitInfo, model) {
-    return isState(hitInfo.item);
-  }
-
-  function hasProperties(hitInfo, model) {
-    const item = hitInfo.item;
-    return isTrueState(item) || isStatechart(item) || isTransition(item);
-  }
-
-  const connectTransitionSrc = 1,
-        connectTransitionDst = 2,
-        copyPaletteItem = 3,
-        moveSelection = 4,
-        moveCopySelection = 5,
-        resizeState = 6,
-        moveTransitionPoint = 7;
-
   class Editor {
-    print() {
-      const renderer = this.renderer,
-            statechart = this.statechart,
-            canvasController = this.canvasController;
-
-      // Calculate document bounds.
-      const states = new Array();
-      visitItems(statechart.items, function (item) {
-        states.push(item);
-      });
-
-      const bounds = renderer.getBounds(states);
-      // Adjust all edges 1 pixel out.
-      const ctx = new C2S(bounds.width + 2, bounds.height + 2);
-      ctx.translate(-bounds.x + 1, -bounds.y + 1);
-
-      renderer.begin(ctx);
-      // We shouldn't need to layout any changed items here.
-      assert(!this.changedItems_.size);
-      canvasController.applyTransform();
-
-      visitItems(statechart.items, function (item) {
-        renderer.draw(item, printMode);
-      }, isNonTransition);
-      visitItems(statechart.items, function (transition) {
-        renderer.draw(transition, printMode);
-      }, isTransition);
-
-      renderer.end();
-
-      // Write out the SVG file.
-      const serializedSVG = ctx.getSerializedSvg();
-      const blob = new Blob([serializedSVG], {
-        type: 'text/plain'
-      });
-      saveAs(blob, 'statechart.svg', true);
-    }
-    getCanvasPosition(canvasController, p) {
-      // When dragging from the palette, convert the position from pointer events
-      // into the canvas space to render the drag and drop.
-      return this.canvasController.viewToOtherCanvasView(canvasController, p);
-    }
-    hitTestCanvas(p) {
-      const renderer = this.renderer,
-            tol = this.hitTolerance,
-            statechart = this.statechart,
-            canvasController = this.canvasController,
-            cp = this.getCanvasPosition(canvasController, p),
-            ctx = canvasController.getCtx(),
-            hitList = [];
-      function pushInfo(info) {
-        if (info)
-          hitList.push(info);
-      }
-      renderer.begin(ctx);
-      this.updateLayout_();
-      // TODO hit test selection first, in highlight, first.
-      // Skip the root statechart, as hits there should go to the underlying canvas controller.
-      reverseVisitItems(statechart.items, function (transition) {
-        pushInfo(renderer.hitTest(transition, cp, tol, normalMode));
-      }, isTransition);
-      reverseVisitItems(statechart.items, function (item) {
-        pushInfo(renderer.hitTest(item, cp, tol, normalMode));
-      }, isNonTransition);
-      renderer.end();
-      return hitList;
-    }
-    hitTestPalette(p) {
-      const renderer = this.renderer,
-            tol = this.hitTolerance,
-            ctx = this.paletteController.getCtx(),
-            hitList = [];
-      function pushInfo(info) {
-        if (info)
-          hitList.push(info);
-      }
-      renderer.begin(ctx);
-      reverseVisitItems(this.palette.items, function (item) {
-        pushInfo(renderer.hitTest(item, p, tol, printMode));
-      }, isNonTransition);
-      renderer.end();
-      return hitList;
-    }
-    getFirstHit(hitList, filterFn) {
-      if (hitList) {
-        const model = this.model;
-        for (let hitInfo of hitList) {
-          if (filterFn(hitInfo, model))
-            return hitInfo;
-        }
-      }
-      return null;
-    }
-    getDraggableAncestor(hitList, hitInfo) {
-      const model = this.model,
-            hierarchicalModel = model.hierarchicalModel;
-      while (!isDraggable(hitInfo, model)) {
-        const parent = hierarchicalModel.getParent(hitInfo.item);
-        hitInfo = this.getFirstHit(hitList, info => { return info.item === parent; })
-      }
-      return hitInfo;
-    }
-    setPropertyGrid() {
-      const model = this.model,
-            item = model.selectionModel.lastSelected(),
-            type = item ? item.type : undefined;
-      this.propertyGridController.show(type, item);
-    }
-    onClick(canvasController, alt) {
-      const model = this.model,
-            selectionModel = model.selectionModel,
-            shiftKeyDown = this.canvasController.shiftKeyDown,
-            cmdKeyDown = this.canvasController.cmdKeyDown,
-            p = canvasController.getInitialPointerPosition(),
-            cp = canvasController.viewToCanvas(p);
-      let hitList, inPalette;
-      if (canvasController === this.paletteController) {
-        hitList = this.hitTestPalette(cp);
-        inPalette = true;
-      } else {
-        assert(canvasController === this.canvasController);
-        hitList = this.hitTestCanvas(cp);
-        inPalette = false;
-      }
-      const mouseHitInfo = this.mouseHitInfo = this.getFirstHit(hitList, isClickable);
-      if (mouseHitInfo) {
-        mouseHitInfo.draggableAncestor = this.getDraggableAncestor(hitList, mouseHitInfo);
-        const item = mouseHitInfo.item;
-        if (inPalette) {
-          mouseHitInfo.inPalette = true;
-          selectionModel.clear();
-        } else if (cmdKeyDown) {
-          mouseHitInfo.moveCopy = true;
-          selectionModel.select(item);
-        } else {
-          selectionModel.select(item, shiftKeyDown);
-        }
-      } else {
-        if (!shiftKeyDown) {
-          selectionModel.clear();
-        }
-      }
-      this.setPropertyGrid();
-      return mouseHitInfo !== null;
-    }
-    onBeginDrag(canvasController) {
-      let mouseHitInfo = this.mouseHitInfo;
-      if (!mouseHitInfo)
-        return false;
-      const model = this.model,
-            editingModel = model.editingModel,
-            selectionModel = model.selectionModel,
-            p0 = canvasController.getInitialPointerPosition();
-      let dragItem = mouseHitInfo.item;
-      let drag, newTransition;
-      if (mouseHitInfo.arrow) {
-        const stateId = model.dataModel.getId(dragItem),
-              cp0 = this.getCanvasPosition(canvasController, p0);
-        // Start the new transition as connecting the src state to itself.
-        newTransition = {
-          type: 'transition',
-          srcId: stateId,
-          t1: 0,
-          [_p2]: cp0,
-          pt: 0.5, // initial property attachment at midpoint.
-        };
-        drag = {
-          type: connectTransitionDst,
-          name: 'Add new transition',
-          newItem: true,
-        };
-      } else {
-        switch (dragItem.type) {
-          case 'statechart':
-          case 'state':
-          case 'start':
-          case 'stop':
-          case 'history':
-          case 'history*':
-            mouseHitInfo = mouseHitInfo.draggableAncestor;
-            dragItem = mouseHitInfo.item;
-            if (mouseHitInfo.inPalette) {
-              drag = {
-                type: copyPaletteItem,
-                name: 'Add palette item',
-                items: [dragItem],
-                newItem: true
-              };
-            } else if (mouseHitInfo.moveCopy) {
-              drag = {
-                type: moveCopySelection,
-                name: 'Move copy of selection',
-                items: selectionModel.contents(),
-                newItem: true
-              };
-            } else {
-              if (dragItem.type === 'state' && mouseHitInfo.border) {
-                drag = {
-                  type: resizeState,
-                  name: 'Resize state',
-                };
-              } else {
-                drag = {
-                  type: moveSelection,
-                  name: 'Move selection',
-                };
-              }
-            }
-            break;
-          case 'transition':
-            if (mouseHitInfo.p1)
-              drag = {
-                type: connectTransitionSrc,
-                name: 'Edit transition'
-              };
-            else if (mouseHitInfo.p2)
-              drag = {
-                type: connectTransitionDst,
-                name: 'Edit transition'
-              };
-            else {
-              drag = {
-                type: moveTransitionPoint,
-                name: 'Drag transition attachment point'
-              };
-            }
-            break;
-        }
-        drag.item = dragItem;
-      }
-
-      this.drag = drag;
-      if (drag) {
-        if (drag.type === moveSelection || drag.type === moveCopySelection) {
-          editingModel.reduceSelection();
-          // let items = selectionModel.contents();
-          // drag.isSingleElement = items.length === 1 && isState(items[0]);
-        }
-        model.transactionModel.beginTransaction(drag.name);
-        if (newTransition) {
-          drag.item = newTransition;
-          editingModel.newItem(newTransition);
-          editingModel.addItem(newTransition, this.statechart);
-          selectionModel.set(newTransition);
-        } else {
-          if (drag.type == copyPaletteItem || drag.type == moveCopySelection) {
-            const map = new Map(), copies = editingModel.copyItems(drag.items, map);
-            // Transform palette items into the canvas coordinate system.
-            if (drag.type == copyPaletteItem) {
-              const offset = this.paletteController.offsetToOtherCanvas(this.canvasController);
-              copies.forEach(function transform(item) {
-                item.x -= offset.x; item.y -= offset.y;
-              });
-            }
-            editingModel.addItems(copies);
-            selectionModel.set(copies);
-          }
-        }
-      }
-    }
     onDrag(canvasController) {
       const drag = this.drag;
       if (!drag)

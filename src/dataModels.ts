@@ -17,6 +17,7 @@ export interface DataContext<TObject extends DataContextObject = DataContextObje
 }
 
 export interface DataContextObject {
+  readonly template: DataObjectTemplate
   readonly context: DataContext;
 }
 
@@ -30,20 +31,20 @@ export interface List<T = any> {
   indexOf(element: T) : number;
   remove(element: T) : number;
   removeAt(index: number) : T;
+  asArray() : T[];
   forEach(visitor: (element: T) => void) : void;
   forEachReverse(visitor: (element: T) => void) : void;
-  [Symbol.iterator]() : IterableIterator<T>;
 }
 
-// TODO work on making List<T> more ergonomic.
-export class DataList<T = any> implements List<T> {
+// Internal, non-type safe implementation of List.
+class DataList implements List {
   private owner: DataContextObject;
   private name: string;
 
-  private get array() : T[] | undefined {
+  private get array() : any[] | undefined {
     return (this.owner as any)[this.name];
   }
-  private set array(value: T[] | undefined) {
+  private set array(value: any[] | undefined) {
     (this.owner as any)[this.name] = value;
   }
 
@@ -51,15 +52,13 @@ export class DataList<T = any> implements List<T> {
     const array = this.array;
     return array ? array.length : 0;
   }
-
-  at(index: number) : T {
+  at(index: number) : any {
     const array = this.array;
     if (!array || array.length <= index)
       throw new RangeError('Index out of range: ' + index);
     return array[index];
   }
-
-  insert(element: T, index: number) {
+  insert(element: any, index: number) {
     let array = this.array;
     if (!array) {
       this.array = array = [];
@@ -68,17 +67,14 @@ export class DataList<T = any> implements List<T> {
     array.splice(index, 0, element);
     this.owner.context.elementInserted(this.owner, this.name, index, element);
   }
-
-  append(element: T) {
+  append(element: any) {
     this.insert(element, this.length);
   }
-
-  indexOf(element: T) : number {
+  indexOf(element: any) : number {
     const array = this.array;
     return array ? array.indexOf(element) : -1;
   }
-
-  removeAt(index: number) : T {
+  removeAt(index: number) : any {
     const array = this.array;
     if (!array || array.length <= index)
       throw new RangeError('Index out of range: ' + index);
@@ -86,34 +82,28 @@ export class DataList<T = any> implements List<T> {
     this.owner.context.elementRemoved(this.owner, this.name, index, oldValue[0]);
     return oldValue[0];
   }
-
-  remove(element: T) : number {
+  remove(element: any) : number {
     const index = this.indexOf(element);
     if (index >= 0)
       this.removeAt(index);
     return index;
   }
-
-  forEach(visitor: (element: T) => void) : void {
+  asArray(): Array<any> {
+    return this.array || [];
+  }
+  forEach(visitor: (element: any) => void) : void {
     const array = this.array;
     if (!array)
       return;
     array.forEach(visitor);
   };
-
-  forEachReverse(visitor: (element: T) => void) : void {
+  forEachReverse(visitor: (element: any) => void) : void {
     const array = this.array;
     if (!array)
       return;
     for (let i = array.length - 1; i >= 0; --i) {
       visitor(array[i]);
     }
-  }
-  [Symbol.iterator]() : IterableIterator<T> {
-    const array = this.array;
-    if (!array)
-      return [][Symbol.iterator]();
-    return array[Symbol.iterator]();
   }
 
   constructor(owner: DataContextObject, name: string) {
@@ -124,34 +114,35 @@ export class DataList<T = any> implements List<T> {
 
 //------------------------------------------------------------------------------
 
-// Objects with properties.
+// Simple property descriptors.
 
-export class ScalarProp<T = any> {
+export class ScalarProp {
   readonly name: string;
-
-  get(owner: DataContextObject) : T | undefined {
+  readonly type: 'scalar';
+  get(owner: DataContextObject) : any {
     return (owner as any)[this.name];
   }
-  set(owner: DataContextObject, value: T) : T | undefined {
-    const oldValue: T = (owner as any)[this.name];
+  set(owner: DataContextObject, value: any) : any {
+    const oldValue = (owner as any)[this.name];
     (owner as any)[this.name] = value;
     owner.context.valueChanged(owner, this.name, oldValue);
     return oldValue;
   }
   constructor(name: string) {
-    this.name = name + '_';
+    this.name = '_' + name;  // Rename to avoid name conflicts.
   }
 }
 
-export class ArrayProp<T = any> {
+export class ArrayProp {
   readonly name: string;
+  readonly type: 'array';
 
-  get(owner: DataContextObject) : List<T> {
-    return new DataList<T>(owner, this.name);
+  get(owner: DataContextObject) : List<any> {
+    return new DataList(owner, this.name);
   }
 
   constructor(name: string) {
-    this.name = name + '_';
+    this.name = '_' + name;  // Rename to avoid name conflicts.
   }
 }
 
@@ -160,47 +151,71 @@ export interface ReferencedObject extends Object {
   readonly id: number;
 }
 
-export class RefProp<T extends ReferencedObject> {
-  readonly prop: ScalarProp<number>;
+export class ReferenceProp {
+  readonly name: string;
+  readonly type: 'reference';
+  readonly prop: ScalarProp;
   readonly cacheKey: symbol;
 
-  get(owner: DataContextObject) : T | undefined {
+  get(owner: DataContextObject) : ReferencedObject | undefined {
     const id = this.prop.get(owner);
     if (!id)
       return undefined;
-    return owner.context.resolveReference(owner, this.cacheKey, id) as T | undefined;
+    return owner.context.resolveReference(owner, this.cacheKey, id) as ReferencedObject | undefined;
   }
-  set(owner: DataContextObject, value: T | undefined) : T | undefined {
+  set(owner: DataContextObject, value: ReferencedObject | undefined) : ReferencedObject | undefined {
     const oldId = this.prop.get(owner),
-          newId = value ? value.id : 0;
+          newId: number = value ? value.id : 0;
     this.prop.set(owner, newId);
-    return owner.context.resolveReference(owner, this.cacheKey, newId) as T | undefined;
+    return owner.context.resolveReference(owner, this.cacheKey, newId) as ReferencedObject | undefined;
   }
   constructor(name: string) {
-    this.prop = new ScalarProp<number>(name);
+    this.name = '_' + name;  // Rename to avoid name conflicts.
+    this.prop = new ScalarProp(name);
     this.cacheKey = Symbol.for(name);
   }
 }
+
+export type PropertyTypes = ScalarProp | ReferenceProp | ArrayProp;
+
+export interface DataObjectTemplate {
+  readonly properties: Array<PropertyTypes>;
+}
+
+//------------------------------------------------------------------------------
+
+// Cloning.
+
+// export function copyProperties<T extends DataContextObject>(source: T, target: T) {
+//   const properties = source.template.properties;
+//   for (let prop of properties) {
+//     switch (prop.type) {
+//       case 'scalar':
+//         prop.set(target, (prop as ScalarProp).get(source));
+//         break;
+//       case 'array':
+//         const sourceList = prop.get(source),
+//               targetList = prop.get(target);
+//         sourceList.forEach((element: any) => targetList.append(element));
+//         break;
+//       case 'reference':
+//         prop.set(target, prop.get(source));
+//         break;
+//     }
+//   }
+// }
+
+// interface CloningContext {
+//   clone: (obj: DataContextObject, map: Map<number, DataContextObject>) => DataContextObject;
+//   remap: (obj: DataContextObject, map: Map<number, number>) => void;
+// }
 
 //------------------------------------------------------------------------------
 
 // Hierarchical structures.
 
-// Derived parent property. Parents and children must be objects.
-export class ParentProp<T extends DataContextObject> {
-  static readonly key: unique symbol = Symbol.for('ParentProp.parent');
-  get(owner: object) : T | undefined {
-    return (owner as any)[ParentProp.key] as T | undefined;
-  }
-  set (owner: object, value: T | undefined) : T | undefined {
-    const oldValue = this.get(owner);
-    (owner as any)[ParentProp.key] = value;
-    return oldValue;
-  }
-}
-
 export interface Parented<T> {
-  readonly parent?: T
+  readonly parent: T | undefined;
 };
 
 export function getLineage<T extends Parented<T>>(item: Parented<T> | undefined) {
