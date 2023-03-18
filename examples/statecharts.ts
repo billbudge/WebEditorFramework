@@ -10,31 +10,14 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
 import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
          evaluateBezier, CurveHitResult } from '../src/geometry'
 
-import { PropertyTypes, ScalarProp, ArrayProp, ReferencedObject, ReferenceProp,
-         DataContext, DataContextObject, DataObjectTemplate, EventBase, Change, ChangeEvents,
+import { ScalarProp, ArrayProp, ReferencedObject, ReferenceProp,
+         DataContext, DataContextObject, EventBase, Change, ChangeEvents,
          getLowestCommonAncestor, reduceToRoots, List,
          TransactionManager, HistoryManager } from '../src/dataModels'
 
 //------------------------------------------------------------------------------
 
-// Derived properties, indexed by symbols to distinguish them from actual properties.
-
-const inTransitions: unique symbol = Symbol('inTransitions'),
-      outTransitions: unique symbol = Symbol('outTransitions'),
-      entryText: unique symbol = Symbol('entryText'),
-      entryY: unique symbol = Symbol('entryY'),
-      exitText: unique symbol = Symbol('exitText'),
-      exitY: unique symbol = Symbol('exitY'),
-      pSrc: unique symbol = Symbol('pSrc'),
-      pDst: unique symbol = Symbol('pDst'),
-      transitionBezier: unique symbol = Symbol('transitionBezier'),
-      transitionTextPoint: unique symbol = Symbol('transitionTextPoint'),
-      transitionText: unique symbol = Symbol('transitionText'),
-      transitionTextWidth: unique symbol = Symbol('transitionTextWidth');
-
-//------------------------------------------------------------------------------
-
-// Interfaces to statechart objects.
+// Implement type-safe interfaces to statechart raw data.
 
 const stateTemplate = (function() {
   const x = new ScalarProp('x'),
@@ -49,24 +32,41 @@ const stateTemplate = (function() {
   return { x, y, width, height, name, entry, exit, statecharts, properties };
 })();
 
-// class StateTemplate implements DataObjectTemplate {
-//   x = new ScalarProp('x');
-//   y = new ScalarProp('y');
-//   width = new ScalarProp('width');
-//   height = new ScalarProp('height');
-//   name = new ScalarProp('name');
-//   entry = new ScalarProp('entry');
-//   exit = new ScalarProp('exit');
+const pseudostateTemplate = (function() {
+  const x = new ScalarProp('x'),
+        y = new ScalarProp('y'),
+        properties = [x, y];
+  return { x, y, properties };
+})();
 
-//   statecharts = new ArrayProp('statecharts');
+const transitionTemplate = (function() {
+  const src = new ReferenceProp('src'),
+        tSrc = new ScalarProp('tSrc'),
+        dst = new ReferenceProp('dst'),
+        tDst = new ScalarProp('tDst'),
 
-//   properties: Array<PropertyTypes>;
+        event = new ScalarProp('event'),
+        guard = new ScalarProp('guard'),
+        action = new ScalarProp('action'),
+        tText = new ScalarProp('tText'),
+        properties = [src, tSrc, dst, tDst, event, guard, action, tText];
 
-//   private constructor() {
-//     this.properties = [this.x, this.y, this.width, this.height, this.name, this.entry, this.exit];
-//   }
-//   static instance = new StateTemplate();
-// }
+  return { src, tSrc, dst, tDst, event, guard, action, tText, properties };
+})();
+
+const statechartTemplate = (function() {
+  const x = new ScalarProp('x'),
+        y = new ScalarProp('y'),
+        width = new ScalarProp('width'),
+        height = new ScalarProp('height'),
+        name = new ScalarProp('name'),
+
+        states = new ArrayProp('states'),
+        transitions = new ArrayProp('transitions'),
+        properties = [x, y, width, height, name, states, transitions];
+
+  return { x, y, width, height, name, states, transitions, properties };
+})();
 
 export type StateType = 'state';
 
@@ -96,14 +96,13 @@ export class State implements DataContextObject, ReferencedObject {
 
   // Derived properties.
   parent: Statechart | undefined;
-
-  globalPosition: Point;  // TODO move geometry interfaces to top.
-  [inTransitions]: Transition[];
-  [outTransitions]: Transition[];
-  [entryText]: string | undefined;
-  [entryY]: number | undefined;
-  [exitText]: string | undefined;
-  [exitY]: number | undefined;
+  globalPosition: Point;
+  inTransitions: Transition[];
+  outTransitions: Transition[];
+  entryText: string | undefined;
+  entryY: number | undefined;
+  exitText: string | undefined;
+  exitY: number | undefined;
 
   constructor(context: StatechartContext, id: number) {
     this.context = context;
@@ -111,23 +110,11 @@ export class State implements DataContextObject, ReferencedObject {
   }
 }
 
-class PseudostateTemplate implements DataObjectTemplate {
-  x = new ScalarProp('x');
-  y = new ScalarProp('y');
-
-  properties: Array<PropertyTypes>;
-
-  private constructor() {
-    this.properties = [this.x, this.y];
-  }
-  static instance = new PseudostateTemplate();
-}
-
 export type PseudostateType = 'pseudostate';
 export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
 
 export class Pseudostate implements DataContextObject, ReferencedObject {
-  readonly template = PseudostateTemplate.instance;
+  readonly template = pseudostateTemplate;
   readonly context: StatechartContext;
 
   readonly type: PseudostateType = 'pseudostate';
@@ -141,10 +128,9 @@ export class Pseudostate implements DataContextObject, ReferencedObject {
 
   // Derived properties.
   parent: Statechart | undefined;
-
   globalPosition: Point;
-  [inTransitions]: Transition[];
-  [outTransitions]: Transition[];
+  inTransitions: Transition[];
+  outTransitions: Transition[];
 
   constructor(subtype: PseudostateSubtype, id: number, context: StatechartContext) {
     this.subtype = subtype;
@@ -153,30 +139,10 @@ export class Pseudostate implements DataContextObject, ReferencedObject {
   }
 }
 
-class TransitionTemplate implements DataObjectTemplate {
-  src = new ReferenceProp('src');
-  tSrc = new ScalarProp('tSrc');
-  dst = new ReferenceProp('dst');
-  tDst = new ScalarProp('tDst');
-
-  event = new ScalarProp('event');
-  guard = new ScalarProp('guard');
-  action = new ScalarProp('action');
-  tText = new ScalarProp('tText');
-
-  properties: Array<PropertyTypes>;
-
-  private constructor() {
-    this.properties = [
-      this.src, this.tSrc, this.dst, this.tDst, this.event, this.guard, this.action, this.tText];
-  }
-  static instance = new TransitionTemplate();
-}
-
 export type TransitionType = 'transition';
 
 export class Transition implements DataContextObject {
-  readonly template = TransitionTemplate.instance;
+  readonly template = transitionTemplate;
   readonly context: StatechartContext;
 
   readonly type: TransitionType = 'transition';
@@ -200,42 +166,22 @@ export class Transition implements DataContextObject {
 
   // Derived properties.
   parent: Statechart | undefined;
-
-  [pSrc]: PointAndNormal;
-  [pDst]: PointAndNormal;
-  [transitionBezier]: BezierCurve;
-  [transitionTextPoint]: Point;
-  [transitionText]: string;
-  [transitionTextWidth]: number;
+  pSrc: PointAndNormal;
+  pDst: PointAndNormal;
+  bezier: BezierCurve;
+  textPoint: Point;
+  text: string;
+  textWidth: number;
 
   constructor(context: StatechartContext) {
     this.context = context;
   }
 }
 
-class StatechartTemplate implements DataObjectTemplate {
-  x = new ScalarProp('x');
-  y = new ScalarProp('y');
-  width = new ScalarProp('width');
-  height = new ScalarProp('height');
-  name = new ScalarProp('name');
-
-  states = new ArrayProp('states');
-  transitions = new ArrayProp('transitions');
-
-  properties: Array<PropertyTypes>;
-
-  private constructor() {
-    this.properties = [
-      this.x, this.y, this.width, this.height, this.name, this.states, this.transitions];
-  }
-  static instance = new StatechartTemplate();
-}
-
 export type StatechartType = 'statechart';
 
 export class Statechart implements DataContextObject {
-  readonly template = StatechartTemplate.instance;
+  readonly template = statechartTemplate;
   readonly context: StatechartContext;
 
   readonly type: StatechartType = 'statechart';
@@ -256,7 +202,6 @@ export class Statechart implements DataContextObject {
 
   // Derived properties.
   parent: State | undefined;
-
   globalPosition: Point;
 
   constructor(context: StatechartContext) {
@@ -417,14 +362,14 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
 
   forInTransitions(state: StateTypes, visitor: TransitionVisitor) {
-    const inputs = state[inTransitions];
+    const inputs = state.inTransitions;
     if (!inputs)
       return;
     inputs.forEach((input, i) => visitor(input));
   }
 
   forOutTransitions(state: StateTypes, visitor: TransitionVisitor) {
-    const outputs = state[outTransitions];
+    const outputs = state.outTransitions;
     if (!outputs)
       return;
     outputs.forEach((output, i) => visitor(output));
@@ -876,8 +821,8 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     state.parent = parent;
     this.initializeItem(state);
 
-    state[inTransitions] = new Array<Transition>();
-    state[outTransitions] = new Array<Transition>();
+    state.inTransitions = new Array<Transition>();
+    state.outTransitions = new Array<Transition>();
 
     if (state.type === 'state' && state.statecharts) {
       const self = this;
@@ -913,12 +858,12 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     const src = transition.src,
           dst = transition.dst;
     if (src) {
-      const outputs = src[outTransitions];
+      const outputs = src.outTransitions;
       if (outputs)
         outputs.push(transition);
     }
     if (dst) {
-      const inputs = dst[inTransitions];
+      const inputs = dst.inTransitions;
       if (inputs)
         inputs.push(transition);
     }
@@ -935,12 +880,12 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       }
     }
     if (src) {
-      const outputs = src[outTransitions];
+      const outputs = src.outTransitions;
       if (outputs)
         remove(outputs, transition);
     }
     if (dst) {
-      const inputs = dst[inTransitions];
+      const inputs = dst.inTransitions;
       if (inputs)
         remove(inputs, transition);
     }
@@ -1143,7 +1088,7 @@ class Renderer {
   getItemRect(item: AllTypes) : Rect {
     let x, y, width, height;
     if (item.type == 'transition') {
-      const extents = getExtents(item[transitionBezier]);
+      const extents = getExtents(item.bezier);
       x = extents.xmin;
       y = extents.ymin;
       width = extents.xmax - x;
@@ -1250,16 +1195,16 @@ class Renderer {
       height = Math.max(height, stateOffsetY);
     }
     if (state.entry && this.ctx) {
-      state[entryText] = 'entry/ ' + state.entry;
-      state[entryY] = height;
+      state.entryText = 'entry/ ' + state.entry;
+      state.entryY = height;
       height += lineSpacing;
-      width = Math.max(width, this.ctx.measureText(state[entryText]).width + 2 * theme.padding);
+      width = Math.max(width, this.ctx.measureText(state.entryText).width + 2 * theme.padding);
     }
     if (state.exit && this.ctx) {
-      state[exitText] = 'exit/ ' + state.exit;
-      state[exitY] = height;
+      state.exitText = 'exit/ ' + state.exit;
+      state.exitY = height;
       height += lineSpacing;
-      width = Math.max(width, this.ctx.measureText(state[exitText]).width + 2 * theme.padding);
+      width = Math.max(width, this.ctx.measureText(state.exitText).width + 2 * theme.padding);
     }
     width = Math.max(width, theme.stateMinWidth);
     height = Math.max(height, theme.stateMinHeight);
@@ -1311,8 +1256,8 @@ class Renderer {
     const self = this,
           src = transition.src,
           dst = transition.dst,
-          p1 = src ? this.stateParamToPoint(src, transition.tSrc) : transition[pSrc],
-          p2 = dst ? this.stateParamToPoint(dst, transition.tDst) : transition[pDst];
+          p1 = src ? this.stateParamToPoint(src, transition.tSrc) : transition.pSrc,
+          p2 = dst ? this.stateParamToPoint(dst, transition.tDst) : transition.pDst;
     // If we're in an intermediate state, don't layout.
     if (!p1 || !p2)
       return;
@@ -1351,8 +1296,8 @@ class Renderer {
       bezier[3] = projection;
       bezier[2] = to;
     }
-    transition[transitionBezier] = bezier;
-    transition[transitionTextPoint] = evaluateBezier(bezier, transition.tText);
+    transition.bezier = bezier;
+    transition.textPoint = evaluateBezier(bezier, transition.tText);
     let text = '', textWidth = 0;
     if (this.ctx) {
       const ctx = this.ctx,
@@ -1370,8 +1315,8 @@ class Renderer {
         textWidth += ctx.measureText(transition.action).width + 2 * padding;
       }
     }
-    transition[transitionText] = text;
-    transition[transitionTextWidth] = textWidth;
+    transition.text = text;
+    transition.textWidth = textWidth;
   }
   // Layout a statechart item.
   layout(item: AllTypes) {
@@ -1428,10 +1373,10 @@ class Renderer {
           ctx.fillText(state.name, x + r, y + textSize);
         }
         if (state.entry) {
-          ctx.fillText(state[entryText]!, x + r, y + state[entryY]! + textSize);
+          ctx.fillText(state.entryText!, x + r, y + state.entryY! + textSize);
         }
         if (state.exit) {
-          ctx.fillText(state[exitText]!, x + r, y + state[exitY]! + textSize);
+          ctx.fillText(state.exitText!, x + r, y + state.exitY! + textSize);
         }
 
         const statecharts = state.statecharts;
@@ -1614,7 +1559,7 @@ class Renderer {
 
     const theme = this.theme_,
           r = theme.knobbyRadius,
-          bezier = transition[transitionBezier];
+          bezier = transition.bezier;
     bezierEdgePath(bezier, ctx, theme.arrowSize);
     switch (mode) {
       case RenderMode.Normal:
@@ -1622,7 +1567,7 @@ class Renderer {
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 1;
         ctx.stroke();
-        const pt = transition[transitionTextPoint];
+        const pt = transition.textPoint;
         if (mode !== RenderMode.Print) {
           const r = theme.radius / 2;
           roundRectPath(pt.x - r, pt.y - r, theme.radius, theme.radius, r, ctx);
@@ -1632,7 +1577,7 @@ class Renderer {
           ctx.stroke();
         }
         ctx.fillStyle = theme.textColor;
-        ctx.fillText(transition[transitionText], pt.x + theme.padding, pt.y + theme.fontSize);
+        ctx.fillText(transition.text, pt.x + theme.padding, pt.y + theme.fontSize);
         break;
       case RenderMode.Highlight:
         ctx.strokeStyle = theme.highlightColor;
@@ -1648,7 +1593,7 @@ class Renderer {
   }
   hitTestTransition(
       transition: Transition, p: Point, tol: number, mode: RenderMode) : TransitionHitResult | undefined {
-    const inner = hitTestBezier(transition[transitionBezier], p, tol);
+    const inner = hitTestBezier(transition.bezier, p, tol);
     if (inner) {
       return { type: 'transition', item: transition, inner: inner };
     }
@@ -2271,7 +2216,7 @@ class Editor {
             cp0 = this.getCanvasPosition(canvasController, p0);
       // Start the new transition as connecting the src state to itself.
       newTransition = context.newTransition(state, undefined);
-      newTransition[pSrc] = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };
+      newTransition.pSrc = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };
       newTransition.tText = 0.5; // initial property attachment at midpoint.
       drag = {
         type: 'connectTransitionSrc',
