@@ -6,6 +6,11 @@ import * as Data from '../src/dataModels';
 
 //------------------------------------------------------------------------------
 
+describe('DataContext', () => {
+  test('cloning', () => {
+  });
+});
+
 describe('DataModel', () => {
   test('constructor', () => {
     const root: any = {},

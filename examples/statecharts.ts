@@ -11,7 +11,7 @@ import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
          evaluateBezier, CurveHitResult } from '../src/geometry'
 
 import { ScalarProp, ArrayProp, ReferencedObject, ReferenceProp,
-         DataContext, DataContextObject, EventBase, Change, ChangeEvents,
+         DataContext, DataContextObject, FactoryContext, EventBase, Change, ChangeEvents,
          getLowestCommonAncestor, reduceToRoots, List,
          TransactionManager, HistoryManager } from '../src/dataModels'
 
@@ -239,7 +239,7 @@ export interface GraphInfo {
 }
 
 export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
-                               implements DataContext {
+                               implements DataContext, FactoryContext {
   private highestId_: number = 0;  // 0 stands for no id.
   private stateMap_ = new Map<number, State | Pseudostate>();
 
@@ -584,62 +584,19 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     this.historyManager.redo();
   }
 
-  private cloneProperties(item: AllTypes, newItem: AllTypes) {
-    for (let key in item) {
-      if (key[0] !== '_') continue;
-      (newItem as any)[key] = (item as any)[key];
+  // FactoryContext interface implementation.
+  construct(original: AllTypes) : AllTypes {
+    switch (original.type) {
+      case 'state':
+        return this.newState();
+      case 'pseudostate':
+        return this.newPseudostate(original.subtype);
+      case 'transition':
+        return this.newTransition(undefined, undefined);
+      case 'statechart':
+        return this.newStatechart();
     }
   }
-
-  copy(items: AllTypes[]) : AllTypes[] {
-      const map = new Map<number, StateTypes>();
-      function copyObject(src: AllTypes) {
-      switch (src.type) {
-        case 'state': {
-          const state = this.newState();
-          map.set(state.id, state);
-          return state;
-        }
-        case 'pseudostate':
-          return this.newPseudostate(src.subtype);
-        case 'transition':
-          return this.newTransition(undefined, undefined);
-        case 'statechart':
-          return this.newStatechart();
-      }
-
-    }
-    return [];
-  }
-  private cloneItem(item: AllTypes, map: Map<number, StateTypes>) : AllTypes {
-    switch (item.type) {
-      case 'state': {
-        const newState = this.newState();
-        this.cloneProperties(item, newState);
-        map.set(newState.id, newState);
-        return newState;
-      }
-      case 'pseudostate': {
-        let newPseudostate = this.newPseudostate(item.subtype);
-        this.cloneProperties(item, newPseudostate);
-        map.set(newPseudostate.id, newPseudostate);
-        return newPseudostate;
-      }
-      case 'transition': {
-        const src = item.src,
-              dst = item.dst,
-              newTransition = this.newTransition(src, dst);
-        return newTransition;
-      }
-      case 'statechart': {
-        const newStatechart = this.newStatechart();
-        this.cloneProperties(item, newStatechart);
-        return newStatechart;
-      }
-    }
-  }
-  // cloneItems(items: AllTypes[]) : AllTypes[] {
-  // }
 
   deleteItem(item: AllTypes) {
     if (item.parent) {
@@ -650,7 +607,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       else
         item.parent.states.remove(item);
     }
-    // TODO update selection.
+    this.selection.delete(item);
   }
 
   deleteItems(items: Array<AllTypes>) {
@@ -914,6 +871,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       this.removeState_(item);
   }
 
+  // DataContext interface implementation.
   valueChanged(owner: AllTypes, attr: string, oldValue: any) : void {
     if (owner.type === 'transition') {
       // Remove and reinsert changed transitions.
@@ -935,7 +893,6 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     this.removeItem_(oldValue);
     this.onElementRemoved(owner, attr, index, oldValue);
   }
-
   resolveReference(owner: AllTypes, cacheKey: symbol, id: number) : StateTypes | undefined {
     // Try to get cached referent.
     let target = (owner as any)[cacheKey];

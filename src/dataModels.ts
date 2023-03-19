@@ -187,38 +187,72 @@ export class ReferenceProp {
 
 // Cloning.
 
-interface CloningContext {
-  clone: (obj: DataContextObject, map: Map<number, DataContextObject>) => DataContextObject;
-  remap: (obj: DataContextObject, map: Map<number, number>) => void;
+export interface FactoryContext {
+  construct: (obj: DataContextObject) => DataContextObject;
 }
 
-export function copyItem(
-    item: DataContextObject, context: CloningContext) : DataContextObject {
-  return context.clone(item, new Map<number, DataContextObject>());
-}
-export function copyItems(
-    items: DataContextObject[], context: CloningContext) : DataContextObject[] {
-  const result = new Array<DataContextObject>();
-  return result;
-}
-
-export function copyProperties(source: DataContextObject, target: DataContextObject, ) {
-  const properties = source.template.properties;
+function copyItem(
+    original: DataContextObject,
+    context: FactoryContext,
+    map: Map<number, ReferencedObject>) : DataContextObject {
+  const copy = context.construct(original),
+        properties = original.template.properties;
   for (let prop of properties) {
     switch (prop.type) {
       case 'scalar':
-        prop.set(target, prop.get(source));
+        prop.set(copy, prop.get(original));
         break;
       case 'array':
-        const sourceList = prop.get(source),
-              targetList = prop.get(target);
-        sourceList.forEach((element: any) => targetList.append(element));
+        const sourceList = prop.get(original),
+              targetList = prop.get(copy);
+        sourceList.forEach(original => {
+          const copy = copyItem(original, context, map);
+          targetList.append(copy);
+        });
         break;
       case 'reference':
-        prop.set(target, prop.get(source));
+        prop.set(copy, prop.get(original));
         break;
     }
   }
+  return copy;
+}
+
+function remapItem(copy: DataContextObject, map: Map<number, ReferencedObject>) {
+  const properties = copy.template.properties;
+  for (let prop of properties) {
+    switch (prop.type) {
+      case 'scalar':
+        break;
+      case 'array':
+        const list = prop.get(copy);
+        list.forEach(copy => remapItem(copy, map));
+        break;
+      case 'reference':
+        const reference: ReferencedObject | undefined = prop.get(copy);
+        if (reference) {
+          const original = map.get(reference.id);
+          if (original) {
+            prop.set(copy, original);
+          }
+        }
+        break;
+    }
+  }
+}
+
+export function copyItems(
+    items: DataContextObject[], context: FactoryContext) :
+    DataContextObject[] {
+  const map = new Map<number, ReferencedObject>(),
+        copies = new Array<DataContextObject>();
+  for (let item of items) {
+    copies.push(copyItem(item, context, map));
+  }
+  for (let copy of copies)  {
+    remapItem(copy, map);
+  }
+  return copies;
 }
 
 //------------------------------------------------------------------------------
