@@ -7,18 +7,28 @@ import { SelectionSet } from './collections';
 //   hierarchy, references.
 // Interfaces adapt the raw data for type safe use.
 
-export interface DataContext<TObject extends DataContextObject = DataContextObject,
-                             TReferent extends ReferencedObject = ReferencedObject,
-                             TArrayElement = any> {
-  valueChanged(owner: TObject, attr: string, oldValue: any) : void;
-  elementInserted(owner: TObject, attr: string, index: number, value: TArrayElement) : void;
-  elementRemoved(owner: TObject, attr: string, index: number, oldValue: TArrayElement) : void;
-  resolveReference(owner: TObject, cacheKey: symbol, id: number) : TReferent | undefined;
+export interface DataContext {
+  valueChanged(
+      owner: DataContextObject, attr: string, oldValue: any) : void;
+  elementInserted(
+      owner: DataContextObject, attr: string, index: number, value: DataContextObject) : void;
+  elementRemoved(
+      owner: DataContextObject, attr: string, index: number, oldValue: DataContextObject) : void;
+  resolveReference(
+      owner: DataContextObject, cacheKey: symbol, id: number) : ReferencedObject | undefined;
 }
 
 export interface DataContextObject {
   readonly template: DataObjectTemplate
   readonly context: DataContext;
+}
+
+export interface DataObjectTemplate {
+  readonly properties: Array<PropertyTypes>;
+}
+
+export interface ReferencedObject {
+  readonly id: number;
 }
 
 //------------------------------------------------------------------------------
@@ -116,6 +126,8 @@ class DataList implements List {
 
 // Simple property descriptors.
 
+export type PropertyTypes = ScalarProp | ReferenceProp | ArrayProp;
+
 export class ScalarProp {
   readonly name: string;
   readonly type: 'scalar';
@@ -146,11 +158,6 @@ export class ArrayProp {
   }
 }
 
-// Only objects with 'id' field can be referenced.
-export interface ReferencedObject extends Object {
-  readonly id: number;
-}
-
 export class ReferenceProp {
   readonly name: string;
   readonly type: 'reference';
@@ -176,39 +183,43 @@ export class ReferenceProp {
   }
 }
 
-export type PropertyTypes = ScalarProp | ReferenceProp | ArrayProp;
-
-export interface DataObjectTemplate {
-  readonly properties: Array<PropertyTypes>;
-}
-
 //------------------------------------------------------------------------------
 
 // Cloning.
 
-// export function copyProperties<T extends DataContextObject>(source: T, target: T) {
-//   const properties = source.template.properties;
-//   for (let prop of properties) {
-//     switch (prop.type) {
-//       case 'scalar':
-//         prop.set(target, (prop as ScalarProp).get(source));
-//         break;
-//       case 'array':
-//         const sourceList = prop.get(source),
-//               targetList = prop.get(target);
-//         sourceList.forEach((element: any) => targetList.append(element));
-//         break;
-//       case 'reference':
-//         prop.set(target, prop.get(source));
-//         break;
-//     }
-//   }
-// }
+interface CloningContext {
+  clone: (obj: DataContextObject, map: Map<number, DataContextObject>) => DataContextObject;
+  remap: (obj: DataContextObject, map: Map<number, number>) => void;
+}
 
-// interface CloningContext {
-//   clone: (obj: DataContextObject, map: Map<number, DataContextObject>) => DataContextObject;
-//   remap: (obj: DataContextObject, map: Map<number, number>) => void;
-// }
+export function copyItem(
+    item: DataContextObject, context: CloningContext) : DataContextObject {
+  return context.clone(item, new Map<number, DataContextObject>());
+}
+export function copyItems(
+    items: DataContextObject[], context: CloningContext) : DataContextObject[] {
+  const result = new Array<DataContextObject>();
+  return result;
+}
+
+export function copyProperties(source: DataContextObject, target: DataContextObject, ) {
+  const properties = source.template.properties;
+  for (let prop of properties) {
+    switch (prop.type) {
+      case 'scalar':
+        prop.set(target, prop.get(source));
+        break;
+      case 'array':
+        const sourceList = prop.get(source),
+              targetList = prop.get(target);
+        sourceList.forEach((element: any) => targetList.append(element));
+        break;
+      case 'reference':
+        prop.set(target, prop.get(source));
+        break;
+    }
+  }
+}
 
 //------------------------------------------------------------------------------
 

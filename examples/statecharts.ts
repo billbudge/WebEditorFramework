@@ -17,7 +17,8 @@ import { ScalarProp, ArrayProp, ReferencedObject, ReferenceProp,
 
 //------------------------------------------------------------------------------
 
-// Implement type-safe interfaces to statechart raw data.
+// Implement type-safe interfaces as well as a raw data interface for
+// cloning, serialization, etc.
 
 const stateTemplate = (function() {
   const x = new ScalarProp('x'),
@@ -238,7 +239,7 @@ export interface GraphInfo {
 }
 
 export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
-                               implements DataContext<AllTypes, StateTypes, AllTypes> {
+                               implements DataContext {
   private highestId_: number = 0;  // 0 stands for no id.
   private stateMap_ = new Map<number, State | Pseudostate>();
 
