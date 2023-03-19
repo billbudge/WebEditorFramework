@@ -585,16 +585,26 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
 
   // FactoryContext interface implementation.
-  construct(original: AllTypes) : AllTypes {
+  construct(original: AllTypes, map: Map<number, ReferencedObject>) : AllTypes {
     switch (original.type) {
-      case 'state':
-        return this.newState();
-      case 'pseudostate':
-        return this.newPseudostate(original.subtype);
-      case 'transition':
+      case 'state': {
+        const result = this.newState();
+        map.set(original.id, result);
+        this.stateMap_.set(result.id, result);
+        return result;
+      }
+      case 'pseudostate': {
+        const result = this.newPseudostate(original.subtype);
+        map.set(original.id, result);
+        this.stateMap_.set(result.id, result);
+        return result;
+      }
+      case 'transition': {
         return this.newTransition(undefined, undefined);
-      case 'statechart':
+      }
+      case 'statechart': {
         return this.newStatechart();
+      }
     }
   }
 

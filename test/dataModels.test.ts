@@ -6,10 +6,164 @@ import * as Data from '../src/dataModels';
 
 //------------------------------------------------------------------------------
 
+class TestDataContext implements Data.DataContext, Data.FactoryContext {
+  valueChange: any;
+  elementInsert: any;
+  elementRemove: any;
+  resolvedReference: any;
+
+  map = new Map<number, TestDataContextObject>();
+  registerObject(obj: TestDataContextObject) {
+    this.map.set(obj.id, obj);
+  }
+
+  valueChanged(
+    owner: TestDataContextObject, attr: string, oldValue: any) : void {
+      this.valueChange = { owner, attr, oldValue };
+    }
+  elementInserted(
+      owner: TestDataContextObject, attr: string, index: number, value: TestDataContextObject) : void {
+    this.elementInsert = { owner, attr, index, value };
+  }
+  elementRemoved(
+      owner: TestDataContextObject, attr: string, index: number, oldValue: TestDataContextObject) : void {
+    this.elementRemove = { owner, attr, index, oldValue };
+  }
+  resolveReference(
+      owner: TestDataContextObject, cacheKey: symbol, id: number) : TestDataContextObject | undefined {
+    this.resolvedReference = { owner, cacheKey, id };
+    return this.map.get(id);
+  }
+
+  construct(obj: TestDataContextObject, map: Map<number, TestDataContextObject>) : TestDataContextObject {
+    const result = new TestDataContextObject(this);
+    map.set(obj.id, result);
+    this.registerObject(result);
+    return result;
+  }
+}
+
+class TestDataObjectTemplate implements Data.DataObjectTemplate {
+  x: Data.ScalarProp;
+  array: Data.ArrayProp;
+  reference: Data.ReferenceProp;
+  properties: Data.PropertyTypes[];
+  constructor() {
+    this.x = new Data.ScalarProp('x');
+    this.array = new Data.ArrayProp('array');
+    this.reference = new Data.ReferenceProp('reference');
+    this.properties = [this.x, this.array, this.reference];
+  }
+}
+
+class TestDataContextObject implements Data.DataContextObject, Data.ReferencedObject {
+  context: TestDataContext;
+  template: TestDataObjectTemplate;
+
+  id: number;
+  static nextId = 1;
+
+  constructor(context: TestDataContext) {
+    this.context = context;
+    this.template = new TestDataObjectTemplate();
+    this.id = TestDataContextObject.nextId++;
+    this.context.registerObject(this);
+  }
+  get x() { return this.template.x.get(this); }
+  set x(value: number) { this.template.x.set(this, value); }
+  get array() { return this.template.array.get(this) as Data.List<TestDataContextObject>; }
+  get reference() { return this.template.reference.get(this) as TestDataContextObject; }
+  set reference(value: TestDataContextObject) { this.template.reference.set(this, value); }
+}
+
 describe('DataContext', () => {
+  test('ScalarProp', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context);
+
+    expect(item.x).toBeUndefined();
+    item.x = 1;
+    expect(item.x).toBe(1);
+    expect(context.valueChange.owner).toBe(item);
+    expect(context.valueChange.attr).toBe('_x');
+    expect(context.valueChange.oldValue).toBeUndefined();
+  });
+  test('ArrayProp', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context);
+
+    expect(item.array.length).toBe(0);
+    const child1 = new TestDataContextObject(context);
+    item.array.append(child1);
+    expect(item.array.length).toBe(1);
+    expect(item.array.at(0)).toBe(child1);
+    expect(() => item.array.at(1)).toThrow(RangeError);
+    expect(context.elementInsert.owner).toBe(item);
+    expect(context.elementInsert.attr).toBe('_array');
+    expect(context.elementInsert.index).toBe(0);
+    expect(context.elementInsert.value).toBe(child1);
+
+    const child2 = new TestDataContextObject(context);
+    item.array.insert(child2, 0);
+    expect(item.array.length).toBe(2);
+    expect(item.array.at(0)).toBe(child2);
+    expect(item.array.at(1)).toBe(child1);
+    expect(item.array.indexOf(child1)).toBe(1);
+    expect(item.array.indexOf(child2)).toBe(0);
+
+    item.array.remove(child2);
+    expect(context.elementRemove.owner).toBe(item);
+    expect(context.elementRemove.attr).toBe('_array');
+    expect(context.elementRemove.index).toBe(0);
+    expect(context.elementRemove.oldValue).toBe(child2);
+  });
+  test('ReferenceProp', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          child1 = new TestDataContextObject(context);
+
+    expect(item.reference).toBeUndefined();
+    item.reference = child1;
+    expect(item.reference).toBe(child1);
+    expect(context.resolvedReference.owner).toBe(item);
+    expect(context.resolvedReference.cacheKey).toBe(item.template.reference.cacheKey);
+    expect(context.resolvedReference.id).toBe(child1.id);
+  });
   test('cloning', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          child1 = new TestDataContextObject(context),
+          child2 = new TestDataContextObject(context),
+          child3 = new TestDataContextObject(context);
+
+    item.array.append(child1);
+    item.array.append(child2);
+    child2.array.append(child3);
+    child1.reference = child2;
+    child2.reference = child3;
+    child3.reference = item;  // to parent, outside cloned graph.
+
+    const clone1 = Data.copyItems([child1, child2], context),
+          child1Clone = clone1[0] as TestDataContextObject,
+          child2Clone = clone1[1] as TestDataContextObject,
+          child3Clone = child2Clone.array.at(0) as TestDataContextObject;
+
+    expect(clone1.length).toBe(2);  // 2 top level items.
+    expect(child1Clone.reference).toBe(child2Clone);
+    expect(child2Clone.reference).toBe(child3Clone);
+    expect(child3Clone.reference).toBe(item);  // |item| was not cloned.
   });
 });
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
 
 describe('DataModel', () => {
   test('constructor', () => {

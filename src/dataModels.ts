@@ -128,9 +128,12 @@ class DataList implements List {
 
 export type PropertyTypes = ScalarProp | ReferenceProp | ArrayProp;
 
+export type ScalarPropertyType = 'scalar';
+
 export class ScalarProp {
   readonly name: string;
-  readonly type: 'scalar';
+  readonly type: ScalarPropertyType = 'scalar';
+
   get(owner: DataContextObject) : any {
     return (owner as any)[this.name];
   }
@@ -145,22 +148,25 @@ export class ScalarProp {
   }
 }
 
+export type ArrayPropertyType = 'array';
+
 export class ArrayProp {
   readonly name: string;
-  readonly type: 'array';
+  readonly type: ArrayPropertyType = 'array';
 
   get(owner: DataContextObject) : List<any> {
     return new DataList(owner, this.name);
   }
-
   constructor(name: string) {
     this.name = '_' + name;  // Rename to avoid name conflicts.
   }
 }
 
+export type ReferencePropertyType = 'reference';
+
 export class ReferenceProp {
   readonly name: string;
-  readonly type: 'reference';
+  readonly type: ReferencePropertyType = 'reference';
   readonly prop: ScalarProp;
   readonly cacheKey: symbol;
 
@@ -187,15 +193,16 @@ export class ReferenceProp {
 
 // Cloning.
 
+// TODO roll this into DataContext.
 export interface FactoryContext {
-  construct: (obj: DataContextObject) => DataContextObject;
+  construct: (obj: DataContextObject, map: Map<number, ReferencedObject>) => DataContextObject;
 }
 
 function copyItem(
     original: DataContextObject,
     context: FactoryContext,
     map: Map<number, ReferencedObject>) : DataContextObject {
-  const copy = context.construct(original),
+  const copy = context.construct(original, map),
         properties = original.template.properties;
   for (let prop of properties) {
     switch (prop.type) {
@@ -203,11 +210,11 @@ function copyItem(
         prop.set(copy, prop.get(original));
         break;
       case 'array':
-        const sourceList = prop.get(original),
-              targetList = prop.get(copy);
-        sourceList.forEach(original => {
+        const originalList = prop.get(original),
+              copyList = prop.get(copy);
+        originalList.forEach(original => {
           const copy = copyItem(original, context, map);
-          targetList.append(copy);
+          copyList.append(copy);
         });
         break;
       case 'reference':
