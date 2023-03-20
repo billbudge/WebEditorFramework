@@ -21,7 +21,8 @@ import { ScalarProp, ArrayProp, ReferencedObject, ReferenceProp,
 // cloning, serialization, etc.
 
 const stateTemplate = (function() {
-  const x = new ScalarProp('x'),
+  const typeName = 'state',
+        x = new ScalarProp('x'),
         y = new ScalarProp('y'),
         width = new ScalarProp('width'),
         height = new ScalarProp('height'),
@@ -30,18 +31,20 @@ const stateTemplate = (function() {
         exit = new ScalarProp('exit'),
         statecharts = new ArrayProp('statecharts'),
         properties = [x, y, width, height, name, entry, exit];
-  return { x, y, width, height, name, entry, exit, statecharts, properties };
+  return { typeName, x, y, width, height, name, entry, exit, statecharts, properties };
 })();
 
 const pseudostateTemplate = (function() {
-  const x = new ScalarProp('x'),
+  const typeName = 'pseudostate',
+        x = new ScalarProp('x'),
         y = new ScalarProp('y'),
         properties = [x, y];
-  return { x, y, properties };
+  return { typeName, x, y, properties };
 })();
 
 const transitionTemplate = (function() {
-  const src = new ReferenceProp('src'),
+  const typeName = 'transition',
+        src = new ReferenceProp('src'),
         tSrc = new ScalarProp('tSrc'),
         dst = new ReferenceProp('dst'),
         tDst = new ScalarProp('tDst'),
@@ -52,11 +55,12 @@ const transitionTemplate = (function() {
         tText = new ScalarProp('tText'),
         properties = [src, tSrc, dst, tDst, event, guard, action, tText];
 
-  return { src, tSrc, dst, tDst, event, guard, action, tText, properties };
+  return { typeName, src, tSrc, dst, tDst, event, guard, action, tText, properties };
 })();
 
 const statechartTemplate = (function() {
-  const x = new ScalarProp('x'),
+  const typeName = 'statechart',
+        x = new ScalarProp('x'),
         y = new ScalarProp('y'),
         width = new ScalarProp('width'),
         height = new ScalarProp('height'),
@@ -66,16 +70,13 @@ const statechartTemplate = (function() {
         transitions = new ArrayProp('transitions'),
         properties = [x, y, width, height, name, states, transitions];
 
-  return { x, y, width, height, name, states, transitions, properties };
+  return { typeName, x, y, width, height, name, states, transitions, properties };
 })();
-
-export type StateType = 'state';
 
 export class State implements DataContextObject, ReferencedObject {
   readonly template = stateTemplate;
   readonly context: StatechartContext;
 
-  readonly type: StateType = 'state';
   readonly id: number;
 
   get x() { return this.template.x.get(this) || 0; }
@@ -111,14 +112,12 @@ export class State implements DataContextObject, ReferencedObject {
   }
 }
 
-export type PseudostateType = 'pseudostate';
 export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
 
 export class Pseudostate implements DataContextObject, ReferencedObject {
   readonly template = pseudostateTemplate;
   readonly context: StatechartContext;
 
-  readonly type: PseudostateType = 'pseudostate';
   readonly subtype: PseudostateSubtype;
   readonly id: number;
 
@@ -140,13 +139,9 @@ export class Pseudostate implements DataContextObject, ReferencedObject {
   }
 }
 
-export type TransitionType = 'transition';
-
 export class Transition implements DataContextObject {
   readonly template = transitionTemplate;
   readonly context: StatechartContext;
-
-  readonly type: TransitionType = 'transition';
 
   get src() { return this.template.src.get(this) as StateTypes | undefined; }
   set src(value: StateTypes | undefined) { this.template.src.set(this, value); }
@@ -179,13 +174,9 @@ export class Transition implements DataContextObject {
   }
 }
 
-export type StatechartType = 'statechart';
-
 export class Statechart implements DataContextObject {
   readonly template = statechartTemplate;
   readonly context: StatechartContext;
-
-  readonly type: StatechartType = 'statechart';
 
   get x() { return this.template.x.get(this) || 0; }
   set x(value: number) { this.template.x.set(this, value); }
@@ -296,9 +287,9 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   visitAll(item: AllTypes, visitor: StatechartVisitor) : void {
     const self = this;
     visitor(item);
-    if (item.type === 'state') {
+    if (item instanceof State) {
       item.statecharts.forEach(t => self.visitAll(t, visitor));
-    } else if  (item.type === 'statechart') {
+    } else if (item instanceof Statechart) {
       item.states.forEach(t => self.visitAll(t, visitor));
       item.transitions.forEach(t => self.visitAll(t, visitor));
     }
@@ -309,9 +300,9 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
   reverseVisitAll(item: AllTypes, visitor: StatechartVisitor) : void {
     const self = this;
-    if (item.type === 'state') {
+    if (item instanceof State) {
       item.statecharts.forEach(t => self.reverseVisitAll(t, visitor));
-    } else if  (item.type === 'statechart') {
+    } else if  (item instanceof Statechart) {
       item.states.forEach(t => self.reverseVisitAll(t, visitor));
       item.transitions.forEach(t => self.reverseVisitAll(t, visitor));
     }
@@ -324,34 +315,20 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
 
   visitNonTransitions(item: NonTransitionTypes, visitor: NonTransitionVisitor) : void {
     const self = this;
-    if (item.type === 'state') {
+    if (item instanceof State) {
       visitor(item);
       item.statecharts.forEach(item => self.visitNonTransitions(item, visitor));
-    } else if (item.type === 'pseudostate') {
+    } else if (item instanceof Pseudostate) {
       visitor(item);
-    } else if (item.type === 'statechart') {
+    } else if (item instanceof Statechart) {
       visitor(item);
       item.states.forEach(item => self.visitNonTransitions(item, visitor));
     }
   }
 
   private initializeItem(item: AllTypes) {
-    switch (item.type) {
-      case 'state': {
-        this.setGlobalPosition(item);
-        break;
-      }
-      case 'pseudostate': {
-        this.setGlobalPosition(item);
-        break;
-      }
-      case 'statechart': {
-        this.setGlobalPosition(item);
-        break;
-      }
-      case 'transition': {
-        break;
-      }
+    if (item instanceof State || item instanceof Pseudostate || item instanceof Statechart) {
+      this.setGlobalPosition(item);
     }
   }
 
@@ -432,9 +409,9 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     // First collect states and statecharts.
     items.forEach(item => {
       this.visitAll(item, item => {
-        if (item.type === 'state')
+        if (item instanceof State)
           states.add(item);
-        else if (item.type === 'statechart')
+        else if (item instanceof Statechart)
           statecharts.add(item);
       });
       });
@@ -461,7 +438,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
           }
         }
       }
-      if (item.type === 'state' || item.type === 'pseudostate') {
+      if (item instanceof State || item instanceof Pseudostate) {
         self.forInTransitions(item, addTransition);
         self.forOutTransitions(item, addTransition);
       }
@@ -517,10 +494,10 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   // without violating statechart constraints.
   canAddState(state: StateTypes, statechart: Statechart) : boolean {
     // The only constraint is that there can't be two start states in a statechart.
-    if (state.type !== 'pseudostate' || state.subtype !== 'start')
+    if (!(state instanceof Pseudostate) || state.subtype !== 'start')
       return true;
     for (let child of statechart.states.asArray()) {
-      if (child !== state && child.type === 'pseudostate' && child.subtype === 'start')
+      if (child !== state && child instanceof Pseudostate && child.subtype === 'start')
         return false;
     }
     return true;
@@ -528,13 +505,13 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
 
   isValidTransition(src: StateTypes, dst: StateTypes) : boolean {
     // No transition to self for pseudostates.
-    if (src === dst) return src.type === 'state';
+    if (src === dst) return src instanceof State;
     // No transitions to a start pseudostate.
-    if (dst.type === 'pseudostate' && dst.subtype === 'start') return false;
+    if (dst instanceof Pseudostate && dst.subtype === 'start') return false;
     // No transitions from a stop pseudostate.
-    if (src.type === 'pseudostate' && src.subtype === 'stop') return false;
+    if (src instanceof Pseudostate && src.subtype === 'stop') return false;
     // No transitions out of parent state for start or history pseudostates.
-    if (src.type === 'pseudostate' && (
+    if (src instanceof Pseudostate && (
         src.subtype === 'start' || src.subtype === 'history' || src.subtype === 'history*')) {
       const srcParent = src.parent,
             dstParent = dst.parent;
@@ -545,14 +522,14 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     const lca = getLowestCommonAncestor<AllTypes>(src, dst);
     if (!lca) return false;
     // Allow transitions between a super state and its child states.
-    if (lca.type === 'state')
+    if (lca instanceof State)
       return src === this.getGrandParent(dst);
-    return lca.type === 'statechart';
+    return lca instanceof Statechart;
   }
 
   findChildStatechart(superState: State, child: StateTypes | Transition) : Statechart | undefined {
     for (let statechart of superState.statecharts.asArray()) {
-      if (child.type === 'transition' || this.canAddState(child, statechart)) {
+      if (child instanceof Transition || this.canAddState(child, statechart)) {
         return statechart;
       }
     }
@@ -586,33 +563,32 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
 
   // FactoryContext interface implementation.
   construct(original: AllTypes, map: Map<number, ReferencedObject>) : AllTypes {
-    switch (original.type) {
-      case 'state': {
-        const result = this.newState();
-        map.set(original.id, result);
-        this.stateMap_.set(result.id, result);
-        return result;
-      }
-      case 'pseudostate': {
-        const result = this.newPseudostate(original.subtype);
-        map.set(original.id, result);
-        this.stateMap_.set(result.id, result);
-        return result;
-      }
-      case 'transition': {
-        return this.newTransition(undefined, undefined);
-      }
-      case 'statechart': {
-        return this.newStatechart();
-      }
+    if (original instanceof State) {
+      const result = this.newState();
+      map.set(original.id, result);
+      this.stateMap_.set(result.id, result);
+      return result;
     }
+    if (original instanceof Pseudostate) {
+      const result = this.newPseudostate(original.subtype);
+      map.set(original.id, result);
+      this.stateMap_.set(result.id, result);
+      return result;
+    }
+    if (original instanceof Transition) {
+      return this.newTransition(undefined, undefined);
+    }
+    if (original instanceof Statechart) {
+      return this.newStatechart();
+    }
+    throw new Error('Unknown type');
   }
 
   deleteItem(item: AllTypes) {
     if (item.parent) {
-      if (item.type === 'transition')
+      if (item instanceof Transition)
         item.parent.transitions.remove(item);
-      else if (item.type === 'statechart')
+      else if (item instanceof Statechart)
         item.parent.statecharts.remove(item);
       else
         item.parent.states.remove(item);
@@ -636,7 +612,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   selectedStates() : Array<StateTypes> {
     const result = new Array<StateTypes>();
     this.selection.forEach(item => {
-      if (item.type === 'state' || item.type === 'pseudostate')
+      if (item instanceof State || item instanceof Pseudostate)
         result.push(item);
     });
     return result;
@@ -647,7 +623,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     // First, replace statecharts by their parent state. We do this by adding parent
     // states to the selection before reducing.
     selection.forEach(function(item: AllTypes) {
-      if (item.type === 'statechart') {
+      if (item instanceof Statechart) {
         selection.delete(item);
         if (item.parent)
           selection.add(item.parent);
@@ -672,10 +648,10 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       parent = this.statechart_;
     if (oldParent === parent)
       return item;
-    if (parent.type === 'state') {
+    if (parent instanceof State) {
       parent = this.findOrCreateChildStatechart(parent, item);
-    } else if (parent.type === 'statechart') {
-      if (item.type !== 'transition') {
+    } else if (parent instanceof Statechart) {
+      if (!(item instanceof Transition)) {
         // If adding a pseudostate to a non-root statechart, add a new statechart to hold it.
         // We allow the exception for the root statechart so we can drag and drop between
         // child statecharts.
@@ -686,7 +662,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       }
     }
     // At this point we can add item to parent.
-    if (item.type === 'state') {
+    if (item instanceof State) {
       const translation = this.getToParent(item, parent);
       item.x += translation.x;
       item.y += translation.y;
@@ -695,10 +671,10 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     if (oldParent)
       this.deleteItem(item);
 
-    if (parent.type === 'statechart') {
-      if (item.type === 'transition') {
+    if (parent instanceof Statechart) {
+      if (item instanceof Transition) {
         parent.transitions.append(item);
-      } else if (item.type === 'state') {
+      } else if (item instanceof State) {
         parent.states.append(item);
       }
     }
@@ -708,10 +684,10 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   addItems(items: AllTypes[], parent: State | Statechart) {
     // Add states first, then transitions, so the context can track transitions.
     for (let item of items) {
-      if (item.type === 'state') this.addItem(item, parent);
+      if (item instanceof State) this.addItem(item, parent);
     }
     for (let item of items) {
-      if (item.type === 'transition') this.addItem(item, parent);
+      if (item instanceof Transition) this.addItem(item, parent);
     }
   }
 
@@ -772,7 +748,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
           valid = false;
     });
     statechart.states.forEach(state => {
-      if (state.type === 'state') {
+      if (state instanceof State) {
         state.statecharts.forEach(statechart => {
           if (!self.isValidStatechart(statechart))
             valid = false;
@@ -792,7 +768,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     state.inTransitions = new Array<Transition>();
     state.outTransitions = new Array<Transition>();
 
-    if (state.type === 'state' && state.statecharts) {
+    if (state instanceof State && state.statecharts) {
       const self = this;
       state.statecharts.forEach(statechart => self.insertStatechart_(statechart, state));
     }
@@ -860,22 +836,22 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
 
   private insertItem_(item: AllTypes, parent: ParentTypes) {
-    if (item.type ==='transition') {
-      if (parent && parent.type === 'statechart')
+    if (item instanceof Transition) {
+      if (parent && parent instanceof Statechart)
         this.insertTransition_(item, parent);
-    } else if (item.type === 'statechart') {
-      if (!parent || parent.type === 'state')
+    } else if (item instanceof Statechart) {
+      if (!parent || parent instanceof State)
         this.insertStatechart_(item, parent);
     } else {
-      if (parent && parent.type === 'statechart')
+      if (parent && parent instanceof Statechart)
         this.insertState_(item, parent);
     }
   }
 
   private removeItem_(item: AllTypes) {
-    if (item.type ==='transition')
+    if (item instanceof Transition)
       this.removeTransition_(item);
-    else if (item.type === 'statechart')
+    else if (item instanceof Statechart)
       this.removeStatechart_(item);
     else
       this.removeState_(item);
@@ -883,7 +859,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
 
   // DataContext interface implementation.
   valueChanged(owner: AllTypes, attr: string, oldValue: any) : void {
-    if (owner.type === 'transition') {
+    if (owner instanceof Transition) {
       // Remove and reinsert changed transitions.
       const parent = owner.parent;
       if (parent) {
@@ -1040,22 +1016,18 @@ class Renderer {
   }
 
   getSize(item: StateTypes | Statechart) : { width: number, height: number } {
-    let width, height;
-    switch (item.type) {
-      case 'state':
-      case 'statechart':
-        width = item.width;
-        height = item.height;
-        break;
-      case 'pseudostate':
-        width = height = 2 * this.theme_.radius;
-        break;
+    let width = 0, height = 0;
+    if (item instanceof State || item instanceof Statechart) {
+      width = item.width;
+      height = item.height;
+    } else if (item instanceof Pseudostate) {
+      width = height = 2 * this.theme_.radius;
     }
     return { width: width, height: height };
   }
   getItemRect(item: AllTypes) : Rect {
     let x, y, width, height;
-    if (item.type == 'transition') {
+    if (item instanceof Transition) {
       const extents = getExtents(item.bezier);
       x = extents.xmin;
       y = extents.ymin;
@@ -1069,7 +1041,7 @@ class Renderer {
       width = size.width;
       height = size.height;
 
-      if (item.type == 'statechart') {
+      if (item instanceof Statechart) {
         const parent = item.parent;
         if (parent) {
           // Statechart width comes from containing state.
@@ -1104,7 +1076,7 @@ class Renderer {
   statePointToParam(state: StateTypes, p: Point) {
     const r = this.theme_.radius,
           rect = this.getItemRect(state);
-    if (state.type === 'state')
+    if (state instanceof State)
       return rectPointToParam(rect.x, rect.y, rect.width, rect.height, p);
 
     return circlePointToParam(rect.x + r, rect.y + r, p);
@@ -1112,7 +1084,7 @@ class Renderer {
   stateParamToPoint(state: StateTypes, t: number) {
     const r = this.theme_.radius,
           rect = this.getItemRect(state);
-    if (state.type === 'state')
+    if (state instanceof State)
       return roundRectParamToPoint(rect.x, rect.y, rect.width, rect.height, r, t);
 
     return circleParamToPoint(rect.x + r, rect.y + r, r, t);
@@ -1120,7 +1092,7 @@ class Renderer {
   getStateMinSize(state: StateTypes) {
     const ctx = this.ctx, theme = this.theme_, r = theme.radius;
     let width = theme.stateMinWidth, height = theme.stateMinHeight;
-    if (state.type === 'pseudostate')
+    if (state instanceof Pseudostate)
       return;
     if (ctx && state.name) {
       width = Math.max(width, ctx.measureText(state.name).width + 2 * r);
@@ -1246,7 +1218,7 @@ class Renderer {
     }
     const scaleFactor = src === dst ? 64 : 0,
           bezier = getEdgeBezier(p1, p2, scaleFactor);
-    if (src && src.type === 'pseudostate') {
+    if (src && src instanceof Pseudostate) {
       // Adjust the bezier's p1 and c1 to start on the boundary, towards bezier c2.
       const to = bezier[2],
             center = getCenter(src),
@@ -1255,7 +1227,7 @@ class Renderer {
       bezier[0] = projection;
       bezier[1] = to;
     }
-    if (dst && dst.type === 'pseudostate') {
+    if (dst && dst instanceof Pseudostate) {
       // Adjust the bezier's c2 and p2 to end on the boundary, towards bezier c1.
       const to = bezier[1],
             center = getCenter(dst),
@@ -1288,16 +1260,12 @@ class Renderer {
   }
   // Layout a statechart item.
   layout(item: AllTypes) {
-    switch (item.type) {
-      case 'state':
-        this.layoutState(item);
-        break;
-      case 'statechart':
-        this.layoutStatechart(item);
-        break;
-      case 'transition':
-        this.layoutTransition(item);
-        break;
+    if  (item instanceof State) {
+      this.layoutState(item);
+    } else if (item instanceof Statechart) {
+      this.layoutStatechart(item);
+    } else if (item instanceof Transition) {
+      this.layoutTransition(item);
     }
   }
   drawArrow(x: number, y: number) {
@@ -1567,36 +1535,26 @@ class Renderer {
     }
   }
   draw(item: AllTypes, mode: RenderMode) {
-    switch (item.type) {
-      case 'state':
-        this.drawState(item, mode);
-        break;
-      case 'pseudostate':
-        this.drawPseudoState(item, mode);
-        break;
-      case 'transition':
-        this.drawTransition(item, mode);
-        break;
-      case 'statechart':
-        this.drawStatechart(item, mode);
-        break;
+    if (item instanceof State) {
+      this.drawState(item, mode);
+    } else if (item instanceof Pseudostate) {
+      this.drawPseudoState(item, mode);
+    } else if (item instanceof Transition) {
+      this.drawTransition(item, mode);
+    } else if (item instanceof Statechart) {
+      this.drawStatechart(item, mode);
     }
   }
   hitTest(item: AllTypes, p: Point, tol: number, mode: RenderMode) {
     let hitInfo: HitResultTypes | undefined;
-    switch (item.type) {
-      case 'state':
-        hitInfo = this.hitTestState(item, p, tol, mode);
-        break;
-      case 'pseudostate':
-        hitInfo = this.hitTestPseudoState(item, p, tol, mode);
-        break;
-      case 'transition':
-        hitInfo = this.hitTestTransition(item, p, tol, mode);
-        break;
-      case 'statechart':
-        hitInfo = this.hitTestStatechart(item, p, tol, mode);
-        break;
+    if (item instanceof State) {
+      hitInfo = this.hitTestState(item, p, tol, mode);
+    } else if (item instanceof Pseudostate) {
+      hitInfo = this.hitTestPseudoState(item, p, tol, mode);
+    } else if (item instanceof Transition) {
+      hitInfo = this.hitTestTransition(item, p, tol, mode);
+    } else if (item instanceof Statechart) {
+      hitInfo = this.hitTestStatechart(item, p, tol, mode);
     }
     return hitInfo;
   }
@@ -1877,7 +1835,7 @@ class Editor {
     }
 
     function addItems(item: AllTypes) {
-      if (item.type === 'state' || item.type === 'pseudostate') {
+      if (item instanceof State || item instanceof Pseudostate) {
         // Layout the state's incoming and outgoing transitions.
         context.forInTransitions(item, addItems);
         context.forOutTransitions(item, addItems);
@@ -1891,7 +1849,7 @@ class Editor {
         if (attr == 'x' || attr == 'y' || attr == 'width' || attr == 'height') {
           // Visit item and sub-items to layout all affected transitions.
           context.visitAll(item, addItems);
-        } else if (item.type === 'transition') {
+        } else if (item instanceof Transition) {
           addItems(item);
         }
         break;
@@ -1915,12 +1873,12 @@ class Editor {
       context.reverseVisitAll(item, item => renderer.layout(item));
     }
     changedItems.forEach(item => {
-      if (item.type !== 'transition')
+      if (!(item instanceof Transition))
         layout(item);
     });
     changedItems.forEach(
       item => {
-        if (item.type === 'transition')
+        if (item instanceof Transition)
           layout(item);
       });
     changedItems.clear();
@@ -1936,7 +1894,7 @@ class Editor {
     this.updateLayout_();
     changedTopLevelStates.forEach(
       state => context.reverseVisitAll(state, item => {
-        if (item.type !== 'transition')
+        if (!(item instanceof Transition))
           renderer.layout(item);
     }));
     // Finally update the root statechart's bounds.
@@ -1973,11 +1931,11 @@ class Editor {
       canvasController.applyTransform();
 
       context.visitAll(statechart, item => {
-        if (item.type !== 'transition')
+        if (!(item instanceof Transition))
           renderer.draw(item, RenderMode.Normal);
       });
       context.visitAll(statechart, item => {
-        if (item.type === 'transition')
+        if (item instanceof Transition)
           renderer.draw(item, RenderMode.Normal);
       });
 
@@ -2125,7 +2083,7 @@ class Editor {
   setPropertyGrid() {
     const context = this.context,
           item = context.selection.lastSelected(),
-          type = item ? item.type.toString() : undefined;
+          type = item ? item.template.typeName : undefined;
     this.propertyGridController.show(type, item);
   }
   onClick(canvasController: CanvasController, alt: boolean) {

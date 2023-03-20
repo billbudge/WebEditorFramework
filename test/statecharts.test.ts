@@ -40,7 +40,7 @@ describe('StatechartContext', () => {
     const context = new Statecharts.StatechartContext(),
           state = context.newState();
 
-    expect(state.type).toBe('state');
+    expect(state instanceof Statecharts.State).toBe(true);
     expect(state.name).toBeUndefined();
     state.name = 'Test State';
     expect(state.name).toBe('Test State');
@@ -55,7 +55,7 @@ describe('StatechartContext', () => {
     const context = new Statecharts.StatechartContext(),
           pseudostate = context.newPseudostate('start');
 
-    expect(pseudostate.type).toBe('pseudostate');
+    expect(pseudostate instanceof Statecharts.Pseudostate).toBe(true);
     expect(pseudostate.id).toBe(1);
     expect(pseudostate.subtype).toBe('start');
     expect(pseudostate.x).toBe(0);
@@ -68,7 +68,7 @@ describe('StatechartContext', () => {
           state2 = context.newState(),
           transition = context.newTransition(state1, state2);
 
-    expect(transition.type).toBe('transition');
+    expect(transition instanceof Statecharts.Transition).toBe(true);
     transition.event = 'test event';
     expect(transition.event).toBe('test event');
     transition.event = undefined;
@@ -85,7 +85,7 @@ describe('StatechartContext', () => {
     const context = new Statecharts.StatechartContext(),
           statechart = context.newStatechart();
 
-    expect(statechart.type).toBe('statechart');
+    expect(statechart instanceof Statecharts.Statechart).toBe(true);
     expect(statechart.name).toBe('');
     statechart.name = 'Test Statechart';
     expect(statechart.name).toBe('Test Statechart');

@@ -128,11 +128,8 @@ class DataList implements List {
 
 export type PropertyTypes = ScalarProp | ReferenceProp | ArrayProp;
 
-export type ScalarPropertyType = 'scalar';
-
 export class ScalarProp {
   readonly name: string;
-  readonly type: ScalarPropertyType = 'scalar';
 
   get(owner: DataContextObject) : any {
     return (owner as any)[this.name];
@@ -148,11 +145,8 @@ export class ScalarProp {
   }
 }
 
-export type ArrayPropertyType = 'array';
-
 export class ArrayProp {
   readonly name: string;
-  readonly type: ArrayPropertyType = 'array';
 
   get(owner: DataContextObject) : List<any> {
     return new DataList(owner, this.name);
@@ -162,11 +156,8 @@ export class ArrayProp {
   }
 }
 
-export type ReferencePropertyType = 'reference';
-
 export class ReferenceProp {
   readonly name: string;
-  readonly type: ReferencePropertyType = 'reference';
   readonly prop: ScalarProp;
   readonly cacheKey: symbol;
 
@@ -205,21 +196,15 @@ function copyItem(
   const copy = context.construct(original, map),
         properties = original.template.properties;
   for (let prop of properties) {
-    switch (prop.type) {
-      case 'scalar':
-        prop.set(copy, prop.get(original));
-        break;
-      case 'array':
-        const originalList = prop.get(original),
-              copyList = prop.get(copy);
-        originalList.forEach(original => {
-          const copy = copyItem(original, context, map);
-          copyList.append(copy);
-        });
-        break;
-      case 'reference':
-        prop.set(copy, prop.get(original));
-        break;
+    if (prop instanceof ScalarProp || prop instanceof ReferenceProp) {
+      prop.set(copy, prop.get(original));
+    } else if (prop instanceof ArrayProp) {
+      const originalList = prop.get(original),
+      copyList = prop.get(copy);
+      originalList.forEach(original => {
+        const copy = copyItem(original, context, map);
+        copyList.append(copy);
+      });
     }
   }
   return copy;
@@ -228,22 +213,17 @@ function copyItem(
 function remapItem(copy: DataContextObject, map: Map<number, ReferencedObject>) {
   const properties = copy.template.properties;
   for (let prop of properties) {
-    switch (prop.type) {
-      case 'scalar':
-        break;
-      case 'array':
-        const list = prop.get(copy);
-        list.forEach(copy => remapItem(copy, map));
-        break;
-      case 'reference':
-        const reference: ReferencedObject | undefined = prop.get(copy);
-        if (reference) {
-          const original = map.get(reference.id);
-          if (original) {
-            prop.set(copy, original);
-          }
+    if (prop instanceof ArrayProp) {
+      const list = prop.get(copy);
+      list.forEach(copy => remapItem(copy, map));
+    } else if (prop instanceof ReferenceProp) {
+      const reference: ReferencedObject | undefined = prop.get(copy);
+      if (reference) {
+        const original = map.get(reference.id);
+        if (original) {
+          prop.set(copy, original);
         }
-        break;
+      }
     }
   }
 }
