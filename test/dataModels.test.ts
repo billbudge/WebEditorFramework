@@ -2,7 +2,7 @@
 'use strict';
 
 import {describe, expect, test} from '@jest/globals';
-import * as Data from '../src/dataModels';
+import * as Data from '../src/dataModels.js';
 
 //------------------------------------------------------------------------------
 

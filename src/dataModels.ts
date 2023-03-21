@@ -1,4 +1,4 @@
-import { SelectionSet } from './collections';
+import { SelectionSet } from './collections.js';
 
 //------------------------------------------------------------------------------
 

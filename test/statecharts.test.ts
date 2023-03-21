@@ -1,5 +1,5 @@
 import {describe, expect, test} from '@jest/globals';
-import * as Statecharts from '../examples/statecharts';
+import * as Statecharts from '../examples/statecharts.js';
 
 function addState(statechart: Statecharts.Statechart) {
   const state = statechart.context.newState();
@@ -93,7 +93,7 @@ describe('StatechartContext', () => {
     statechart.x = 10;
     expect(statechart.x).toBe(10);
   });
-  test('parent', () => {
+  test('parent derived property', () => {
     const context = new Statecharts.StatechartContext(),
           statechart = context.newStatechart(),
           state1 = context.newState(),

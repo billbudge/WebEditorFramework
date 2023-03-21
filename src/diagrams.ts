@@ -1,6 +1,6 @@
 // Useful diagram stuff.
 
-import * as geometry from '../src/geometry';
+import * as geometry from '../src/geometry.js';
 
 interface Point {
   x: number;
@@ -566,7 +566,7 @@ export class CanvasController {
   private dragThreshold: number = 4;
   private hoverTimeout: number = 500; // milliseconds
   private isDragging: boolean;
-  private draggable: boolean;
+  draggable: boolean;
   private hovering: number;
   private hoverOwner: CanvasLayer | undefined
   private keyOwner: CanvasLayer | undefined

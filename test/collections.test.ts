@@ -1,8 +1,7 @@
 // Collections tests.
 
 import {describe, expect, test} from '@jest/globals';
-import { LinkedList, Queue, PriorityQueue, SelectionSet, DisjointSet } from '../src/collections';
-import { resourceLimits } from 'worker_threads';
+import { LinkedList, Queue, PriorityQueue, SelectionSet, DisjointSet } from '../src/collections.js';
 
 'use strict';
 

@@ -1,4 +1,4 @@
-import { Queue } from "./collections"
+import { Queue } from "./collections.js"
 
 export interface Point {
   x: number;

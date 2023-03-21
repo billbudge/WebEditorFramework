@@ -1,19 +1,19 @@
 
-import { SelectionSet } from '../src/collections'
+import { SelectionSet } from '../src/collections.js'
 
 import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, RectHitResult,
          diskPath, hitTestDisk, DiskHitResult, roundRectPath, bezierEdgePath,
-         hitTestBezier, measureNameValuePairs, CanvasController,
-         PropertyGridController, PropertyInfo, FileController } from '../src/diagrams'
+         hitTestBezier, measureNameValuePairs, CanvasController, CanvasLayer,
+         PropertyGridController, PropertyInfo, FileController } from '../src/diagrams.js'
 
 import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
-         evaluateBezier, CurveHitResult } from '../src/geometry'
+         evaluateBezier, CurveHitResult } from '../src/geometry.js'
 
 import { ScalarProp, ArrayProp, ReferencedObject, ReferenceProp,
          DataContext, DataContextObject, FactoryContext, EventBase, Change, ChangeEvents,
          copyItems, getLowestCommonAncestor, reduceToRoots, List,
-         TransactionManager, HistoryManager } from '../src/dataModels'
+         TransactionManager, HistoryManager } from '../src/dataModels.js'
 
 //------------------------------------------------------------------------------
 
@@ -1647,7 +1647,7 @@ class TransitionDrag {
 
 type DragTypes = StateDrag | TransitionDrag;
 
-class Editor {
+export class StatechartEditor implements CanvasLayer {
   private theme_: StatechartTheme;
   private canvasController: CanvasController;
   private paletteController: CanvasController;
@@ -2116,7 +2116,7 @@ class Editor {
           type = item ? item.template.typeName : undefined;
     this.propertyGridController.show(type, item);
   }
-  onClick(canvasController: CanvasController, alt: boolean) {
+  onClick(canvasController: CanvasController) {
     const context = this.context,
           selection = context.selection,
           shiftKeyDown = this.canvasController.shiftKeyDown,
@@ -2470,6 +2470,15 @@ class Editor {
         }
       }
     }
+    return false;
+  }
+  onBeginHover(canvasController: CanvasController) {
+    return false;
+  }
+  onEndHover(canvasController: CanvasController) {
+  }
+  onKeyUp(e: KeyboardEvent): boolean {
+    return false;
   }
 }
 

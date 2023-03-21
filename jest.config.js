@@ -5,4 +5,7 @@ module.exports = {
   testMatch: [
     '<rootDir>/test/*.test.ts',
   ],
+  moduleNameMapper: {
+    "(.*)\\.js": "$1"
+  }
 };
