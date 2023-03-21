@@ -250,7 +250,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     this.addHandler('changed',
         this.transactionManager.onChanged.bind(this.transactionManager));
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
-    this.statechart_ = new Statechart(this);
+    this.setRoot(new Statechart(this));
   }
 
   root() : Statechart {
