@@ -1697,17 +1697,21 @@ export class StatechartEditor implements CanvasLayer {
           start = context.newPseudostate('start'),
           stop = context.newPseudostate('stop'),
           history = context.newPseudostate('history'),
-          historyDeep = context.newPseudostate('history*');
+          historyDeep = context.newPseudostate('history*'),
+          newState = context.newState();
 
     start.x = start.y = 8;
     stop.x = 40; stop.y = 8;
     history.x = 72; history.y = 8;
     historyDeep.x = 104; historyDeep.y = 8;
+    newState.x = 8; newState.y = 40;
+    newState.width = 80; newState.height = 40;
 
-    statechart.states.append(context.newPseudostate('start'));
-    statechart.states.append(context.newPseudostate('stop'));
-    statechart.states.append(context.newPseudostate('start'));
-    statechart.states.append(context.newPseudostate('start'));
+    statechart.states.append(start);
+    statechart.states.append(stop);
+    statechart.states.append(history);
+    statechart.states.append(historyDeep);
+    statechart.states.append(newState);
     context.setRoot(statechart);
     this.palette = statechart;
 
