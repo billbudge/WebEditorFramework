@@ -1704,8 +1704,8 @@ export class StatechartEditor implements CanvasLayer {
     stop.x = 40; stop.y = 8;
     history.x = 72; history.y = 8;
     historyDeep.x = 104; historyDeep.y = 8;
-    newState.x = 8; newState.y = 40;
-    newState.width = 80; newState.height = 40;
+    newState.x = 8; newState.y = 32;
+    newState.width = 100; newState.height = 60;
 
     statechart.states.append(start);
     statechart.states.append(stop);
@@ -2191,8 +2191,10 @@ export class StatechartEditor implements CanvasLayer {
       pointerHitInfo = this.pointerHitInfo_ = this.draggableHitInfo_;
       if (pointerHitInfo instanceof StateHitResult || pointerHitInfo instanceof PseudostateHitResult) {
         if (this.clickInPalette_) {
-          drag = new StateDrag([pointerHitInfo.item], 'moveSelection', 'Move selection');
+          this.clickInPalette_ = false;  // TODO fix
+          drag = new StateDrag([pointerHitInfo.item], 'copyPalette', 'Create new state or pseudostate');
         } else if (this.moveCopy_) {
+          this.moveCopy_ = false;  // TODO fix
           drag = new StateDrag([pointerHitInfo.item], 'moveCopySelection', 'Move copy of selection');
         } else {
           if (pointerHitInfo.inner.border) {
@@ -2230,7 +2232,7 @@ export class StatechartEditor implements CanvasLayer {
             context.addItems(copies, this.statechart);
             selection.set(copies);
           }
-          }
+        }
       }
     }
   }
@@ -2347,7 +2349,7 @@ export class StatechartEditor implements CanvasLayer {
       // Find state beneath mouse.
       const hitList = this.hitTestCanvas(cp),
             hitInfo = this.getFirstHit(hitList, isDropTarget),
-            parent = hitInfo && hitInfo instanceof StatechartHitResult ? hitInfo.item : statechart;
+            parent = hitInfo && hitInfo instanceof StateHitResult ? hitInfo.item : statechart;
       // Reparent items.
       selection.contents().forEach(item => {
         if (!(item instanceof Statechart))

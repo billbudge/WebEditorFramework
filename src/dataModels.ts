@@ -532,7 +532,7 @@ export class TransactionManager<TOwner extends DataContextObject>
     if (!snapshots)
       return;
     const changedItem = snapshots.get(item);
-    return changedItem;
+    return changedItem ? changedItem : item;
   }
 
   private recordChange(change: Change<TOwner>) {
