@@ -554,8 +554,14 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   cancelTransaction(name: string) {
     this.transactionManager.cancelTransaction();
   }
+  getUndo() {
+    return this.historyManager.getUndo();
+  }
   undo() {
     this.historyManager.undo();
+  }
+  getRedo() {
+    return this.historyManager.getRedo();
   }
   redo() {
     this.historyManager.redo();
@@ -662,7 +668,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       }
     }
     // At this point we can add item to parent.
-    if (item instanceof State) {
+    if (item instanceof State || item instanceof Pseudostate) {
       const translation = this.getToParent(item, parent);
       item.x += translation.x;
       item.y += translation.y;
@@ -674,7 +680,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     if (parent instanceof Statechart) {
       if (item instanceof Transition) {
         parent.transitions.append(item);
-      } else if (item instanceof State) {
+      } else if (item instanceof State || item instanceof Pseudostate) {
         parent.states.append(item);
       }
     }
@@ -684,10 +690,12 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   addItems(items: AllTypes[], parent: State | Statechart) {
     // Add states first, then transitions, so the context can track transitions.
     for (let item of items) {
-      if (item instanceof State) this.addItem(item, parent);
+      if (item instanceof State || item instanceof Pseudostate)
+        this.addItem(item, parent);
     }
     for (let item of items) {
-      if (item instanceof Transition) this.addItem(item, parent);
+      if (item instanceof Transition)
+        this.addItem(item, parent);
     }
   }
 
@@ -866,10 +874,9 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
         this.removeTransition_(owner);
         this.insertTransition_(owner, parent);
       }
-    } else {
-      this.initializeItem(owner);
     }
     this.onValueChanged(owner, attr, oldValue);
+    this.initializeItem(owner);  // Update any derived properties.
   }
   elementInserted(owner: State | Statechart, attr: string, index: number, value: AllTypes) : void {
     this.insertItem_(value, owner);
@@ -2130,25 +2137,24 @@ export class StatechartEditor implements CanvasLayer {
     let hitList, inPalette;
     if (canvasController === this.paletteController) {
       hitList = this.hitTestPalette(cp);
-      inPalette = true;
+      this.clickInPalette_ = true;
     } else {
       // assert(canvasController === this.canvasController);
       hitList = this.hitTestCanvas(cp);
-      inPalette = false;
+      this.clickInPalette_ = false;
     }
     const pointerHitInfo = this.pointerHitInfo_ = this.getFirstHit(hitList, isClickable);
     if (pointerHitInfo) {
       this.draggableHitInfo_ = this.getDraggableAncestor(hitList, pointerHitInfo);
       const item = pointerHitInfo.item;
-      if (inPalette) {
-        this.clickInPalette_ = true;
+      if (this.clickInPalette_) {
         selection.clear();
       } else if (cmdKeyDown) {
         this.moveCopy_ = true;
         selection.set(item);
       } else if (shiftKeyDown) {
         selection.add(item);
-      } else {
+      } else if (!selection.has(item)) {
         selection.set(item);
       }
     } else {
@@ -2197,7 +2203,7 @@ export class StatechartEditor implements CanvasLayer {
           this.moveCopy_ = false;  // TODO fix
           drag = new StateDrag([pointerHitInfo.item], 'moveCopySelection', 'Move copy of selection');
         } else {
-          if (pointerHitInfo.inner.border) {
+          if (pointerHitInfo.item instanceof State && pointerHitInfo.inner.border) {
             drag = new StateDrag(selection.contents() as StateTypes[], 'resizeState', 'Resize state');
           } else {
             // Deselect transitions. TODO
@@ -2392,18 +2398,18 @@ export class StatechartEditor implements CanvasLayer {
           //   selectionModel.add(v);
           // });
           return true;
-        case 90: // 'z'
-          // if (transactionHistory.getUndo()) {
-          //   selectionModel.clear();
-          //   transactionHistory.undo();
-          // }
+        case 90: { // 'z'
+          if (context.getUndo()) {
+            context.undo();
+          }
           return true;
-        case 89: // 'y'
-          // if (transactionHistory.getRedo()) {
-          //   selectionModel.clear();
-          //   transactionHistory.redo();
-          // }
+        }
+        case 89: { // 'y'
+          if (context.getRedo()) {
+            context.redo();
+          }
           return true;
+        }
         case 88: // 'x'
           // editingModel.doCut();
           return true;

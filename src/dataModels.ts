@@ -617,10 +617,11 @@ export class HistoryManager<TOwner extends DataContextObject> {
         startingSelection.every(function(element, i) {
           return element === endingSelection[i];
         })) {
-      endingSelection = startingSelection;
+      return;  // endingSelection and startingSelection are the same.
     }
+
     const selectionOp = new SelectionOp(selectionSet, startingSelection, endingSelection);
-    op.add(op);
+    op.add(selectionOp);
     this.startingSelection = [];
   }
 
