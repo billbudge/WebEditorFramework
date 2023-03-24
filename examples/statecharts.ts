@@ -2134,12 +2134,11 @@ export class StatechartEditor implements CanvasLayer {
           cmdKeyDown = this.canvasController.cmdKeyDown,
           p = canvasController.getClickPointerPosition(),
           cp = canvasController.viewToCanvas(p);
-    let hitList, inPalette;
+    let hitList;
     if (canvasController === this.paletteController) {
       hitList = this.hitTestPalette(cp);
       this.clickInPalette_ = true;
     } else {
-      // assert(canvasController === this.canvasController);
       hitList = this.hitTestCanvas(cp);
       this.clickInPalette_ = false;
     }
@@ -2220,8 +2219,8 @@ export class StatechartEditor implements CanvasLayer {
         // let items = selectionModel.contents();
         // drag.isSingleElement = items.length === 1 && isState(items[0]);
       }
-      context.transactionManager.beginTransaction(drag.description);
       if (newTransition) {
+        context.transactionManager.beginTransaction(drag.description);
         context.addItem(newTransition, this.statechart);
         selection.set(newTransition);
       } else {
@@ -2235,6 +2234,7 @@ export class StatechartEditor implements CanvasLayer {
                 item.x -= offset.x; item.y -= offset.y;
               });
             }
+            context.transactionManager.beginTransaction(drag.description);
             context.addItems(copies, this.statechart);
             selection.set(copies);
           }
