@@ -451,7 +451,7 @@ class SelectionOp<TOwner extends DataContextObject> implements Operation {
 
 export class CompoundOp implements Operation {
   readonly name: string;
-  private ops: Array<Operation>;
+  readonly ops: Array<Operation>;
 
   add(op: Operation) {
     this.ops.push(op);
@@ -480,31 +480,34 @@ export class TransactionManager<TOwner extends DataContextObject>
   private snapshots = new Map<TOwner, object>();
 
   // Notifies observers that a transaction has started.
-  beginTransaction(name: string) {
+  beginTransaction(name: string) : CompoundOp {
     const transaction = new CompoundOp(name);
-
     this.transaction = transaction;
     this.snapshots = new Map<TOwner, object>();
     super.onEvent('transactionBegan', transaction);
+    return transaction;
   }
 
   // Notifies observers that a transaction is ending. Observers should now
   // do any adjustments to make data valid, or cancel the transaction if
   // the data is in an invalid state.
-  endTransaction() {
+  endTransaction() : CompoundOp {
     const transaction = this.transaction;
-    if (!transaction) return;
+    if (!transaction)
+      throw new Error('No transaction in progress.');
     super.onEvent('transactionEnding', transaction);
     this.snapshots.clear();
     this.transaction = undefined;
     super.onEvent('transactionEnded', transaction);
+    return transaction;
   }
 
   // Notifies observers that a transaction was canceled and its operations
   // rolled back.
   cancelTransaction() {
     const transaction = this.transaction;
-    if (!transaction) return;
+    if (!transaction)
+      throw new Error('No transaction in progress.');
     this.undo(transaction);
     this.snapshots.clear();
     this.transaction = undefined;

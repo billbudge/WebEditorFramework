@@ -210,10 +210,36 @@ describe('EventBase', () => {
 //------------------------------------------------------------------------------
 
 describe('TransactionManager', () => {
-  test('ScalarProp', () => {
+  test('value change coalescing', () => {
     const context = new TestDataContext(),
           item = new TestDataContextObject(context),
+          reference = new TestDataContextObject(context),
           transactionManager = new Data.TransactionManager();
+
+    context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+    const transaction = transactionManager.beginTransaction('test');
+    expect(transaction.ops.length).toBe(0);
+    expect(transactionManager.getOldValue(item, 'x')).toBeUndefined();
+    expect(transactionManager.getOldValue(item, 'reference')).toBeUndefined();
+
+    item.x = 1;
+    expect(transaction.ops.length).toBe(1);
+    expect(transactionManager.getOldValue(item, 'x')).toBeUndefined();
+    item.x = 2;
+    expect(transaction.ops.length).toBe(1);
+    expect(transactionManager.getOldValue(item, 'x')).toBeUndefined();
+
+    item.reference = new TestDataContextObject(context);
+    expect(transaction.ops.length).toBe(2);
+    expect(transactionManager.getOldValue(item, 'reference')).toBeUndefined();
+    item.x = 3;
+    expect(transaction.ops.length).toBe(2);
+    expect(transactionManager.getOldValue(item, 'x')).toBeUndefined();
+
+    transactionManager.endTransaction();
+    transactionManager.undo(transaction);
+    expect(item.x).toBeUndefined();
+    expect(item.reference).toBeUndefined();
   });
 });
 
