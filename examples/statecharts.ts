@@ -241,8 +241,8 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
 
   selection = new SelectionSet<AllTypes>();
 
-  transactionManager: TransactionManager<AllTypes>;
-  historyManager: HistoryManager<AllTypes>;
+  readonly transactionManager: TransactionManager<AllTypes>;
+  readonly historyManager: HistoryManager<AllTypes>;
 
   constructor() {
     super();
@@ -250,7 +250,8 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     this.addHandler('changed',
         this.transactionManager.onChanged.bind(this.transactionManager));
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
-    this.setRoot(new Statechart(this));
+    this.statechart_ = new Statechart(this);
+    this.insertItem_(this.statechart_, undefined);
   }
 
   root() : Statechart {
@@ -328,9 +329,10 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     }
   }
 
-  private initializeItem(item: AllTypes) {
+  updateItem(item: AllTypes) {
     if (item instanceof State || item instanceof Pseudostate || item instanceof Statechart) {
-      this.setGlobalPosition(item);
+      const self = this;
+      this.visitNonTransitions(item, item => self.setGlobalPosition(item));
     }
   }
 
@@ -367,8 +369,8 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     }
     if (newParent) {
       const global = newParent.globalPosition;
-      dx += global.x;
-      dy += global.y;
+      dx -= global.x;
+      dy -= global.y;
     }
     return { x: dx, y: dy };
   }
@@ -750,7 +752,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   private insertState_(state: StateTypes, parent: Statechart) {
     this.states_.add(state);
     state.parent = parent;
-    this.initializeItem(state);
+    this.updateItem(state);
 
     state.inTransitions = new Array<Transition>();
     state.outTransitions = new Array<Transition>();
@@ -768,7 +770,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   private insertStatechart_(statechart: Statechart, parent: State | undefined) {
     this.statecharts_.add(statechart);
     statechart.parent = parent;
-    this.initializeItem(statechart);
+    this.updateItem(statechart);
 
     const self = this;
     statechart.states.forEach(state => self.insertState_(state, statechart));
@@ -784,7 +786,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   private insertTransition_(transition: Transition, parent: Statechart) {
     this.transitions_.add(transition);
     transition.parent = parent;
-    this.initializeItem(transition);
+    this.updateItem(transition);
 
     const src = transition.src,
           dst = transition.dst;
@@ -855,7 +857,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       }
     }
     this.onValueChanged(owner, attr, oldValue);
-    this.initializeItem(owner);  // Update any derived properties.
+    this.updateItem(owner);  // Update any derived properties.
   }
   elementInserted(owner: State | Statechart, attr: string, index: number, value: AllTypes) : void {
     this.insertItem_(value, owner);
@@ -1660,7 +1662,6 @@ export class StatechartEditor implements CanvasLayer {
   private paletteController: CanvasController;
   private propertyGridController: PropertyGridController;
   private fileController: FileController;
-  private transactionManager: TransactionManager<AllTypes>;
   private hitTolerance: number;
   private changedItems_: Set<AllTypes>;
   private changedTopLevelStates_: Set<State>;
@@ -1721,6 +1722,11 @@ export class StatechartEditor implements CanvasLayer {
     statechart.states.append(newState);
     context.setRoot(statechart);
     this.palette = statechart;
+
+    // Default statechart.
+    this.context = new StatechartContext();
+    this.initializeContext(this.context);
+    this.statechart = this.context.root();
 
     // Register property grid layouts.
     function getAttr(info: PropertyInfo) : string | undefined {
@@ -1907,14 +1913,16 @@ export class StatechartEditor implements CanvasLayer {
           changedItems = this.changedItems_;
     // First layout containers, and then layout transitions which depend on states'
     // size and location.
-    // This function is called during the draw and updateBounds_ methods, so the renderer
-    // is already started.
+    // This function is called during the draw, hitTest, and updateBounds_ methods,
+    // so the renderer is started.
     function layout(item: AllTypes) {
       context.reverseVisitAll(item, item => renderer.layout(item));
     }
     changedItems.forEach(item => {
-      if (!(item instanceof Transition))
+      if (!(item instanceof Transition)) {
+        context.updateItem(item);  // TODO derived property updates should be automatic.
         layout(item);
+      }
     });
     changedItems.forEach(
       item => {

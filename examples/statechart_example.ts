@@ -9,16 +9,12 @@ import { StatechartContext, StatechartEditor } from '../examples/statecharts.js'
   if (body && canvas && palette) {
 
         // TODO proper "document" handling.
-    const statechartContext = new StatechartContext(),
-          theme = getDefaultTheme(),  // or getBlueprintTheme
+    const theme = getDefaultTheme(),  // or getBlueprintTheme
           canvasController = new CanvasController(canvas as HTMLCanvasElement),
           paletteController = new CanvasController(palette as HTMLCanvasElement),
           propertyGridController = new PropertyGridController(body, theme),
           statechartEditor = new StatechartEditor(
               theme, canvasController, paletteController, propertyGridController);
-
-    statechartEditor.initializeContext(statechartContext);
-    statechartEditor.setContext(statechartContext);
 
     document.bgColor = theme.bgColor;
     palette.style.backgroundColor = theme.altBgColor;
