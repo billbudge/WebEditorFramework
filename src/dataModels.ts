@@ -16,6 +16,8 @@ export interface DataContext {
       owner: DataContextObject, attr: string, index: number, oldValue: DataContextObject) : void;
   resolveReference(
       owner: DataContextObject, cacheKey: symbol, id: number) : ReferencedObject | undefined;
+  construct(
+      obj: DataContextObject, map: Map<number, ReferencedObject>) : DataContextObject;
 }
 
 export interface DataContextObject {
@@ -184,14 +186,9 @@ export class ReferenceProp {
 
 // Cloning.
 
-// TODO roll this into DataContext.
-export interface FactoryContext {
-  construct: (obj: DataContextObject, map: Map<number, ReferencedObject>) => DataContextObject;
-}
-
 function copyItem(
     original: DataContextObject,
-    context: FactoryContext,
+    context: DataContext,
     map: Map<number, ReferencedObject>) : DataContextObject {
   const copy = context.construct(original, map),
         properties = original.template.properties;
@@ -229,7 +226,7 @@ function remapItem(copy: DataContextObject, map: Map<number, ReferencedObject>) 
 }
 
 export function copyItems(
-    items: DataContextObject[], context: FactoryContext) :
+    items: DataContextObject[], context: DataContext) :
     DataContextObject[] {
   const map = new Map<number, ReferencedObject>(),
         copies = new Array<DataContextObject>();
@@ -254,7 +251,7 @@ export function getLineage<T extends Parented<T>>(item: Parented<T> | undefined)
   const lineage = new Array<Parented<T>>();
   while (item) {
     lineage.push(item);
-    item = this.getParent(item);
+    item = item.parent;
   }
   return lineage;
 }
@@ -369,7 +366,7 @@ export type ChangeEvents = 'changed' | ChangeType;
 // 'valueChanged': item, attr, oldValue.
 // 'elementInserted': item, attr, index.
 // 'elementRemoved': item, attr, index, oldValue.
-export class Change<TOwner extends object = object, TValue = any> {
+export interface Change<TOwner extends object = object, TValue = any> {
   type: ChangeType;
   item: TOwner;
   attr: string;
@@ -388,7 +385,6 @@ interface Operation {
 
 class ChangeOp<TOwner extends DataContextObject> implements Operation {
   private change: Change<TOwner>;
-  private dataContext: DataContext;
 
   undo() {
     const change = this.change,
@@ -1041,7 +1037,6 @@ export class HierarchyModel<T extends object = object> {
 // SelectionModel
 
 export class SelectionModel extends SelectionSet<any> {
-  private hierarchyModel_: HierarchyModel;
 
   set(item: any | Array<any>) {
     this.clear();
@@ -1409,11 +1404,12 @@ export class InstancingModel {
   }
 
   cloneGraph(items: Array<any>, map: Map<number, any>) {
-    const dataModel = this.dataModel,
+    const self = this,
+          dataModel = this.dataModel,
           referenceModel = this.referenceModel,
           copies: any[] = [];
     items.forEach(function(item) {
-      copies.push(this.clone(item, map));
+      copies.push(self.clone(item, map));
     }, this);
     copies.forEach(function(copy: any) {
       dataModel.visitSubtree(copy, function(copy: any) {

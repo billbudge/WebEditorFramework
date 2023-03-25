@@ -5,6 +5,7 @@
     "sourceMap": true,
     "outDir": "out",
     "noImplicitAny": true,
+   // "strict": true,  // TODO fix
     "strictNullChecks": true,
     "allowJs": true,
     "moduleResolution": "node",

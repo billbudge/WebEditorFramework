@@ -6,8 +6,8 @@ import * as Data from '../src/dataModels.js';
 
 //------------------------------------------------------------------------------
 
-class TestDataContext extends Data.EventBase<Data.Change, Data.ChangeEvents>
-                      implements Data.DataContext, Data.FactoryContext {
+class TestDataContext extends Data.EventBase<Data.Change<TestDataContextObject>, Data.ChangeEvents>
+                      implements Data.DataContext {
   valueChange: any;
   elementInsert: any;
   elementRemove: any;
@@ -39,28 +39,28 @@ class TestDataContext extends Data.EventBase<Data.Change, Data.ChangeEvents>
     return this.map.get(id);
   }
 
-  private onChanged(change: Data.Change) : Data.Change {
+  private onChanged(change: Data.Change<TestDataContextObject>) {
     // console.log(change);
     super.onEvent('changed', change);
     return change;
   }
   private onValueChanged(
-      item: Data.DataContextObject, attr: string, oldValue: any) : Data.Change {
-    const change: Data.Change = {type: 'valueChanged', item, attr, index: 0, oldValue };
+      item: TestDataContextObject, attr: string, oldValue: any) {
+    const change: Data.Change<TestDataContextObject> = {type: 'valueChanged', item, attr, index: 0, oldValue };
     super.onEvent('valueChanged', change);
     return this.onChanged(change);
   }
   private onElementInserted(
-      item: Data.DataContextObject, attr: string, index: number) : Data.Change {
-    const change: Data.Change =
+      item: TestDataContextObject, attr: string, index: number) {
+    const change: Data.Change<TestDataContextObject> =
         { type: 'elementInserted', item: item, attr: attr, index: index, oldValue: undefined };
     super.onEvent('elementInserted', change);
     return this.onChanged(change);
   }
   private onElementRemoved(
-      item: Data.DataContextObject, attr: string, index: number, oldValue: Data.DataContextObject ) :
+      item: TestDataContextObject, attr: string, index: number, oldValue: TestDataContextObject ) :
       Data.Change {
-    const change: Data.Change =
+    const change: Data.Change<TestDataContextObject> =
         { type: 'elementRemoved', item: item, attr: attr, index: index, oldValue: oldValue };
     super.onEvent('elementRemoved', change);
     return this.onChanged(change);

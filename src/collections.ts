@@ -142,13 +142,12 @@ export class LinkedList<T> {
 // headLimit.
 
 export class Queue<T> {
-  private array: Array<T>;
-  private head: number;
+  private array = new Array<T>();
+  private head = 0;
   private sliceMin: number;
 
   constructor(sliceMin: number = 1000) {
     this.sliceMin = sliceMin;
-    this.clear();
   }
 
   empty() {

@@ -11,7 +11,7 @@ import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
          evaluateBezier, CurveHitResult } from '../src/geometry.js'
 
 import { ScalarProp, ArrayProp, ReferencedObject, ReferenceProp,
-         DataContext, DataContextObject, FactoryContext, EventBase, Change, ChangeEvents,
+         DataContext, DataContextObject, EventBase, Change, ChangeEvents,
          copyItems, getLowestCommonAncestor, reduceToRoots, List,
          TransactionManager, HistoryManager } from '../src/dataModels.js'
 
@@ -230,7 +230,7 @@ export interface GraphInfo {
 }
 
 export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
-                               implements DataContext, FactoryContext {
+                               implements DataContext {
   private highestId_: number = 0;  // 0 stands for no id.
   private stateMap_ = new Map<number, State | Pseudostate>();
 
@@ -569,29 +569,6 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     this.historyManager.redo();
   }
 
-  // FactoryContext interface implementation.
-  construct(original: AllTypes, map: Map<number, ReferencedObject>) : AllTypes {
-    if (original instanceof State) {
-      const result = this.newState();
-      map.set(original.id, result);
-      this.stateMap_.set(result.id, result);
-      return result;
-    }
-    if (original instanceof Pseudostate) {
-      const result = this.newPseudostate(original.subtype);
-      map.set(original.id, result);
-      this.stateMap_.set(result.id, result);
-      return result;
-    }
-    if (original instanceof Transition) {
-      return this.newTransition(undefined, undefined);
-    }
-    if (original instanceof Statechart) {
-      return this.newStatechart();
-    }
-    throw new Error('Unknown type');
-  }
-
   deleteItem(item: AllTypes) {
     if (item.parent) {
       if (item instanceof Transition)
@@ -899,6 +876,27 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       (owner as any)[cacheKey] = { id: id, ref: ref };
     }
     return ref;
+  }
+  construct(original: AllTypes, map: Map<number, ReferencedObject>) : AllTypes {
+    if (original instanceof State) {
+      const result = this.newState();
+      map.set(original.id, result);
+      this.stateMap_.set(result.id, result);
+      return result;
+    }
+    if (original instanceof Pseudostate) {
+      const result = this.newPseudostate(original.subtype);
+      map.set(original.id, result);
+      this.stateMap_.set(result.id, result);
+      return result;
+    }
+    if (original instanceof Transition) {
+      return this.newTransition(undefined, undefined);
+    }
+    if (original instanceof Statechart) {
+      return this.newStatechart();
+    }
+    throw new Error('Unknown type');
   }
 
   private onChanged(change: StatechartChange) : StatechartChange {
