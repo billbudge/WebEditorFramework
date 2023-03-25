@@ -6,7 +6,8 @@ import * as Data from '../src/dataModels.js';
 
 //------------------------------------------------------------------------------
 
-class TestDataContext implements Data.DataContext, Data.FactoryContext {
+class TestDataContext extends Data.EventBase<Data.Change, Data.ChangeEvents>
+                      implements Data.DataContext, Data.FactoryContext {
   valueChange: any;
   elementInsert: any;
   elementRemove: any;
@@ -20,19 +21,49 @@ class TestDataContext implements Data.DataContext, Data.FactoryContext {
   valueChanged(
     owner: TestDataContextObject, attr: string, oldValue: any) : void {
       this.valueChange = { owner, attr, oldValue };
+      this.onValueChanged(owner, attr, oldValue);
     }
   elementInserted(
       owner: TestDataContextObject, attr: string, index: number, value: TestDataContextObject) : void {
     this.elementInsert = { owner, attr, index, value };
+    this.onElementInserted(owner, attr, index);
   }
   elementRemoved(
       owner: TestDataContextObject, attr: string, index: number, oldValue: TestDataContextObject) : void {
     this.elementRemove = { owner, attr, index, oldValue };
+    this.onElementRemoved(owner, attr, index, oldValue);
   }
   resolveReference(
       owner: TestDataContextObject, cacheKey: symbol, id: number) : TestDataContextObject | undefined {
     this.resolvedReference = { owner, cacheKey, id };
     return this.map.get(id);
+  }
+
+  private onChanged(change: Data.Change) : Data.Change {
+    // console.log(change);
+    super.onEvent('changed', change);
+    return change;
+  }
+  private onValueChanged(
+      item: Data.DataContextObject, attr: string, oldValue: any) : Data.Change {
+    const change: Data.Change = {type: 'valueChanged', item, attr, index: 0, oldValue };
+    super.onEvent('valueChanged', change);
+    return this.onChanged(change);
+  }
+  private onElementInserted(
+      item: Data.DataContextObject, attr: string, index: number) : Data.Change {
+    const change: Data.Change =
+        { type: 'elementInserted', item: item, attr: attr, index: index, oldValue: undefined };
+    super.onEvent('elementInserted', change);
+    return this.onChanged(change);
+  }
+  private onElementRemoved(
+      item: Data.DataContextObject, attr: string, index: number, oldValue: Data.DataContextObject ) :
+      Data.Change {
+    const change: Data.Change =
+        { type: 'elementRemoved', item: item, attr: attr, index: index, oldValue: oldValue };
+    super.onEvent('elementRemoved', change);
+    return this.onChanged(change);
   }
 
   construct(obj: TestDataContextObject, map: Map<number, TestDataContextObject>) : TestDataContextObject {
@@ -155,7 +186,36 @@ describe('DataContext', () => {
   });
 });
 
+//------------------------------------------------------------------------------
 
+describe('EventBase', () => {
+  test('addHandler, removeHandler, onEvent', () => {
+    let count = 0;
+    const eventBase = new Data.EventBase<() => void, string>(),
+          handler = () => { count++ };
+
+    eventBase.onEvent('test', handler);
+    expect(count).toBe(0);
+    eventBase.addHandler('test', handler);
+    expect(count).toBe(0);
+    eventBase.onEvent('test', handler);
+    expect(count).toBe(1);
+    eventBase.removeHandler('test', handler);
+    expect(count).toBe(1);
+    eventBase.onEvent('test', handler);
+    expect(count).toBe(1);
+  });
+});
+
+//------------------------------------------------------------------------------
+
+describe('TransactionManager', () => {
+  test('ScalarProp', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          transactionManager = new Data.TransactionManager();
+  });
+});
 
 
 
@@ -230,27 +290,6 @@ describe('DataModel', () => {
     dataModel.addInitializer(initializer);
     dataModel.initialize(item);
     expect(item.initialized).toBe(true);
-  });
-});
-
-//------------------------------------------------------------------------------
-
-describe('EventBase', () => {
-  test('addHandler, removeHandler, onEvent', () => {
-    let count = 0;
-    const eventBase = new Data.EventBase<() => void, string>(),
-          handler = () => { count++ };
-
-    eventBase.onEvent('test', handler);
-    expect(count).toBe(0);
-    eventBase.addHandler('test', handler);
-    expect(count).toBe(0);
-    eventBase.onEvent('test', handler);
-    expect(count).toBe(1);
-    eventBase.removeHandler('test', handler);
-    expect(count).toBe(1);
-    eventBase.onEvent('test', handler);
-    expect(count).toBe(1);
   });
 });
 

@@ -527,14 +527,19 @@ export class TransactionManager<TOwner extends DataContextObject>
     super.onEvent('didRedo', transaction);
   }
 
-  getSnapshot(item: TOwner) : object | undefined {
-    const snapshots = this.snapshots;
-    if (!snapshots)
-      return;
-    const changedItem = snapshots.get(item);
-    return changedItem ? changedItem : item;
+  getOldValue(item: TOwner, attr: string) : any {
+    const snapshot = this.snapshots.get(item) || item;
+    return (snapshot as any)[attr];
   }
 
+  private getSnapshot(item: TOwner) : object {
+    let snapshot = this.snapshots.get(item);
+    if (!snapshot) {
+      snapshot = {};
+      this.snapshots.set(item, snapshot);
+    }
+    return snapshot;
+  }
   private recordChange(change: Change<TOwner>) {
     if (!this.transaction)
       return;
@@ -546,24 +551,21 @@ export class TransactionManager<TOwner extends DataContextObject>
     if (!this.transaction)
       return;
 
-    const item: TOwner = change.item, attr = change.attr;
+    const item: TOwner = change.item,
+          attr = change.attr.substring(1);  // Trim leading underscore. TODO fix
 
-    if (change.type !== 'valueChanged') {
-      // Record insert and remove element changes.
+    if (change.type === 'elementInserted') {
+      const snapshot = this.getSnapshot(item);
+      item.template.properties.forEach((prop) => {
+        const value = prop.get(item);
+        (snapshot as any)[prop.name.substring(1)] = value;  // Trim leading underscore. TODO fix
+      });
       this.recordChange(change);
-    } else {
+    } else if (change.type === 'valueChanged') {
       // Coalesce value changes. Only record them the first time we observe
       // the (item, attr) change.
-      const snapshots = this.snapshots;
-      let snapshot = snapshots.get(item);
-      if (snapshot === undefined) {
-        // The snapshot collects the attribute changes for its corresponding item.
-        snapshot = Object.create(item);
-        if (snapshot)
-          snapshots.set(item, snapshot);
-      }
-      // Capture the old value on the snapshot only if it hasn't already been set.
-      if (snapshot && !snapshot.hasOwnProperty(attr)) {
+      const snapshot = this.getSnapshot(item);
+      if (!snapshot.hasOwnProperty(attr)) {
         (snapshot as any)[attr] = change.oldValue;
         this.recordChange(change);
       }

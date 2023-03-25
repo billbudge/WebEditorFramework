@@ -257,6 +257,8 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     return this.statechart_;
   }
   setRoot(root: Statechart) : void {
+    if (this.statechart_)
+      this.removeItem_(this.statechart_);
     this.insertItem_(root, undefined);
     this.statechart_ = root;
   }
@@ -2216,28 +2218,27 @@ export class StatechartEditor implements CanvasLayer {
     if (drag) {
       if (drag.type === 'moveSelection' || drag.type === 'moveCopySelection') {
         context.reduceSelection();
-        // let items = selectionModel.contents();
-        // drag.isSingleElement = items.length === 1 && isState(items[0]);
       }
+      if (drag.type == 'copyPalette' || drag.type == 'moveCopySelection') {
+        const copies = copyItems(drag.items!, context) as StateTypes[];  // TODO fix
+        // Transform palette items into the canvas coordinate system.
+        if (drag.type == 'copyPalette') {
+          const offset = this.paletteController.offsetToOtherCanvas(this.canvasController);
+          copies.forEach(copy => {
+            copy.x -= offset.x;
+            copy.y -= offset.y;
+          });
+        }
+        drag.items = copies;
+      }
+      context.transactionManager.beginTransaction(drag.description);
       if (newTransition) {
-        context.transactionManager.beginTransaction(drag.description);
         context.addItem(newTransition, this.statechart);
         selection.set(newTransition);
       } else {
-        if (drag instanceof StateDrag) {
-          if (drag.type == 'copyPalette' || drag.type == 'moveCopySelection') {
-            const copies = copyItems(drag.items!, context) as NonTransitionTypes[];  // TODO fix
-            // Transform palette items into the canvas coordinate system.
-            if (drag.type == 'copyPalette') {
-              const offset = this.paletteController.offsetToOtherCanvas(this.canvasController);
-              copies.forEach(item => {
-                item.x -= offset.x; item.y -= offset.y;
-              });
-            }
-            context.transactionManager.beginTransaction(drag.description);
-            context.addItems(copies, this.statechart);
-            selection.set(copies);
-          }
+        if (drag.type == 'copyPalette' || drag.type == 'moveCopySelection') {
+          context.addItems(drag.items, this.statechart);
+          selection.set(drag.items);
         }
       }
     }
@@ -2265,30 +2266,33 @@ export class StatechartEditor implements CanvasLayer {
         case 'moveSelection': {
           hitInfo = this.getFirstHit(hitList, isDropTarget) as StateHitResult | StatechartHitResult;
           context.selection.forEach(item => {
-            const snapshot: any = transactionManager.getSnapshot(item);
-            if (snapshot && !(item instanceof Transition)) {
-              item.x = snapshot.x + dx;
-              item.y = snapshot.y + dy;
-            }
+            if (item instanceof Transition) return;
+            const oldX = transactionManager.getOldValue(item, 'x'),
+                  oldY = transactionManager.getOldValue(item, 'y');
+            item.x = oldX + dx;
+            item.y = oldY + dy;
           });
           break;
         }
         case 'resizeState': {
           const hitInfo = pointerHitInfo as StateHitResult,
-                dragItem = drag.items[0] as State,
-                snapshot: any = transactionManager.getSnapshot(dragItem);
-          if (hitInfo.inner.left) {
-            dragItem.x = snapshot.x + dx;
-            dragItem.width = snapshot.width - dx;
+                item = drag.items[0] as State,
+                oldX = transactionManager.getOldValue(item, 'x'),
+                oldY = transactionManager.getOldValue(item, 'y'),
+                oldWidth =  transactionManager.getOldValue(item, 'width'),
+                oldHeight =  transactionManager.getOldValue(item, 'height');
+        if (hitInfo.inner.left) {
+            item.x = oldX + dx;
+            item.width = oldWidth - dx;
           }
           if (hitInfo.inner.top) {
-            dragItem.y = snapshot.y + dy;
-            dragItem.height = snapshot.height - dy;
+            item.y = oldY + dy;
+            item.height = oldHeight - dy;
           }
           if (hitInfo.inner.right)
-            dragItem.width = snapshot.width + dx;
+            item.width = oldWidth + dx;
           if (hitInfo.inner.bottom)
-            dragItem.height = snapshot.height + dy;
+            item.height = oldHeight + dy;
           break;
         }
       }
@@ -2328,8 +2332,8 @@ export class StatechartEditor implements CanvasLayer {
           if (hitInfo && hitInfo instanceof TransitionHitResult) {
             transition.tText = hitInfo.inner.t;
           } else {
-            const snapshot: any = transactionManager.getSnapshot(transition);
-            transition.tText = snapshot.pt;
+            const oldTText = transactionManager.getOldValue(transition, 'tText');
+            transition.tText = oldTText;
           }
           break;
         }
