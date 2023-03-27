@@ -1642,7 +1642,7 @@ class StateDrag {
 }
 
 type TransitionDragType =
-    'newTransition' | 'connectTransitionSrc' | 'connectTransitionDst' | 'moveTransitionPoint';
+    'connectTransitionSrc' | 'connectTransitionDst' | 'moveTransitionPoint';
 class TransitionDrag {
   transition: Transition;
   type: TransitionDragType;
@@ -1927,7 +1927,7 @@ export class StatechartEditor implements CanvasLayer {
     changedItems.forEach(
       item => {
         if (item instanceof Transition)
-          layout(item);
+          renderer.layoutTransition(item);
       });
     changedItems.clear();
   }
@@ -2189,9 +2189,9 @@ export class StatechartEditor implements CanvasLayer {
             cp0 = this.getCanvasPosition(canvasController, p0);
       // Start the new transition as connecting the src state to itself.
       newTransition = context.newTransition(state, undefined);
-      newTransition.pSrc = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };
+      newTransition.pDst = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };
       newTransition.tText = 0.5; // initial property attachment at midpoint.
-      drag = new TransitionDrag(newTransition, 'newTransition', 'Add new transition');
+      drag = new TransitionDrag(newTransition, 'connectTransitionDst', 'Add new transition');
     } else if (pointerHitInfo instanceof TransitionHitResult) {
       if (pointerHitInfo.inner.t === 0)
         drag = new TransitionDrag(dragItem as Transition, 'connectTransitionSrc', 'Edit transition');
