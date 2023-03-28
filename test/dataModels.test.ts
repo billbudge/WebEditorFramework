@@ -24,7 +24,8 @@ class TestDataContext extends Data.EventBase<Data.Change<TestDataContextObject>,
       this.onValueChanged(owner, attr, oldValue);
     }
   elementInserted(
-      owner: TestDataContextObject, attr: string, index: number, value: TestDataContextObject) : void {
+      owner: TestDataContextObject, attr: string, index: number) : void {
+    const value = (owner as any)[attr][index];
     this.elementInsert = { owner, attr, index, value };
     this.onElementInserted(owner, attr, index);
   }

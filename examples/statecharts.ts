@@ -246,9 +246,13 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
 
   constructor() {
     super();
+    const self = this;
     this.transactionManager = new TransactionManager();
     this.addHandler('changed',
         this.transactionManager.onChanged.bind(this.transactionManager));
+    this.transactionManager.addHandler('transactionEnding', () => {
+      self.makeConsistent();
+    });
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
     this.statechart_ = new Statechart(this);
     this.insertItem_(this.statechart_, undefined);
@@ -305,7 +309,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     const self = this;
     if (item instanceof State) {
       item.statecharts.forEach(t => self.reverseVisitAll(t, visitor));
-    } else if  (item instanceof Statechart) {
+    } else if (item instanceof Statechart) {
       item.states.forEach(t => self.reverseVisitAll(t, visitor));
       item.transitions.forEach(t => self.reverseVisitAll(t, visitor));
     }
@@ -628,6 +632,12 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     graphInfo.interiorTransitions.forEach(transition => self.selection.add(transition));
   }
 
+  selectConnectedStates(upstream: boolean) {
+    const selectedStates = this.selectedStates(),
+          connectedStates = this.getConnectedStates(selectedStates, upstream, false);
+    this.selection.set(Array.from(connectedStates));
+  }
+
   addItem(item: StateTypes | Transition, parent: State | Statechart) : AllTypes {
     const oldParent = item.parent;
 
@@ -832,8 +842,11 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
       if (!parent || parent instanceof State)
         this.insertStatechart_(item, parent);
     } else {
-      if (parent && parent instanceof Statechart)
+      if (parent && parent instanceof Statechart) {
+        if (!item)
+          throw new Error('item is undefined');
         this.insertState_(item, parent);
+      }
     }
   }
 
@@ -859,7 +872,8 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     this.onValueChanged(owner, attr, oldValue);
     this.updateItem(owner);  // Update any derived properties.
   }
-  elementInserted(owner: State | Statechart, attr: string, index: number, value: AllTypes) : void {
+  elementInserted(owner: State | Statechart, attr: string, index: number) : void {
+    const value: AllTypes = (owner as any)[attr][index];
     this.insertItem_(value, owner);
     this.onElementInserted(owner, attr, index);
   }
@@ -1642,7 +1656,7 @@ class StateDrag {
 }
 
 type TransitionDragType =
-    'connectTransitionSrc' | 'connectTransitionDst' | 'moveTransitionPoint';
+    'newTransition' | 'connectTransitionSrc' | 'connectTransitionDst' | 'moveTransitionPoint';
 class TransitionDrag {
   transition: Transition;
   type: TransitionDragType;
@@ -1892,7 +1906,7 @@ export class StatechartEditor implements CanvasLayer {
     switch (change.type) {
       case 'valueChanged': {
         // For changes to x, y, width, or height, layout affected transitions.
-        if (attr == 'x' || attr == 'y' || attr == 'width' || attr == 'height') {
+        if (attr == '_x' || attr == '_y' || attr == '_width' || attr == '_height') {  // TODO fix
           // Visit item and sub-items to layout all affected transitions.
           context.visitAll(item, addItems);
         } else if (item instanceof Transition) {
@@ -1916,11 +1930,15 @@ export class StatechartEditor implements CanvasLayer {
     // This function is called during the draw, hitTest, and updateBounds_ methods,
     // so the renderer is started.
     function layout(item: AllTypes) {
-      context.reverseVisitAll(item, item => renderer.layout(item));
+      context.reverseVisitAll(item, item => {
+        if (!(item instanceof Transition)) {
+          context.updateItem(item);  // TODO derived property updates should be automatic.
+        }
+        renderer.layout(item);
+      });
     }
     changedItems.forEach(item => {
       if (!(item instanceof Transition)) {
-        context.updateItem(item);  // TODO derived property updates should be automatic.
         layout(item);
       }
     });
@@ -2191,7 +2209,7 @@ export class StatechartEditor implements CanvasLayer {
       newTransition = context.newTransition(state, undefined);
       newTransition.pDst = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };
       newTransition.tText = 0.5; // initial property attachment at midpoint.
-      drag = new TransitionDrag(newTransition, 'connectTransitionDst', 'Add new transition');
+      drag = new TransitionDrag(newTransition, 'newTransition', 'Add new transition');
     } else if (pointerHitInfo instanceof TransitionHitResult) {
       if (pointerHitInfo.inner.t === 0)
         drag = new TransitionDrag(dragItem as Transition, 'connectTransitionSrc', 'Edit transition');
@@ -2319,10 +2337,14 @@ export class StatechartEditor implements CanvasLayer {
           }
           break;
         }
+        case 'newTransition':
         case 'connectTransitionDst': {
           const src = transition.src,
                 hitInfo = this.getFirstHit(hitList, isStateBorder),
                 dst = hitInfo ? hitInfo.item as State | Pseudostate : undefined;
+          if (src && drag.type === 'newTransition') {
+            transition.tSrc = renderer.statePointToParam(src, cp);
+          }
           if (src && dst && context.isValidTransition(src, dst)) {
             transition.dst = dst;
             const t2 = renderer.statePointToParam(dst, cp);
@@ -2393,21 +2415,26 @@ export class StatechartEditor implements CanvasLayer {
           context = this.context,
           statechart = this.statechart,
           selection = context.selection,
+          transactionManager = context.transactionManager,
           keyCode = e.keyCode,  // TODO fix
           cmdKey = e.ctrlKey || e.metaKey,
           shiftKey = e.shiftKey;
 
     if (keyCode === 8) { // 'delete'
-      // editingModel.doDelete();
+      transactionManager.beginTransaction('delete');
+      context.reduceSelection();
+      context.deleteItems(selection.contents());
+      transactionManager.endTransaction();
       return true;
     }
     if (cmdKey) {
       switch (keyCode) {
-        case 65: // 'a'
-          // statechart.items.forEach(function (v) {
-          //   selectionModel.add(v);
-          // });
+        case 65: { // 'a'
+          statechart.states.forEach(function (v) {
+            context.selection.add(v);
+          });
           return true;
+        }
         case 90: { // 'z'
           if (context.getUndo()) {
             context.undo();
@@ -2433,9 +2460,10 @@ export class StatechartEditor implements CanvasLayer {
           //   return true;
           // }
           return false;
-        case 69: // 'e'
-          // editingModel.doSelectConnectedStates(!shiftKey);
+        case 69: { // 'e'
+          context.selectConnectedStates(true);
           return true;
+        }
         case 72: // 'h'
           // editingModel.doTogglePalette();
           return true;
@@ -2588,16 +2616,6 @@ const editingModel = (function() {
       });
       copyPasteModel.doPaste(this.copyItems.bind(this),
                              this.addItems.bind(this));
-    },
-
-    doSelectConnectedStates: function(upstream) {
-      const model = this.model,
-            selectionModel = model.selectionModel,
-            selection = selectionModel.contents(),
-            statechartModel = model.statechartModel,
-            newSelection =
-                statechartModel.getConnectedStates(selection, upstream, true);
-      selectionModel.set(newSelection);
     },
 
     doTogglePalette: function() {

@@ -11,7 +11,7 @@ export interface DataContext {
   valueChanged(
       owner: DataContextObject, attr: string, oldValue: any) : void;
   elementInserted(
-      owner: DataContextObject, attr: string, index: number, value: DataContextObject) : void;
+      owner: DataContextObject, attr: string, index: number) : void;
   elementRemoved(
       owner: DataContextObject, attr: string, index: number, oldValue: DataContextObject) : void;
   resolveReference(
@@ -77,7 +77,7 @@ class DataList implements List {
       this.owner.context.valueChanged(this.owner, this.name, undefined);
     }
     array.splice(index, 0, element);
-    this.owner.context.elementInserted(this.owner, this.name, index, element);
+    this.owner.context.elementInserted(this.owner, this.name, index);
   }
   append(element: any) {
     this.insert(element, this.length);
@@ -409,7 +409,7 @@ class ChangeOp<TOwner extends DataContextObject> implements Operation {
       case 'elementRemoved': {
         const array = (item as any)[attr], index = change.index;
         array.splice(index, 0, change.oldValue);
-        item.context.elementInserted(item, attr, index, change.oldValue);
+        item.context.elementInserted(item, attr, index);
         change.type = 'elementInserted';
         break;
       }
