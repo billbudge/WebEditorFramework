@@ -298,20 +298,20 @@ interface SetLike<T> {
   has(item: T) : boolean;
 }
 
-export function reduceToRoots<T extends Parented<T>>(items: Array<T>, set: SetLike<T>) : Array<T> {
-  function ancestorInSet(item: T) {
-    let ancestor = item.parent;
-    while (ancestor) {
-      if (set.has(ancestor))
-        return true;
-      ancestor = ancestor.parent;
-    }
-    return false;
+export function ancestorInSet<T extends Parented<T>>(item: T, set: SetLike<T>) {
+  let ancestor = item.parent;
+  while (ancestor) {
+    if (set.has(ancestor))
+      return true;
+    ancestor = ancestor.parent;
   }
+  return false;
+}
 
+export function reduceToRoots<T extends Parented<T>>(items: Array<T>, set: SetLike<T>) : Array<T> {
   const roots = new Array();
   items.forEach(function(item: T) {
-    if (!ancestorInSet(item)) {
+    if (!ancestorInSet(item, set)) {
       roots.push(item);
     }
   });
@@ -553,14 +553,7 @@ export class TransactionManager<TOwner extends DataContextObject>
     const item: TOwner = change.item,
           attr = change.attr.substring(1);  // Trim leading underscore. TODO fix
 
-    if (change.type === 'elementInserted') {
-      const snapshot = this.getSnapshot(item);
-      item.template.properties.forEach((prop) => {
-        const value = prop.get(item);
-        (snapshot as any)[prop.name.substring(1)] = value;  // Trim leading underscore. TODO fix
-      });
-      this.recordChange(change);
-    } else if (change.type === 'valueChanged') {
+    if (change.type === 'valueChanged') {
       // Coalesce value changes. Only record them the first time we observe
       // the (item, attr) change.
       const snapshot = this.getSnapshot(item);
@@ -568,6 +561,15 @@ export class TransactionManager<TOwner extends DataContextObject>
         (snapshot as any)[attr] = change.oldValue;
         this.recordChange(change);
       }
+    } else {
+      if (change.type === 'elementInserted') {
+        const snapshot = this.getSnapshot(item);
+        item.template.properties.forEach((prop) => {
+          const value = prop.get(item);
+          (snapshot as any)[prop.name.substring(1)] = value;  // Trim leading underscore. TODO fix
+        });
+      }
+      this.recordChange(change);
     }
   }
 }

@@ -12,8 +12,8 @@ import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
 
 import { ScalarProp, ArrayProp, ReferencedObject, ReferenceProp,
          DataContext, DataContextObject, EventBase, Change, ChangeEvents,
-         copyItems, getLowestCommonAncestor, reduceToRoots, List,
-         TransactionManager, HistoryManager } from '../src/dataModels.js'
+         copyItems, getLowestCommonAncestor, ancestorInSet, reduceToRoots,
+         List, TransactionManager, HistoryManager } from '../src/dataModels.js'
 
 //------------------------------------------------------------------------------
 
@@ -162,8 +162,8 @@ export class Transition implements DataContextObject {
 
   // Derived properties.
   parent: Statechart | undefined;
-  pSrc: PointAndNormal;
-  pDst: PointAndNormal;
+  pSrc: PointAndNormal | undefined;
+  pDst: PointAndNormal | undefined;
   bezier: BezierCurve;
   textPoint: Point;
   text: string;
@@ -512,6 +512,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
 
   isValidTransition(src: StateTypes, dst: StateTypes) : boolean {
+    if (!src || !dst) return false;
     // No transition to self for pseudostates.
     if (src === dst) return src instanceof State;
     // No transitions to a start pseudostate.
@@ -523,7 +524,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
         src.subtype === 'start' || src.subtype === 'history' || src.subtype === 'history*')) {
       const srcParent = src.parent,
             dstParent = dst.parent;
-      return srcParent == dstParent;
+      return srcParent === dstParent;
     }
     // Transitions can't straddle parallel statecharts. The lowest common ancestor
     // of src and dst must be a statechart, not a state, except for "inside" transitions.
@@ -1626,13 +1627,14 @@ function isStateBorder(hitInfo: HitResultTypes) : boolean {
 }
 
 function isDropTarget(hitInfo: HitResultTypes) : boolean {
-  const item = hitInfo.item;
+  const item = hitInfo.item,
+        selection = item.context.selection;
   return (hitInfo instanceof StateHitResult || hitInfo instanceof StatechartHitResult) &&
-          !item.context.selection.has(item);
+          !selection.has(item) && !ancestorInSet(item, selection);
 }
 
 function isClickable(hitInfo: HitResultTypes) : boolean {
-  return true;
+  return !(hitInfo instanceof StatechartHitResult);
 }
 
 function isDraggable(hitInfo: HitResultTypes) : boolean {
@@ -2229,7 +2231,7 @@ export class StatechartEditor implements CanvasLayer {
           drag = new StateDrag([pointerHitInfo.item], 'moveCopySelection', 'Move copy of selection');
         } else {
           if (pointerHitInfo.item instanceof State && pointerHitInfo.inner.border) {
-            drag = new StateDrag(selection.contents() as StateTypes[], 'resizeState', 'Resize state');
+            drag = new StateDrag([pointerHitInfo.item], 'resizeState', 'Resize state');
           } else {
             // Deselect transitions. TODO
             drag = new StateDrag(selection.contents() as StateTypes[], 'moveSelection', 'Move selection');
@@ -2380,14 +2382,17 @@ export class StatechartEditor implements CanvasLayer {
           p = canvasController.getCurrentPointerPosition(),
           cp = this.getCanvasPosition(canvasController, p);
     if (drag instanceof TransitionDrag) {
-      // drag.transition.pSrc = drag.transition.pDst = undefined;  // TODO fix
+      drag.transition.pSrc = drag.transition.pDst = undefined;
     } else if (drag instanceof StateDrag &&
               (drag.type == 'copyPalette' || drag.type === 'moveSelection' ||
                drag.type === 'moveCopySelection')) {
       // Find state beneath mouse.
       const hitList = this.hitTestCanvas(cp),
-            hitInfo = this.getFirstHit(hitList, isDropTarget),
-            parent = hitInfo && hitInfo instanceof StateHitResult ? hitInfo.item : statechart;
+            hitInfo = this.getFirstHit(hitList, isDropTarget);
+      let parent: State | Statechart = statechart;
+      if (hitInfo && (hitInfo instanceof StatechartHitResult || hitInfo instanceof StateHitResult)) {
+        parent = hitInfo.item;
+      }
       // Reparent items.
       selection.contents().forEach(item => {
         if (!(item instanceof Statechart))
@@ -2405,6 +2410,7 @@ export class StatechartEditor implements CanvasLayer {
 
     this.dragInfo_ = undefined;
     this.pointerHitInfo_ = undefined;
+    this.draggableHitInfo_ = undefined;
     this.hotTrackInfo_ = undefined;
 
     this.canvasController.draw();
