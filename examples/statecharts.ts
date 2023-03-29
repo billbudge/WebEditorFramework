@@ -308,10 +308,10 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   reverseVisitAll(item: AllTypes, visitor: StatechartVisitor) : void {
     const self = this;
     if (item instanceof State) {
-      item.statecharts.forEach(t => self.reverseVisitAll(t, visitor));
+      item.statecharts.forEachReverse(t => self.reverseVisitAll(t, visitor));
     } else if (item instanceof Statechart) {
-      item.states.forEach(t => self.reverseVisitAll(t, visitor));
-      item.transitions.forEach(t => self.reverseVisitAll(t, visitor));
+      item.states.forEachReverse(t => self.reverseVisitAll(t, visitor));
+      item.transitions.forEachReverse(t => self.reverseVisitAll(t, visitor));
     }
     visitor(item);
   }
@@ -691,22 +691,54 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     }
   }
 
-  // copyItems(items: Array<AllItems>, map: Map<number, AllItems>) : Array<AllItems> {
-  //   const statechart = this.statechart_,
-  //         referenceModel = this.referenceModel_,
-  //         translationModel_ = this.translationModel_,
-  //         copies = this.instancingModel_.cloneGraph(items, map);
+  copy() : Array<AllTypes> {
+    const statechart = this.statechart_,
+          selection = this.selection;
 
-  //   items.forEach(function(item) {
-  //     const copy = map.get(referenceModel.getId(item));  // TODO get rid of indirection getId
-  //     if (copy && copy.type !== 'transition') {
-  //       const translation = translationModel_.getToParent(item, statechart);
-  //       copy.x += translation.x;
-  //       copy.y += translation.y;
-  //     }
-  //   });
-  //   return copies;
-  // }
+    selection.set(this.selectedStates());
+    this.selectInteriorTransitions();
+    this.reduceSelection();
+
+    const selected = selection.contents(),
+          map = new Map<number, StateTypes>(),
+          copies = copyItems(selected, this, map);
+
+    selected.forEach(item => {
+      if (item instanceof State || item instanceof Pseudostate) {
+        const copy = map.get(item.id);
+        if (copy) {
+          const translation = this.getToParent(item, statechart);
+          copy.x += translation.x;
+          copy.y += translation.y;
+        }
+      }
+    });
+    return copies as Array<AllTypes>;
+  }
+
+  paste(items: Array<AllTypes>) : Array<AllTypes> {
+    this.transactionManager.beginTransaction('paste');
+    items.forEach(item => {
+      // Offset paste so copies don't overlap with the originals.
+      if (item instanceof State || item instanceof Pseudostate) {
+        item.x += 16;
+        item.y += 16;
+      }
+    });
+    const copies = copyItems(items, this) as Array<AllTypes>;  // TODO fix
+    this.addItems(copies, this.statechart_);
+    this.selection.set(copies);
+    this.transactionManager.endTransaction();
+    return copies;
+  }
+
+  cut() : Array<AllTypes> {
+    this.transactionManager.beginTransaction('cut');
+    const result = this.copy();
+    this.deleteItems(this.selection.contents());
+    this.transactionManager.endTransaction();
+    return result;
+  }
 
   makeConsistent () {
     const self = this,
@@ -1685,6 +1717,7 @@ export class StatechartEditor implements CanvasLayer {
   private palette: Statechart;  // Statechart to simplify layout of palette items.
   private context: StatechartContext;
   private statechart: Statechart;
+  private scrap: Array<AllTypes> = []
 
   private pointerHitInfo_: HitResultTypes | undefined;
   private draggableHitInfo_: HitResultTypes | undefined;
@@ -2108,10 +2141,11 @@ export class StatechartEditor implements CanvasLayer {
     this.updateLayout_();
     // TODO hit test selection first, in highlight, first.
     // Skip the root statechart, as hits there should go to the underlying canvas controller.
-    context.reverseVisitAllItems(statechart.transitions, transition => {
-      pushInfo(renderer.hitTest(transition, cp, tol, RenderMode.Normal));
+    // Hit test transitions first.
+    context.reverseVisitAllItems(statechart.transitions, (transition: Transition) => {
+      pushInfo(renderer.hitTestTransition(transition, cp, tol, RenderMode.Normal));
     });
-    context.reverseVisitAllItems(statechart.states, state => {
+    context.reverseVisitAllItems(statechart.states, (state: StateTypes) => {
       pushInfo(renderer.hitTest(state, cp, tol, RenderMode.Normal));
     });
     renderer.end();
@@ -2453,19 +2487,22 @@ export class StatechartEditor implements CanvasLayer {
           }
           return true;
         }
-        case 88: // 'x'
-          // editingModel.doCut();
+        case 88: { // 'x'
+          this.scrap = context.cut()
           return true;
-        case 67: // 'c'
-          // editingModel.doCopy();
+        }
+        case 67: { // 'c'
+          this.scrap = context.copy();
           return true;
-        case 86: // 'v'
-          // if (model.copyPasteModel.getScrap()) {
-          //   editingModel.doPaste();
-          //   this.updateBounds_();
-          //   return true;
-          // }
+        }
+        case 86: { // 'v'
+          if (this.scrap.length > 0) {
+            context.paste(this.scrap);
+            this.updateBounds_();
+            return true;
+          }
           return false;
+        }
         case 69: { // 'e'
           context.selectConnectedStates(true);
           return true;
@@ -2563,81 +2600,5 @@ export class StatechartEditor implements CanvasLayer {
       if (this.hoverHitInfo)
         this.hoverHitInfo = null;
     }
-
-return {
-  editingModel,
-  statechartModel,
-
-  Renderer,
-  Editor,
-};
-})();
-
-
-const statechart_data = {
-  'type': 'statechart',
-  'id': 1001,
-  'x': 0,
-  'y': 0,
-  'width': 0,
-  'height': 0,
-  'items': [],
-}
-
-/*
-//------------------------------------------------------------------------------
-
-const editingModel = (function() {
-  const proto = {
-
-    doDelete: function() {
-      this.reduceSelection();
-      this.model.copyPasteModel.doDelete(this.deleteItems.bind(this));
-    },
-
-    doCopy: function() {
-      const selectionModel = this.model.selectionModel;
-      selectionModel.contents().forEach(function(item) {
-        if (isTransition(item))
-          selectionModel.remove(item);
-      });
-      this.selectInteriorTransitions();
-      this.reduceSelection();
-      this.model.copyPasteModel.doCopy(this.copyItems.bind(this));
-    },
-
-    doCut: function() {
-      this.doCopy();
-      this.doDelete();
-    },
-
-    doPaste: function() {
-      const copyPasteModel = this.model.copyPasteModel;
-      copyPasteModel.getScrap().forEach(function(item) {
-        // Offset pastes so the user can see them.
-        if (isState(item)) {
-          item.x += 16;
-          item.y += 16;
-        }
-      });
-      copyPasteModel.doPaste(this.copyItems.bind(this),
-                             this.addItems.bind(this));
-    },
-
-    doTogglePalette: function() {
-      // const model = this.model;
-      // this.reduceSelection();
-      // model.transactionModel.beginTransaction('toggle master state');
-      // model.selectionModel.contents().forEach(function(item) {
-      //   if (!isState(item))
-      //     return;
-      //   model.observableModel.changeValue(item, 'state',
-      //     (item.state === 'palette') ? 'normal' : 'palette');
-      // })
-      // model.transactionModel.endTransaction();
-    },
-  }
-
-})();
 
 */

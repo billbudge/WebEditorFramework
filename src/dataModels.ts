@@ -49,6 +49,7 @@ export interface List<T = any> {
 }
 
 // Internal, non-type safe implementation of List.
+// TODO should cache list on owner.
 class DataList implements List {
   private owner: DataContextObject;
   private name: string;
@@ -226,10 +227,9 @@ function remapItem(copy: DataContextObject, map: Map<number, ReferencedObject>) 
 }
 
 export function copyItems(
-    items: DataContextObject[], context: DataContext) :
+    items: DataContextObject[], context: DataContext, map: Map<number, ReferencedObject> = new Map()) :
     DataContextObject[] {
-  const map = new Map<number, ReferencedObject>(),
-        copies = new Array<DataContextObject>();
+  const copies = new Array<DataContextObject>();
   for (let item of items) {
     copies.push(copyItem(item, context, map));
   }
