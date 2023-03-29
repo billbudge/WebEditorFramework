@@ -30,7 +30,7 @@ const stateTemplate = (function() {
         entry = new ScalarProp('entry'),
         exit = new ScalarProp('exit'),
         statecharts = new ArrayProp('statecharts'),
-        properties = [x, y, width, height, name, entry, exit];
+        properties = [x, y, width, height, name, entry, exit, statecharts];
   return { typeName, x, y, width, height, name, entry, exit, statecharts, properties };
 })();
 
