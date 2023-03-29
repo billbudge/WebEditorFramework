@@ -1738,11 +1738,10 @@ export class StatechartEditor implements CanvasLayer {
 
     this.hitTolerance = 8;
 
-    // TODO extend model with this info to avoid crosstalk between models.
     // Change tracking for layout.
     // Changed items that must be updated before drawing and hit testing.
     this.changedItems_ = new Set();
-    // Changed top level states that must be updated during transactions and undo/redo.
+    // Changed top level states that must be laid out after transactions and undo/redo.
     this.changedTopLevelStates_ = new Set();
 
     const renderer = new Renderer(theme);
@@ -1803,11 +1802,15 @@ export class StatechartEditor implements CanvasLayer {
     function setter(info: PropertyInfo, item: AllTypes, value: any) {
       const canvasController = self.canvasController;
       if (item) {
-        const attr = getAttr(info), description = 'change ' + attr;
-        // model.transactionModel.beginTransaction(description);
-        // model.observableModel.changeValue(item, attr, value);
-        // model.transactionModel.endTransaction();
-        canvasController.draw();
+        const attr = getAttr(info);
+        if (attr) {
+          const description = 'change ' + attr,
+                transactionManager = self.context.transactionManager;
+          transactionManager.beginTransaction(description);
+          (item as any)[attr] = value;
+          transactionManager.endTransaction();
+          canvasController.draw();
+       }
       }
     }
     const statechartInfo: PropertyInfo[] = [
