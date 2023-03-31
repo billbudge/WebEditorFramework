@@ -19,20 +19,20 @@ class TestDataContext extends Data.EventBase<Data.Change<TestDataContextObject>,
   }
 
   valueChanged(
-    owner: TestDataContextObject, attr: string, oldValue: any) : void {
-      this.valueChange = { owner, attr, oldValue };
-      this.onValueChanged(owner, attr, oldValue);
+    owner: TestDataContextObject, prop: Data.PropertyTypes, oldValue: any) : void {
+      this.valueChange = { owner, prop, oldValue };
+      this.onValueChanged(owner, prop, oldValue);
     }
   elementInserted(
-      owner: TestDataContextObject, attr: string, index: number) : void {
-    const value = (owner as any)[attr][index];
-    this.elementInsert = { owner, attr, index, value };
-    this.onElementInserted(owner, attr, index);
+      owner: TestDataContextObject, prop: Data.ChildArrayProp, index: number) : void {
+    const value = prop.get(owner).at(index);
+    this.elementInsert = { owner, prop, index, value };
+    this.onElementInserted(owner, prop, index);
   }
   elementRemoved(
-      owner: TestDataContextObject, attr: string, index: number, oldValue: TestDataContextObject) : void {
-    this.elementRemove = { owner, attr, index, oldValue };
-    this.onElementRemoved(owner, attr, index, oldValue);
+      owner: TestDataContextObject, prop: Data.ChildArrayProp, index: number, oldValue: TestDataContextObject) : void {
+    this.elementRemove = { owner, prop, index, oldValue };
+    this.onElementRemoved(owner, prop, index, oldValue);
   }
   resolveReference(
       owner: TestDataContextObject, cacheKey: symbol, id: number) : TestDataContextObject | undefined {
@@ -46,23 +46,23 @@ class TestDataContext extends Data.EventBase<Data.Change<TestDataContextObject>,
     return change;
   }
   private onValueChanged(
-      item: TestDataContextObject, attr: string, oldValue: any) {
-    const change: Data.Change<TestDataContextObject> = {type: 'valueChanged', item, attr, index: 0, oldValue };
+      item: TestDataContextObject, prop: Data.PropertyTypes, oldValue: any) {
+    const change: Data.Change<TestDataContextObject> = {type: 'valueChanged', item, prop, index: 0, oldValue };
     super.onEvent('valueChanged', change);
     return this.onChanged(change);
   }
   private onElementInserted(
-      item: TestDataContextObject, attr: string, index: number) {
+      item: TestDataContextObject, prop: Data.ChildArrayProp, index: number) {
     const change: Data.Change<TestDataContextObject> =
-        { type: 'elementInserted', item: item, attr: attr, index: index, oldValue: undefined };
+        { type: 'elementInserted', item: item, prop: prop, index: index, oldValue: undefined };
     super.onEvent('elementInserted', change);
     return this.onChanged(change);
   }
   private onElementRemoved(
-      item: TestDataContextObject, attr: string, index: number, oldValue: TestDataContextObject ) :
+      item: TestDataContextObject, prop: Data.ChildArrayProp, index: number, oldValue: TestDataContextObject ) :
       Data.Change {
     const change: Data.Change<TestDataContextObject> =
-        { type: 'elementRemoved', item: item, attr: attr, index: index, oldValue: oldValue };
+        { type: 'elementRemoved', item: item, prop: prop, index: index, oldValue: oldValue };
     super.onEvent('elementRemoved', change);
     return this.onChanged(change);
   }
@@ -118,7 +118,7 @@ describe('DataContext', () => {
     item.x = 1;
     expect(item.x).toBe(1);
     expect(context.valueChange.owner).toBe(item);
-    expect(context.valueChange.attr).toBe('_x');
+    expect(context.valueChange.prop).toBe(item.template.x);
     expect(context.valueChange.oldValue).toBeUndefined();
   });
   test('ArrayProp', () => {
@@ -132,7 +132,7 @@ describe('DataContext', () => {
     expect(item.array.at(0)).toBe(child1);
     expect(() => item.array.at(1)).toThrow(RangeError);
     expect(context.elementInsert.owner).toBe(item);
-    expect(context.elementInsert.attr).toBe('_array');
+    expect(context.elementInsert.prop).toBe(item.template.array);
     expect(context.elementInsert.index).toBe(0);
     expect(context.elementInsert.value).toBe(child1);
 
@@ -146,7 +146,7 @@ describe('DataContext', () => {
 
     item.array.remove(child2);
     expect(context.elementRemove.owner).toBe(item);
-    expect(context.elementRemove.attr).toBe('_array');
+    expect(context.elementRemove.prop).toBe(item.template.array);
     expect(context.elementRemove.index).toBe(0);
     expect(context.elementRemove.oldValue).toBe(child2);
   });

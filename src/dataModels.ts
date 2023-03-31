@@ -7,13 +7,14 @@ import { SelectionSet } from './collections.js';
 //   hierarchy, references.
 // Interfaces adapt the raw data for type safe use.
 
+// TODO consider using template properties instead of attr strings.
 export interface DataContext {
   valueChanged(
-      owner: DataContextObject, attr: string, oldValue: any) : void;
+      owner: DataContextObject, prop: PropertyTypes, oldValue: any) : void;
   elementInserted(
-      owner: DataContextObject, attr: string, index: number) : void;
+      owner: DataContextObject, prop: ChildArrayProp, index: number) : void;
   elementRemoved(
-      owner: DataContextObject, attr: string, index: number, oldValue: DataContextObject) : void;
+      owner: DataContextObject, prop: ChildArrayProp, index: number, oldValue: DataContextObject) : void;
   resolveReference(
       owner: DataContextObject, cacheKey: symbol, id: number) : ReferencedObject | undefined;
   construct(
@@ -53,13 +54,13 @@ export interface List<T = any> {
 // TODO should cache list on owner.
 class DataList implements List {
   private owner: DataContextObject;
-  private name: string;
+  private prop: ChildArrayProp;
 
   private get array() : any[] | undefined {
-    return (this.owner as any)[this.name];
+    return (this.owner as any)[this.prop.internalName];
   }
   private set array(value: any[] | undefined) {
-    (this.owner as any)[this.name] = value;
+    (this.owner as any)[this.prop.internalName] = value;
   }
 
   get length() : number {
@@ -76,10 +77,10 @@ class DataList implements List {
     let array = this.array;
     if (!array) {
       this.array = array = [];
-      this.owner.context.valueChanged(this.owner, this.name, undefined);
+      this.owner.context.valueChanged(this.owner, this.prop, undefined);
     }
     array.splice(index, 0, element);
-    this.owner.context.elementInserted(this.owner, this.name, index);
+    this.owner.context.elementInserted(this.owner, this.prop, index);
   }
   append(element: any) {
     this.insert(element, this.length);
@@ -93,7 +94,7 @@ class DataList implements List {
     if (!array || array.length <= index)
       throw new RangeError('Index out of range: ' + index);
     const oldValue = array.splice(index, 1);
-    this.owner.context.elementRemoved(this.owner, this.name, index, oldValue[0]);
+    this.owner.context.elementRemoved(this.owner, this.prop, index, oldValue[0]);
     return oldValue[0];
   }
   remove(element: any) : number {
@@ -120,9 +121,9 @@ class DataList implements List {
     }
   }
 
-  constructor(owner: DataContextObject, name: string) {
+  constructor(owner: DataContextObject, prop: ChildArrayProp) {
     this.owner = owner;
-    this.name = name;
+    this.prop = prop;
   }
 }
 
@@ -134,29 +135,40 @@ export type PropertyTypes = ScalarProp | ReferenceProp | ChildArrayProp;
 
 export class ScalarProp {
   readonly name: string;
+  readonly internalName: string;
 
   get(owner: DataContextObject) : any {
-    return (owner as any)[this.name];
+    return (owner as any)[this.internalName];
   }
   set(owner: DataContextObject, value: any) : any {
-    const oldValue = (owner as any)[this.name];
-    (owner as any)[this.name] = value;
-    owner.context.valueChanged(owner, this.name, oldValue);
+    const oldValue = (owner as any)[this.internalName];
+    (owner as any)[this.internalName] = value;
+    owner.context.valueChanged(owner, this, oldValue);
     return oldValue;
   }
   constructor(name: string) {
-    this.name = '_' + name;  // Rename to avoid name conflicts.
+    this.name = name;
+    this.internalName = '_' + name;
   }
 }
 
 export class ChildArrayProp<T extends DataContextObject = DataContextObject> {
   readonly name: string;
+  readonly internalName: string;
 
   get(owner: DataContextObject) : List<T> {
-    return new DataList(owner, this.name);
+    return new DataList(owner, this);
+  }
+  set(owner: DataContextObject, value: List<T> | undefined) : List<T> {
+    // TODO reconsider this.
+    const oldValue = new DataList(owner, this);
+    (owner as any)[this.internalName] = value;
+    owner.context.valueChanged(owner, this, oldValue);
+    return oldValue;
   }
   constructor(name: string) {
-    this.name = '_' + name;  // Rename to avoid name conflicts.
+    this.name = name;
+    this.internalName = '_' + name;
   }
 }
 
@@ -177,7 +189,7 @@ export class ReferenceProp {
     return owner.context.resolveReference(owner, this.cacheKey, newId) as ReferencedObject | undefined;
   }
   constructor(name: string) {
-    this.name = '_' + name;  // Rename to avoid name conflicts.
+    this.name = name;
     this.inner = new ScalarProp(name);
     this.cacheKey = Symbol.for(name);
   }
@@ -436,7 +448,7 @@ export type ChangeEvents = 'changed' | ChangeType;
 export interface Change<TOwner extends object = object, TValue = any> {
   type: ChangeType;
   item: TOwner;
-  attr: string;
+  prop: PropertyTypes;
   index: number;
   oldValue: TValue;
 }
@@ -456,27 +468,27 @@ class ChangeOp<TOwner extends DataContextObject> implements Operation {
   undo() {
     const change = this.change,
           item: TOwner = change.item,
-          attr: string = change.attr;
+          prop: PropertyTypes = change.prop;
     switch (change.type) {
       case 'valueChanged': {
-        const oldValue = (item as any)[attr];
-        (item as any)[attr] = change.oldValue;
+        const oldValue = prop.get(item);
+        prop.set(item, change.oldValue);
         change.oldValue = oldValue;
-        item.context.valueChanged(item, attr, oldValue);  // this change is its own inverse.
+        item.context.valueChanged(item, prop, oldValue);  // this change is its own inverse.
         break;
       }
       case 'elementInserted': {
-        const array = (item as any)[attr], index = change.index;
-        change.oldValue = array[index];
-        array.splice(index, 1);
-        item.context.elementRemoved(item, attr, index, change.oldValue);
+        const list = prop.get(item), index = change.index;
+        change.oldValue = list.at(index);
+        list.removeAt(index);
+        item.context.elementRemoved(item, prop as ChildArrayProp, index, change.oldValue);
         change.type = 'elementRemoved';
         break;
       }
       case 'elementRemoved': {
-        const array = (item as any)[attr], index = change.index;
-        array.splice(index, 0, change.oldValue);
-        item.context.elementInserted(item, attr, index);
+        const list = prop.get(item), index = change.index;
+        list.insert(index, change.oldValue)
+        item.context.elementInserted(item, prop as ChildArrayProp, index);
         change.type = 'elementInserted';
         break;
       }
@@ -618,14 +630,14 @@ export class TransactionManager<TOwner extends DataContextObject>
       return;
 
     const item: TOwner = change.item,
-          attr = change.attr.substring(1);  // Trim leading underscore. TODO fix
+          prop = change.prop;
 
     if (change.type === 'valueChanged') {
       // Coalesce value changes. Only record them the first time we observe
-      // the (item, attr) change.
+      // the (item, prop) change.
       const snapshot = this.getSnapshot(item);
-      if (!snapshot.hasOwnProperty(attr)) {
-        (snapshot as any)[attr] = change.oldValue;
+      if (!snapshot.hasOwnProperty(prop.name)) {
+        (snapshot as any)[prop.name] = change.oldValue;
         this.recordChange(change);
       }
     } else {
@@ -633,7 +645,7 @@ export class TransactionManager<TOwner extends DataContextObject>
         const snapshot = this.getSnapshot(item);
         item.template.properties.forEach((prop) => {
           const value = prop.get(item);
-          (snapshot as any)[prop.name.substring(1)] = value;  // Trim leading underscore. TODO fix
+          (snapshot as any)[prop.name] = value;
         });
       }
       this.recordChange(change);

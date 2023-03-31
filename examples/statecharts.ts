@@ -10,7 +10,7 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
 import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
          evaluateBezier, CurveHitResult } from '../src/geometry.js'
 
-import { ScalarProp, ChildArrayProp, ReferencedObject, ReferenceProp,
+import { ScalarProp, ChildArrayProp, ReferencedObject, ReferenceProp, PropertyTypes,
          DataContext, DataContextObject, EventBase, Change, ChangeEvents,
          copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet,
          reduceToRoots, List, TransactionManager, HistoryManager } from '../src/dataModels.js'
@@ -893,7 +893,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
 
   // DataContext interface implementation.
-  valueChanged(owner: AllTypes, attr: string, oldValue: any) : void {
+  valueChanged(owner: AllTypes, prop: PropertyTypes, oldValue: any) : void {
     if (owner instanceof Transition) {
       // Remove and reinsert changed transitions.
       const parent = owner.parent;
@@ -902,17 +902,17 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
         this.insertTransition_(owner, parent);
       }
     }
-    this.onValueChanged(owner, attr, oldValue);
+    this.onValueChanged(owner, prop, oldValue);
     this.updateItem(owner);  // Update any derived properties.
   }
-  elementInserted(owner: State | Statechart, attr: string, index: number) : void {
-    const value: AllTypes = (owner as any)[attr][index];
+  elementInserted(owner: State | Statechart, prop: ChildArrayProp, index: number) : void {
+    const value: AllTypes = prop.get(owner).at(index) as AllTypes;
     this.insertItem_(value, owner);
-    this.onElementInserted(owner, attr, index);
+    this.onElementInserted(owner, prop, index);
   }
-  elementRemoved(owner: State | Statechart, attr: string, index: number, oldValue: AllTypes) : void {
+  elementRemoved(owner: State | Statechart, prop: ChildArrayProp, index: number, oldValue: AllTypes) : void {
     this.removeItem_(oldValue);
-    this.onElementRemoved(owner, attr, index, oldValue);
+    this.onElementRemoved(owner, prop, index, oldValue);
   }
   resolveReference(owner: AllTypes, cacheKey: symbol, id: number) : StateTypes | undefined {
     // Try to get cached referent.
@@ -953,20 +953,20 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     super.onEvent('changed', change);
     return change;
   }
-  private onValueChanged(item: AllTypes, attr: string, oldValue: any) : StatechartChange {
-    const change: StatechartChange = {type: 'valueChanged', item, attr, index: 0, oldValue };
+  private onValueChanged(item: AllTypes, prop: PropertyTypes, oldValue: any) : StatechartChange {
+    const change: StatechartChange = {type: 'valueChanged', item, prop, index: 0, oldValue };
     super.onEvent('valueChanged', change);
     return this.onChanged(change);
   }
-  private onElementInserted(item: State | Statechart, attr: string, index: number) : StatechartChange {
+  private onElementInserted(item: State | Statechart, prop: ChildArrayProp, index: number) : StatechartChange {
     const change: StatechartChange =
-        { type: 'elementInserted', item: item, attr: attr, index: index, oldValue: undefined };
+        { type: 'elementInserted', item: item, prop: prop, index: index, oldValue: undefined };
     super.onEvent('elementInserted', change);
     return this.onChanged(change);
   }
-  private onElementRemoved(item: State | Statechart, attr: string, index: number, oldValue: AllTypes ) : StatechartChange {
+  private onElementRemoved(item: State | Statechart, prop: ChildArrayProp, index: number, oldValue: AllTypes ) : StatechartChange {
     const change: StatechartChange =
-        { type: 'elementRemoved', item: item, attr: attr, index: index, oldValue: oldValue };
+        { type: 'elementRemoved', item: item, prop: prop, index: index, oldValue: oldValue };
     super.onEvent('elementRemoved', change);
     return this.onChanged(change);
   }
@@ -1916,7 +1916,7 @@ export class StatechartEditor implements CanvasLayer {
     const statechart = this.statechart,
           context = this.context, changedItems = this.changedItems_,
           changedTopLevelStates = this.changedTopLevelStates_,
-          item: AllTypes = change.item, attr = change.attr;
+          item: AllTypes = change.item, prop = change.prop;
 
     // Track all top level states which contain changes. On ending a transaction,
     // update the layout of states and statecharts.
@@ -1943,8 +1943,9 @@ export class StatechartEditor implements CanvasLayer {
 
     switch (change.type) {
       case 'valueChanged': {
+        const attr = prop.name;
         // For changes to x, y, width, or height, layout affected transitions.
-        if (attr == '_x' || attr == '_y' || attr == '_width' || attr == '_height') {  // TODO fix
+        if (attr == 'x' || attr == 'y' || attr == 'width' || attr == 'height') {
           // Visit item and sub-items to layout all affected transitions.
           context.visitAll(item, addItems);
         } else if (item instanceof Transition) {
@@ -1954,7 +1955,7 @@ export class StatechartEditor implements CanvasLayer {
       }
       case 'elementInserted': {
         // Update item subtrees as they are inserted.
-        context.reverseVisitAll((item as any)[attr][change.index] as AllTypes, addItems);
+        context.reverseVisitAll(prop.get(item).at(change.index), addItems);
         break;
       }
     }
