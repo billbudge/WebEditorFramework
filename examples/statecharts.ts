@@ -10,10 +10,10 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
 import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
          evaluateBezier, CurveHitResult } from '../src/geometry.js'
 
-import { ScalarProp, ArrayProp, ReferencedObject, ReferenceProp,
+import { ScalarProp, ChildArrayProp, ReferencedObject, ReferenceProp,
          DataContext, DataContextObject, EventBase, Change, ChangeEvents,
-         copyItems, getLowestCommonAncestor, ancestorInSet, reduceToRoots,
-         List, TransactionManager, HistoryManager } from '../src/dataModels.js'
+         copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet,
+         reduceToRoots, List, TransactionManager, HistoryManager } from '../src/dataModels.js'
 
 //------------------------------------------------------------------------------
 
@@ -29,7 +29,7 @@ const stateTemplate = (function() {
         name = new ScalarProp('name'),
         entry = new ScalarProp('entry'),
         exit = new ScalarProp('exit'),
-        statecharts = new ArrayProp('statecharts'),
+        statecharts = new ChildArrayProp('statecharts'),
         properties = [x, y, width, height, name, entry, exit, statecharts];
   return { typeName, x, y, width, height, name, entry, exit, statecharts, properties };
 })();
@@ -66,8 +66,8 @@ const statechartTemplate = (function() {
         height = new ScalarProp('height'),
         name = new ScalarProp('name'),
 
-        states = new ArrayProp('states'),
-        transitions = new ArrayProp('transitions'),
+        states = new ChildArrayProp('states'),
+        transitions = new ChildArrayProp('transitions'),
         properties = [x, y, width, height, name, states, transitions];
 
   return { typeName, x, y, width, height, name, states, transitions, properties };
@@ -2542,20 +2542,7 @@ export class StatechartEditor implements CanvasLayer {
           return true;
         }
         case 83: { // 's'
-          let text = JSON.stringify(
-            statechart,
-            function (key, value) {
-              // Don't serialize generated and hidden fields.
-              // TODO proper data model serialization using templates.
-              if (key.toString().charAt(0) !== '_')
-                return;
-              if (value === undefined || value === null)
-                return;
-              return value;
-            },
-            2);
-
-          // Writes statechart as JSON.
+          let text = Serialize(statechart);
           this.fileController.saveUnnamedFile(text, 'statechart.txt').then();
           // console.log(text);
           return true;
