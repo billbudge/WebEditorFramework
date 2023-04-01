@@ -19,18 +19,18 @@ class TestDataContext extends Data.EventBase<Data.Change<TestDataContextObject>,
   }
 
   valueChanged(
-    owner: TestDataContextObject, prop: Data.PropertyTypes, oldValue: any) : void {
+    owner: TestDataContextObject, prop: Data.ScalarPropertyTypes, oldValue: any) : void {
       this.valueChange = { owner, prop, oldValue };
       this.onValueChanged(owner, prop, oldValue);
     }
   elementInserted(
-      owner: TestDataContextObject, prop: Data.ChildArrayProp, index: number) : void {
+      owner: TestDataContextObject, prop: Data.ArrayPropertyTypes, index: number) : void {
     const value = prop.get(owner).at(index);
     this.elementInsert = { owner, prop, index, value };
     this.onElementInserted(owner, prop, index);
   }
   elementRemoved(
-      owner: TestDataContextObject, prop: Data.ChildArrayProp, index: number, oldValue: TestDataContextObject) : void {
+      owner: TestDataContextObject, prop: Data.ArrayPropertyTypes, index: number, oldValue: TestDataContextObject) : void {
     this.elementRemove = { owner, prop, index, oldValue };
     this.onElementRemoved(owner, prop, index, oldValue);
   }
@@ -46,20 +46,20 @@ class TestDataContext extends Data.EventBase<Data.Change<TestDataContextObject>,
     return change;
   }
   private onValueChanged(
-      item: TestDataContextObject, prop: Data.PropertyTypes, oldValue: any) {
+      item: TestDataContextObject, prop: Data.ScalarPropertyTypes, oldValue: any) {
     const change: Data.Change<TestDataContextObject> = {type: 'valueChanged', item, prop, index: 0, oldValue };
     super.onEvent('valueChanged', change);
     return this.onChanged(change);
   }
   private onElementInserted(
-      item: TestDataContextObject, prop: Data.ChildArrayProp, index: number) {
+      item: TestDataContextObject, prop: Data.ArrayPropertyTypes, index: number) {
     const change: Data.Change<TestDataContextObject> =
         { type: 'elementInserted', item: item, prop: prop, index: index, oldValue: undefined };
     super.onEvent('elementInserted', change);
     return this.onChanged(change);
   }
   private onElementRemoved(
-      item: TestDataContextObject, prop: Data.ChildArrayProp, index: number, oldValue: TestDataContextObject ) :
+      item: TestDataContextObject, prop: Data.ArrayPropertyTypes, index: number, oldValue: TestDataContextObject ) :
       Data.Change {
     const change: Data.Change<TestDataContextObject> =
         { type: 'elementRemoved', item: item, prop: prop, index: index, oldValue: oldValue };
@@ -67,25 +67,28 @@ class TestDataContext extends Data.EventBase<Data.Change<TestDataContextObject>,
     return this.onChanged(change);
   }
 
-  construct(obj: TestDataContextObject, map: Map<number, TestDataContextObject>) : TestDataContextObject {
+  construct(typeName: string) : TestDataContextObject {
+    if (typeName !== 'TestDataObjectTemplate')
+      throw('Unknown type: ' + typeName);
     const result = new TestDataContextObject(this);
-    map.set(obj.id, result);
     this.registerObject(result);
     return result;
   }
 }
 
 class TestDataObjectTemplate implements Data.DataObjectTemplate {
-  typeName: 'TestDataObjectTemplate';
+  typeName: string = 'TestDataObjectTemplate';
+  id: Data.IdProp;
   x: Data.ScalarProp;
   array: Data.ChildArrayProp;
   reference: Data.ReferenceProp;
   properties: Data.PropertyTypes[];
   constructor() {
+    this.id = new Data.IdProp('id');
     this.x = new Data.ScalarProp('x');
     this.array = new Data.ChildArrayProp('array');
     this.reference = new Data.ReferenceProp('reference');
-    this.properties = [this.x, this.array, this.reference];
+    this.properties = [this.id, this.x, this.array, this.reference];
   }
 }
 

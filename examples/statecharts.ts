@@ -13,7 +13,7 @@ import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
 import { ScalarProp, ChildArrayProp, ReferencedObject, ReferenceProp, PropertyTypes,
          DataContext, DataContextObject, EventBase, Change, ChangeEvents,
          copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet,
-         reduceToRoots, List, TransactionManager, HistoryManager } from '../src/dataModels.js'
+         reduceToRoots, List, TransactionManager, HistoryManager, ScalarPropertyTypes, ArrayPropertyTypes, DataObjectTemplate } from '../src/dataModels.js'
 
 //------------------------------------------------------------------------------
 
@@ -21,7 +21,7 @@ import { ScalarProp, ChildArrayProp, ReferencedObject, ReferenceProp, PropertyTy
 // cloning, serialization, etc.
 
 const stateTemplate = (function() {
-  const typeName = 'state',
+  const typeName: string = 'state',
         x = new ScalarProp('x'),
         y = new ScalarProp('y'),
         width = new ScalarProp('width'),
@@ -34,16 +34,27 @@ const stateTemplate = (function() {
   return { typeName, x, y, width, height, name, entry, exit, statecharts, properties };
 })();
 
+export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
+type PseudostateTemplate = {
+  readonly typeName: string,
+  readonly x: ScalarProp,
+  readonly y: ScalarProp,
+  readonly properties: ScalarPropertyTypes[],
+}
 const pseudostateTemplate = (function() {
-  const typeName = 'pseudostate',
-        x = new ScalarProp('x'),
+  const x = new ScalarProp('x'),
         y = new ScalarProp('y'),
         properties = [x, y];
-  return { typeName, x, y, properties };
+  return {
+    start: { typeName: 'start', x, y, properties },
+    stop: { typeName: 'stop', x, y, properties },
+    history: { typeName: 'history', x, y, properties },
+    deepHistory: { typeName: 'history*', x, y, properties },
+  };
 })();
 
 const transitionTemplate = (function() {
-  const typeName = 'transition',
+  const typeName: string = 'transition',
         src = new ReferenceProp('src'),
         tSrc = new ScalarProp('tSrc'),
         dst = new ReferenceProp('dst'),
@@ -59,7 +70,7 @@ const transitionTemplate = (function() {
 })();
 
 const statechartTemplate = (function() {
-  const typeName = 'statechart',
+  const typeName: string = 'statechart',
         x = new ScalarProp('x'),
         y = new ScalarProp('y'),
         width = new ScalarProp('width'),
@@ -112,14 +123,13 @@ export class State implements DataContextObject, ReferencedObject {
   }
 }
 
-export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
-
 export class Pseudostate implements DataContextObject, ReferencedObject {
-  readonly template = pseudostateTemplate;
+  readonly template: PseudostateTemplate;
   readonly context: StatechartContext;
 
-  readonly subtype: PseudostateSubtype;
   readonly id: number;
+
+  get subtype() : string { return this.template.typeName };
 
   get x() { return this.template.x.get(this) || 0; }
   set x(value: number) { this.template.x.set(this, value); }
@@ -132,8 +142,8 @@ export class Pseudostate implements DataContextObject, ReferencedObject {
   inTransitions: Transition[];
   outTransitions: Transition[];
 
-  constructor(subtype: PseudostateSubtype, id: number, context: StatechartContext) {
-    this.subtype = subtype;
+  constructor(template: PseudostateTemplate, id: number, context: StatechartContext) {
+    this.template = template;
     this.id = id;
     this.context = context;
   }
@@ -274,9 +284,17 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     this.stateMap_.set(nextId, result);
     return result;
   }
-  newPseudostate(subtype: PseudostateSubtype) : Pseudostate {
-    const nextId = ++this.highestId_,
-          result: Pseudostate = new Pseudostate(subtype, nextId, this);
+  newPseudostate(typeName: string) : Pseudostate {
+    const nextId = ++this.highestId_;
+    let template;
+    switch (typeName) {
+      case 'start': template = pseudostateTemplate.start; break;
+      case 'stop': template = pseudostateTemplate.stop; break;
+      case 'history': template = pseudostateTemplate.history; break;
+      case 'history*': template = pseudostateTemplate.deepHistory; break;
+      default: throw new Error('Unknown pseudostate type: ' + typeName);
+    }
+    const result: Pseudostate = new Pseudostate(template as PseudostateTemplate, nextId, this);  // TODO fix
     this.stateMap_.set(nextId, result);
     return result;
   }
@@ -893,7 +911,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
 
   // DataContext interface implementation.
-  valueChanged(owner: AllTypes, prop: PropertyTypes, oldValue: any) : void {
+  valueChanged(owner: AllTypes, prop: ScalarPropertyTypes, oldValue: any) : void {
     if (owner instanceof Transition) {
       // Remove and reinsert changed transitions.
       const parent = owner.parent;
@@ -905,12 +923,12 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     this.onValueChanged(owner, prop, oldValue);
     this.updateItem(owner);  // Update any derived properties.
   }
-  elementInserted(owner: State | Statechart, prop: ChildArrayProp, index: number) : void {
+  elementInserted(owner: State | Statechart, prop: ArrayPropertyTypes, index: number) : void {
     const value: AllTypes = prop.get(owner).at(index) as AllTypes;
     this.insertItem_(value, owner);
     this.onElementInserted(owner, prop, index);
   }
-  elementRemoved(owner: State | Statechart, prop: ChildArrayProp, index: number, oldValue: AllTypes) : void {
+  elementRemoved(owner: State | Statechart, prop: ArrayPropertyTypes, index: number, oldValue: AllTypes) : void {
     this.removeItem_(oldValue);
     this.onElementRemoved(owner, prop, index, oldValue);
   }
@@ -926,24 +944,15 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     }
     return ref;
   }
-  construct(original: AllTypes, map: Map<number, ReferencedObject>) : AllTypes {
-    if (original instanceof State) {
-      const result = this.newState();
-      map.set(original.id, result);
-      this.stateMap_.set(result.id, result);
-      return result;
-    }
-    if (original instanceof Pseudostate) {
-      const result = this.newPseudostate(original.subtype);
-      map.set(original.id, result);
-      this.stateMap_.set(result.id, result);
-      return result;
-    }
-    if (original instanceof Transition) {
-      return this.newTransition(undefined, undefined);
-    }
-    if (original instanceof Statechart) {
-      return this.newStatechart();
+  construct(typeName: string) : AllTypes {
+    switch (typeName) {
+      case 'state': return this.newState();
+      case 'start':
+      case 'stop':
+      case 'history':
+      case 'history*': return this.newPseudostate(typeName);
+      case 'transition': return this.newTransition(undefined, undefined);
+      case 'statechart': return this.newStatechart();
     }
     throw new Error('Unknown type');
   }
@@ -953,18 +962,24 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     super.onEvent('changed', change);
     return change;
   }
-  private onValueChanged(item: AllTypes, prop: PropertyTypes, oldValue: any) : StatechartChange {
+  private onValueChanged(
+      item: AllTypes, prop: ScalarPropertyTypes, oldValue: any) :
+      StatechartChange {
     const change: StatechartChange = {type: 'valueChanged', item, prop, index: 0, oldValue };
     super.onEvent('valueChanged', change);
     return this.onChanged(change);
   }
-  private onElementInserted(item: State | Statechart, prop: ChildArrayProp, index: number) : StatechartChange {
+  private onElementInserted(
+      item: State | Statechart, prop: ArrayPropertyTypes, index: number) :
+      StatechartChange {
     const change: StatechartChange =
         { type: 'elementInserted', item: item, prop: prop, index: index, oldValue: undefined };
     super.onEvent('elementInserted', change);
     return this.onChanged(change);
   }
-  private onElementRemoved(item: State | Statechart, prop: ChildArrayProp, index: number, oldValue: AllTypes ) : StatechartChange {
+  private onElementRemoved(
+      item: State | Statechart, prop: ArrayPropertyTypes, index: number, oldValue: AllTypes ) :
+      StatechartChange {
     const change: StatechartChange =
         { type: 'elementRemoved', item: item, prop: prop, index: index, oldValue: oldValue };
     super.onEvent('elementRemoved', change);

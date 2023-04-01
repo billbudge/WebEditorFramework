@@ -7,18 +7,12 @@ import { SelectionSet } from './collections.js';
 //   hierarchy, references.
 // Interfaces adapt the raw data for type safe use.
 
-// TODO consider using template properties instead of attr strings.
 export interface DataContext {
-  valueChanged(
-      owner: DataContextObject, prop: PropertyTypes, oldValue: any) : void;
-  elementInserted(
-      owner: DataContextObject, prop: ChildArrayProp, index: number) : void;
-  elementRemoved(
-      owner: DataContextObject, prop: ChildArrayProp, index: number, oldValue: DataContextObject) : void;
-  resolveReference(
-      owner: DataContextObject, cacheKey: symbol, id: number) : ReferencedObject | undefined;
-  construct(
-      obj: DataContextObject, map: Map<number, ReferencedObject>) : DataContextObject;
+  valueChanged(owner: DataContextObject, prop: ScalarPropertyTypes, oldValue: any) : void;
+  elementInserted(owner: DataContextObject, prop: ArrayPropertyTypes, index: number) : void;
+  elementRemoved(owner: DataContextObject, prop: ArrayPropertyTypes, index: number, oldValue: DataContextObject) : void;
+  resolveReference(owner: DataContextObject, cacheKey: symbol, id: number) : ReferencedObject | undefined;
+  construct(typeName: string) : DataContextObject;
 }
 
 export interface DataContextObject {
@@ -50,7 +44,7 @@ export interface List<T = any> {
   forEachReverse(visitor: (element: T) => void) : void;
 }
 
-// Internal, non-type safe implementation of List.
+// Internal, non-type safe implementation of List<T>.
 // TODO should cache list on owner.
 class DataList implements List {
   private owner: DataContextObject;
@@ -76,8 +70,9 @@ class DataList implements List {
   insert(element: any, index: number) {
     let array = this.array;
     if (!array) {
+      // Set the internal value to an empty array, which is equivalent to
+      // undefined, so don't notify any observers.
       this.array = array = [];
-      this.owner.context.valueChanged(this.owner, this.prop, undefined);
     }
     array.splice(index, 0, element);
     this.owner.context.elementInserted(this.owner, this.prop, index);
@@ -131,7 +126,10 @@ class DataList implements List {
 
 // Simple property descriptors.
 
-export type PropertyTypes = ScalarProp | ReferenceProp | ChildArrayProp;
+export type ScalarPropertyTypes = ScalarProp | ReferenceProp;
+export type ArrayPropertyTypes = ChildArrayProp;
+export type PropertyTypes = ScalarPropertyTypes | ArrayPropertyTypes | IdProp;
+
 
 export class ScalarProp {
   readonly name: string;
@@ -158,13 +156,6 @@ export class ChildArrayProp<T extends DataContextObject = DataContextObject> {
 
   get(owner: DataContextObject) : List<T> {
     return new DataList(owner, this);
-  }
-  set(owner: DataContextObject, value: List<T> | undefined) : List<T> {
-    // TODO reconsider this.
-    const oldValue = new DataList(owner, this);
-    (owner as any)[this.internalName] = value;
-    owner.context.valueChanged(owner, this, oldValue);
-    return oldValue;
   }
   constructor(name: string) {
     this.name = name;
@@ -195,6 +186,17 @@ export class ReferenceProp {
   }
 }
 
+export class IdProp {
+  readonly name: string;
+
+  get(owner: DataContextObject) : number {
+    return (owner as any)['id'];
+  }
+  constructor(name: string) {
+    this.name = name;
+  }
+}
+
 //------------------------------------------------------------------------------
 
 // Cloning.
@@ -202,11 +204,14 @@ export class ReferenceProp {
 function copyItem(
     original: DataContextObject, context: DataContext, map: Map<number, ReferencedObject>) :
     DataContextObject {
-  const copy = context.construct(original, map),
+  const copy = context.construct(original.template.typeName),
         properties = original.template.properties;
   for (let prop of properties) {
     if (prop instanceof ScalarProp || prop instanceof ReferenceProp) {
       prop.set(copy, prop.get(original));
+    } else if (prop instanceof IdProp) {
+      const id = prop.get(original);
+      map.set(id, (copy as unknown) as ReferencedObject); // TODO fix
     } else if (prop instanceof ChildArrayProp) {
       const originalList = prop.get(original),
       copyList = prop.get(copy);
@@ -472,9 +477,9 @@ class ChangeOp<TOwner extends DataContextObject> implements Operation {
     switch (change.type) {
       case 'valueChanged': {
         const oldValue = prop.get(item);
-        prop.set(item, change.oldValue);
+        (prop as ScalarPropertyTypes).set(item, change.oldValue);
         change.oldValue = oldValue;
-        item.context.valueChanged(item, prop, oldValue);  // this change is its own inverse.
+        item.context.valueChanged(item, (prop as ScalarPropertyTypes), oldValue);  // this change is its own inverse.
         break;
       }
       case 'elementInserted': {
