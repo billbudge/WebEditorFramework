@@ -25,7 +25,7 @@ export interface DataObjectTemplate {
   readonly properties: Array<PropertyTypes>;
 }
 
-export interface ReferencedObject {
+export interface ReferencedObject extends DataContextObject {
   readonly id: number;
 }
 
@@ -192,6 +192,12 @@ export class IdProp {
   get(owner: DataContextObject) : number {
     return (owner as any)['id'];
   }
+  setMap(owner: DataContextObject, target: DataContextObject, map: Map<number, ReferencedObject>) :
+         ReferencedObject {
+    const value = target as ReferencedObject;
+    map.set(this.get(owner), value);
+    return value;
+  }
   constructor(name: string) {
     this.name = name;
   }
@@ -210,8 +216,7 @@ function copyItem(
     if (prop instanceof ScalarProp || prop instanceof ReferenceProp) {
       prop.set(copy, prop.get(original));
     } else if (prop instanceof IdProp) {
-      const id = prop.get(original);
-      map.set(id, (copy as unknown) as ReferencedObject); // TODO fix
+      prop.setMap(original, copy, map);
     } else if (prop instanceof ChildArrayProp) {
       const originalList = prop.get(original),
       copyList = prop.get(copy);
@@ -259,8 +264,6 @@ export function copyItems(
 
 // Serialization/Deserialization, via JSON.
 
-type SerializationFn = (item: DataContextObject) => string;
-
 function serializeItem(original: DataContextObject) : object {
   let result: any = {
     type: original.template.typeName,
@@ -290,11 +293,9 @@ export function Serialize(item: DataContextObject) : string {
   return JSON.stringify(serializeItem(item), (key, value) => value, 2);
 }
 
-type DeserializationFn = (type: string) => DataContextObject;
-
-function deserializeItem(raw: any, deserializeFn: DeserializationFn) : DataContextObject {
+function deserializeItem(raw: any, context: DataContext) : DataContextObject {
   const type = raw.type,
-        item = deserializeFn(type);
+        item = context.construct(type);
   for (let prop of item.template.properties) {
     if (prop instanceof ScalarProp) {
       const value = raw[prop.name];
