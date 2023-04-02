@@ -310,7 +310,7 @@ function deserializeItem(raw: any, context: DataContext) : DataContextObject {
             list = prop.get(item);
       if (rawList) {
         for (let rawChild of rawList) {
-          const child = deserializeItem(rawChild, deserializeFn);
+          const child = deserializeItem(rawChild, context);
           list.append(child);
         }
       }
@@ -319,9 +319,9 @@ function deserializeItem(raw: any, context: DataContext) : DataContextObject {
   return item;
 }
 
-export function Deserialize(raw: string, deserializeFn: DeserializationFn) : DataContextObject {
+export function Deserialize(raw: string, context: DataContext) : DataContextObject {
   // TODO update id's to references.
-  return deserializeItem(JSON.parse(raw), deserializeFn);
+  return deserializeItem(JSON.parse(raw), context);
 }
 
 //------------------------------------------------------------------------------
