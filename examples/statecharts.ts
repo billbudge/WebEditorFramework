@@ -815,8 +815,10 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     state.parent = parent;
     this.updateItem(state);
 
-    state.inTransitions = new Array<Transition>();
-    state.outTransitions = new Array<Transition>();
+    if (state.inTransitions === undefined)
+      state.inTransitions = new Array<Transition>();
+      if (state.outTransitions === undefined)
+      state.outTransitions = new Array<Transition>();
 
     if (state instanceof State && state.statecharts) {
       const self = this;
