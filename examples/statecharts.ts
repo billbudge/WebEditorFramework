@@ -380,7 +380,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
 
   // Gets the translation to move an item from its current parent to
-  // newParent. Handles the cases where current parent or newParent are null.
+  // newParent. Handles the cases where current parent or newParent are undefined.
   getToParent(item: NonTransitionTypes, newParent: ParentTypes) {
     const oldParent: ParentTypes = item.parent;
     let dx = 0, dy = 0;
@@ -2326,7 +2326,7 @@ export class StatechartEditor implements CanvasLayer {
       }
     }
     this.setPropertyGrid();
-    return pointerHitInfo !== null;
+    return pointerHitInfo !== undefined;
   }
   onBeginDrag(canvasController: CanvasController) {
     let pointerHitInfo = this.pointerHitInfo_;
@@ -2689,7 +2689,7 @@ export class StatechartEditor implements CanvasLayer {
     }
     onEndHover(canvasController) {
       if (this.hoverHitInfo)
-        this.hoverHitInfo = null;
+        this.hoverHitInfo = undefined;
     }
 
 */
