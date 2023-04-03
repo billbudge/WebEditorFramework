@@ -1669,6 +1669,91 @@ class Renderer {
 
 //------------------------------------------------------------------------------
 
+function assignProps(src: any, dst: DataContextObject) {
+  dst.template.properties.forEach(function (prop) {
+    if (prop instanceof ScalarProp || prop instanceof ReferenceProp) {
+      prop.set(dst, src[prop.name]);
+    }
+  });
+}
+function readState(
+    raw: any, context: StatechartContext, map: Map<number, StateTypes>) : State {
+  const state = context.newState();
+  assignProps(raw, state);
+  map.set(raw.id, state)
+  if (raw.items) {
+    raw.items.forEach((raw: any) => {
+      state.statecharts.append(readStatechart(raw, context, map));
+    });
+  }
+  return state;
+}
+function readPseudostate(
+    raw: any, context: StatechartContext, map: Map<number, StateTypes>) : Pseudostate {
+  const pseudostate = context.newPseudostate(raw.type);
+  assignProps(raw, pseudostate);
+  map.set(raw.id, pseudostate)
+  return pseudostate;
+}
+function readTransition(
+    raw: any, context: StatechartContext, map: Map<number, StateTypes>) : Transition {
+  // Property names changed so do it manually.
+  const transition = context.newTransition(map.get(raw.srcId), map.get(raw.dstId));
+  transition.tSrc = raw.t1;
+  transition.tDst = raw.t2;
+  transition.event = raw.event;
+  transition.guard = raw.guard;
+  transition.action = raw.action;
+  transition.tText = raw.pt;
+//   "srcId": 1003,
+//   "t1": 2.459876895194184,
+//   "pt": 0.47680717398461436,
+//   "id": 1011,
+//   "dstId": 1009,
+//   "t2": 2.440397658477461,
+//   "event": "announceOrder(i:item)",
+//   "guard": "self.State(Loader::Idle)"
+// ;
+  return transition;
+}
+function readStatechart(
+    raw: any, context: StatechartContext, map: Map<number, StateTypes>) : Statechart {
+  const statechart = context.newStatechart();
+  assignProps(raw, statechart);
+  // First states and pseudostates.
+  raw.items.forEach((raw: any) => {
+    if (raw.type === 'state') {
+      statechart.states.append(readState(raw, context, map));
+    } else if (raw.type !== 'transition') {
+      statechart.states.append(readPseudostate(raw, context, map));
+    }
+  });
+  // Now transitions.
+  raw.items.forEach((raw: any) => {
+    if (raw.type === 'transition') {
+      statechart.transitions.append(readTransition(raw, context, map));
+    }
+  });
+  return statechart;
+}
+
+function readRaw(raw: any, context: StatechartContext) : void {
+  let statechart: Statechart | undefined = undefined;
+  if (raw.items === undefined) {
+    // new format.
+    statechart = Deserialize(raw, context) as Statechart;
+  } else {
+    // old format.
+    const map = new Map<number, StateTypes>();
+    statechart = readStatechart(raw, context, map);
+  }
+  if (statechart) {
+    context.setRoot(statechart);
+  }
+}
+
+//------------------------------------------------------------------------------
+
 function isStateBorder(hitInfo: HitResultTypes) : boolean {
   return hitInfo instanceof StateHitResult && hitInfo.inner.border;
 }
@@ -2546,19 +2631,21 @@ export class StatechartEditor implements CanvasLayer {
           return true;
         }
         case 79: { // 'o'
-          // function parse(text) {
-          //   const statechart = JSON.parse(text),
-          //         model = { root: statechart };
-          //   self.initializeModel(model);
-          //   self.setModel(model);
-          //   self.updateBounds_();
-          //   self.canvasController.draw();
-          // }
-          // this.fileController.openFile().then(result => parse(result));
+          function parse(text: string) {
+            const raw = JSON.parse(text),
+                  context = new StatechartContext();
+            const statechart = readRaw(raw, context);
+            self.initializeContext(context);
+            self.setContext(context);
+            self.updateLayout_();
+            self.updateBounds_();
+            self.canvasController.draw();
+        }
+          this.fileController.openFile().then(result => parse(result));
           return true;
         }
         case 83: { // 's'
-          let text = Serialize(statechart);
+          let text = JSON.stringify(Serialize(statechart), undefined, 2);
           this.fileController.saveUnnamedFile(text, 'statechart.txt').then();
           // console.log(text);
           return true;

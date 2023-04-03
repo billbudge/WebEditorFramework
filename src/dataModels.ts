@@ -289,8 +289,8 @@ function serializeItem(original: DataContextObject) : object {
   return result;
 }
 
-export function Serialize(item: DataContextObject) : string {
-  return JSON.stringify(serializeItem(item), (key, value) => value, 2);
+export function Serialize(item: DataContextObject) : any {
+  return serializeItem(item);
 }
 
 function deserializeItem(raw: any, context: DataContext) : DataContextObject {
@@ -319,9 +319,8 @@ function deserializeItem(raw: any, context: DataContext) : DataContextObject {
   return item;
 }
 
-export function Deserialize(raw: string, context: DataContext) : DataContextObject {
-  // TODO update id's to references.
-  return deserializeItem(JSON.parse(raw), context);
+export function Deserialize(raw: any, context: DataContext) : DataContextObject {
+  return deserializeItem(raw, context);
 }
 
 //------------------------------------------------------------------------------
