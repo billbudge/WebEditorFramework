@@ -894,8 +894,6 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
         this.insertStatechart_(item, parent);
     } else {
       if (parent && parent instanceof Statechart) {
-        if (!item)
-          throw new Error('item is undefined');
         this.insertState_(item, parent);
       }
     }

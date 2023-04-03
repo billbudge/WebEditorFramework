@@ -492,7 +492,7 @@ class ChangeOp<TOwner extends DataContextObject> implements Operation {
       }
       case 'elementRemoved': {
         const list = prop.get(item), index = change.index;
-        list.insert(index, change.oldValue)
+        list.insert(change.oldValue, index);
         item.context.elementInserted(item, prop as ChildArrayProp, index);
         change.type = 'elementInserted';
         break;
