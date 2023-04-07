@@ -11,7 +11,7 @@ export interface DataContext {
   valueChanged(owner: DataContextObject, prop: ScalarPropertyTypes, oldValue: any) : void;
   elementInserted(owner: DataContextObject, prop: ArrayPropertyTypes, index: number) : void;
   elementRemoved(owner: DataContextObject, prop: ArrayPropertyTypes, index: number, oldValue: DataContextObject) : void;
-  resolveReference(owner: DataContextObject, cacheKey: symbol, id: number) : ReferencedObject | undefined;
+  resolveReference(owner: DataContextObject, prop: ReferenceProp) : ReferencedObject | undefined;
   construct(typeName: string) : DataContextObject;
 }
 
@@ -45,7 +45,6 @@ export interface List<T = any> {
 }
 
 // Internal, non-type safe implementation of List<T>.
-// TODO should cache list on owner.
 class DataList implements List {
   private owner: DataContextObject;
   private prop: ChildArrayProp;
@@ -153,35 +152,56 @@ export class ScalarProp {
 export class ChildArrayProp<T extends DataContextObject = DataContextObject> {
   readonly name: string;
   readonly internalName: string;
+  readonly cacheKey: symbol;
 
   get(owner: DataContextObject) : List<T> {
-    return new DataList(owner, this);
+    let list = (owner as any)[this.cacheKey];
+    if (!list) {
+      list = new DataList(owner, this);
+      (owner as any)[this.cacheKey] = list;
+    }
+    return list;
   }
   constructor(name: string) {
     this.name = name;
     this.internalName = '_' + name;
+    this.cacheKey = Symbol.for(name);
   }
 }
 
 export class ReferenceProp {
   readonly name: string;
-  readonly inner: ScalarProp;
+  readonly internalName: string;
   readonly cacheKey: symbol;
 
   get(owner: DataContextObject) : ReferencedObject | undefined {
-    const id = this.inner.get(owner);
-    if (!id)
-      return undefined;
-    return owner.context.resolveReference(owner, this.cacheKey, id) as ReferencedObject | undefined;
+    let value = (owner as any)[this.cacheKey];
+    if  (value === undefined) {
+      const id = this.serialize(owner);
+      if (id) {
+        value = owner.context.resolveReference(owner, this);
+        (owner as any)[this.cacheKey] = value;
+      }
+    }
+    return value;
   }
-  set(owner: DataContextObject, value: ReferencedObject | undefined) : ReferencedObject | undefined {
-    const newId: number = value ? value.id : 0;
-    this.inner.set(owner, newId);
-    return owner.context.resolveReference(owner, this.cacheKey, newId) as ReferencedObject | undefined;
+  set(owner: DataContextObject, value: ReferencedObject | undefined) : void {
+    (owner as any)[this.cacheKey] = value;
+    const newId: number = value !== undefined ? value.id : 0;
+    const oldValue = (owner as any)[this.internalName];
+    (owner as any)[this.internalName] = newId;
+    owner.context.valueChanged(owner, this, oldValue);
+  }
+  serialize(owner: DataContextObject) : number {
+    return (owner as any)[this.internalName];
+  }
+  deserialize(owner: DataContextObject, id: number) : void {
+    (owner as any)[this.cacheKey] = undefined;
+    (owner as any)[this.internalName] = id;
   }
   constructor(name: string) {
     this.name = name;
-    this.inner = new ScalarProp(name);
+    this.internalName = '_' + name;
     this.cacheKey = Symbol.for(name);
   }
 }
@@ -274,9 +294,8 @@ function serializeItem(original: DataContextObject) : object {
       if (value !== undefined)
         result[prop.name] = value;
     } else if (prop instanceof ReferenceProp) {
-      const value = prop.inner.get(original);
-      if (value !== undefined)
-        result[prop.name] = value;
+      const value = prop.serialize(original);
+      result[prop.name] = value;
     } else if (prop instanceof ChildArrayProp) {
       const originalList = prop.get(original),
             copyList = new Array<object>();
@@ -302,9 +321,8 @@ function deserializeItem(raw: any, context: DataContext) : DataContextObject {
       if (value !== undefined)
         prop.set(item, value);
     } else if (prop instanceof ReferenceProp) {
-      const value = raw[prop.name];
-      if (value !== undefined)
-        prop.inner.set(item, value);
+      const value = raw[prop.name] || 0;
+      prop.deserialize(item, value);
     } else if (prop instanceof ChildArrayProp) {
       const rawList = raw[prop.name],
             list = prop.get(item);
@@ -476,25 +494,36 @@ class ChangeOp<TOwner extends DataContextObject> implements Operation {
           prop: PropertyTypes = change.prop;
     switch (change.type) {
       case 'valueChanged': {
+        // value change can be its own inverse by swapping current and old values.
         const oldValue = prop.get(item);
-        (prop as ScalarPropertyTypes).set(item, change.oldValue);
-        change.oldValue = oldValue;
-        item.context.valueChanged(item, (prop as ScalarPropertyTypes), oldValue);  // this change is its own inverse.
+        if (prop instanceof ScalarProp) {
+          prop.set(item, change.oldValue);
+          change.oldValue = oldValue;
+          item.context.valueChanged(item, prop, oldValue);
+        } else if (prop instanceof ReferenceProp) {
+          prop.set(item, change.oldValue);
+          change.oldValue = oldValue;
+          item.context.valueChanged(item, prop, oldValue);
+        }
         break;
       }
       case 'elementInserted': {
-        const list = prop.get(item), index = change.index;
-        change.oldValue = list.at(index);
-        list.removeAt(index);
-        item.context.elementRemoved(item, prop as ChildArrayProp, index, change.oldValue);
-        change.type = 'elementRemoved';
+        if (prop instanceof ChildArrayProp) {
+          const list = prop.get(item), index = change.index;
+          change.oldValue = list.at(index);
+          list.removeAt(index);
+          item.context.elementRemoved(item, prop, index, change.oldValue);
+          change.type = 'elementRemoved';
+          }
         break;
       }
       case 'elementRemoved': {
-        const list = prop.get(item), index = change.index;
-        list.insert(change.oldValue, index);
-        item.context.elementInserted(item, prop as ChildArrayProp, index);
-        change.type = 'elementInserted';
+        if (prop instanceof ChildArrayProp) {
+          const list = prop.get(item), index = change.index;
+          list.insert(change.oldValue, index);
+          item.context.elementInserted(item, prop, index);
+          change.type = 'elementInserted';
+        }
         break;
       }
     }

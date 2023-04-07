@@ -855,12 +855,12 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
           dst = transition.dst;
     if (src) {
       const outputs = src.outTransitions;
-      if (outputs)
+      if (outputs && !outputs.includes(transition))
         outputs.push(transition);
     }
     if (dst) {
       const inputs = dst.inTransitions;
-      if (inputs)
+      if (inputs && !inputs.includes(transition))
         inputs.push(transition);
     }
   }
@@ -932,17 +932,12 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     this.removeItem_(oldValue);
     this.onElementRemoved(owner, prop, index, oldValue);
   }
-  resolveReference(owner: AllTypes, cacheKey: symbol, id: number) : StateTypes | undefined {
-    // Try to get cached referent.
-    let target = (owner as any)[cacheKey];
-    if (target && target.id === id)
-      return target.ref;
-    const ref = this.stateMap_.get(id);
-    // Cache it on the object.
-    if (ref) {
-      (owner as any)[cacheKey] = { id: id, ref: ref };
-    }
-    return ref;
+  resolveReference(owner: AllTypes, prop: ReferenceProp) : StateTypes | undefined {
+    // Look up state id.
+    const id: number = prop.serialize(owner);
+    if  (!id)
+      return undefined;
+    return this.stateMap_.get(id);
   }
   construct(typeName: string) : AllTypes {
     switch (typeName) {
