@@ -174,31 +174,45 @@ export class ReferenceProp {
   readonly internalName: string;
   readonly cacheKey: symbol;
 
+  private getRef(owner: DataContextObject) : ReferencedObject | undefined {
+    return (owner as any)[this.cacheKey];
+  }
+  private setRef(owner: DataContextObject, value: ReferencedObject | undefined) : void {
+    (owner as any)[this.cacheKey] = value;
+  }
+  private getId(owner: DataContextObject) : number {
+    return (owner as any)[this.internalName];
+  }
+  private setId(owner: DataContextObject, id: number) : void {
+    (owner as any)[this.internalName] = id;
+  }
+
   get(owner: DataContextObject) : ReferencedObject | undefined {
-    let value = (owner as any)[this.cacheKey];
+    let value = this.getRef(owner);
     if  (value === undefined) {
-      const id = this.serialize(owner);
+      const id = this.getId(owner);
       if (id) {
         value = owner.context.resolveReference(owner, this);
-        (owner as any)[this.cacheKey] = value;
+        this.setRef(owner, value);
       }
     }
     return value;
   }
   set(owner: DataContextObject, value: ReferencedObject | undefined) : void {
-    (owner as any)[this.cacheKey] = value;
+    this.setRef(owner, value);
     const newId: number = value !== undefined ? value.id : 0;
-    const oldValue = (owner as any)[this.internalName];
-    (owner as any)[this.internalName] = newId;
+    const oldValue = this.getId(owner);
+    this.setId(owner, newId);
     owner.context.valueChanged(owner, this, oldValue);
   }
   serialize(owner: DataContextObject) : number {
-    return (owner as any)[this.internalName];
+    return this.getId(owner);
   }
   deserialize(owner: DataContextObject, id: number) : void {
-    (owner as any)[this.cacheKey] = undefined;
-    (owner as any)[this.internalName] = id;
+    this.setRef(owner, undefined);
+    this.setId(owner, id);
   }
+
   constructor(name: string) {
     this.name = name;
     this.internalName = '_' + name;
@@ -468,6 +482,7 @@ export type ChangeEvents = 'changed' | ChangeType;
 // 'valueChanged': item, attr, oldValue.
 // 'elementInserted': item, attr, index.
 // 'elementRemoved': item, attr, index, oldValue.
+// TODO split into value and child array changes.
 export interface Change<TOwner extends object = object, TValue = any> {
   type: ChangeType;
   item: TOwner;
