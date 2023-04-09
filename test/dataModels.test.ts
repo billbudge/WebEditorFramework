@@ -36,7 +36,7 @@ class TestDataContext extends Data.EventBase<Data.Change<TestDataContextObject>,
   }
   resolveReference(
       owner: TestDataContextObject, prop: Data.ReferenceProp) : TestDataContextObject | undefined {
-    const id = prop.serialize(owner);
+    const id = prop.getId(owner);
     this.resolvedReference = { owner, id };
     return this.map.get(id);
   }

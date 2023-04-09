@@ -251,8 +251,8 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
 
   selection = new SelectionSet<AllTypes>();
 
-  readonly transactionManager: TransactionManager<AllTypes>;
-  readonly historyManager: HistoryManager<AllTypes>;
+  readonly transactionManager: TransactionManager;
+  readonly historyManager: HistoryManager;
 
   constructor() {
     super();
@@ -934,7 +934,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
   }
   resolveReference(owner: AllTypes, prop: ReferenceProp) : StateTypes | undefined {
     // Look up state id.
-    const id: number = prop.serialize(owner);
+    const id: number = prop.getId(owner);
     if  (!id)
       return undefined;
     return this.stateMap_.get(id);
@@ -1317,21 +1317,22 @@ class Renderer {
     transition.bezier = bezier;
     transition.textPoint = evaluateBezier(bezier, transition.tText);
     let text = '', textWidth = 0;
-    if (this.ctx) {
-      const ctx = this.ctx,
-            padding = this.theme_.padding;
-      if (transition.event) {
-        text += transition.event;
-        textWidth += ctx.measureText(transition.event).width + 2 * padding;
-      }
-      if (transition.guard) {
-        text += '[' + transition.guard + ']';
-        textWidth += ctx.measureText(transition.guard).width + 2 * padding;
-      }
-      if (transition.action) {
-        text += '/' + transition.action;
-        textWidth += ctx.measureText(transition.action).width + 2 * padding;
-      }
+    if (!this.ctx)
+      return;
+
+    const ctx = this.ctx,
+          padding = this.theme_.padding;
+    if (transition.event) {
+      text += transition.event;
+      textWidth += ctx.measureText(transition.event).width + 2 * padding;
+    }
+    if (transition.guard) {
+      text += '[' + transition.guard + ']';
+      textWidth += ctx.measureText(transition.guard).width + 2 * padding;
+    }
+    if (transition.action) {
+      text += '/' + transition.action;
+      textWidth += ctx.measureText(transition.action).width + 2 * padding;
     }
     transition.text = text;
     transition.textWidth = textWidth;
@@ -2076,11 +2077,11 @@ export class StatechartEditor implements CanvasLayer {
         layout(item);
       }
     });
-    changedItems.forEach(
-      item => {
-        if (item instanceof Transition)
-          renderer.layoutTransition(item);
-      });
+    changedItems.forEach(item => {
+      if (item instanceof Transition) {
+        renderer.layoutTransition(item);
+      }
+    });
     changedItems.clear();
   }
   updateBounds_() {
@@ -2110,6 +2111,7 @@ export class StatechartEditor implements CanvasLayer {
       height = Math.max(height, canvasSize.height);
       canvasController.setSize(width, height);
     }
+    this.updateLayout_();
   }
   draw(canvasController: CanvasController) {
     const renderer = this.renderer,

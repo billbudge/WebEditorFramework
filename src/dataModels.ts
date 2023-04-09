@@ -2,10 +2,10 @@ import { SelectionSet } from './collections.js';
 
 //------------------------------------------------------------------------------
 
-// Raw objects store data as a tree. Objects have properties and children.
-// Various data models add data derived from the raw data, such as change events,
-//   hierarchy, references.
-// Interfaces adapt the raw data for type safe use.
+// DataContextObject objects store data as a tree. Objects have properties and
+// children, which are described by a template. The template is a list of property
+// descriptors, which describe the normalized properties and children of an object,
+// and make it possible to clone and serialize objects without custom code.
 
 export interface DataContext {
   valueChanged(owner: DataContextObject, prop: ScalarPropertyTypes, oldValue: any) : void;
@@ -16,13 +16,14 @@ export interface DataContext {
 }
 
 export interface DataContextObject {
-  readonly template: DataObjectTemplate
+  readonly template: DataObjectTemplate;
   readonly context: DataContext;
 }
 
 export interface DataObjectTemplate {
   readonly typeName: string;
   readonly properties: Array<PropertyTypes>;
+  readonly idProp?: IdProp;
 }
 
 export interface ReferencedObject extends DataContextObject {
@@ -129,7 +130,6 @@ export type ScalarPropertyTypes = ScalarProp | ReferenceProp;
 export type ArrayPropertyTypes = ChildArrayProp;
 export type PropertyTypes = ScalarPropertyTypes | ArrayPropertyTypes | IdProp;
 
-
 export class ScalarProp {
   readonly name: string;
   readonly internalName: string;
@@ -177,14 +177,8 @@ export class ReferenceProp {
   private getRef(owner: DataContextObject) : ReferencedObject | undefined {
     return (owner as any)[this.cacheKey];
   }
-  private setRef(owner: DataContextObject, value: ReferencedObject | undefined) : void {
+  private setRef(owner: DataContextObject, value: ReferencedObject | undefined) {
     (owner as any)[this.cacheKey] = value;
-  }
-  private getId(owner: DataContextObject) : number {
-    return (owner as any)[this.internalName];
-  }
-  private setId(owner: DataContextObject, id: number) : void {
-    (owner as any)[this.internalName] = id;
   }
 
   get(owner: DataContextObject) : ReferencedObject | undefined {
@@ -205,12 +199,12 @@ export class ReferenceProp {
     this.setId(owner, newId);
     owner.context.valueChanged(owner, this, oldValue);
   }
-  serialize(owner: DataContextObject) : number {
-    return this.getId(owner);
+  getId(owner: DataContextObject) : number {
+    return (owner as any)[this.internalName];
   }
-  deserialize(owner: DataContextObject, id: number) : void {
+  setId(owner: DataContextObject, id: number) : void {
     this.setRef(owner, undefined);
-    this.setId(owner, id);
+    (owner as any)[this.internalName] = id;
   }
 
   constructor(name: string) {
@@ -308,7 +302,7 @@ function serializeItem(original: DataContextObject) : object {
       if (value !== undefined)
         result[prop.name] = value;
     } else if (prop instanceof ReferenceProp) {
-      const value = prop.serialize(original);
+      const value = prop.getId(original);
       result[prop.name] = value;
     } else if (prop instanceof ChildArrayProp) {
       const originalList = prop.get(original),
@@ -336,7 +330,7 @@ function deserializeItem(raw: any, context: DataContext) : DataContextObject {
         prop.set(item, value);
     } else if (prop instanceof ReferenceProp) {
       const value = raw[prop.name] || 0;
-      prop.deserialize(item, value);
+      prop.setId(item, value);
     } else if (prop instanceof ChildArrayProp) {
       const rawList = raw[prop.name],
             list = prop.get(item);
@@ -474,6 +468,70 @@ export class EventBase<TArg, TEvents> {
 
 // Change events.
 
+// export interface ValueChange {
+//   item: DataContextObject;
+//   prop: ScalarPropertyTypes;
+//   index: number;
+//   oldValue: any;
+// }
+
+// export class ValueChangeOp implements Operation {
+//   private change: ValueChange;
+//   undo() {
+//     const change = this.change,
+//           item = change.item,
+//           prop = change.prop;
+//     // value change can be its own inverse by swapping current and old values.
+//     const oldValue = prop.get(item);
+//     if (prop instanceof ScalarProp) {
+//       prop.set(item, change.oldValue);
+//       change.oldValue = oldValue;
+//       item.context.valueChanged(item, prop, oldValue);
+//     } else if (prop instanceof ReferenceProp) {
+//       prop.set(item, change.oldValue);
+//       change.oldValue = oldValue;
+//       item.context.valueChanged(item, prop, oldValue);
+//     }
+//   }
+//   redo() {
+//     this.undo();
+//   }
+//   constructor(change: ValueChange) {
+//     this.change = change;
+//   }
+// }
+
+// export interface ChildElementChange {
+//   type: 'elementInserted' | 'elementRemoved';
+//   item: DataContextObject;
+//   prop: ChildArrayProp;
+//   index: number;
+//   oldValue: DataContextObject | undefined;
+// }
+
+// export class ChildElementChangeOp implements Operation {
+//   private change: ChildElementChange;
+//   undo() {
+//     const change = this.change,
+//           item = change.item,
+//           prop = change.prop;
+//     if (change.type == 'elementInserted') {
+//       const list = prop.get(item), index = change.index;
+//       change.oldValue = list.at(index);
+//       list.removeAt(index);
+//       item.context.elementRemoved(item, prop, index, change.oldValue);
+//       change.type = 'elementRemoved';
+//     } else if (change.type == 'elementRemoved') {  // TODO something?
+//       const list = prop.get(item), index = change.index;
+//       list.insert(change.oldValue!, index);
+//       item.context.elementInserted(item, prop, index);
+//       change.type = 'elementInserted';
+//     }
+//   }
+//   redo() {
+//   }
+// }
+
 export type ChangeType = 'valueChanged' | 'elementInserted' | 'elementRemoved';
 // Generic 'change' event.
 export type ChangeEvents = 'changed' | ChangeType;
@@ -495,7 +553,7 @@ export interface Change<TOwner extends object = object, TValue = any> {
 
 // Command pattern, transactions, and undo/redo.
 
-interface Operation {
+export interface Operation {
   undo() : void;
   redo() : void;
 }
@@ -553,10 +611,10 @@ class ChangeOp<TOwner extends DataContextObject> implements Operation {
   }
 }
 
-class SelectionOp<TOwner extends DataContextObject> implements Operation {
-  private selectionSet: SelectionSet<TOwner>;
-  private startingSelection: Array<TOwner>;
-  private endingSelection: Array<TOwner>;
+class SelectionOp implements Operation {
+  private selectionSet: SelectionSet<DataContextObject>;
+  private startingSelection: Array<DataContextObject>;
+  private endingSelection: Array<DataContextObject>;
 
   undo() {
     this.selectionSet.set(this.startingSelection);
@@ -564,7 +622,7 @@ class SelectionOp<TOwner extends DataContextObject> implements Operation {
   redo() {
     this.selectionSet.set(this.endingSelection);
   }
-  constructor(selectionSet: SelectionSet<TOwner>,
+  constructor(selectionSet: SelectionSet<DataContextObject>,
               startingSelection: Array<any>,
               endingSelection: Array<any>) {
     this.selectionSet = selectionSet;
@@ -598,16 +656,15 @@ export class CompoundOp implements Operation {
 type TransactionEvent = 'transactionBegan' | 'transactionEnding' | 'transactionEnded' |
                         'transactionCancelled' | 'didUndo' | 'didRedo';
 
-export class TransactionManager<TOwner extends DataContextObject>
-    extends EventBase<CompoundOp, TransactionEvent> {
+export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> {
   private transaction?: CompoundOp;
-  private snapshots = new Map<TOwner, object>();
+  private snapshots = new Map<DataContextObject, object>();
 
   // Notifies observers that a transaction has started.
   beginTransaction(name: string) : CompoundOp {
     const transaction = new CompoundOp(name);
     this.transaction = transaction;
-    this.snapshots = new Map<TOwner, object>();
+    this.snapshots = new Map<DataContextObject, object>();
     super.onEvent('transactionBegan', transaction);
     return transaction;
   }
@@ -654,12 +711,12 @@ export class TransactionManager<TOwner extends DataContextObject>
     super.onEvent('didRedo', transaction);
   }
 
-  getOldValue(item: TOwner, attr: string) : any {
+  getOldValue(item: DataContextObject, attr: string) : any {
     const snapshot = this.snapshots.get(item) || item;
     return (snapshot as any)[attr];
   }
 
-  private getSnapshot(item: TOwner) : object {
+  private getSnapshot(item: DataContextObject) : object {
     let snapshot = this.snapshots.get(item);
     if (!snapshot) {
       snapshot = {};
@@ -667,18 +724,18 @@ export class TransactionManager<TOwner extends DataContextObject>
     }
     return snapshot;
   }
-  private recordChange(change: Change<TOwner>) {
+  private recordChange(change: Change<DataContextObject>) {
     if (!this.transaction)
       return;
-    const op = new ChangeOp<TOwner>(change);
+    const op = new ChangeOp<DataContextObject>(change);
     this.transaction.add(op);
   }
 
-  onChanged(change: Change<TOwner>) {
+  onChanged(change: Change<DataContextObject>) {
     if (!this.transaction)
       return;
 
-    const item: TOwner = change.item,
+    const item: DataContextObject = change.item,
           prop = change.prop;
 
     if (change.type === 'valueChanged') {
@@ -702,11 +759,11 @@ export class TransactionManager<TOwner extends DataContextObject>
   }
 }
 
-export class HistoryManager<TOwner extends DataContextObject> {
+export class HistoryManager {
   private done: Array<CompoundOp> = [];
   private undone: Array<CompoundOp> = [];
-  private transactionManager: TransactionManager<TOwner>;
-  private selectionSet: SelectionSet<TOwner>;
+  private transactionManager: TransactionManager;
+  private selectionSet: SelectionSet<DataContextObject>;
   private startingSelection: Array<any> = [];
 
   getRedo() {
@@ -767,7 +824,7 @@ export class HistoryManager<TOwner extends DataContextObject> {
     this.startingSelection = [];
   }
 
-  constructor(transactionManager: TransactionManager<TOwner>, selectionSet: SelectionSet<TOwner>) {
+  constructor(transactionManager: TransactionManager, selectionSet: SelectionSet<DataContextObject>) {
     this.transactionManager = transactionManager;
     this.selectionSet = selectionSet;
     transactionManager.addHandler('transactionBegan', this.onTransactionBegan_.bind(this));
