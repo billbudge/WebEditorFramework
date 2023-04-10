@@ -228,8 +228,6 @@ export type StatechartVisitor = (item: AllTypes) => void;
 export type NonTransitionVisitor = (item: NonTransitionTypes) => void;
 export type TransitionVisitor = (item: Transition) => void;
 
-type StatechartChange = Change<AllTypes>;
-
 export interface GraphInfo {
   states: Set<StateTypes>;
   statecharts: Set<Statechart>;
@@ -239,7 +237,7 @@ export interface GraphInfo {
   outTransitions: Set<Transition>;
 }
 
-export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
+export class StatechartContext extends EventBase<Change, ChangeEvents>
                                implements DataContext {
   private highestId_: number = 0;  // 0 stands for no id.
   private stateMap_ = new Map<number, State | Pseudostate>();
@@ -950,30 +948,30 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     throw new Error('Unknown type');
   }
 
-  private onChanged(change: StatechartChange) : StatechartChange {
+  private onChanged(change: Change) : Change {
     // console.log(change);
     super.onEvent('changed', change);
     return change;
   }
   private onValueChanged(
       item: AllTypes, prop: ScalarPropertyTypes, oldValue: any) :
-      StatechartChange {
-    const change: StatechartChange = {type: 'valueChanged', item, prop, index: 0, oldValue };
+      Change {
+    const change: Change = {type: 'valueChanged', item, prop, index: 0, oldValue };
     super.onEvent('valueChanged', change);
     return this.onChanged(change);
   }
   private onElementInserted(
       item: State | Statechart, prop: ArrayPropertyTypes, index: number) :
-      StatechartChange {
-    const change: StatechartChange =
+      Change {
+    const change: Change =
         { type: 'elementInserted', item: item, prop: prop, index: index, oldValue: undefined };
     super.onEvent('elementInserted', change);
     return this.onChanged(change);
   }
   private onElementRemoved(
       item: State | Statechart, prop: ArrayPropertyTypes, index: number, oldValue: AllTypes ) :
-      StatechartChange {
-    const change: StatechartChange =
+      Change {
+    const change: Change =
         { type: 'elementRemoved', item: item, prop: prop, index: index, oldValue: oldValue };
     super.onEvent('elementRemoved', change);
     return this.onChanged(change);
@@ -1989,15 +1987,15 @@ export class StatechartEditor implements CanvasLayer {
       renderer.end();
     }
   }
-  onChanged_(change: Change<AllTypes>) {
+  onChanged_(change: Change) {
     const statechart = this.statechart,
           context = this.context, changedItems = this.changedItems_,
           changedTopLevelStates = this.changedTopLevelStates_,
-          item: AllTypes = change.item, prop = change.prop;
+          item: AllTypes = change.item as AllTypes, prop = change.prop;
 
     // Track all top level states which contain changes. On ending a transaction,
     // update the layout of states and statecharts.
-    let ancestor: AllTypes | undefined = change.item,
+    let ancestor: AllTypes | undefined = item,
         topLevel;
     do {
       topLevel = ancestor;

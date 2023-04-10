@@ -6,7 +6,7 @@ import * as Data from '../src/dataModels.js';
 
 //------------------------------------------------------------------------------
 
-class TestDataContext extends Data.EventBase<Data.Change<TestDataContextObject>, Data.ChangeEvents>
+class TestDataContext extends Data.EventBase<Data.Change, Data.ChangeEvents>
                       implements Data.DataContext {
   valueChange: any;
   elementInsert: any;
@@ -41,20 +41,20 @@ class TestDataContext extends Data.EventBase<Data.Change<TestDataContextObject>,
     return this.map.get(id);
   }
 
-  private onChanged(change: Data.Change<TestDataContextObject>) {
+  private onChanged(change: Data.Change) {
     // console.log(change);
     super.onEvent('changed', change);
     return change;
   }
   private onValueChanged(
       item: TestDataContextObject, prop: Data.ScalarPropertyTypes, oldValue: any) {
-    const change: Data.Change<TestDataContextObject> = {type: 'valueChanged', item, prop, index: 0, oldValue };
+    const change: Data.Change = {type: 'valueChanged', item, prop, index: 0, oldValue };
     super.onEvent('valueChanged', change);
     return this.onChanged(change);
   }
   private onElementInserted(
       item: TestDataContextObject, prop: Data.ArrayPropertyTypes, index: number) {
-    const change: Data.Change<TestDataContextObject> =
+    const change: Data.Change =
         { type: 'elementInserted', item: item, prop: prop, index: index, oldValue: undefined };
     super.onEvent('elementInserted', change);
     return this.onChanged(change);
@@ -62,7 +62,7 @@ class TestDataContext extends Data.EventBase<Data.Change<TestDataContextObject>,
   private onElementRemoved(
       item: TestDataContextObject, prop: Data.ArrayPropertyTypes, index: number, oldValue: TestDataContextObject ) :
       Data.Change {
-    const change: Data.Change<TestDataContextObject> =
+    const change: Data.Change =
         { type: 'elementRemoved', item: item, prop: prop, index: index, oldValue: oldValue };
     super.onEvent('elementRemoved', change);
     return this.onChanged(change);

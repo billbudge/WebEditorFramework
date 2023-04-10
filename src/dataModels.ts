@@ -541,12 +541,12 @@ export type ChangeEvents = 'changed' | ChangeType;
 // 'elementInserted': item, attr, index.
 // 'elementRemoved': item, attr, index, oldValue.
 // TODO split into value and child array changes.
-export interface Change<TOwner extends object = object, TValue = any> {
+export interface Change {
   type: ChangeType;
-  item: TOwner;
+  item: DataContextObject;
   prop: PropertyTypes;
   index: number;
-  oldValue: TValue;
+  oldValue: any;
 }
 
 //------------------------------------------------------------------------------
@@ -558,13 +558,13 @@ export interface Operation {
   redo() : void;
 }
 
-class ChangeOp<TOwner extends DataContextObject> implements Operation {
-  private change: Change<TOwner>;
+class ChangeOp implements Operation {
+  change: Change;
 
   undo() {
     const change = this.change,
-          item: TOwner = change.item,
-          prop: PropertyTypes = change.prop;
+          item = change.item,
+          prop = change.prop;
     switch (change.type) {
       case 'valueChanged': {
         // value change can be its own inverse if we swap current and old values.
@@ -579,7 +579,7 @@ class ChangeOp<TOwner extends DataContextObject> implements Operation {
           change.oldValue = list.at(index);
           list.removeAt(index);
           change.type = 'elementRemoved';
-          }
+        }
         break;
       }
       case 'elementRemoved': {
@@ -597,7 +597,7 @@ class ChangeOp<TOwner extends DataContextObject> implements Operation {
     // 'elementRemoved', so redo is the same as applying undo again.
     this.undo();
   }
-  constructor(change: Change<TOwner>) {
+  constructor(change: Change) {
     this.change = change;
   }
 }
@@ -715,14 +715,23 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
     }
     return snapshot;
   }
-  private recordChange(change: Change<DataContextObject>) {
+  private recordChange(change: Change) {
     if (!this.transaction)
       return;
-    const op = new ChangeOp<DataContextObject>(change);
+    const ops = this.transaction.ops;
+    for (let i = 0; i < ops.length; ++i) {
+      const op = ops[i];
+      if (op instanceof ChangeOp && op.change.type === 'valueChanged' &&
+          op.change.item === change.item && op.change.prop === change.prop) {
+        change.oldValue = op.change.oldValue;
+        ops.splice(i, 1);
+      }
+    }
+    const op = new ChangeOp(change);
     this.transaction.add(op);
   }
 
-  onChanged(change: Change<DataContextObject>) {
+  onChanged(change: Change) {
     if (!this.transaction)
       return;
 
@@ -734,13 +743,9 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
       // the (item, prop) change.
       const snapshot = this.getSnapshot(item);
       if (!snapshot.hasOwnProperty(prop.name)) {
-        (snapshot as any)[prop.name] = change.oldValue;
-        // Only record value changes if the value actually changed. Editors may
-        // generate changes to force updates of derived properties, but we don't
-        // want to record those 'changes'.
-        if (change.oldValue !== prop.get(item))
-          this.recordChange(change);
+        (snapshot as any)[prop.name] = change.oldValue;  // TODO lazy snapshot from value changes in trans.
       }
+      this.recordChange(change);
     } else {
       if (change.type === 'elementInserted') {
         const snapshot = this.getSnapshot(item);
