@@ -817,7 +817,7 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
 
     if (state.inTransitions === undefined)
       state.inTransitions = new Array<Transition>();
-      if (state.outTransitions === undefined)
+    if (state.outTransitions === undefined)
       state.outTransitions = new Array<Transition>();
 
     if (state instanceof State && state.statecharts) {
@@ -855,12 +855,12 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
           dst = transition.dst;
     if (src) {
       const outputs = src.outTransitions;
-      if (outputs && !outputs.includes(transition))
+      if (!outputs.includes(transition))
         outputs.push(transition);
     }
     if (dst) {
       const inputs = dst.inTransitions;
-      if (inputs && !inputs.includes(transition))
+      if (!inputs.includes(transition))
         inputs.push(transition);
     }
   }
@@ -877,13 +877,11 @@ export class StatechartContext extends EventBase<StatechartChange, ChangeEvents>
     }
     if (src) {
       const outputs = src.outTransitions;
-      if (outputs)
-        remove(outputs, transition);
+      remove(outputs, transition);
     }
     if (dst) {
       const inputs = dst.inTransitions;
-      if (inputs)
-        remove(inputs, transition);
+      remove(inputs, transition);
     }
   }
 
@@ -1075,7 +1073,7 @@ enum RenderMode {
 
 class Renderer {
   private theme_: StatechartTheme;
-  private ctx: CanvasRenderingContext2D | undefined;
+  private ctx: CanvasRenderingContext2D;
 
   constructor(theme: Theme) {
     this.theme_ = new StatechartTheme(theme);
@@ -1087,10 +1085,7 @@ class Renderer {
     ctx.font = this.theme_.font;
   }
   end() {
-    if (this.ctx) {
-      this.ctx.restore();
-      this.ctx = undefined;
-    }
+    this.ctx.restore();
   }
 
   getSize(item: StateTypes | Statechart) : { width: number, height: number } {
@@ -1317,7 +1312,7 @@ class Renderer {
     transition.bezier = bezier;
     transition.textPoint = evaluateBezier(bezier, transition.tText);
     let text = '', textWidth = 0;
-    if (!this.ctx)
+    if (!this.ctx)  // TODO why are we laying out without a context?
       return;
 
     const ctx = this.ctx,
@@ -1358,11 +1353,8 @@ class Renderer {
     return hitTestRect(x - r, y - r, d, d, p, tol);
   }
   drawState(state: State, mode: RenderMode) {
-    const ctx = this.ctx;
-    if (!ctx)
-      return;
-
-    const theme = this.theme_,
+    const ctx = this.ctx,
+          theme = this.theme_,
           r = theme.radius,
           rect = this.getItemRect(state),
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
@@ -1441,11 +1433,8 @@ class Renderer {
     }
   }
   drawPseudoState(pseudostate: Pseudostate, mode: RenderMode) {
-    const ctx = this.ctx;
-    if (!ctx)
-      return
-
-    const theme = this.theme_,
+    const ctx = this.ctx,
+          theme = this.theme_,
           r = theme.radius,
           rect = this.getItemRect(pseudostate),
           x = rect.x, y = rect.y,
@@ -1531,11 +1520,8 @@ class Renderer {
     }
   }
   drawStatechart(statechart: Statechart, mode: RenderMode) {
-    const ctx = this.ctx;
-    if (!ctx)
-      return;
-
-    const theme = this.theme_,
+    const ctx = this.ctx,
+          theme = this.theme_,
           r = theme.radius,
           textSize = theme.fontSize,
           rect = this.getItemRect(statechart),
@@ -1569,11 +1555,8 @@ class Renderer {
     }
   }
   drawTransition(transition: Transition, mode: RenderMode) {
-    const ctx = this.ctx;
-    if (!ctx)
-      return;
-
-    const theme = this.theme_,
+    const ctx = this.ctx,
+          theme = this.theme_,
           r = theme.knobbyRadius,
           bezier = transition.bezier;
     bezierEdgePath(bezier, ctx, theme.arrowSize);
@@ -1639,10 +1622,8 @@ class Renderer {
     return hitInfo;
   }
   drawHoverText(item: AllTypes, p: Point, nameValuePairs: { name: string, value: any }[]) {
-    const ctx = this.ctx;
-    if (!ctx)
-      return;
     const self = this,
+          ctx = this.ctx,
           theme = this.theme_,
           textSize = theme.fontSize,
           gap = 16,
@@ -2023,9 +2004,8 @@ export class StatechartEditor implements CanvasLayer {
       ancestor = ancestor.parent;
     } while (ancestor && ancestor !== statechart);
 
-    if (ancestor === statechart) {
-      // assert(topLevel);
-      changedTopLevelStates.add(topLevel as State);
+    if (ancestor === statechart && topLevel instanceof State) {
+      changedTopLevelStates.add(topLevel);
     }
 
     function addItems(item: AllTypes) {
@@ -2093,6 +2073,7 @@ export class StatechartEditor implements CanvasLayer {
     renderer.begin(ctx);
     // Update any changed items first.
     this.updateLayout_();
+    // Then update the bounds of super states, bottom up.
     changedTopLevelStates.forEach(
       state => context.reverseVisitAll(state, item => {
         if (!(item instanceof Transition))
@@ -2111,7 +2092,6 @@ export class StatechartEditor implements CanvasLayer {
       height = Math.max(height, canvasSize.height);
       canvasController.setSize(width, height);
     }
-    this.updateLayout_();
   }
   draw(canvasController: CanvasController) {
     const renderer = this.renderer,
@@ -2243,11 +2223,13 @@ export class StatechartEditor implements CanvasLayer {
     // TODO hit test selection first, in highlight, first.
     // Skip the root statechart, as hits there should go to the underlying canvas controller.
     // Hit test transitions first.
-    context.reverseVisitAllItems(statechart.transitions, (transition: Transition) => {
-      pushInfo(renderer.hitTestTransition(transition, cp, tol, RenderMode.Normal));
+    context.reverseVisitAll(statechart, (item: AllTypes) => {
+      if (item instanceof Transition)
+        pushInfo(renderer.hitTestTransition(item, cp, tol, RenderMode.Normal));
     });
-    context.reverseVisitAllItems(statechart.states, (state: StateTypes) => {
-      pushInfo(renderer.hitTest(state, cp, tol, RenderMode.Normal));
+    context.reverseVisitAll(statechart, (item: AllTypes) => {
+      if (!(item instanceof Transition))
+        pushInfo(renderer.hitTest(item, cp, tol, RenderMode.Normal));
     });
     renderer.end();
     return hitList;
@@ -2634,7 +2616,7 @@ export class StatechartEditor implements CanvasLayer {
             const statechart = readRaw(raw, context);
             self.initializeContext(context);
             self.setContext(context);
-            self.updateLayout_();
+            self.renderer.begin(self.canvasController.getCtx());
             self.updateBounds_();
             self.canvasController.draw();
         }

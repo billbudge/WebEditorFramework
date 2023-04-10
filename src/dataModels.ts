@@ -182,22 +182,22 @@ export class ReferenceProp {
   }
 
   get(owner: DataContextObject) : ReferencedObject | undefined {
-    let value = this.getRef(owner);
-    if  (value === undefined) {
+    let ref = this.getRef(owner);
+    if  (ref === undefined) {
       const id = this.getId(owner);
       if (id) {
-        value = owner.context.resolveReference(owner, this);
-        this.setRef(owner, value);
+        ref = owner.context.resolveReference(owner, this);
+        this.setRef(owner, ref);
       }
     }
-    return value;
+    return ref;
   }
   set(owner: DataContextObject, value: ReferencedObject | undefined) : void {
+    const oldRef = this.getRef(owner);
     this.setRef(owner, value);
-    const newId: number = value !== undefined ? value.id : 0;
-    const oldValue = this.getId(owner);
+    const newId = (value !== undefined) ? value.id : 0;
     this.setId(owner, newId);
-    owner.context.valueChanged(owner, this, oldValue);
+    owner.context.valueChanged(owner, this, oldRef);
   }
   getId(owner: DataContextObject) : number {
     return (owner as any)[this.internalName];
@@ -567,16 +567,9 @@ class ChangeOp<TOwner extends DataContextObject> implements Operation {
           prop: PropertyTypes = change.prop;
     switch (change.type) {
       case 'valueChanged': {
-        // value change can be its own inverse by swapping current and old values.
-        const oldValue = prop.get(item);
-        if (prop instanceof ScalarProp) {
-          prop.set(item, change.oldValue);
-          change.oldValue = oldValue;
-          item.context.valueChanged(item, prop, oldValue);
-        } else if (prop instanceof ReferenceProp) {
-          prop.set(item, change.oldValue);
-          change.oldValue = oldValue;
-          item.context.valueChanged(item, prop, oldValue);
+        // value change can be its own inverse if we swap current and old values.
+        if (prop instanceof ScalarProp || prop instanceof ReferenceProp) {
+          change.oldValue = prop.set(item, change.oldValue);
         }
         break;
       }
@@ -585,7 +578,6 @@ class ChangeOp<TOwner extends DataContextObject> implements Operation {
           const list = prop.get(item), index = change.index;
           change.oldValue = list.at(index);
           list.removeAt(index);
-          item.context.elementRemoved(item, prop, index, change.oldValue);
           change.type = 'elementRemoved';
           }
         break;
@@ -594,7 +586,6 @@ class ChangeOp<TOwner extends DataContextObject> implements Operation {
         if (prop instanceof ChildArrayProp) {
           const list = prop.get(item), index = change.index;
           list.insert(change.oldValue, index);
-          item.context.elementInserted(item, prop, index);
           change.type = 'elementInserted';
         }
         break;
@@ -657,7 +648,7 @@ type TransactionEvent = 'transactionBegan' | 'transactionEnding' | 'transactionE
                         'transactionCancelled' | 'didUndo' | 'didRedo';
 
 export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> {
-  private transaction?: CompoundOp;
+  private transaction: CompoundOp | undefined;
   private snapshots = new Map<DataContextObject, object>();
 
   // Notifies observers that a transaction has started.
@@ -744,7 +735,11 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
       const snapshot = this.getSnapshot(item);
       if (!snapshot.hasOwnProperty(prop.name)) {
         (snapshot as any)[prop.name] = change.oldValue;
-        this.recordChange(change);
+        // Only record value changes if the value actually changed. Editors may
+        // generate changes to force updates of derived properties, but we don't
+        // want to record those 'changes'.
+        if (change.oldValue !== prop.get(item))
+          this.recordChange(change);
       }
     } else {
       if (change.type === 'elementInserted') {
@@ -821,6 +816,7 @@ export class HistoryManager {
   }
 
   onTransactionCancelled_(op: CompoundOp) {
+    this.selectionSet.set(this.startingSelection);
     this.startingSelection = [];
   }
 
