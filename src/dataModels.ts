@@ -32,6 +32,31 @@ export interface ReferencedObject extends DataContextObject {
 
 //------------------------------------------------------------------------------
 
+// Simple property descriptors.
+
+export type ScalarPropertyTypes = ScalarProp | ReferenceProp;
+export type ArrayPropertyTypes = ChildArrayProp;
+export type PropertyTypes = ScalarPropertyTypes | ArrayPropertyTypes | IdProp;
+
+export class ScalarProp {
+  readonly name: string;
+  readonly internalName: string;
+
+  get(owner: DataContextObject) : any {
+    return (owner as any)[this.internalName];
+  }
+  set(owner: DataContextObject, value: any) : any {
+    const oldValue = (owner as any)[this.internalName];
+    (owner as any)[this.internalName] = value;
+    owner.context.valueChanged(owner, this, oldValue);
+    return oldValue;
+  }
+  constructor(name: string) {
+    this.name = name;
+    this.internalName = '_' + name;
+  }
+}
+
 export interface List<T = any> {
   length: number;
   at: (index: number) => T;
@@ -122,33 +147,6 @@ class DataList implements List {
   }
 }
 
-//------------------------------------------------------------------------------
-
-// Simple property descriptors.
-
-export type ScalarPropertyTypes = ScalarProp | ReferenceProp;
-export type ArrayPropertyTypes = ChildArrayProp;
-export type PropertyTypes = ScalarPropertyTypes | ArrayPropertyTypes | IdProp;
-
-export class ScalarProp {
-  readonly name: string;
-  readonly internalName: string;
-
-  get(owner: DataContextObject) : any {
-    return (owner as any)[this.internalName];
-  }
-  set(owner: DataContextObject, value: any) : any {
-    const oldValue = (owner as any)[this.internalName];
-    (owner as any)[this.internalName] = value;
-    owner.context.valueChanged(owner, this, oldValue);
-    return oldValue;
-  }
-  constructor(name: string) {
-    this.name = name;
-    this.internalName = '_' + name;
-  }
-}
-
 export class ChildArrayProp<T extends DataContextObject = DataContextObject> {
   readonly name: string;
   readonly internalName: string;
@@ -214,6 +212,7 @@ export class ReferenceProp {
   }
 }
 
+// TODO develop this with statechart example.
 export class IdProp {
   readonly name: string;
 
@@ -718,13 +717,34 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
   private recordChange(change: Change) {
     if (!this.transaction)
       return;
+    // Combine value changes, combine nop insert/remove changes.
     const ops = this.transaction.ops;
     for (let i = 0; i < ops.length; ++i) {
       const op = ops[i];
-      if (op instanceof ChangeOp && op.change.type === 'valueChanged' &&
-          op.change.item === change.item && op.change.prop === change.prop) {
-        change.oldValue = op.change.oldValue;
-        ops.splice(i, 1);
+      if (op instanceof ChangeOp) {
+        if (op.change.type === 'valueChanged') {
+          if (op.change.item === change.item && op.change.prop === change.prop) {
+            // Delete the old op and replace it with a new one.
+            change.oldValue = op.change.oldValue;
+            ops.splice(i, 1);
+          }
+        } else if (op.change.type === 'elementInserted') {
+          if (change.type === 'elementRemoved' &&
+              op.change.item === change.item && op.change.prop === change.prop &&
+              op.change.index === change.index) {
+            // Remove after insert cancel out.
+            ops.splice(i, 1);
+            return;
+          }
+        } else if (op.change.type === 'elementRemoved') {
+          if (change.type === 'elementInserted' &&
+              op.change.item === change.item && op.change.prop === change.prop &&
+              op.change.index === change.index) {
+            // Insert after remove cancel out.
+            ops.splice(i, 1);
+            return;
+          }
+        }
       }
     }
     const op = new ChangeOp(change);
