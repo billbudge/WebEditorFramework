@@ -13,7 +13,10 @@ import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
 import { ScalarProp, ChildArrayProp, ReferencedObject, ReferenceProp, PropertyTypes,
          DataContext, DataContextObject, EventBase, Change, ChangeEvents,
          copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet,
-         reduceToRoots, List, TransactionManager, HistoryManager, ScalarPropertyTypes, ArrayPropertyTypes, DataObjectTemplate } from '../src/dataModels.js'
+         reduceToRoots, List, TransactionManager, HistoryManager, ScalarPropertyTypes,
+         ArrayPropertyTypes, DataObjectTemplate } from '../src/dataModels.js'
+
+import * as Canvas2SVG from '../third_party/canvas2svg/canvas2svg.js'
 
 //------------------------------------------------------------------------------
 
@@ -2161,42 +2164,40 @@ export class StatechartEditor implements CanvasLayer {
     }
   }
   print() {
-    // const renderer = this.renderer,
-    //       context = this.context,
-    //       statechart = this.statechart,
-    //       canvasController = this.canvasController;
+    const renderer = this.renderer,
+          context = this.context,
+          statechart = this.statechart,
+          canvasController = this.canvasController;
 
-    // // Calculate document bounds.
-    // const items = new Array<AllTypes>();
-    // context.visitAll(statechart, function (item) {
-    //   items.push(item);
-    // });
+    // Calculate document bounds.
+    const items = new Array<AllTypes>();
+    context.visitAll(statechart, function (item) {
+      items.push(item);
+    });
 
-    // const bounds = renderer.getBounds(items);
-    // // Adjust all edges 1 pixel out.
-    // const ctx = new C2S(bounds.width + 2, bounds.height + 2);
-    // ctx.translate(-bounds.x + 1, -bounds.y + 1);
+    const bounds = renderer.getBounds(items);
+    // Adjust all edges 1 pixel out.
+    const ctx = new (window as any).C2S(bounds.width + 2, bounds.height + 2);
+    ctx.translate(-bounds.x + 1, -bounds.y + 1);
 
-    // renderer.begin(ctx);
-    // // We shouldn't need to layout any changed items here.
-    // assert(!this.changedItems_.size);
-    // canvasController.applyTransform();
+    renderer.begin(ctx);
+    canvasController.applyTransform();
 
-    // visitItems(statechart.items, function (item) {
-    //   renderer.draw(item, printMode);
-    // }, isNonTransition);
-    // visitItems(statechart.items, function (transition) {
-    //   renderer.draw(transition, printMode);
-    // }, isTransition);
+    context.visitAllItems(statechart.states, state => {
+      renderer.draw(state, RenderMode.Print);
+    });
+    context.visitAllItems(statechart.transitions, transition => {
+      renderer.draw(transition, RenderMode.Print);
+    });
 
-    // renderer.end();
+    renderer.end();
 
-    // // Write out the SVG file.
-    // const serializedSVG = ctx.getSerializedSvg();
-    // const blob = new Blob([serializedSVG], {
-    //   type: 'text/plain'
-    // });
-    // saveAs(blob, 'statechart.svg', true);
+    // Write out the SVG file.
+    const serializedSVG = ctx.getSerializedSvg();
+    const blob = new Blob([serializedSVG], {
+      type: 'text/plain'
+    });
+    (window as any).saveAs(blob, 'statechart.svg', true);
   }
   getCanvasPosition(canvasController: CanvasController, p: Point) {
     // When dragging from the palette, convert the position from pointer events
