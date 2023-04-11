@@ -242,13 +242,13 @@ export interface GraphInfo {
 
 export class StatechartContext extends EventBase<Change, ChangeEvents>
                                implements DataContext {
-  private highestId_: number = 0;  // 0 stands for no id.
-  private stateMap_ = new Map<number, State | Pseudostate>();
+  private highestId: number = 0;  // 0 stands for no id.
+  private stateMap = new Map<number, State | Pseudostate>();
 
-  private statechart_: Statechart;  // The root statechart.
-  private states_ = new Set<StateTypes>;
-  private statecharts_ = new Set<Statechart>;
-  private transitions_ = new Set<Transition>;
+  private statechart: Statechart;  // The root statechart.
+  private states = new Set<StateTypes>;
+  private statecharts = new Set<Statechart>;
+  private transitions = new Set<Transition>;
 
   selection = new SelectionSet<AllTypes>();
 
@@ -265,28 +265,28 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
       self.makeConsistent();
     });
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
-    this.statechart_ = new Statechart(this);
-    this.insertItem_(this.statechart_, undefined);
+    this.statechart = new Statechart(this);
+    this.insertItem_(this.statechart, undefined);
   }
 
   root() : Statechart {
-    return this.statechart_;
+    return this.statechart;
   }
   setRoot(root: Statechart) : void {
-    if (this.statechart_)
-      this.removeItem_(this.statechart_);
+    if (this.statechart)
+      this.removeItem_(this.statechart);
     this.insertItem_(root, undefined);
-    this.statechart_ = root;
+    this.statechart = root;
   }
 
   newState() : State {
-    const nextId = ++this.highestId_,
+    const nextId = ++this.highestId,
           result: State = new State(this, nextId);
-    this.stateMap_.set(nextId, result);
+    this.stateMap.set(nextId, result);
     return result;
   }
   newPseudostate(typeName: string) : Pseudostate {
-    const nextId = ++this.highestId_;
+    const nextId = ++this.highestId;
     let template;
     switch (typeName) {
       case 'start': template = pseudostateTemplate.start; break;
@@ -296,7 +296,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
       default: throw new Error('Unknown pseudostate type: ' + typeName);
     }
     const result: Pseudostate = new Pseudostate(template as PseudostateTemplate, nextId, this);  // TODO fix
-    this.stateMap_.set(nextId, result);
+    this.stateMap.set(nextId, result);
     return result;
   }
   newTransition(src: StateTypes | undefined, dst: StateTypes | undefined) : Transition {
@@ -416,10 +416,10 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
 
   getGraphInfo() : GraphInfo {
     return {
-      states: this.states_,
-      statecharts: this.statecharts_,
-      transitions: this.transitions_,
-      interiorTransitions: this.transitions_,
+      states: this.states,
+      statecharts: this.statecharts,
+      transitions: this.transitions,
+      interiorTransitions: this.transitions,
       inTransitions: new Set(),
       outTransitions: new Set(),
     };
@@ -508,7 +508,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
 
   getTopLevelState(item: StateTypes) : StateTypes {
-    const topLevelStatechart = this.statechart_;
+    const topLevelStatechart = this.statechart;
     while (true) {
       const statechart = item.parent;
       if (!statechart || statechart === topLevelStatechart)
@@ -662,7 +662,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     const oldParent = item.parent;
 
     if (!parent)
-      parent = this.statechart_;
+      parent = this.statechart;
     if (oldParent === parent)
       return item;
     if (parent instanceof State) {
@@ -672,7 +672,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
         // If adding a pseudostate to a non-root statechart, add a new statechart to hold it.
         // We allow the exception for the root statechart so we can drag and drop between
         // child statecharts.
-        if (!this.canAddState(item, parent) && parent !== this.statechart_) {
+        if (!this.canAddState(item, parent) && parent !== this.statechart) {
           const superState = parent.parent!;
           parent = this.findOrCreateChildStatechart(superState, item);
         }
@@ -711,7 +711,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
 
   copy() : Array<AllTypes> {
-    const statechart = this.statechart_,
+    const statechart = this.statechart,
           selection = this.selection;
 
     selection.set(this.selectedStates());
@@ -745,7 +745,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
       }
     });
     const copies = copyItems(items, this) as Array<AllTypes>;  // TODO fix
-    this.addItems(copies, this.statechart_);
+    this.addItems(copies, this.statechart);
     this.selection.set(copies);
     this.transactionManager.endTransaction();
     return copies;
@@ -761,7 +761,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
 
   makeConsistent () {
     const self = this,
-          statechart = this.statechart_,
+          statechart = this.statechart,
           graphInfo = this.getGraphInfo();
     // Eliminate dangling transitions.
     graphInfo.transitions.forEach(function(transition) {
@@ -812,7 +812,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
 
   private insertState_(state: StateTypes, parent: Statechart) {
-    this.states_.add(state);
+    this.states.add(state);
     state.parent = parent;
     this.updateItem(state);
 
@@ -828,11 +828,11 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
 
   private removeState_(state: StateTypes) {
-    this.states_.delete(state);
+    this.states.delete(state);
   }
 
   private insertStatechart_(statechart: Statechart, parent: State | undefined) {
-    this.statecharts_.add(statechart);
+    this.statecharts.add(statechart);
     statechart.parent = parent;
     this.updateItem(statechart);
 
@@ -842,13 +842,13 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
 
   private removeStatechart_(stateChart: Statechart) {
-    this.statecharts_.delete(stateChart);
+    this.statecharts.delete(stateChart);
     const self = this;
     stateChart.states.forEach(state => self.removeState_(state));
   }
 
   private insertTransition_(transition: Transition, parent: Statechart) {
-    this.transitions_.add(transition);
+    this.transitions.add(transition);
     transition.parent = parent;
     this.updateItem(transition);
 
@@ -867,7 +867,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
 
   private removeTransition_(transition: Transition) {
-    this.transitions_.delete(transition);
+    this.transitions.delete(transition);
     const src = transition.src,
           dst = transition.dst;
     function remove(array: Array<Transition>, item: Transition) {
@@ -936,7 +936,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     const id: number = prop.getId(owner);
     if  (!id)
       return undefined;
-    return this.stateMap_.get(id);
+    return this.stateMap.get(id);
   }
   construct(typeName: string) : AllTypes {
     switch (typeName) {
@@ -1073,17 +1073,17 @@ enum RenderMode {
 }
 
 class Renderer {
-  private theme_: StatechartTheme;
+  private theme: StatechartTheme;
   private ctx: CanvasRenderingContext2D;
 
   constructor(theme: Theme) {
-    this.theme_ = new StatechartTheme(theme);
+    this.theme = new StatechartTheme(theme);
   }
 
   begin(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
     ctx.save();
-    ctx.font = this.theme_.font;
+    ctx.font = this.theme.font;
   }
   end() {
     this.ctx.restore();
@@ -1095,7 +1095,7 @@ class Renderer {
       width = item.width;
       height = item.height;
     } else if (item instanceof Pseudostate) {
-      width = height = 2 * this.theme_.radius;
+      width = height = 2 * this.theme.radius;
     }
     return { width: width, height: height };
   }
@@ -1148,7 +1148,7 @@ class Renderer {
     return { x: xmin, y: ymin, width: xmax - xmin, height: ymax - ymin };
   }
   statePointToParam(state: StateTypes, p: Point) {
-    const r = this.theme_.radius,
+    const r = this.theme.radius,
           rect = this.getItemRect(state);
     if (state instanceof State)
       return rectPointToParam(rect.x, rect.y, rect.width, rect.height, p);
@@ -1156,7 +1156,7 @@ class Renderer {
     return circlePointToParam(rect.x + r, rect.y + r, p);
   }
   stateParamToPoint(state: StateTypes, t: number) {
-    const r = this.theme_.radius,
+    const r = this.theme.radius,
           rect = this.getItemRect(state);
     if (state instanceof State)
       return roundRectParamToPoint(rect.x, rect.y, rect.width, rect.height, r, t);
@@ -1164,7 +1164,7 @@ class Renderer {
     return circleParamToPoint(rect.x + r, rect.y + r, r, t);
   }
   getStateMinSize(state: StateTypes) {
-    const ctx = this.ctx, theme = this.theme_, r = theme.radius;
+    const ctx = this.ctx, theme = this.theme, r = theme.radius;
     let width = theme.stateMinWidth, height = theme.stateMinHeight;
     if (state instanceof Pseudostate)
       return;
@@ -1184,7 +1184,7 @@ class Renderer {
   }
   layoutState(state: State) {
     const self = this,
-          theme = this.theme_,
+          theme = this.theme,
           textSize = theme.fontSize,
           textLeading = theme.textLeading,
           lineSpacing = textSize + textLeading;
@@ -1237,7 +1237,7 @@ class Renderer {
   // are always sized automatically to contain their contents and fit tightly in
   // their parent state.
   layoutStatechart(statechart: Statechart) {
-    const padding = this.theme_.padding,
+    const padding = this.theme.padding,
           global = statechart.globalPosition,
           statechartX = global.x,
           statechartY = global.y,
@@ -1296,7 +1296,7 @@ class Renderer {
       // Adjust the bezier's p1 and c1 to start on the boundary, towards bezier c2.
       const to = bezier[2],
             center = getCenter(src),
-            radius = this.theme_.radius,
+            radius = this.theme.radius,
             projection = projectPointToCircle(to, center, radius);
       bezier[0] = projection;
       bezier[1] = to;
@@ -1305,7 +1305,7 @@ class Renderer {
       // Adjust the bezier's c2 and p2 to end on the boundary, towards bezier c1.
       const to = bezier[1],
             center = getCenter(dst),
-            radius = this.theme_.radius,
+            radius = this.theme.radius,
             projection = projectPointToCircle(to, center, radius);
       bezier[3] = projection;
       bezier[2] = to;
@@ -1317,7 +1317,7 @@ class Renderer {
       return;
 
     const ctx = this.ctx,
-          padding = this.theme_.padding;
+          padding = this.theme.padding;
     if (transition.event) {
       text += transition.event;
       textWidth += ctx.measureText(transition.event).width + 2 * padding;
@@ -1346,16 +1346,16 @@ class Renderer {
   drawArrow(x: number, y: number) {
     const ctx = this.ctx!;
     ctx.beginPath();
-    arrowPath({ x: x, y: y, nx: -1, ny: 0 }, ctx, this.theme_.arrowSize);
+    arrowPath({ x: x, y: y, nx: -1, ny: 0 }, ctx, this.theme.arrowSize);
     ctx.stroke();
   }
   hitTestArrow(x: number, y: number, p:  Point, tol: number) {
-    const d = this.theme_.arrowSize, r = d * 0.5;
+    const d = this.theme.arrowSize, r = d * 0.5;
     return hitTestRect(x - r, y - r, d, d, p, tol);
   }
   drawState(state: State, mode: RenderMode) {
     const ctx = this.ctx,
-          theme = this.theme_,
+          theme = this.theme,
           r = theme.radius,
           rect = this.getItemRect(state),
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
@@ -1420,7 +1420,7 @@ class Renderer {
     }
   }
   hitTestState(state: State, p: Point, tol: number, mode: RenderMode) : StateHitResult | undefined {
-    const theme = this.theme_,
+    const theme = this.theme,
           r = theme.radius,
           rect = this.getItemRect(state),
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
@@ -1435,7 +1435,7 @@ class Renderer {
   }
   drawPseudoState(pseudostate: Pseudostate, mode: RenderMode) {
     const ctx = this.ctx,
-          theme = this.theme_,
+          theme = this.theme,
           r = theme.radius,
           rect = this.getItemRect(pseudostate),
           x = rect.x, y = rect.y,
@@ -1506,7 +1506,7 @@ class Renderer {
   }
   hitTestPseudoState(
       state: Pseudostate, p: Point, tol: number, mode: RenderMode) : PseudostateHitResult | undefined {
-    const theme = this.theme_,
+    const theme = this.theme,
           r = theme.radius,
           rect = this.getItemRect(state),
           x = rect.x, y = rect.y,
@@ -1522,7 +1522,7 @@ class Renderer {
   }
   drawStatechart(statechart: Statechart, mode: RenderMode) {
     const ctx = this.ctx,
-          theme = this.theme_,
+          theme = this.theme,
           r = theme.radius,
           textSize = theme.fontSize,
           rect = this.getItemRect(statechart),
@@ -1546,7 +1546,7 @@ class Renderer {
   }
   hitTestStatechart(
       statechart: Statechart, p: Point, tol: number, mode: RenderMode) : StatechartHitResult | undefined {
-    const theme = this.theme_,
+    const theme = this.theme,
           r = theme.radius,
           rect = this.getItemRect(statechart),
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
@@ -1557,7 +1557,7 @@ class Renderer {
   }
   drawTransition(transition: Transition, mode: RenderMode) {
     const ctx = this.ctx,
-          theme = this.theme_,
+          theme = this.theme,
           r = theme.knobbyRadius,
           bezier = transition.bezier;
     bezierEdgePath(bezier, ctx, theme.arrowSize);
@@ -1625,7 +1625,7 @@ class Renderer {
   drawHoverText(item: AllTypes, p: Point, nameValuePairs: { name: string, value: any }[]) {
     const self = this,
           ctx = this.ctx,
-          theme = this.theme_,
+          theme = this.theme,
           textSize = theme.fontSize,
           gap = 16,
           border = 4,
@@ -1646,6 +1646,9 @@ class Renderer {
 }
 
 //------------------------------------------------------------------------------
+
+// Serialization to raw objects, deserialization from raw objects. Import of old
+// format.
 
 function assignProps(src: any, dst: DataContextObject) {
   dst.template.properties.forEach(function (prop) {
@@ -1683,15 +1686,6 @@ function readTransition(
   transition.guard = raw.guard;
   transition.action = raw.action;
   transition.tText = raw.pt;
-//   "srcId": 1003,
-//   "t1": 2.459876895194184,
-//   "pt": 0.47680717398461436,
-//   "id": 1011,
-//   "dstId": 1009,
-//   "t2": 2.440397658477461,
-//   "event": "announceOrder(i:item)",
-//   "guard": "self.State(Loader::Idle)"
-// ;
   return transition;
 }
 function readStatechart(
@@ -1752,7 +1746,7 @@ function isDraggable(hitInfo: HitResultTypes) : boolean {
 }
 
 function hasProperties(hitInfo: HitResultTypes) : boolean {
-  return !(hitInfo instanceof TransitionHitResult);
+  return !(hitInfo instanceof PseudostateHitResult);
 }
 
 type StateDragType = 'copyPalette' | 'moveSelection' | 'moveCopySelection' | 'resizeState';
@@ -1783,32 +1777,36 @@ class TransitionDrag {
 type DragTypes = StateDrag | TransitionDrag;
 
 export class StatechartEditor implements CanvasLayer {
-  private theme_: StatechartTheme;
+  private theme: StatechartTheme;
   private canvasController: CanvasController;
   private paletteController: CanvasController;
   private propertyGridController: PropertyGridController;
   private fileController: FileController;
   private hitTolerance: number;
-  private changedItems_: Set<AllTypes>;
-  private changedTopLevelStates_: Set<State>;
+  private changedItems: Set<AllTypes>;
+  private changedTopLevelStates: Set<State>;
   private renderer: Renderer;
   private palette: Statechart;  // Statechart to simplify layout of palette items.
   private context: StatechartContext;
   private statechart: Statechart;
   private scrap: Array<AllTypes> = []
 
-  private pointerHitInfo_: HitResultTypes | undefined;
-  private draggableHitInfo_: HitResultTypes | undefined;
-  private clickInPalette_: boolean = false;
-  private moveCopy_: boolean = false;
-  private dragInfo_: DragTypes | undefined;
-  private hotTrackInfo_: HitResultTypes | undefined;
+  private pointerHitInfo: HitResultTypes | undefined;
+  private draggableHitInfo: HitResultTypes | undefined;
+  private clickInPalette: boolean = false;
+  private moveCopy: boolean = false;
+  private dragInfo: DragTypes | undefined;
+  private hotTrackInfo: HitResultTypes | undefined;
+  private hoverHitInfo: HitResultTypes | undefined;
+  private hoverPoint: Point;
+  private propertyInfo = new Map<string, PropertyInfo[]>();
 
-  constructor(
-      theme: Theme, canvasController: CanvasController, paletteController: CanvasController,
-      propertyGridController: PropertyGridController) {
+  constructor(theme: Theme,
+              canvasController: CanvasController,
+              paletteController: CanvasController,
+              propertyGridController: PropertyGridController) {
     const self = this;
-    this.theme_ = new StatechartTheme(theme);
+    this.theme = new StatechartTheme(theme);
     this.canvasController = canvasController;
     this.paletteController = paletteController;
     this.propertyGridController = propertyGridController;
@@ -1818,9 +1816,9 @@ export class StatechartEditor implements CanvasLayer {
 
     // Change tracking for layout.
     // Changed items that must be updated before drawing and hit testing.
-    this.changedItems_ = new Set();
+    this.changedItems = new Set();
     // Changed top level states that must be laid out after transactions and undo/redo.
-    this.changedTopLevelStates_ = new Set();
+    this.changedTopLevelStates = new Set();
 
     const renderer = new Renderer(theme);
     this.renderer = renderer;
@@ -1891,15 +1889,7 @@ export class StatechartEditor implements CanvasLayer {
        }
       }
     }
-    const statechartInfo: PropertyInfo[] = [
-      {
-        label: 'name',
-        type: 'text',
-        getter: getter,
-        setter: setter,
-      },
-    ],
-    stateInfo: PropertyInfo[] = [
+    this.propertyInfo.set('state', [
       {
         label: 'name',
         type: 'text',
@@ -1918,8 +1908,8 @@ export class StatechartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
       },
-    ],
-    transitionInfo: PropertyInfo[] = [
+    ]);
+    this.propertyInfo.set('transition', [
       {
         label: 'event',
         type: 'text',
@@ -1938,11 +1928,19 @@ export class StatechartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
       },
-    ];
+    ]);
+    this.propertyInfo.set('statechart', [
+      {
+        label: 'name',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+      },
+    ]);
 
-    propertyGridController.register('statechart', statechartInfo);
-    propertyGridController.register('state', stateInfo);
-    propertyGridController.register('transition', transitionInfo);
+    this.propertyInfo.forEach((info, key) => {
+      propertyGridController.register(key, info);
+    });
   }
   initializeContext(context: StatechartContext) {
     const self = this;
@@ -1966,8 +1964,8 @@ export class StatechartEditor implements CanvasLayer {
     this.context = context;
     this.statechart = statechart;
 
-    this.changedItems_.clear();
-    this.changedTopLevelStates_.clear();
+    this.changedItems.clear();
+    this.changedTopLevelStates.clear();
 
     // renderer.setModel(model);
 
@@ -1992,8 +1990,8 @@ export class StatechartEditor implements CanvasLayer {
   }
   onChanged_(change: Change) {
     const statechart = this.statechart,
-          context = this.context, changedItems = this.changedItems_,
-          changedTopLevelStates = this.changedTopLevelStates_,
+          context = this.context, changedItems = this.changedItems,
+          changedTopLevelStates = this.changedTopLevelStates,
           item: AllTypes = change.item as AllTypes, prop = change.prop;
 
     // Track all top level states which contain changes. On ending a transaction,
@@ -2040,7 +2038,7 @@ export class StatechartEditor implements CanvasLayer {
   updateLayout_() {
     const renderer = this.renderer,
           context = this.context,
-          changedItems = this.changedItems_;
+          changedItems = this.changedItems;
     // First layout containers, and then layout transitions which depend on states'
     // size and location.
     // This function is called during the draw, hitTest, and updateBounds_ methods,
@@ -2070,7 +2068,7 @@ export class StatechartEditor implements CanvasLayer {
           renderer = this.renderer,
           context = this.context,
           statechart = this.statechart,
-          changedTopLevelStates = this.changedTopLevelStates_;
+          changedTopLevelStates = this.changedTopLevelStates;
     renderer.begin(ctx);
     // Update any changed items first.
     this.updateLayout_();
@@ -2102,7 +2100,7 @@ export class StatechartEditor implements CanvasLayer {
       // Draw a dashed border around the canvas.
       const ctx = canvasController.getCtx(),
             size = canvasController.getSize();
-      ctx.strokeStyle = this.theme_.strokeColor;
+      ctx.strokeStyle = this.theme.strokeColor;
       ctx.lineWidth = 0.5;
       ctx.setLineDash([6, 3]);
       ctx.strokeRect(0, 0, size.width, size.height);
@@ -2126,23 +2124,26 @@ export class StatechartEditor implements CanvasLayer {
         renderer.draw(item, RenderMode.Highlight);
       });
 
-      if (this.hotTrackInfo_)
-        renderer.draw(this.hotTrackInfo_.item, RenderMode.HotTrack);
+      if (this.hotTrackInfo)
+        renderer.draw(this.hotTrackInfo.item, RenderMode.HotTrack);
 
-      // const hoverHitInfo = this.hoverHitInfo;
-      // if (hoverHitInfo) {
-      //   const item = hoverHitInfo.item,
-      //         nameValuePairs = [];
-      //   for (let info of hoverHitInfo.propertyInfo) {
-      //     const name = info.label,
-      //           value = info.getter(info, item);
-      //     if (value !== undefined && value !== undefined) {
-      //       nameValuePairs.push({ name, value });
-      //     }
-      //   }
-      //   renderer.drawHoverText(hoverHitInfo.item, hoverHitInfo.p, nameValuePairs);
-      // }
-      // renderer.end();
+      const hoverHitInfo = this.hoverHitInfo;
+      if (hoverHitInfo) {
+        const item = hoverHitInfo.item,
+              propertyInfo = this.propertyInfo.get(item.template.typeName),
+              nameValuePairs = [];
+        if (propertyInfo) {
+          for (let info of propertyInfo) {
+            const name = info.label,
+                  value = info.getter(info, item);
+            if (value !== undefined) {
+              nameValuePairs.push({ name, value });
+            }
+          }
+          renderer.drawHoverText(hoverHitInfo.item, this.hoverPoint, nameValuePairs);
+        }
+      }
+      renderer.end();
     } else if (canvasController === this.paletteController) {
       // Palette drawing occurs during drag and drop. If the palette has the drag,
       // draw the canvas underneath so the new object will appear on the canvas.
@@ -2281,19 +2282,19 @@ export class StatechartEditor implements CanvasLayer {
     let hitList;
     if (canvasController === this.paletteController) {
       hitList = this.hitTestPalette(cp);
-      this.clickInPalette_ = true;
+      this.clickInPalette = true;
     } else {
       hitList = this.hitTestCanvas(cp);
-      this.clickInPalette_ = false;
+      this.clickInPalette = false;
     }
-    const pointerHitInfo = this.pointerHitInfo_ = this.getFirstHit(hitList, isClickable);
+    const pointerHitInfo = this.pointerHitInfo = this.getFirstHit(hitList, isClickable);
     if (pointerHitInfo) {
-      this.draggableHitInfo_ = this.getDraggableAncestor(hitList, pointerHitInfo);
+      this.draggableHitInfo = this.getDraggableAncestor(hitList, pointerHitInfo);
       const item = pointerHitInfo.item;
-      if (this.clickInPalette_) {
+      if (this.clickInPalette) {
         selection.clear();
       } else if (cmdKeyDown) {
-        this.moveCopy_ = true;
+        this.moveCopy = true;
         selection.set(item);
       } else if (shiftKeyDown) {
         selection.add(item);
@@ -2309,7 +2310,7 @@ export class StatechartEditor implements CanvasLayer {
     return pointerHitInfo !== undefined;
   }
   onBeginDrag(canvasController: CanvasController) {
-    let pointerHitInfo = this.pointerHitInfo_;
+    let pointerHitInfo = this.pointerHitInfo;
     if (!pointerHitInfo)
       return false;
 
@@ -2336,14 +2337,14 @@ export class StatechartEditor implements CanvasLayer {
       else {
         drag = new TransitionDrag(dragItem as Transition, 'moveTransitionPoint', 'Drag transition attachment point');
       }
-    } else if (this.draggableHitInfo_) {
-      pointerHitInfo = this.pointerHitInfo_ = this.draggableHitInfo_;
+    } else if (this.draggableHitInfo) {
+      pointerHitInfo = this.pointerHitInfo = this.draggableHitInfo;
       if (pointerHitInfo instanceof StateHitResult || pointerHitInfo instanceof PseudostateHitResult) {
-        if (this.clickInPalette_) {
-          this.clickInPalette_ = false;  // TODO fix
+        if (this.clickInPalette) {
+          this.clickInPalette = false;  // TODO fix
           drag = new StateDrag([pointerHitInfo.item], 'copyPalette', 'Create new state or pseudostate');
-        } else if (this.moveCopy_) {
-          this.moveCopy_ = false;  // TODO fix
+        } else if (this.moveCopy) {
+          this.moveCopy = false;  // TODO fix
           drag = new StateDrag([pointerHitInfo.item], 'moveCopySelection', 'Move copy of selection');
         } else {
           if (pointerHitInfo.item instanceof State && pointerHitInfo.inner.border) {
@@ -2356,7 +2357,7 @@ export class StatechartEditor implements CanvasLayer {
       }
     }
 
-    this.dragInfo_ = drag;
+    this.dragInfo = drag;
     if (drag) {
       if (drag.type === 'moveSelection' || drag.type === 'moveCopySelection') {
         context.reduceSelection();
@@ -2386,7 +2387,7 @@ export class StatechartEditor implements CanvasLayer {
     }
   }
   onDrag(canvasController: CanvasController) {
-    const drag = this.dragInfo_;
+    const drag = this.dragInfo;
     if (!drag)
       return;
     const context = this.context,
@@ -2398,7 +2399,7 @@ export class StatechartEditor implements CanvasLayer {
           cp = this.getCanvasPosition(canvasController, p),
           dx = cp.x - cp0.x,
           dy = cp.y - cp0.y,
-          pointerHitInfo = this.pointerHitInfo_!,
+          pointerHitInfo = this.pointerHitInfo!,
           hitList = this.hitTestCanvas(cp);
     let hitInfo;
     if (drag instanceof StateDrag) {
@@ -2485,10 +2486,10 @@ export class StatechartEditor implements CanvasLayer {
         }
       }
     }
-    this.hotTrackInfo_ = (hitInfo && hitInfo.item !== this.statechart) ? hitInfo : undefined;
+    this.hotTrackInfo = (hitInfo && hitInfo.item !== this.statechart) ? hitInfo : undefined;
   }
   onEndDrag(canvasController: CanvasController) {
-    const drag = this.dragInfo_;
+    const drag = this.dragInfo;
     if (!drag)
       return;
     const context = this.context,
@@ -2524,10 +2525,10 @@ export class StatechartEditor implements CanvasLayer {
 
     this.setPropertyGrid();
 
-    this.dragInfo_ = undefined;
-    this.pointerHitInfo_ = undefined;
-    this.draggableHitInfo_ = undefined;
-    this.hotTrackInfo_ = undefined;
+    this.dragInfo = undefined;
+    this.pointerHitInfo = undefined;
+    this.draggableHitInfo = undefined;
+    this.hotTrackInfo = undefined;
 
     this.canvasController.draw();
   }
@@ -2636,40 +2637,24 @@ export class StatechartEditor implements CanvasLayer {
     }
     return false;
   }
-  onBeginHover(canvasController: CanvasController) {
-    return false;
-  }
-  onEndHover(canvasController: CanvasController) {
-  }
   onKeyUp(e: KeyboardEvent): boolean {
     return false;
   }
+  onBeginHover(canvasController: CanvasController) {
+    const context = this.context,
+          p = canvasController.getCurrentPointerPosition(),
+          hitList = this.hitTestCanvas(p),
+          hoverHitInfo = this.hoverHitInfo = this.getFirstHit(hitList, hasProperties);
+    if (!hoverHitInfo)
+      return false;
+
+    const cp = canvasController.viewToCanvas(p);
+    this.hoverPoint = cp;
+    this.hoverHitInfo = hoverHitInfo;
+    return true;
+  }
+  onEndHover(canvasController: CanvasController) {
+    this.hoverHitInfo = undefined;
+  }
 }
 
-/*
-//------------------------------------------------------------------------------
-
-  // Statechart Editor and helpers.
-
-  class Editor {
-    onBeginHover(canvasController) {
-      // TODO hover over palette items?
-      const model = this.model,
-            p = canvasController.getCurrentPointerPosition(),
-            hitList = this.hitTestCanvas(p),
-            hoverHitInfo = this.hoverHitInfo = this.getFirstHit(hitList, hasProperties);
-      if (!hoverHitInfo)
-        return false;
-
-      const cp = canvasController.viewToCanvas(p);
-      hoverHitInfo.p = cp;
-      hoverHitInfo.propertyInfo = this.propertyInfo[hoverHitInfo.item.type];
-      this.hoverHitInfo = hoverHitInfo;
-      return true;
-    }
-    onEndHover(canvasController) {
-      if (this.hoverHitInfo)
-        this.hoverHitInfo = undefined;
-    }
-
-*/
