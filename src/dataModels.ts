@@ -212,7 +212,6 @@ export class ReferenceProp {
   }
 }
 
-// TODO develop this with statechart example.
 export class IdProp {
   readonly name: string;
 
@@ -467,70 +466,6 @@ export class EventBase<TArg, TEvents> {
 
 // Change events.
 
-// export interface ValueChange {
-//   item: DataContextObject;
-//   prop: ScalarPropertyTypes;
-//   index: number;
-//   oldValue: any;
-// }
-
-// export class ValueChangeOp implements Operation {
-//   private change: ValueChange;
-//   undo() {
-//     const change = this.change,
-//           item = change.item,
-//           prop = change.prop;
-//     // value change can be its own inverse by swapping current and old values.
-//     const oldValue = prop.get(item);
-//     if (prop instanceof ScalarProp) {
-//       prop.set(item, change.oldValue);
-//       change.oldValue = oldValue;
-//       item.context.valueChanged(item, prop, oldValue);
-//     } else if (prop instanceof ReferenceProp) {
-//       prop.set(item, change.oldValue);
-//       change.oldValue = oldValue;
-//       item.context.valueChanged(item, prop, oldValue);
-//     }
-//   }
-//   redo() {
-//     this.undo();
-//   }
-//   constructor(change: ValueChange) {
-//     this.change = change;
-//   }
-// }
-
-// export interface ChildElementChange {
-//   type: 'elementInserted' | 'elementRemoved';
-//   item: DataContextObject;
-//   prop: ChildArrayProp;
-//   index: number;
-//   oldValue: DataContextObject | undefined;
-// }
-
-// export class ChildElementChangeOp implements Operation {
-//   private change: ChildElementChange;
-//   undo() {
-//     const change = this.change,
-//           item = change.item,
-//           prop = change.prop;
-//     if (change.type == 'elementInserted') {
-//       const list = prop.get(item), index = change.index;
-//       change.oldValue = list.at(index);
-//       list.removeAt(index);
-//       item.context.elementRemoved(item, prop, index, change.oldValue);
-//       change.type = 'elementRemoved';
-//     } else if (change.type == 'elementRemoved') {  // TODO something?
-//       const list = prop.get(item), index = change.index;
-//       list.insert(change.oldValue!, index);
-//       item.context.elementInserted(item, prop, index);
-//       change.type = 'elementInserted';
-//     }
-//   }
-//   redo() {
-//   }
-// }
-
 export type ChangeType = 'valueChanged' | 'elementInserted' | 'elementRemoved';
 // Generic 'change' event.
 export type ChangeEvents = 'changed' | ChangeType;
@@ -539,7 +474,6 @@ export type ChangeEvents = 'changed' | ChangeType;
 // 'valueChanged': item, attr, oldValue.
 // 'elementInserted': item, attr, index.
 // 'elementRemoved': item, attr, index, oldValue.
-// TODO split into value and child array changes.
 export interface Change {
   type: ChangeType;
   item: DataContextObject;
@@ -689,7 +623,6 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
   undo(transaction: CompoundOp) {
     // Roll back operations.
     transaction.undo();
-    // TODO consider raising transaction ended event instead.
     super.onEvent('didUndo', transaction);
   }
 
@@ -697,7 +630,6 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
   redo(transaction: CompoundOp) {
     // Roll forward changes.
     transaction.redo();
-    // TODO consider raising transaction ended event instead.
     super.onEvent('didRedo', transaction);
   }
 
@@ -763,7 +695,7 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
       // the (item, prop) change.
       const snapshot = this.getSnapshot(item);
       if (!snapshot.hasOwnProperty(prop.name)) {
-        (snapshot as any)[prop.name] = change.oldValue;  // TODO lazy snapshot from value changes in trans.
+        (snapshot as any)[prop.name] = change.oldValue;
       }
       this.recordChange(change);
     } else {

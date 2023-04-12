@@ -10,7 +10,7 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
 import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
          evaluateBezier, CurveHitResult } from '../src/geometry.js'
 
-import { ScalarProp, ChildArrayProp, ReferencedObject, ReferenceProp, PropertyTypes,
+import { ScalarProp, ChildArrayProp, ReferencedObject, ReferenceProp, IdProp,
          DataContext, DataContextObject, EventBase, Change, ChangeEvents,
          copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet,
          reduceToRoots, List, TransactionManager, HistoryManager, ScalarPropertyTypes,
@@ -25,6 +25,7 @@ import * as Canvas2SVG from '../third_party/canvas2svg/canvas2svg.js'
 
 const stateTemplate = (function() {
   const typeName: string = 'state',
+        id = new IdProp('id'),
         x = new ScalarProp('x'),
         y = new ScalarProp('y'),
         width = new ScalarProp('width'),
@@ -33,8 +34,8 @@ const stateTemplate = (function() {
         entry = new ScalarProp('entry'),
         exit = new ScalarProp('exit'),
         statecharts = new ChildArrayProp('statecharts'),
-        properties = [x, y, width, height, name, entry, exit, statecharts];
-  return { typeName, x, y, width, height, name, entry, exit, statecharts, properties };
+        properties = [id, x, y, width, height, name, entry, exit, statecharts];
+  return { typeName, id, x, y, width, height, name, entry, exit, statecharts, properties };
 })();
 
 export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
@@ -45,14 +46,15 @@ type PseudostateTemplate = {
   readonly properties: ScalarPropertyTypes[],
 }
 const pseudostateTemplate = (function() {
-  const x = new ScalarProp('x'),
+  const id = new IdProp('id'),
+        x = new ScalarProp('x'),
         y = new ScalarProp('y'),
-        properties = [x, y];
+        properties = [id, x, y];
   return {
-    start: { typeName: 'start', x, y, properties },
-    stop: { typeName: 'stop', x, y, properties },
-    history: { typeName: 'history', x, y, properties },
-    deepHistory: { typeName: 'history*', x, y, properties },
+    start: { typeName: 'start', id, x, y, properties },
+    stop: { typeName: 'stop', id, x, y, properties },
+    history: { typeName: 'history', id, x, y, properties },
+    deepHistory: { typeName: 'history*', id, x, y, properties },
   };
 })();
 
@@ -2592,21 +2594,15 @@ export class StatechartEditor implements CanvasLayer {
         }
         case 72: // 'h'
           // editingModel.doTogglePalette();
-          return true;
-        case 78: { // 'n'   /// Can't intercept this key combo
-          const statechart = {
-            'type': 'statechart',
-            'id': 1,
-            'x': 0,
-            'y': 0,
-            'width': 0,
-            'height': 0,
-            'items': [],
-          }
-          // model = { root: statechart };
-          // self.setModel(model);
-          // self.updateBounds_();
-          // self.canvasController.draw();
+          // return true;
+          return false;
+        case 78: { // ctrl 'n'   // Can't intercept cmd n.
+          const context = new StatechartContext();
+          self.initializeContext(context);
+          self.setContext(context);
+          self.renderer.begin(self.canvasController.getCtx());
+          self.updateBounds_();
+          self.canvasController.draw();
           return true;
         }
         case 79: { // 'o'
