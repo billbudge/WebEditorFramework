@@ -575,7 +575,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     }
     return statechart;
   }
-// TODO eliminate these accessor methods.
+
   beginTransaction(name: string) {
     this.transactionManager.beginTransaction(name);
   }
@@ -610,7 +610,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.selection.delete(item);
   }
 
-  deleteItems(items: Array<AllTypes>) {
+  deleteItems(items: AllTypes[]) {
     const self = this;
     items.forEach(item => self.deleteItem(item));
   }
@@ -619,7 +619,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.selection.add(item);
   }
 
-  selectionContents() : Array<AllTypes> {
+  selectionContents() : AllTypes[] {
     return this.selection.contents();
   }
 
@@ -713,7 +713,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  copy() : Array<AllTypes> {
+  copy() : AllTypes[] {
     const statechart = this.statechart,
           selection = this.selection;
 
@@ -735,10 +735,10 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
         }
       }
     });
-    return copies as Array<AllTypes>;
+    return copies as AllTypes[];
   }
 
-  paste(items: Array<AllTypes>) : Array<AllTypes> {
+  paste(items: AllTypes[]) : AllTypes[] {
     this.transactionManager.beginTransaction('paste');
     items.forEach(item => {
       // Offset paste so copies don't overlap with the originals.
@@ -747,14 +747,14 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
         item.y += 16;
       }
     });
-    const copies = copyItems(items, this) as Array<AllTypes>;  // TODO fix
+    const copies = copyItems(items, this) as AllTypes[];  // TODO fix
     this.addItems(copies, this.statechart);
     this.selection.set(copies);
     this.transactionManager.endTransaction();
     return copies;
   }
 
-  cut() : Array<AllTypes> {
+  cut() : AllTypes[] {
     this.transactionManager.beginTransaction('cut');
     const result = this.copy();
     this.deleteItems(this.selection.contents());
@@ -1130,7 +1130,7 @@ class Renderer {
     }
     return { x, y, width, height };
   }
-  getBounds(items: Array<AllTypes>) : Rect {
+  getBounds(items: AllTypes[]) : Rect {
     let first = true,
         xmin = 0, ymin = 0, xmax = 0, ymax = 0;
     for (let item of items) {
@@ -1790,7 +1790,7 @@ export class StatechartEditor implements CanvasLayer {
   private palette: Statechart;  // Statechart to simplify layout of palette items.
   private context: StatechartContext;
   private statechart: Statechart;
-  private scrap: Array<AllTypes> = []
+  private scrap: AllTypes[] = []
 
   private pointerHitInfo: HitResultTypes | undefined;
   private draggableHitInfo: HitResultTypes | undefined;
@@ -2172,7 +2172,7 @@ export class StatechartEditor implements CanvasLayer {
           canvasController = this.canvasController;
 
     // Calculate document bounds.
-    const items = new Array<AllTypes>();
+    const items: AllTypes[] = new Array();
     context.visitAll(statechart, function (item) {
       items.push(item);
     });
@@ -2365,7 +2365,7 @@ export class StatechartEditor implements CanvasLayer {
       if (drag.type == 'copyPalette') {
         // Transform palette items into the canvas coordinate system.
         const offset = this.paletteController.offsetToOtherCanvas(this.canvasController),
-              copies = copyItems(drag.items, context) as StateTypes[];  // TODO fix
+              copies = copyItems(drag.items, context) as AllTypes[];
         copies.forEach(copy => {
           if (copy instanceof State || copy instanceof Pseudostate) {
             copy.x -= offset.x;

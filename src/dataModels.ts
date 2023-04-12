@@ -288,7 +288,7 @@ export function copyItems(
 
 //------------------------------------------------------------------------------
 
-// Serialization/Deserialization, via JSON.
+// Serialization/Deserialization, via raw objects.
 
 function serializeItem(original: DataContextObject) : object {
   let result: any = {
