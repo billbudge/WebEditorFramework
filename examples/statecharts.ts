@@ -10,11 +10,11 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
 import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
          evaluateBezier, CurveHitResult } from '../src/geometry.js'
 
-import { ScalarProp, ChildArrayProp, ReferencedObject, ReferenceProp, IdProp,
-         DataContext, DataContextObject, EventBase, Change, ChangeEvents,
+import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
+         ReferencedObject, DataContext, DataContextObject, EventBase, Change, ChangeEvents,
          copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet,
          reduceToRoots, List, TransactionManager, HistoryManager, ScalarPropertyTypes,
-         ArrayPropertyTypes, DataObjectTemplate } from '../src/dataModels.js'
+         ArrayPropertyTypes } from '../src/dataModels.js'
 
 import * as Canvas2SVG from '../third_party/canvas2svg/canvas2svg.js'
 
@@ -41,9 +41,10 @@ const stateTemplate = (function() {
 export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
 type PseudostateTemplate = {
   readonly typeName: string,
+  readonly id: IdProp,
   readonly x: ScalarProp,
   readonly y: ScalarProp,
-  readonly properties: ScalarPropertyTypes[],
+  readonly properties: PropertyTypes[],
 }
 const pseudostateTemplate = (function() {
   const id = new IdProp('id'),
@@ -289,7 +290,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
   newPseudostate(typeName: string) : Pseudostate {
     const nextId = ++this.highestId;
-    let template;
+    let template: PseudostateTemplate;
     switch (typeName) {
       case 'start': template = pseudostateTemplate.start; break;
       case 'stop': template = pseudostateTemplate.stop; break;
@@ -297,7 +298,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
       case 'history*': template = pseudostateTemplate.deepHistory; break;
       default: throw new Error('Unknown pseudostate type: ' + typeName);
     }
-    const result: Pseudostate = new Pseudostate(template as PseudostateTemplate, nextId, this);  // TODO fix
+    const result = new Pseudostate(template, nextId, this);
     this.stateMap.set(nextId, result);
     return result;
   }
@@ -574,7 +575,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     }
     return statechart;
   }
-
+// TODO eliminate these accessor methods.
   beginTransaction(name: string) {
     this.transactionManager.beginTransaction(name);
   }
@@ -1315,8 +1316,6 @@ class Renderer {
     transition.bezier = bezier;
     transition.textPoint = evaluateBezier(bezier, transition.tText);
     let text = '', textWidth = 0;
-    if (!this.ctx)  // TODO why are we laying out without a context?
-      return;
 
     const ctx = this.ctx,
           padding = this.theme.padding;
@@ -1753,7 +1752,7 @@ function hasProperties(hitInfo: HitResultTypes) : boolean {
 
 type StateDragType = 'copyPalette' | 'moveSelection' | 'moveCopySelection' | 'resizeState';
 class StateDrag {
-  items: StateTypes[];
+  items: AllTypes[];
   type: StateDragType;
   description: string;
   constructor(items: StateTypes[], type: StateDragType, description: string) {
@@ -2297,7 +2296,7 @@ export class StatechartEditor implements CanvasLayer {
         selection.clear();
       } else if (cmdKeyDown) {
         this.moveCopy = true;
-        selection.set(item);
+        selection.add(item);
       } else if (shiftKeyDown) {
         selection.add(item);
       } else if (!selection.has(item)) {
@@ -2347,13 +2346,12 @@ export class StatechartEditor implements CanvasLayer {
           drag = new StateDrag([pointerHitInfo.item], 'copyPalette', 'Create new state or pseudostate');
         } else if (this.moveCopy) {
           this.moveCopy = false;  // TODO fix
-          drag = new StateDrag([pointerHitInfo.item], 'moveCopySelection', 'Move copy of selection');
+          drag = new StateDrag(context.selectedStates(), 'moveCopySelection', 'Move copy of selection');
         } else {
           if (pointerHitInfo.item instanceof State && pointerHitInfo.inner.border) {
             drag = new StateDrag([pointerHitInfo.item], 'resizeState', 'Resize state');
           } else {
-            // Deselect transitions. TODO
-            drag = new StateDrag(selection.contents() as StateTypes[], 'moveSelection', 'Move selection');
+            drag = new StateDrag(context.selectedStates(), 'moveSelection', 'Move selection');
           }
         }
       }
@@ -2364,18 +2362,22 @@ export class StatechartEditor implements CanvasLayer {
       if (drag.type === 'moveSelection' || drag.type === 'moveCopySelection') {
         context.reduceSelection();
       }
-      if (drag.type == 'copyPalette' || drag.type == 'moveCopySelection') {
-        const copies = copyItems(drag.items!, context) as StateTypes[];  // TODO fix
+      if (drag.type == 'copyPalette') {
         // Transform palette items into the canvas coordinate system.
-        if (drag.type == 'copyPalette') {
-          const offset = this.paletteController.offsetToOtherCanvas(this.canvasController);
-          copies.forEach(copy => {
+        const offset = this.paletteController.offsetToOtherCanvas(this.canvasController),
+              copies = copyItems(drag.items, context) as StateTypes[];  // TODO fix
+        copies.forEach(copy => {
+          if (copy instanceof State || copy instanceof Pseudostate) {
             copy.x -= offset.x;
             copy.y -= offset.y;
-          });
-        }
+          }
+        });
+        drag.items = copies;
+      } else if (drag.type == 'moveCopySelection') {
+        const copies = context.copy();
         drag.items = copies;
       }
+
       context.transactionManager.beginTransaction(drag.description);
       if (newTransition) {
         context.addItem(newTransition, this.statechart);
