@@ -1,5 +1,5 @@
 import {describe, expect, test} from '@jest/globals';
-import * as SC from '../examples/statecharts.js';
+import * as SC from '../examples/statecharts/statecharts.js';
 
 function addState(statechart: SC.Statechart) {
   const state = statechart.context.newState();

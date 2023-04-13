@@ -1,22 +1,22 @@
 
-import { SelectionSet } from '../src/collections.js'
+import { SelectionSet } from '../../src/collections.js'
 
 import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, RectHitResult,
          diskPath, hitTestDisk, DiskHitResult, roundRectPath, bezierEdgePath,
          hitTestBezier, measureNameValuePairs, CanvasController, CanvasLayer,
-         PropertyGridController, PropertyInfo, FileController } from '../src/diagrams.js'
+         PropertyGridController, PropertyInfo, FileController } from '../../src/diagrams.js'
 
 import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
-         evaluateBezier, CurveHitResult } from '../src/geometry.js'
+         evaluateBezier, CurveHitResult } from '../../src/geometry.js'
 
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          ReferencedObject, DataContext, DataContextObject, EventBase, Change, ChangeEvents,
          copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet,
          reduceToRoots, List, TransactionManager, HistoryManager, ScalarPropertyTypes,
-         ArrayPropertyTypes } from '../src/dataModels.js'
+         ArrayPropertyTypes } from '../../src/dataModels.js'
 
-import * as Canvas2SVG from '../third_party/canvas2svg/canvas2svg.js'
+import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
 //------------------------------------------------------------------------------
 
