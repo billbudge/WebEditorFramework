@@ -767,7 +767,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
           statechart = this.statechart,
           graphInfo = this.getGraphInfo();
     // Eliminate dangling transitions.
-    graphInfo.transitions.forEach(function(transition) {
+    graphInfo.transitions.forEach(transition => {
       const src = transition.src,
             dst = transition.dst;
       if (!src || !graphInfo.states.has(src) ||
