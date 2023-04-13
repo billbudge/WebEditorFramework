@@ -333,7 +333,17 @@ type NonWireTypes = Element | Functionchart;
 type AllTypes = Element | Wire | Functionchart;
 
 export type FunctionchartVisitor = (item: AllTypes) => void;
-export type NonWireVisitor = (item: NonWireTypes) => void;
+export type NonWireVisitor = (nonwire: NonWireTypes) => void;
+export type WireVisitor = (wire: Wire) => void;
+
+export interface GraphInfo {
+  elements: Set<Element>;
+  functioncharts: Set<Functionchart>;
+  wires: Set<Wire>;
+  interiorWires: Set<Wire>;
+  inWires: Set<Wire>;
+  outWires: Set<Wire>;
+}
 
 export class FunctionchartContext extends EventBase<Change, ChangeEvents>
                                   implements DataContext {
@@ -344,6 +354,35 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   private elements = new Set<Element>;
   private functioncharts = new Set<Functionchart>;
   private wires = new Set<Wire>;
+
+  readonly transactionManager: TransactionManager;
+  readonly historyManager: HistoryManager;
+
+  selection = new SelectionSet<AllTypes>();
+
+  constructor() {
+    super();
+    const self = this;
+    this.transactionManager = new TransactionManager();
+    this.addHandler('changed',
+        this.transactionManager.onChanged.bind(this.transactionManager));
+    this.transactionManager.addHandler('transactionEnding', () => {
+      // self.makeConsistent();
+    });
+    this.historyManager = new HistoryManager(this.transactionManager, this.selection);
+    this.functionchart = new Functionchart(this);
+    this.insertItem_(this.functionchart, undefined);
+  }
+
+  root() : Functionchart {
+    return this.functionchart;
+  }
+  setRoot(root: Functionchart) : void {
+    if (this.functionchart)
+      this.removeItem_(this.functionchart);
+    this.insertItem_(root, undefined);
+    this.functionchart = root;
+  }
 
   newElement() : Element {
     const nextId = ++this.highestId,
@@ -398,6 +437,166 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       visitor(item);
       item.elements.forEach(item => self.visitNonTransitions(item, visitor));
     }
+  }
+
+  updateItem(item: AllTypes) {
+    if (item instanceof Element || item instanceof Functionchart) {
+      const self = this;
+      this.visitNonTransitions(item, item => self.setGlobalPosition(item));
+    }
+  }
+
+  getGrandParent(item: AllTypes) : AllTypes | undefined {
+    let result = item.parent;
+    if (result)
+      result = result.parent;
+    return result;
+  }
+
+  forInWires(element: Element, visitor: WireVisitor) {
+    const inputs = element.inWires;
+    if (!inputs)
+      return;
+    inputs.forEach(wire => {
+      if (wire)
+      visitor(wire);
+    });
+  }
+
+  forOutWires(element: Element, visitor: WireVisitor) {
+    const outputs = element.outWires;
+    if (!outputs)
+      return;
+    outputs.forEach((wires: Wire[]) => {
+      wires.forEach(wire => visitor(wire))
+    });
+  }
+
+  // Gets the translation to move an item from its current parent to
+  // newParent. Handles the cases where current parent or newParent are undefined.
+  getToParent(item: NonWireTypes, newParent: Functionchart | undefined) {
+    const oldParent = item.parent;
+    let dx = 0, dy = 0;
+    if (oldParent) {
+      const global = oldParent.globalPosition;
+      dx += global.x;
+      dy += global.y;
+    }
+    if (newParent) {
+      const global = newParent.globalPosition;
+      dx -= global.x;
+      dy -= global.y;
+    }
+    return { x: dx, y: dy };
+  }
+
+  private setGlobalPosition(item: NonWireTypes) {
+    const x = item.x,
+          y = item.y,
+          parent = item.parent;
+
+    if (parent) {
+      // console.log(item.type, parent.type, parent.globalPosition);
+      const global = parent.globalPosition;
+      if (global) {
+        item.globalPosition = { x: x + global.x, y: y + global.y };
+      }
+    } else {
+      item.globalPosition = { x: x, y: y };
+    }
+  }
+
+  getGraphInfo() : GraphInfo {
+    return {
+      elements: this.elements,
+      functioncharts: this.functioncharts,
+      wires: this.wires,
+      interiorWires: this.wires,
+      inWires: new Set(),
+      outWires: new Set(),
+    };
+  }
+
+  getSubgraphInfo(items: Element[]) : GraphInfo {
+    const self = this,
+          elements = new Set<Element>(),
+          functioncharts = new Set<Functionchart>(),
+          wires = new Set<Wire>(),
+          interiorWires = new Set<Wire>(),
+          inWires = new Set<Wire>(),
+          outWires = new Set<Wire>();
+    // First collect states and statecharts.
+    items.forEach(item => {
+      this.visitAll(item, item => {
+        if (item instanceof Element)
+          elements.add(item);
+        else if (item instanceof Functionchart)
+          functioncharts.add(item);
+      });
+      });
+    // Now collect and classify transitions that connect to them.
+    items.forEach(item => {
+      function addWire(wire: Wire) {
+        // Stop if we've already processed this transtion (handle transitions from a state to itself.)
+        if (wires.has(wire)) return;
+        wires.add(wire);
+        const src: Element = wire.src!,
+              dst: Element = wire.dst!,
+              srcInside = elements.has(src),
+              dstInside = elements.has(dst);
+        if (srcInside) {
+          if (dstInside) {
+            interiorWires.add(wire);
+          } else {
+            outWires.add(wire);
+          }
+        }
+        if (dstInside) {
+          if (!srcInside) {
+            inWires.add(wire);
+          }
+        }
+      }
+      if (item instanceof Element) {
+        self.forInWires(item, addWire);
+        self.forOutWires(item, addWire);
+      }
+    });
+
+    return {
+      elements: elements,
+      functioncharts: functioncharts,
+      wires: wires,
+      interiorWires: interiorWires,
+      inWires: inWires,
+      outWires: outWires,
+    }
+  }
+
+  getConnectedElements(elements: Element[], upstream: boolean, downstream: boolean) : Set<Element> {
+    const result = new Set<Element>();
+    elements = elements.slice(0);  // Copy input array
+    while (elements.length > 0) {
+      const element = elements.pop();
+      if (!element) continue;
+
+      result.add(element);
+      if (upstream) {
+        this.forInWires(element, wire => {
+          const src: Element = wire.src!;
+          if (!result.has(src))
+            elements.push(src);
+        });
+      }
+      if (downstream) {
+        this.forOutWires(element, wire => {
+          const dst = wire.dst!;
+          if (!result.has(dst))
+            elements.push(dst);
+        });
+      }
+    }
+    return result;
   }
 
   private insertElement_(element: Element, parent: Functionchart) {
