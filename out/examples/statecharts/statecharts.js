@@ -480,7 +480,7 @@ export class StatechartContext extends EventBase {
         graphInfo.interiorTransitions.forEach(transition => self.selection.add(transition));
     }
     selectConnectedStates(upstream) {
-        const selectedStates = this.selectedStates(), connectedStates = this.getConnectedStates(selectedStates, upstream, false);
+        const selectedStates = this.selectedStates(), connectedStates = this.getConnectedStates(selectedStates, upstream, true);
         this.selection.set(Array.from(connectedStates));
     }
     addItem(item, parent) {
@@ -575,7 +575,7 @@ export class StatechartContext extends EventBase {
     makeConsistent() {
         const self = this, statechart = this.statechart, graphInfo = this.getGraphInfo();
         // Eliminate dangling transitions.
-        graphInfo.transitions.forEach(function (transition) {
+        graphInfo.transitions.forEach(transition => {
             const src = transition.src, dst = transition.dst;
             if (!src || !graphInfo.states.has(src) ||
                 !dst || !graphInfo.states.has(dst)) {
@@ -711,6 +711,24 @@ export class StatechartContext extends EventBase {
             const parent = owner.parent;
             if (parent) {
                 this.removeTransition_(owner);
+                if (prop === transitionTemplate.src) {
+                    const oldSrc = oldValue;
+                    if (oldSrc) {
+                        const outputs = oldSrc.outTransitions;
+                        const index = outputs.indexOf(owner);
+                        if (index >= 0)
+                            outputs.splice(index, 1);
+                    }
+                }
+                else if (prop === transitionTemplate.dst) {
+                    const oldDst = oldValue;
+                    if (oldDst) {
+                        const inputs = oldDst.inTransitions;
+                        const index = inputs.indexOf(owner);
+                        if (index >= 0)
+                            inputs.splice(index, 1);
+                    }
+                }
                 this.insertTransition_(owner, parent);
             }
         }

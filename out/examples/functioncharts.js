@@ -1,4 +1,6 @@
-import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase } from '../src/dataModels.js';
+import { SelectionSet } from '../src/collections.js';
+import { Theme } from '../src/diagrams.js';
+import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, getLowestCommonAncestor, reduceToRoots, TransactionManager, HistoryManager } from '../src/dataModels.js';
 export class TypeParser {
     constructor() {
         this.map_ = new Map();
@@ -209,12 +211,31 @@ export class Functionchart {
 }
 export class FunctionchartContext extends EventBase {
     constructor() {
-        super(...arguments);
+        super();
         this.highestId = 0; // 0 stands for no id.
         this.referentMap = new Map();
         this.elements = new Set;
         this.functioncharts = new Set;
         this.wires = new Set;
+        this.selection = new SelectionSet();
+        const self = this;
+        this.transactionManager = new TransactionManager();
+        this.addHandler('changed', this.transactionManager.onChanged.bind(this.transactionManager));
+        this.transactionManager.addHandler('transactionEnding', () => {
+            // self.makeConsistent();
+        });
+        this.historyManager = new HistoryManager(this.transactionManager, this.selection);
+        this.functionchart = new Functionchart(this);
+        this.insertItem_(this.functionchart, undefined);
+    }
+    root() {
+        return this.functionchart;
+    }
+    setRoot(root) {
+        if (this.functionchart)
+            this.removeItem_(this.functionchart);
+        this.insertItem_(root, undefined);
+        this.functionchart = root;
     }
     newElement() {
         const nextId = ++this.highestId, result = new Element(this, nextId);
@@ -266,6 +287,284 @@ export class FunctionchartContext extends EventBase {
             item.elements.forEach(item => self.visitNonTransitions(item, visitor));
         }
     }
+    updateItem(item) {
+        if (item instanceof Element || item instanceof Functionchart) {
+            const self = this;
+            this.visitNonTransitions(item, item => self.setGlobalPosition(item));
+        }
+    }
+    getGrandParent(item) {
+        let result = item.parent;
+        if (result)
+            result = result.parent;
+        return result;
+    }
+    forInWires(element, visitor) {
+        const inputs = element.inWires;
+        if (!inputs)
+            return;
+        inputs.forEach(wire => {
+            if (wire)
+                visitor(wire);
+        });
+    }
+    forOutWires(element, visitor) {
+        const outputs = element.outWires;
+        if (!outputs)
+            return;
+        outputs.forEach((wires) => {
+            wires.forEach(wire => visitor(wire));
+        });
+    }
+    // Gets the translation to move an item from its current parent to
+    // newParent. Handles the cases where current parent or newParent are undefined.
+    getToParent(item, newParent) {
+        const oldParent = item.parent;
+        let dx = 0, dy = 0;
+        if (oldParent) {
+            const global = oldParent.globalPosition;
+            dx += global.x;
+            dy += global.y;
+        }
+        if (newParent) {
+            const global = newParent.globalPosition;
+            dx -= global.x;
+            dy -= global.y;
+        }
+        return { x: dx, y: dy };
+    }
+    setGlobalPosition(item) {
+        const x = item.x, y = item.y, parent = item.parent;
+        if (parent) {
+            // console.log(item.type, parent.type, parent.globalPosition);
+            const global = parent.globalPosition;
+            if (global) {
+                item.globalPosition = { x: x + global.x, y: y + global.y };
+            }
+        }
+        else {
+            item.globalPosition = { x: x, y: y };
+        }
+    }
+    getGraphInfo() {
+        return {
+            elements: this.elements,
+            functioncharts: this.functioncharts,
+            wires: this.wires,
+            interiorWires: this.wires,
+            inWires: new Set(),
+            outWires: new Set(),
+        };
+    }
+    getSubgraphInfo(items) {
+        const self = this, elements = new Set(), functioncharts = new Set(), wires = new Set(), interiorWires = new Set(), inWires = new Set(), outWires = new Set();
+        // First collect states and statecharts.
+        items.forEach(item => {
+            this.visitAll(item, item => {
+                if (item instanceof Element)
+                    elements.add(item);
+                else if (item instanceof Functionchart)
+                    functioncharts.add(item);
+            });
+        });
+        // Now collect and classify transitions that connect to them.
+        items.forEach(item => {
+            function addWire(wire) {
+                // Stop if we've already processed this transtion (handle transitions from a state to itself.)
+                if (wires.has(wire))
+                    return;
+                wires.add(wire);
+                const src = wire.src, dst = wire.dst, srcInside = elements.has(src), dstInside = elements.has(dst);
+                if (srcInside) {
+                    if (dstInside) {
+                        interiorWires.add(wire);
+                    }
+                    else {
+                        outWires.add(wire);
+                    }
+                }
+                if (dstInside) {
+                    if (!srcInside) {
+                        inWires.add(wire);
+                    }
+                }
+            }
+            if (item instanceof Element) {
+                self.forInWires(item, addWire);
+                self.forOutWires(item, addWire);
+            }
+        });
+        return {
+            elements: elements,
+            functioncharts: functioncharts,
+            wires: wires,
+            interiorWires: interiorWires,
+            inWires: inWires,
+            outWires: outWires,
+        };
+    }
+    getConnectedElements(elements, upstream, downstream) {
+        const result = new Set();
+        elements = elements.slice(0); // Copy input array
+        while (elements.length > 0) {
+            const element = elements.pop();
+            if (!element)
+                continue;
+            result.add(element);
+            if (upstream) {
+                this.forInWires(element, wire => {
+                    const src = wire.src;
+                    if (!result.has(src))
+                        elements.push(src);
+                });
+            }
+            if (downstream) {
+                this.forOutWires(element, wire => {
+                    const dst = wire.dst;
+                    if (!result.has(dst))
+                        elements.push(dst);
+                });
+            }
+        }
+        return result;
+    }
+    beginTransaction(name) {
+        this.transactionManager.beginTransaction(name);
+    }
+    endTransaction(name) {
+        this.transactionManager.endTransaction();
+    }
+    cancelTransaction(name) {
+        this.transactionManager.cancelTransaction();
+    }
+    getUndo() {
+        return this.historyManager.getUndo();
+    }
+    undo() {
+        this.historyManager.undo();
+    }
+    getRedo() {
+        return this.historyManager.getRedo();
+    }
+    redo() {
+        this.historyManager.redo();
+    }
+    deleteItem(item) {
+        if (item.parent) {
+            if (item instanceof Wire)
+                item.parent.wires.remove(item);
+            else if (item instanceof Functionchart)
+                item.parent.functioncharts.remove(item);
+            else
+                item.parent.elements.remove(item);
+        }
+        this.selection.delete(item);
+    }
+    deleteItems(items) {
+        const self = this;
+        items.forEach(item => self.deleteItem(item));
+    }
+    select(item) {
+        this.selection.add(item);
+    }
+    selectionContents() {
+        return this.selection.contents();
+    }
+    selectedElements() {
+        const result = new Array();
+        this.selection.forEach(item => {
+            if (item instanceof Element)
+                result.push(item);
+        });
+        return result;
+    }
+    reduceSelection() {
+        const selection = this.selection;
+        const roots = reduceToRoots(selection.contents(), selection);
+        // Reverse, to preserve the previous order of selection.
+        selection.set(roots.reverse());
+    }
+    selectInteriorWires() {
+        const self = this, graphInfo = this.getSubgraphInfo(this.selectedElements());
+        graphInfo.interiorWires.forEach(wire => self.selection.add(wire));
+    }
+    selectConnectedElements(upstream) {
+        const selectedElements = this.selectedElements(), connectedElements = this.getConnectedElements(selectedElements, upstream, false);
+        this.selection.set(Array.from(connectedElements));
+    }
+    addItem(item, parent) {
+        const oldParent = item.parent;
+        if (!parent)
+            parent = this.functionchart;
+        if (oldParent === parent)
+            return item;
+        // At this point we can add item to parent.
+        if (item instanceof Element || item instanceof Functionchart) {
+            const translation = this.getToParent(item, parent);
+            item.x += translation.x;
+            item.y += translation.y;
+        }
+        if (oldParent)
+            this.deleteItem(item);
+        if (item instanceof Wire) {
+            parent.wires.append(item);
+        }
+        else if (item instanceof Element) {
+            parent.elements.append(item);
+        }
+        return item;
+    }
+    addItems(items, parent) {
+        // Add states first, then transitions, so the context can track transitions.
+        for (let item of items) {
+            if (item instanceof Element)
+                this.addItem(item, parent);
+        }
+        for (let item of items) {
+            if (item instanceof Wire)
+                this.addItem(item, parent);
+        }
+    }
+    copy() {
+        const statechart = this.functionchart, selection = this.selection;
+        selection.set(this.selectedElements());
+        this.selectInteriorWires();
+        this.reduceSelection();
+        const selected = selection.contents(), map = new Map(), copies = copyItems(selected, this, map);
+        selected.forEach(item => {
+            if (item instanceof Element) {
+                const copy = map.get(item.id);
+                if (copy) {
+                    const translation = this.getToParent(item, statechart);
+                    copy.x += translation.x;
+                    copy.y += translation.y;
+                }
+            }
+        });
+        return copies;
+    }
+    paste(items) {
+        this.transactionManager.beginTransaction('paste');
+        items.forEach(item => {
+            // Offset paste so copies don't overlap with the originals.
+            if (item instanceof Element || item instanceof Functionchart) {
+                item.x += 16;
+                item.y += 16;
+            }
+        });
+        const copies = copyItems(items, this); // TODO fix
+        this.addItems(copies, this.functionchart);
+        this.selection.set(copies);
+        this.transactionManager.endTransaction();
+        return copies;
+    }
+    cut() {
+        this.transactionManager.beginTransaction('cut');
+        const result = this.copy();
+        this.deleteItems(this.selection.contents());
+        this.transactionManager.endTransaction();
+        return result;
+    }
     insertElement_(element, parent) {
         this.elements.add(element);
         element.parent = parent;
@@ -274,6 +573,30 @@ export class FunctionchartContext extends EventBase {
             element.inWires = new Array();
         if (element.outWires === undefined)
             element.outWires = new Array();
+    }
+    makeConsistent() {
+        const self = this, statechart = this.functionchart, graphInfo = this.getGraphInfo();
+        // Eliminate dangling transitions.
+        graphInfo.wires.forEach(wire => {
+            const src = wire.src, dst = wire.dst;
+            if (!src || !graphInfo.elements.has(src) ||
+                !dst || !graphInfo.elements.has(dst)) {
+                self.deleteItem(wire);
+                return;
+            }
+            // Make sure transitions belong to lowest common functionchart.
+            const srcParent = src.parent, dstParent = dst.parent, lca = getLowestCommonAncestor(srcParent, dstParent);
+            if (wire.parent !== lca) {
+                self.deleteItem(wire);
+                self.addItem(wire, lca);
+            }
+        });
+        // Delete any empty functioncharts (except for the root functionchart).
+        graphInfo.functioncharts.forEach(functionchart => {
+            if (functionchart.parent &&
+                functionchart.elements.length === 0)
+                self.deleteItem(functionchart);
+        });
     }
     removeElement_(element) {
         this.elements.delete(element);
@@ -405,6 +728,57 @@ export class FunctionchartContext extends EventBase {
         const change = { type: 'elementRemoved', item: owner, prop: prop, index: index, oldValue: oldValue };
         super.onEvent('elementRemoved', change);
         return this.onChanged(change);
+    }
+}
+//------------------------------------------------------------------------------
+class FunctionchartTheme extends Theme {
+    constructor(theme, radius = 8) {
+        super();
+        this.textIndent = 8;
+        this.textLeading = 6;
+        this.knobbyRadius = 4;
+        this.padding = 8;
+        Object.assign(this, theme);
+        this.radius = radius;
+    }
+}
+class ElementHitResult {
+    constructor(item, inner) {
+        this.arrow = false;
+        this.item = item;
+        this.inner = inner;
+    }
+}
+class WireHitResult {
+    constructor(item, inner) {
+        this.item = item;
+        this.inner = inner;
+    }
+}
+class FunctionchartHitResult {
+    constructor(item, inner) {
+        this.item = item;
+        this.inner = inner;
+    }
+}
+var RenderMode;
+(function (RenderMode) {
+    RenderMode[RenderMode["Normal"] = 0] = "Normal";
+    RenderMode[RenderMode["Highlight"] = 1] = "Highlight";
+    RenderMode[RenderMode["HotTrack"] = 2] = "HotTrack";
+    RenderMode[RenderMode["Print"] = 3] = "Print";
+})(RenderMode || (RenderMode = {}));
+class Renderer {
+    constructor(theme) {
+        this.theme = new FunctionchartTheme(theme);
+    }
+    begin(ctx) {
+        this.ctx = ctx;
+        ctx.save();
+        ctx.font = this.theme.font;
+    }
+    end() {
+        this.ctx.restore();
     }
 }
 /*
@@ -1774,566 +2148,6 @@ const editingModel = (function() {
   }
 })();
 
-//------------------------------------------------------------------------------
-
-const normalMode = 1,
-    highlightMode = 2,
-    hotTrackMode = 3,
-    printMode = 1;
-
-class Renderer {
-  constructor(theme) {
-    this.theme = extendTheme(theme);
-  }
-  extend(model) {
-    assert(model.hierarchicalModel);
-    assert(model.translatableModel);
-    assert(model.referencingModel);
-    assert(model.observableModel);
-    // A Renderer doesn't store any information on the model itself.
-  }
-  setModel(model) {
-    this.model = model;
-    model.renderer = this; // TODO eliminate this cyclic reference if possible.
-
-    const translatableModel = model.translatableModel, referencingModel = model.referencingModel;
-
-    this.translatableModel = translatableModel;
-    this.referencingModel = referencingModel;
-
-    // TODO Make these functions global to the Statechart component.
-    this.getWireSrc = referencingModel.getReferenceFn('srcId');
-    this.getWireDst = referencingModel.getReferenceFn('dstId');
-  }
-
-  begin(ctx) {
-    this.ctx = ctx;
-
-    ctx.save();
-    ctx.font = this.theme.font;
-  }
-
-  end() {
-    this.ctx.restore();
-  }
-
-  getBounds(item) {
-    assert(!isWire(item));
-    const translatableModel = this.model.translatableModel;
-    let x = translatableModel.globalX(item),
-        y = translatableModel.globalY(item);
-    if (isElement(item)) {
-      const type = getType(item);
-      if (!type[_hasLayout])
-        this.layoutType(type);
-      // Palette items aren't part of any model, so have no translatableModel x or y.
-      if (x === undefined) x = item.x;
-      if (y === undefined) y = item.y;
-      return { x: x, y: y, w: type[_width], h: type[_height] };
-    }
-    if (isGroup(item)) {
-      if (!item[_hasLayout])
-        this.layoutGroup(item);
-      return { x: x, y: y, w: item[_width], h: item[_height] };
-    }
-  }
-
-  setBounds(item, width, height) {
-    assert(!isWire(item));
-    item[_width] = width;
-    item[_height] = height;
-  }
-
-  getUnionBounds(items) {
-    let xMin = Number.POSITIVE_INFINITY, yMin = Number.POSITIVE_INFINITY,
-        xMax = -Number.POSITIVE_INFINITY, yMax = -Number.POSITIVE_INFINITY;
-    for (let item of items) {
-      if (isWire(item))
-        continue;
-      const rect = this.getBounds(item);
-      xMin = Math.min(xMin, rect.x);
-      yMin = Math.min(yMin, rect.y);
-      xMax = Math.max(xMax, rect.x + rect.w);
-      yMax = Math.max(yMax, rect.y + rect.h);
-    }
-    return { x: xMin, y: yMin, w: xMax - xMin, h: yMax - yMin };
-  }
-
-  pinToPoint(element, index, isInput) {
-    assert(isElement(element));
-    const rect = this.getBounds(element),
-        w = rect.w, h = rect.h,
-        type = getType(element);
-    let x = rect.x, y = rect.y,
-        pin, nx;
-    if (isInput) {
-      pin = type.inputs[index];
-      nx = -1;
-    } else {
-      pin = type.outputs[index];
-      nx = 1;
-      x += w;
-    }
-    y += pin[_y] + pin[_height] / 2;
-    return { x: x, y: y, nx: nx, ny: 0 }
-  }
-
-  // Compute sizes for an element type.
-  layoutType(type) {
-    assert(!type[_hasLayout]);
-    const self = this,
-          model = this.model,
-          ctx = this.ctx, theme = this.theme,
-          textSize = theme.fontSize, spacing = theme.spacing,
-          name = type.name,
-          inputs = type.inputs, outputs = type.outputs;
-    let height = 0, width = 0;
-    if (name) {
-      width = 2 * spacing + ctx.measureText(name).width;
-      height += textSize + spacing / 2;
-    } else {
-      height += spacing / 2;
-    }
-
-    function layoutPins(pins) {
-      let y = height, w = 0;
-      for (let i = 0; i < pins.length; i++) {
-        let pin = pins[i];
-        self.layoutPin(pin);
-        pin[_y] = y + spacing / 2;
-        let name = pin.name, pw = pin[_width], ph = pin[_height] + spacing / 2;
-        if (name) {
-          pin[_baseline] = y + textSize;
-          if (textSize > ph) {
-            pin[_y] += (textSize - ph) / 2;
-            ph = textSize;
-          } else {
-            pin[_baseline] += (ph - textSize) / 2;
-          }
-          pw += 2 * spacing + ctx.measureText(name).width;
-        }
-        y += ph;
-        w = Math.max(w, pw);
-      }
-      return [y, w];
-    }
-    const [yIn, wIn] = layoutPins(inputs);
-    const [yOut, wOut] = layoutPins(outputs);
-
-    this.setBounds(
-      type,
-      Math.round(Math.max(width, wIn + 2 * spacing + wOut, theme.minTypeWidth)),
-      Math.round(Math.max(yIn, yOut, theme.minTypeHeight) + spacing / 2));
-
-    type[_hasLayout] = true;
-  }
-
-  layoutPin(pin) {
-    const theme = this.theme;
-    if (pin.type === 'v' || pin.type === '*') {
-      pin[_width] = pin[_height] = 2 * theme.knobbyRadius;
-    } else {
-      const type = getType(pin);
-      if (!type[_hasLayout])
-        this.layoutType(type);
-      pin[_width] = type[_width];
-      pin[_height] = type[_height];
-    }
-  }
-
-  layoutWire(wire) {
-    assert(!wire[_hasLayout]);
-    let src = this.getWireSrc(wire),
-        dst = this.getWireDst(wire),
-        p1 = wire[_p1],
-        p2 = wire[_p2];
-    // Since we intercept change events and not transactions, wires may be in
-    // an inconsistent state, so check before creating the path.
-    if (src && wire.srcPin !== undefined) {
-      p1 = this.pinToPoint(src, wire.srcPin, false);
-    }
-    if (dst && wire.dstPin !== undefined) {
-      p2 = this.pinToPoint(dst, wire.dstPin, true);
-    }
-    if (p1 && p2) {
-      wire[_bezier] = diagrams.getEdgeBezier(p1, p2);
-    }
-    wire[_hasLayout] = true;
-  }
-
-  // Make sure a group is big enough to enclose its contents.
-  layoutGroup(group) {
-    assert(!group[_hasLayout]);
-    const self = this, spacing = this.theme.spacing;
-    function layout(group) {
-      const extents = self.getUnionBounds(group.items),
-            translatableModel = self.model.translatableModel,
-            groupX = translatableModel.globalX(group),
-            groupY = translatableModel.globalY(group),
-            margin = 2 * spacing,
-            type = getType(group);
-      let width = extents.x + extents.w - groupX + margin,
-          height = extents.y + extents.h - groupY + margin;
-      if (!type[_hasLayout])
-        self.layoutType(type);
-      width += type[_width];
-      height = Math.max(height, type[_height] + margin);
-      self.setBounds(group, width, height);
-    }
-    // Visit in reverse order to correctly include sub-group bounds.
-    reverseVisitItem(group, function(group) {
-      layout(group);
-    }, isGroup);
-
-    group[_hasLayout] = true;
-  }
-
-  drawType(type, x, y, fillOutputs) {
-    if (!type[_hasLayout])
-      this.layoutType(type);
-
-    const self = this, ctx = this.ctx, theme = this.theme,
-          textSize = theme.fontSize, spacing = theme.spacing,
-          name = type.name,
-          w = type[_width], h = type[_height],
-          right = x + w;
-    ctx.lineWidth = 0.5;
-    ctx.fillStyle = theme.textColor;
-    ctx.textBaseline = 'bottom';
-    if (name) {
-      ctx.textAlign = 'center';
-      ctx.fillText(name, x + w / 2, y + textSize + spacing / 2);
-    }
-    type.inputs.forEach(function(pin, i) {
-      const name = pin.name;
-      self.drawPin(pin, x, y + pin[_y], false);
-      if (name) {
-        ctx.textAlign = 'left';
-        ctx.fillText(name, x + pin[_width] + spacing, y + pin[_baseline]);
-      }
-    });
-    type.outputs.forEach(function(pin) {
-      const name = pin.name,
-            pinLeft = right - pin[_width];
-      self.drawPin(pin, pinLeft, y + pin[_y], fillOutputs);
-      if (name) {
-        ctx.textAlign = 'right';
-        ctx.fillText(name, pinLeft - spacing, y + pin[_baseline]);
-      }
-    });
-  }
-
-  drawPin(pin, x, y, fill) {
-    const ctx = this.ctx,
-          theme = this.theme;
-    ctx.strokeStyle = theme.strokeColor;
-    if (pin.type === 'v' || pin.type === '*') {
-      const r = theme.knobbyRadius;
-      ctx.beginPath();
-      if (pin.type === 'v') {
-        const d = 2 * r;
-        ctx.rect(x, y, d, d);
-      } else {
-        ctx.arc(x + r, y + r, r, 0, Math.PI * 2, true);
-      }
-      ctx.stroke();
-    } else {
-      const type = getType(pin),
-            width = type[_width], height = type[_height];
-      ctx.beginPath();
-      ctx.rect(x, y, width, height);
-      // if (level == 1) {
-      //   ctx.fillStyle = theme.altBgColor;
-      //   ctx.fill();
-      // }
-      ctx.stroke();
-      this.drawType(type, x, y);
-    }
-  }
-
-  drawElement(element, mode) {
-    const ctx = this.ctx,
-          theme = this.theme, spacing = theme.spacing,
-          rect = this.getBounds(element),
-          x = rect.x, y = rect.y, w = rect.w, h = rect.h,
-          right = x + w, bottom = y + h;
-
-    switch (element.elementKind) {
-      case 'input':
-        diagrams.inFlagPath(x, y, w, h, spacing, ctx);
-        break;
-      case 'output':
-        diagrams.outFlagPath(x, y, w, h, spacing, ctx);
-        break;
-      default:
-        ctx.beginPath();
-        ctx.rect(x, y, w, h);
-        break;
-    }
-
-    switch (mode) {
-      case normalMode:
-        ctx.fillStyle = element.state === 'palette' ? theme.altBgColor : theme.bgColor;
-        ctx.fill();
-        ctx.strokeStyle = theme.strokeColor;
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
-        let type = getType(element);
-        this.drawType(type, x, y, 0);
-        break;
-      case highlightMode:
-        ctx.strokeStyle = theme.highlightColor;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        break;
-      case hotTrackMode:
-        ctx.strokeStyle = theme.hotTrackColor;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        break;
-    }
-  }
-
-  drawElementPin(element, input, output, mode) {
-    const theme = this.theme,
-          ctx = this.ctx,
-          rect = this.getBounds(element),
-          type = getType(element);
-    let x = rect.x, y = rect.y, w = rect.w, h = rect.h,
-        right = x + w,
-        pin;
-
-    if (input !== undefined) {
-      pin = type.inputs[input];
-    } else if (output !== undefined) {
-      pin = type.outputs[output];
-      x = right - pin[_width];
-    }
-    ctx.beginPath();
-    ctx.rect(x, y + pin[_y], pin[_width], pin[_height]);
-
-    switch (mode) {
-      case normalMode:
-        ctx.strokeStyle = theme.strokeColor;
-        ctx.lineWidth = 1;
-        break;
-      case highlightMode:
-        ctx.strokeStyle = theme.highlightColor;
-        ctx.lineWidth = 2;
-        break;
-      case hotTrackMode:
-        ctx.strokeStyle = theme.hotTrackColor;
-        ctx.lineWidth = 2;
-        break;
-    }
-    ctx.stroke();
-  }
-
-  // Gets the bounding rect for the group instancing element.
-  getGroupInstanceBounds(type, groupRight, groupBottom) {
-    const theme = this.theme, spacing = theme.spacing,
-          width = type[_width], height = type[_height],
-          x = groupRight - width - spacing, y = groupBottom - height - spacing;
-    return { x: x, y: y, w: width, h: height };
-  }
-
-  drawGroup(group, mode) {
-    if (!group[_hasLayout])
-      this.layoutGroup(group);
-    const ctx = this.ctx,
-          theme = this.theme,
-          rect = this.getBounds(group),
-          x = rect.x, y = rect.y, w = rect.w , h = rect.h,
-          right = x + w, bottom = y + h;
-    diagrams.roundRectPath(x, y, w, h, theme.spacing, ctx);
-    switch (mode) {
-      case normalMode:
-        ctx.fillStyle = theme.bgColor;
-        ctx.fill();
-        ctx.strokeStyle = theme.strokeColor;
-        ctx.lineWidth = 0.5;
-        ctx.setLineDash([6,3]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        const type = getType(group),
-              instanceRect = this.getGroupInstanceBounds(type, right, bottom);
-        ctx.beginPath();
-        ctx.rect(instanceRect.x, instanceRect.y, instanceRect.w, instanceRect.h);
-        ctx.fillStyle = theme.altBgColor;
-        ctx.fill();
-        ctx.strokeStyle = theme.strokeColor;
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
-        this.drawType(type, instanceRect.x, instanceRect.y, 0);
-        break;
-      case highlightMode:
-        ctx.strokeStyle = theme.highlightColor;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        break;
-      case hotTrackMode:
-        ctx.strokeStyle = theme.hotTrackColor;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        break;
-    }
-  }
-
-  hitTestElement(element, p, tol, mode) {
-    const rect = this.getBounds(element),
-          x = rect.x, y = rect.y, width = rect.w, height = rect.h,
-          hitInfo = diagrams.hitTestRect(x, y, width, height, p, tol);
-    if (hitInfo) {
-      const type = getType(element);
-      assert(type[_hasLayout]);
-      type.inputs.forEach(function(input, i) {
-        if (diagrams.hitTestRect(x, y + input[_y],
-                                 input[_width], input[_height], p, 0)) {
-          hitInfo.input = i;
-        }
-      });
-      type.outputs.forEach(function(output, i) {
-        if (diagrams.hitTestRect(x + width - output[_width], y + output[_y],
-                                 output[_width], output[_height], p, 0)) {
-          hitInfo.output = i;
-        }
-      });
-    }
-    return hitInfo;
-  }
-
-  hitTestGroup(group, p, tol, mode) {
-    const rect = this.getBounds(group),
-          x = rect.x, y = rect.y, w = rect.w , h = rect.h,
-          hitInfo = diagrams.hitTestRect(x, y, w, h, p, tol);
-    if (hitInfo) {
-      assert(group[_hasLayout]);
-      const type = getType(group),
-            instanceRect = this.getGroupInstanceBounds(type, x + w, y + h);
-      if (diagrams.hitTestRect(instanceRect.x, instanceRect.y,
-                               instanceRect.w, instanceRect.h, p, tol)) {
-        hitInfo.newGroupInstanceInfo = {
-          x: instanceRect.x,
-          y: instanceRect.y,
-        };
-      }
-    }
-    return hitInfo;
-  }
-
-  drawWire(wire, mode) {
-    if (!wire[_hasLayout])
-      this.layoutWire(wire);
-    const theme = this.theme,
-          ctx = this.ctx;
-    diagrams.bezierEdgePath(wire[_bezier], ctx, 0);
-    switch (mode) {
-      case normalMode:
-        ctx.strokeStyle = theme.strokeColor;
-        ctx.lineWidth = 1;
-        break;
-      case highlightMode:
-        ctx.strokeStyle = theme.highlightColor;
-        ctx.lineWidth = 2;
-        break;
-      case hotTrackMode:
-        ctx.strokeStyle = theme.hotTrackColor;
-        ctx.lineWidth = 2;
-        break;
-    }
-    ctx.stroke();
-  }
-
-  hitTestWire(wire, p, tol, mode) {
-    // TODO don't hit test new wire as it's dragged!
-    if (!wire[_hasLayout])
-      return;
-    return diagrams.hitTestBezier(wire[_bezier], p, tol);
-  }
-
-  draw(item, mode) {
-    switch (item.kind) {
-      case 'element':
-        this.drawElement(item, mode);
-        break;
-      case 'group':
-        this.drawGroup(item, mode);
-        break;
-      case 'wire':
-        this.drawWire(item, mode);
-        break;
-    }
-  }
-
-  hitTest(item, p, tol, mode) {
-    let hitInfo;
-    switch (item.kind) {
-      case 'element':
-        hitInfo = this.hitTestElement(item, p, tol, mode);
-        break;
-      case 'group':
-        hitInfo = this.hitTestGroup(item, p, tol, mode);
-        break;
-      case 'wire':
-        hitInfo = this.hitTestWire(item, p, tol, mode);
-        break;
-    }
-    if (hitInfo && !hitInfo.item)
-      hitInfo.item = item;
-    return hitInfo;
-  }
-
-  layout(item) {
-    switch (item.kind) {
-      case 'element':
-        break;
-      case 'group':
-        this.layoutGroup(item);
-        break;
-      case 'wire':
-        this.layoutWire(item);
-        break;
-    }
-  }
-
-  drawHoverInfo(item, p) {
-    const self = this, theme = this.theme, ctx = this.ctx,
-          x = p.x, y = p.y;
-    ctx.fillStyle = theme.hoverColor;
-    if (isGroupInstance(item)) {
-      const groupItems = getDefinition(item);
-      let r = this.getUnionBounds(groupItems);
-      ctx.translate(x - r.x, y - r.y);
-      let border = 4;
-      ctx.fillRect(r.x - border, r.y - border, r.w + 2 * border, r.h + 2 * border);
-      ctx.fillStyle = theme.hoverTextColor;
-      visitItems(groupItems, item => self.draw(item, normalMode), isElementOrGroup);
-      visitItems(groupItems, wire => self.draw(wire, normalMode), isWire);
-    } else {
-      // // Just list properties as text.
-      // let props = [];
-      // this.model.dataModel.visitProperties(item, function(item, attr) {
-      //   let value = item[attr];
-      //   if (Array.isArray(value))
-      //     return;
-      //   props.push({ name: attr, value: value });
-      // });
-      // let textSize = theme.fontSize, gap = 16, border = 4,
-      //     height = textSize * props.length + 2 * border,
-      //     maxWidth = diagrams.measureNameValuePairs(props, gap, ctx) + 2 * border;
-      // ctx.fillRect(x, y, maxWidth, height);
-      // ctx.fillStyle = theme.hoverTextColor;
-      // props.forEach(function(prop) {
-      //   ctx.textAlign = 'left';
-      //   ctx.fillText(prop.name, x + border, y + textSize);
-      //   ctx.textAlign = 'right';
-      //   ctx.fillText(prop.value, x + maxWidth - border, y + textSize);
-      //   y += textSize;
-      // });
-    }
-  }
-}
 
 //------------------------------------------------------------------------------
 
