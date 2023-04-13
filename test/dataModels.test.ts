@@ -234,7 +234,8 @@ describe('TransactionManager', () => {
     expect(transaction.ops.length).toBe(1);
     expect(transactionManager.getOldValue(item, 'x')).toBeUndefined();
 
-    item.reference = new TestDataContextObject(context);
+    const newReference = new TestDataContextObject(context);
+    item.reference = newReference;
     expect(transaction.ops.length).toBe(2);
     expect(transactionManager.getOldValue(item, 'reference')).toBeUndefined();
     item.x = 3;
@@ -245,6 +246,10 @@ describe('TransactionManager', () => {
     transactionManager.undo(transaction);
     expect(item.x).toBeUndefined();
     expect(item.reference).toBeUndefined();
+
+    transactionManager.redo(transaction);
+    expect(item.x).toBe(3);
+    expect(item.reference).toBe(newReference);
   });
 });
 

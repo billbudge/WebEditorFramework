@@ -1,26 +1,26 @@
 import {describe, expect, test} from '@jest/globals';
-import * as Statecharts from '../examples/statecharts.js';
+import * as SC from '../examples/statecharts.js';
 
-function addState(statechart: Statecharts.Statechart) {
+function addState(statechart: SC.Statechart) {
   const state = statechart.context.newState();
   statechart.states.append(state);
   return state;
 }
 
-function addPseudostate(statechart: Statecharts.Statechart, subtype: Statecharts.PseudostateSubtype) {
+function addPseudostate(statechart: SC.Statechart, subtype: SC.PseudostateSubtype) {
   const state = statechart.context.newPseudostate(subtype);
   statechart.states.append(state);
   return state;
 }
 
 function addTransition(
-    statechart: Statecharts.Statechart, state1: Statecharts.StateTypes, state2: Statecharts.StateTypes) {
+    statechart: SC.Statechart, state1: SC.StateTypes, state2: SC.StateTypes) {
   const transition = statechart.context.newTransition(state1, state2);
   statechart.transitions.append(transition);
   return transition;
 }
 
-function addStatechart(state: Statecharts.State) : Statecharts.Statechart {
+function addStatechart(state: SC.State) : SC.Statechart {
   const statechart = state.context.newStatechart();
   state.statecharts.append(statechart);
   return statechart;
@@ -37,10 +37,10 @@ function setEquals(set1: Set<any>, set2: Array<any>) {
 
 describe('StatechartContext', () => {
   test('state interface', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           state = context.newState();
 
-    expect(state instanceof Statecharts.State).toBe(true);
+    expect(state instanceof SC.State).toBe(true);
     expect(state.name).toBeUndefined();
     state.name = 'Test State';
     expect(state.name).toBe('Test State');
@@ -52,10 +52,10 @@ describe('StatechartContext', () => {
     expect(state.x).toBe(10);
   });
   test('pseudostate interface', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           pseudostate = context.newPseudostate('start');
 
-    expect(pseudostate instanceof Statecharts.Pseudostate).toBe(true);
+    expect(pseudostate instanceof SC.Pseudostate).toBe(true);
     expect(pseudostate.id).toBe(1);
     expect(pseudostate.subtype).toBe('start');
     expect(pseudostate.x).toBe(0);
@@ -63,12 +63,12 @@ describe('StatechartContext', () => {
     expect(pseudostate.x).toBe(10);
   });
   test('transition interface', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           state1 = context.newState(),
           state2 = context.newState(),
           transition = context.newTransition(state1, state2);
 
-    expect(transition instanceof Statecharts.Transition).toBe(true);
+    expect(transition instanceof SC.Transition).toBe(true);
     transition.event = 'test event';
     expect(transition.event).toBe('test event');
     transition.event = undefined;
@@ -82,10 +82,10 @@ describe('StatechartContext', () => {
     expect(transition.dst).toBeUndefined();
   });
   test('statechart interface', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           statechart = context.newStatechart();
 
-    expect(statechart instanceof Statecharts.Statechart).toBe(true);
+    expect(statechart instanceof SC.Statechart).toBe(true);
     expect(statechart.name).toBe('');
     statechart.name = 'Test Statechart';
     expect(statechart.name).toBe('Test Statechart');
@@ -94,7 +94,7 @@ describe('StatechartContext', () => {
     expect(statechart.x).toBe(10);
   });
   test('parent derived property', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           statechart = context.newStatechart(),
           state1 = context.newState(),
           childStatechart1 = context.newStatechart(),
@@ -116,7 +116,7 @@ describe('StatechartContext', () => {
     expect(childState1.parent).toBe(childStatechart1);
   });
   test('getGraphInfo', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           statechart = context.newStatechart(),
           state1 = addState(statechart),
           state2 = addState(statechart),
@@ -145,7 +145,7 @@ describe('StatechartContext', () => {
     setEquals(graph2.outTransitions, []);
   });
   test('getSubgraphInfo', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           statechart = context.newStatechart(),
           state1 = addState(statechart),
           state2 = addState(statechart),
@@ -177,7 +177,7 @@ describe('StatechartContext', () => {
     setEquals(subgraph2.outTransitions, [transition3]);
   });
   test('ids', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           statechart = context.newStatechart(),
           state1 = addState(statechart),
           state2 = addState(statechart);
@@ -187,17 +187,17 @@ describe('StatechartContext', () => {
   });
   test('iterators', () => {
     function testIterator(
-        fn: (state: Statecharts.StateTypes, visitor: Statecharts.TransitionVisitor) => void,
-        state: Statecharts.StateTypes,
-        items: Array<Statecharts.Transition>) {
-      const iterated = new Array<Statecharts.Transition>();
+        fn: (state: SC.StateTypes, visitor: SC.TransitionVisitor) => void,
+        state: SC.StateTypes,
+        items: Array<SC.Transition>) {
+      const iterated = new Array<SC.Transition>();
       fn(state, t => iterated.push(t));
       expect(items.length).toBe(iterated.length);
       for (const item of items) {
         expect(iterated).toContain(item);
       }
     }
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           statechart = context.newStatechart(),
           state1 = addState(statechart),
           state2 = addState(statechart),
@@ -220,7 +220,7 @@ describe('StatechartContext', () => {
     testIterator(outputFn, state2, [transition4]);
   });
   test('canAddState', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           statechart = context.newStatechart(),
           state1 = context.newState(),
           state2 = context.newState(),
@@ -250,7 +250,7 @@ describe('StatechartContext', () => {
     expect(context.canAddState(context.newPseudostate('stop'), statechart)).toBe(true);
   });
   test('canAddTransition', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           statechart = context.newStatechart(),
           state1 = addState(statechart),
           state2 = addState(statechart),
@@ -286,7 +286,7 @@ describe('StatechartContext', () => {
     expect(context.isValidTransition(subState1, subState2)).toBe(false);
   });
   test('addAndDelete', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           statechart = context.newStatechart(),
           state1 = context.newState();
 
@@ -299,7 +299,7 @@ describe('StatechartContext', () => {
     expect(statechart.states.length).toBe(0);
   });
   test('findChildStatechart, findOrCreateStatechart', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           statechart = context.newStatechart(),
           superState = addState(statechart),
           state = context.newState(),
@@ -325,7 +325,7 @@ describe('StatechartContext', () => {
     expect(statechart2).not.toBe(statechart1);
   });
   test('selectionContents', () => {
-    const context = new Statecharts.StatechartContext(),
+    const context = new SC.StatechartContext(),
           statechart = context.newStatechart(),
           superState = addState(statechart),
           statechart1 = addStatechart(superState),

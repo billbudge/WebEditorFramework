@@ -11,8 +11,9 @@
     "moduleResolution": "node",
   },
   "modules": ["src/collections.ts", "src/diagrams.ts", "src/geometry.ts", "src/dataModels.ts",
-              "examples/statecharts.ts"],
+              "examples/statecharts.ts", "examples/functioncharts.ts"],
   "files": ["test/collections.test.ts", "test/dataModels.test.ts", "test/statecharts.test.ts",
+            "test/functioncharts.ts",
             "examples/statechart_example.ts", "third_party/canvas2svg/canvas2svg.js",
             "third_party/FileSaver.min.js"],
 }

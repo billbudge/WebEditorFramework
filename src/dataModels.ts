@@ -190,12 +190,14 @@ export class ReferenceProp {
     }
     return ref;
   }
-  set(owner: DataContextObject, value: ReferencedObject | undefined) : void {
-    const oldRef = this.getRef(owner);
+  set(owner: DataContextObject, value: ReferencedObject | undefined) :
+      ReferencedObject | undefined {
+    const oldRef = this.get(owner);
     this.setRef(owner, value);
     const newId = (value !== undefined) ? value.id : 0;
     this.setId(owner, newId);
     owner.context.valueChanged(owner, this, oldRef);
+    return oldRef;
   }
   getId(owner: DataContextObject) : number {
     return (owner as any)[this.internalName];

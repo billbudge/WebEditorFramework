@@ -873,8 +873,8 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.transitions.delete(transition);
     const src = transition.src,
           dst = transition.dst;
-    function remove(array: Array<Transition>, item: Transition) {
-      const index = array.indexOf(item);
+    function remove(array: Array<Transition>, transition: Transition) {
+      const index = array.indexOf(transition);
       if (index >= 0) {
         array.splice(index, 1);
       }
@@ -960,25 +960,25 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     return change;
   }
   private onValueChanged(
-      item: AllTypes, prop: ScalarPropertyTypes, oldValue: any) :
+      owner: AllTypes, prop: ScalarPropertyTypes, oldValue: any) :
       Change {
-    const change: Change = {type: 'valueChanged', item, prop, index: 0, oldValue };
+    const change: Change = {type: 'valueChanged', item: owner, prop, index: 0, oldValue };
     super.onEvent('valueChanged', change);
     return this.onChanged(change);
   }
   private onElementInserted(
-      item: State | Statechart, prop: ArrayPropertyTypes, index: number) :
+      owner: State | Statechart, prop: ArrayPropertyTypes, index: number) :
       Change {
     const change: Change =
-        { type: 'elementInserted', item: item, prop: prop, index: index, oldValue: undefined };
+        { type: 'elementInserted', item: owner, prop: prop, index: index, oldValue: undefined };
     super.onEvent('elementInserted', change);
     return this.onChanged(change);
   }
   private onElementRemoved(
-      item: State | Statechart, prop: ArrayPropertyTypes, index: number, oldValue: AllTypes ) :
+      owner: State | Statechart, prop: ArrayPropertyTypes, index: number, oldValue: AllTypes ) :
       Change {
     const change: Change =
-        { type: 'elementRemoved', item: item, prop: prop, index: index, oldValue: oldValue };
+        { type: 'elementRemoved', item: owner, prop: prop, index: index, oldValue: oldValue };
     super.onEvent('elementRemoved', change);
     return this.onChanged(change);
   }
