@@ -1859,11 +1859,11 @@ export class StatechartEditor {
                 selection.clear();
             }
             else if (cmdKeyDown) {
-                this.moveCopy = true;
-                selection.add(item);
+                selection.toggle(item);
             }
             else if (shiftKeyDown) {
                 selection.add(item);
+                this.moveCopy = true;
             }
             else if (!selection.has(item)) {
                 selection.set(item);
