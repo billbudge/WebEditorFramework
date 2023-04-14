@@ -439,7 +439,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     // First collect states and statecharts.
     items.forEach(item => {
       this.visitAll(item, item => {
-        if (item instanceof State)
+        if (item instanceof State || item instanceof Pseudostate)
           states.add(item);
         else if (item instanceof Statechart)
           statecharts.add(item);
@@ -2318,6 +2318,8 @@ export class StatechartEditor implements CanvasLayer {
         selection.add(item);
       } else if (!selection.has(item)) {
         selection.set(item);
+      } else {
+        selection.add(item);
       }
     } else {
       if (!shiftKeyDown) {
