@@ -1,21 +1,21 @@
-import { SelectionSet } from '../src/collections.js'
+import { SelectionSet } from '../../src/collections.js'
 
 import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, RectHitResult,
          diskPath, hitTestDisk, DiskHitResult, roundRectPath, bezierEdgePath,
          hitTestBezier, measureNameValuePairs, CanvasController, CanvasLayer,
-         PropertyGridController, PropertyInfo, FileController } from '../src/diagrams.js'
+         PropertyGridController, PropertyInfo, FileController } from '../../src/diagrams.js'
 
 import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
-         evaluateBezier, CurveHitResult } from '../src/geometry.js'
+         evaluateBezier, CurveHitResult } from '../../src/geometry.js'
 
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          ReferencedObject, DataContext, DataContextObject, EventBase, Change, ChangeEvents,
          copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet,
          reduceToRoots, List, TransactionManager, HistoryManager, ScalarPropertyTypes,
-         ArrayPropertyTypes } from '../src/dataModels.js'
+         ArrayPropertyTypes } from '../../src/dataModels.js'
 
-import * as Canvas2SVG from '../third_party/canvas2svg/canvas2svg.js'
+import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
 //------------------------------------------------------------------------------
 
@@ -28,28 +28,56 @@ import * as Canvas2SVG from '../third_party/canvas2svg/canvas2svg.js'
 export interface Pin {
   name?: string;
   typeString: string;
-  type?: Type;
+  type?: AtomizedType;
+  layout?: PinLayout;
 }
-export interface Type {
+export interface AtomizedType {
   name?: string;
   typeString: string;
   inputs: Pin[];
   outputs: Pin[];
+  layout?: TypeLayout;
+}
+class PinLayout {
+  y: number;
+  width: number;
+  height: number;
+  constructor(y: number, width: number, height: number) {
+    this.y = y;
+    this.width = width;
+    this.height = height;
+  }
+}
+class TypeLayout {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  constructor(x: number, y: number, width: number, height: number) {
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+  }
 }
 
 export class TypeParser {
-  private readonly map_ = new Map<string, Type>();
+  private readonly map_ = new Map<string, AtomizedType>();
 
-  get(s: string) : Type | undefined {
+  get(s: string) : AtomizedType | undefined {
     return this.map_.get(s);
   }
   has(s: string) {
     return this.map_.has(s);
   }
-  add(s: string) : Type | undefined {
+  add(s: string) : AtomizedType {
+    const atomized = this.map_.get(s);
+    if (atomized)
+      return atomized;
+
     const self = this;
 
-    function addType(s: string, type: Type) {
+    function addType(s: string, type: AtomizedType) {
       let result = self.map_.get(s);
       if (!result) {
         self.map_.set(s, type);
@@ -94,7 +122,7 @@ export class TypeParser {
         type: type,
       };
     }
-    function parseFunction() : Type | undefined {
+    function parseFunction() : AtomizedType {
       let i = j;
       if (s[j] === '[') {
         j++;
@@ -116,7 +144,9 @@ export class TypeParser {
         addType(typeString, type);
         return type;
       }
+      throw new Error('Invalid type string: ' + s);
     }
+
     const type = parseFunction();
     if (type) {
       // Add the type with label.
@@ -175,21 +205,8 @@ export class TypeParser {
   }
 }
 
-const globalTypeParser_ = new TypeParser();
-
-// Gets the type object with information about a pin or element.
-function getType(item: Element) : Type | undefined {
-  let type = item.typeInfo;
-  if (!type)
-  type = updateType(item);
-  return type;
-}
-
-function updateType(item: Element) : Type | undefined {
-  const type = globalTypeParser_.add(item.type);
-  item.typeInfo = type;
-  return type;
-}
+const globalTypeParser_ = new TypeParser(),
+      nullFunction = globalTypeParser_.add('[,]');
 
 //------------------------------------------------------------------------------
 
@@ -248,12 +265,21 @@ export class Element implements DataContextObject, ReferencedObject {
   get name() { return this.template.name.get(this); }
   set name(value: string | undefined) { this.template.name.set(this, value); }
   get type() { return this.template.type.get(this); }
-  set type(value: string) { this.template.type.set(this, value); }
+  set type(value: string) {
+    if (this.typeInfo !== nullFunction)
+      throw new Error('Cannot change type of element');  // TODO ?
+    this.template.type.set(this, value);
+    this.typeInfo = globalTypeParser_.add(value);
+    this.inWires = new Array<Wire | undefined>(this.typeInfo.inputs.length);
+    this.outWires = new Array<Wire[]>(this.typeInfo.outputs.length);
+    for (let i = 0; i < this.outWires.length; i++)
+      this.outWires[i] = [];
+  }
 
   // Derived properties.
   parent: Functionchart | undefined;
   globalPosition: Point;
-  typeInfo: Type | undefined;
+  typeInfo: AtomizedType = nullFunction;
   inWires: (Wire | undefined)[];  // one input per pin.
   outWires: Wire[][];             // array of outputs per pin, outputs have fan out.
 
@@ -945,7 +971,7 @@ class FunctionchartTheme extends Theme {
   textLeading: number = 6;
   knobbyRadius: number = 4;
   padding: number = 8;
-
+  spacing: number = 8;
 
   constructor(theme: Theme, radius: number = 8) {
     super();
@@ -1024,49 +1050,48 @@ class Renderer {
   // getBounds(item: NonWireTypes) : Rect {
   //   const global = item.globalPosition;
   //   let x = global.x,
-  //       y = global.y);
+  //       y = global.y;
   //   if (item instanceof Element) {
-  //     const type = getType(item);
-  //     if (!type[_hasLayout])
+  //     const type = item.typeInfo;
+  //     if (!type.layout)
   //       this.layoutType(type);
   //     // Palette items aren't part of any model, so have no translatableModel x or y.
   //     if (x === undefined) x = item.x;
   //     if (y === undefined) y = item.y;
-  //     return { x: x, y: y, w: type[_width], h: type[_height] };
+  //     return { x: x, y: y, width: type.width!, height: type.height! };
   //   }
   //   if (isGroup(item)) {
   //     if (!item[_hasLayout])
   //       this.layoutGroup(item);
-  //     return { x: x, y: y, w: item[_width], h: item[_height] };
+  //     return { x: x, y: y, width: item[_width], height: item[_height] };
   //   }
   // }
 
-  // setBounds(item, width, height) {
-  //   assert(!isWire(item));
-  //   item[_width] = width;
-  //   item[_height] = height;
-  // }
+  // // setBounds(item, width, height) {
+  // //   assert(!isWire(item));
+  // //   item[_width] = width;
+  // //   item[_height] = height;
+  // // }
 
-  // getUnionBounds(items) {
-  //   let xMin = Number.POSITIVE_INFINITY, yMin = Number.POSITIVE_INFINITY,
-  //       xMax = -Number.POSITIVE_INFINITY, yMax = -Number.POSITIVE_INFINITY;
-  //   for (let item of items) {
-  //     if (isWire(item))
-  //       continue;
-  //     const rect = this.getBounds(item);
-  //     xMin = Math.min(xMin, rect.x);
-  //     yMin = Math.min(yMin, rect.y);
-  //     xMax = Math.max(xMax, rect.x + rect.w);
-  //     yMax = Math.max(yMax, rect.y + rect.h);
-  //   }
-  //   return { x: xMin, y: yMin, w: xMax - xMin, h: yMax - yMin };
-  // }
+  // // getUnionBounds(items) {
+  // //   let xMin = Number.POSITIVE_INFINITY, yMin = Number.POSITIVE_INFINITY,
+  // //       xMax = -Number.POSITIVE_INFINITY, yMax = -Number.POSITIVE_INFINITY;
+  // //   for (let item of items) {
+  // //     if (isWire(item))
+  // //       continue;
+  // //     const rect = this.getBounds(item);
+  // //     xMin = Math.min(xMin, rect.x);
+  // //     yMin = Math.min(yMin, rect.y);
+  // //     xMax = Math.max(xMax, rect.x + rect.w);
+  // //     yMax = Math.max(yMax, rect.y + rect.h);
+  // //   }
+  // //   return { x: xMin, y: yMin, w: xMax - xMin, h: yMax - yMin };
+  // // }
 
-  // pinToPoint(element, index, isInput) {
-  //   assert(isElement(element));
-  //   const rect = this.getBounds(element),
-  //       w = rect.w, h = rect.h,
-  //       type = getType(element);
+  // pinToPoint(element: Element, index: number, isInput: boolean) : PointAndNormal {
+  //   const rect: Rect = this.getBounds(element),
+  //         w = rect.width, h = rect.height,
+  //         type = element.typeInfo!;
   //   let x = rect.x, y = rect.y,
   //       pin, nx;
   //   if (isInput) {
@@ -1077,15 +1102,16 @@ class Renderer {
   //     nx = 1;
   //     x += w;
   //   }
-  //   y += pin[_y] + pin[_height] / 2;
+  //   let layout = type.layout;
+  //   if (!layout)
+  //     this.layoutPin(type);
+  //   y += pin.y! + pin.height! / 2;
   //   return { x: x, y: y, nx: nx, ny: 0 }
   // }
 
   // // Compute sizes for an element type.
-  // layoutType(type) {
-  //   assert(!type[_hasLayout]);
+  // layoutType(type: AtomizedType) {
   //   const self = this,
-  //         model = this.model,
   //         ctx = this.ctx, theme = this.theme,
   //         textSize = theme.fontSize, spacing = theme.spacing,
   //         name = type.name,
@@ -1098,13 +1124,13 @@ class Renderer {
   //     height += spacing / 2;
   //   }
 
-  //   function layoutPins(pins) {
+  //   function layoutPins(pins: Pin[]) {
   //     let y = height, w = 0;
   //     for (let i = 0; i < pins.length; i++) {
   //       let pin = pins[i];
   //       self.layoutPin(pin);
-  //       pin[_y] = y + spacing / 2;
-  //       let name = pin.name, pw = pin[_width], ph = pin[_height] + spacing / 2;
+  //       pin.y = y + spacing / 2;
+  //       let name = pin.name, pw = pin.width, ph = pin.height! + spacing / 2;
   //       if (name) {
   //         pin[_baseline] = y + textSize;
   //         if (textSize > ph) {
@@ -1131,12 +1157,12 @@ class Renderer {
   //   type[_hasLayout] = true;
   // }
 
-  // layoutPin(pin) {
+  // layoutPin(pin: Pin) {
   //   const theme = this.theme;
-  //   if (pin.type === 'v' || pin.type === '*') {
-  //     pin[_width] = pin[_height] = 2 * theme.knobbyRadius;
+  //   if (pin.typeString === 'v' || pin.typeString === '*') {
+  //     pin.width = pin.height = 2 * theme.knobbyRadius;
   //   } else {
-  //     const type = getType(pin);
+  //     const type = pin.type!;
   //     if (!type[_hasLayout])
   //       this.layoutType(type);
   //     pin[_width] = type[_width];
