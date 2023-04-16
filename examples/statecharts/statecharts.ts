@@ -97,7 +97,6 @@ const defaultPoint = { x: 0, y: 0 },
       defaultBezierCurve: BezierCurve = [
           defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal];
 
-
 export class State implements DataContextObject, ReferencedObject {
   readonly template = stateTemplate;
   readonly context: StatechartContext;
@@ -390,7 +389,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
 
   // Gets the translation to move an item from its current parent to
-  // newParent. Handles the cases where current parent or newParent are undefined.
+  // newParent.
   getToParent(item: NonTransitionTypes, newParent: ParentTypes) {
     const oldParent: ParentTypes = item.parent;
     let dx = 0, dy = 0;
@@ -822,8 +821,6 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
 
   private insertState_(state: StateTypes, parent: Statechart) {
     this.states.add(state);
-    state.parent = parent;
-    this.updateItem(state);
 
     if (state.inTransitions === undefined)
       state.inTransitions = new Array<Transition>();
@@ -842,8 +839,6 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
 
   private insertStatechart_(statechart: Statechart, parent: State | undefined) {
     this.statecharts.add(statechart);
-    statechart.parent = parent;
-    this.updateItem(statechart);
 
     const self = this;
     statechart.states.forEach(state => self.insertState_(state, statechart));
@@ -858,8 +853,6 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
 
   private insertTransition_(transition: Transition, parent: Statechart) {
     this.transitions.add(transition);
-    transition.parent = parent;
-    this.updateItem(transition);
 
     const src = transition.src,
           dst = transition.dst;
@@ -896,6 +889,9 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
 
   private insertItem_(item: AllTypes, parent: ParentTypes) {
+    item.parent = parent;
+    this.updateItem(item);
+
     if (item instanceof Transition) {
       if (parent && parent instanceof Statechart)
         this.insertTransition_(item, parent);
@@ -2581,22 +2577,26 @@ export class StatechartEditor implements CanvasLayer {
           statechart.states.forEach(function (v) {
             context.selection.add(v);
           });
+          self.canvasController.draw();
           return true;
         }
         case 90: { // 'z'
           if (context.getUndo()) {
             context.undo();
+            self.canvasController.draw();
           }
           return true;
         }
         case 89: { // 'y'
           if (context.getRedo()) {
             context.redo();
+            self.canvasController.draw();
           }
           return true;
         }
         case 88: { // 'x'
           this.scrap = context.cut()
+          self.canvasController.draw();
           return true;
         }
         case 67: { // 'c'
@@ -2613,6 +2613,7 @@ export class StatechartEditor implements CanvasLayer {
         }
         case 69: { // 'e'
           context.selectConnectedStates(true);
+          self.canvasController.draw();
           return true;
         }
         case 72: // 'h'

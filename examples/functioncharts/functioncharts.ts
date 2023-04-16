@@ -252,6 +252,11 @@ const functionchartTemplate = (function() {
   return { typeName, x, y, width, height, name, elements, wires, functioncharts, properties };
 })();
 
+const defaultPoint = { x: 0, y: 0 },
+      defaultPointWithNormal: PointWithNormal = { x: 0, y: 0, nx: 0 , ny: 0 },
+      defaultBezierCurve: BezierCurve = [
+          defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal];
+
 export class Element implements DataContextObject, ReferencedObject {
   readonly template = elementTemplate;
   readonly context: FunctionchartContext;
@@ -278,7 +283,7 @@ export class Element implements DataContextObject, ReferencedObject {
 
   // Derived properties.
   parent: Functionchart | undefined;
-  globalPosition: Point;
+  globalPosition = defaultPoint;
   typeInfo: AtomizedType = nullFunction;
   inWires: (Wire | undefined)[];  // one input per pin.
   outWires: Wire[][];             // array of outputs per pin, outputs have fan out.
@@ -334,7 +339,7 @@ export class Functionchart implements DataContextObject {
 
   // Derived properties.
   parent: Functionchart | undefined;
-  globalPosition: Point;
+  globalPosition = defaultPoint;
 
   constructor(context: FunctionchartContext) {
     this.context = context;
@@ -441,21 +446,19 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     items.forEachReverse(item => self.reverseVisitAll(item, visitor));
   }
 
-  visitNonTransitions(item: NonWireTypes, visitor: NonWireVisitor) : void {
+  visitNonWires(item: AllTypes, visitor: NonWireVisitor) : void {
     const self = this;
     if (item instanceof Element) {
       visitor(item);
     } else if (item instanceof Functionchart) {
       visitor(item);
-      item.elements.forEach(item => self.visitNonTransitions(item, visitor));
+      item.elements.forEach(item => self.visitNonWires(item, visitor));
     }
   }
 
   updateItem(item: AllTypes) {
-    if (item instanceof Element || item instanceof Functionchart) {
-      const self = this;
-      this.visitNonTransitions(item, item => self.setGlobalPosition(item));
-    }
+    const self = this;
+    this.visitNonWires(item, item => self.setGlobalPosition(item));
   }
 
   getGrandParent(item: AllTypes) : AllTypes | undefined {
@@ -485,7 +488,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   // Gets the translation to move an item from its current parent to
-  // newParent. Handles the cases where current parent or newParent are undefined.
+  // newParent.
   getToParent(item: NonWireTypes, newParent: Functionchart | undefined) {
     const oldParent = item.parent;
     let dx = 0, dy = 0;
@@ -772,17 +775,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
-  private insertElement_(element: Element, parent: Functionchart) {
-    this.elements.add(element);
-    element.parent = parent;
-    // this.updateItem(state);
-
-    if (element.inWires === undefined)
-      element.inWires = new Array<Wire>();
-    if (element.outWires === undefined)
-      element.outWires = new Array<Wire[]>();
-  }
-
   makeConsistent () {
     const self = this,
           statechart = this.functionchart,
@@ -813,6 +805,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
+  private insertElement_(element: Element, parent: Functionchart) {
+    this.elements.add(element);
+    element.parent = parent;
+    this.updateItem(element);
+
+    if (element.inWires === undefined)
+      element.inWires = new Array<Wire>();
+    if (element.outWires === undefined)
+      element.outWires = new Array<Wire[]>();
+  }
+
   private removeElement_(element: Element) {
     this.elements.delete(element);
   }
@@ -820,7 +823,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   private insertFunctionchart_(functionchart: Functionchart, parent: Functionchart | undefined) {
     this.functioncharts.add(functionchart);
     functionchart.parent = parent;
-    // this.updateItem(statechart);
+    this.updateItem(functionchart);
 
     const self = this;
     functionchart.elements.forEach(element => self.insertElement_(element, functionchart));
@@ -836,7 +839,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   private insertWire_(wire: Wire, parent: Functionchart) {
     this.wires.add(wire);
     wire.parent = parent;
-    // this.updateItem(transition);
+    this.updateItem(wire);
 
     const src = wire.src,
           dst = wire.dst;

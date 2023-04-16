@@ -248,7 +248,7 @@ export class StatechartContext extends EventBase {
         outputs.forEach((output, i) => visitor(output));
     }
     // Gets the translation to move an item from its current parent to
-    // newParent. Handles the cases where current parent or newParent are undefined.
+    // newParent.
     getToParent(item, newParent) {
         const oldParent = item.parent;
         let dx = 0, dy = 0;
@@ -633,8 +633,6 @@ export class StatechartContext extends EventBase {
     }
     insertState_(state, parent) {
         this.states.add(state);
-        state.parent = parent;
-        this.updateItem(state);
         if (state.inTransitions === undefined)
             state.inTransitions = new Array();
         if (state.outTransitions === undefined)
@@ -649,8 +647,6 @@ export class StatechartContext extends EventBase {
     }
     insertStatechart_(statechart, parent) {
         this.statecharts.add(statechart);
-        statechart.parent = parent;
-        this.updateItem(statechart);
         const self = this;
         statechart.states.forEach(state => self.insertState_(state, statechart));
         statechart.transitions.forEach(transition => self.insertTransition_(transition, statechart));
@@ -662,8 +658,6 @@ export class StatechartContext extends EventBase {
     }
     insertTransition_(transition, parent) {
         this.transitions.add(transition);
-        transition.parent = parent;
-        this.updateItem(transition);
         const src = transition.src, dst = transition.dst;
         if (src) {
             const outputs = src.outTransitions;
@@ -695,6 +689,8 @@ export class StatechartContext extends EventBase {
         }
     }
     insertItem_(item, parent) {
+        item.parent = parent;
+        this.updateItem(item);
         if (item instanceof Transition) {
             if (parent && parent instanceof Statechart)
                 this.insertTransition_(item, parent);
@@ -1659,10 +1655,10 @@ export class StatechartEditor {
     }
     updateLayout_() {
         const renderer = this.renderer, context = this.context, changedItems = this.changedItems;
-        // First layout containers, and then layout transitions which depend on states'
-        // size and location.
         // This function is called during the draw, hitTest, and updateBounds_ methods,
         // so the renderer is started.
+        // First layout containers, and then layout transitions which depend on states'
+        // size and location.
         function layout(item, visitor) {
             context.reverseVisitAll(item, visitor);
         }
