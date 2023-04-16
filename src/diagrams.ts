@@ -169,7 +169,7 @@ export function diskPath(x: number, y: number, r: number, ctx: CanvasRenderingCo
 }
 
 export function getEdgeBezier(
-    p1: geometry.PointAndNormal, p2: geometry.PointAndNormal, scaleFactor: number) :
+    p1: geometry.PointWithNormal, p2: geometry.PointWithNormal, scaleFactor: number) :
     geometry.BezierCurve {
   let dx = p1.x - p2.x, dy = p1.y - p2.y,
       nx1 = p1.nx || 0, ny1 = p1.ny || 0, nx2 = p2.nx || 0, ny2 = p2.ny || 0,
@@ -182,7 +182,7 @@ export function getEdgeBezier(
 }
 
 export function arrowPath(
-    p: geometry.PointAndNormal, ctx: CanvasRenderingContext2D, arrowSize: number) {
+    p: geometry.PointWithNormal, ctx: CanvasRenderingContext2D, arrowSize: number) {
   let cos45 = 0.866, sin45 = 0.500,
       nx = p.nx, ny = p.ny;
   ctx.moveTo(p.x + arrowSize * (nx * cos45 - ny * sin45),
@@ -193,7 +193,7 @@ export function arrowPath(
 }
 
 export function lineEdgePath(
-    p1: Point, p2: geometry.PointAndNormal, ctx: CanvasRenderingContext2D, arrowSize: number) {
+    p1: Point, p2: geometry.PointWithNormal, ctx: CanvasRenderingContext2D, arrowSize: number) {
   ctx.beginPath();
   ctx.moveTo(p1.x, p1.y);
   ctx.lineTo(p2.x, p2.y);

@@ -19,7 +19,7 @@ export interface ParameterizedIntersection {
   s: number;
   t: number;
 }
-export type PointAndNormal  = Point & Normal;
+export type PointWithNormal  = Point & Normal;
 
 export function matMulPt(v: Point, m: number[]) : Point {
   const x = v.x, y = v.y;
@@ -75,7 +75,7 @@ export function projectPointToSegment(p1: Point, p2: Point, p: Point) : Paramete
   return projection;
 }
 
-export function projectPointToCircle(p: Point, center: Point, radius: number) : PointAndNormal {
+export function projectPointToCircle(p: Point, center: Point, radius: number) : PointWithNormal {
   const dx = p.x - center.x,
         dy = p.y - center.y;
   if  (dx === 0 && dy === 0) {
@@ -124,7 +124,7 @@ export function lineIntersection(p0: Point, p1: Point, p2: Point, p3: Point) : P
 }
 
 export type BezierCurve = [
-  PointAndNormal, Point, Point, PointAndNormal
+  PointWithNormal, Point, Point, PointWithNormal
 ];
 
 // Evaluate bezier segment by deCastlejau algorithm.

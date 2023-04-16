@@ -6,7 +6,7 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          hitTestBezier, measureNameValuePairs, CanvasController, CanvasLayer,
          PropertyGridController, PropertyInfo, FileController } from '../../src/diagrams.js'
 
-import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
+import { PointWithNormal, getExtents, projectPointToCircle, BezierCurve,
          evaluateBezier, CurveHitResult } from '../../src/geometry.js'
 
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
@@ -304,8 +304,8 @@ export class Wire implements DataContextObject {
 
   // Derived properties.
   parent: Functionchart | undefined;
-  pSrc: PointAndNormal | undefined;
-  pDst: PointAndNormal | undefined;
+  pSrc: PointWithNormal | undefined;
+  pDst: PointWithNormal | undefined;
   bezier: BezierCurve;
 
   constructor(context: FunctionchartContext) {

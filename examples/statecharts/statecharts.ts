@@ -7,7 +7,7 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          hitTestBezier, measureNameValuePairs, CanvasController, CanvasLayer,
          PropertyGridController, PropertyInfo, FileController } from '../../src/diagrams.js'
 
-import { PointAndNormal, getExtents, projectPointToCircle, BezierCurve,
+import { PointWithNormal, getExtents, projectPointToCircle, BezierCurve,
          evaluateBezier, CurveHitResult } from '../../src/geometry.js'
 
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
@@ -17,6 +17,8 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          ArrayPropertyTypes } from '../../src/dataModels.js'
 
 import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
+
+// TODO special context when objects are being constructed, before they are in a context.
 
 //------------------------------------------------------------------------------
 
@@ -90,6 +92,12 @@ const statechartTemplate = (function() {
   return { typeName, x, y, width, height, name, states, transitions, properties };
 })();
 
+const defaultPoint = { x: 0, y: 0 },
+      defaultPointWithNormal: PointWithNormal = { x: 0, y: 0, nx: 0 , ny: 0 },
+      defaultBezierCurve: BezierCurve = [
+          defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal];
+
+
 export class State implements DataContextObject, ReferencedObject {
   readonly template = stateTemplate;
   readonly context: StatechartContext;
@@ -115,13 +123,13 @@ export class State implements DataContextObject, ReferencedObject {
 
   // Derived properties.
   parent: Statechart | undefined;
-  globalPosition: Point;
+  globalPosition = defaultPoint;
   inTransitions: Transition[];
   outTransitions: Transition[];
-  entryText: string | undefined;
-  entryY: number | undefined;
-  exitText: string | undefined;
-  exitY: number | undefined;
+  entryText = '';
+  entryY = 0;
+  exitText = '';
+  exitY = 0;
 
   constructor(context: StatechartContext, id: number) {
     this.context = context;
@@ -144,7 +152,7 @@ export class Pseudostate implements DataContextObject, ReferencedObject {
 
   // Derived properties.
   parent: Statechart | undefined;
-  globalPosition: Point;
+  globalPosition = defaultPoint;
   inTransitions: Transition[];
   outTransitions: Transition[];
 
@@ -178,12 +186,12 @@ export class Transition implements DataContextObject {
 
   // Derived properties.
   parent: Statechart | undefined;
-  pSrc: PointAndNormal | undefined;
-  pDst: PointAndNormal | undefined;
-  bezier: BezierCurve;
-  textPoint: Point;
-  text: string;
-  textWidth: number;
+  pSrc: PointWithNormal | undefined;
+  pDst: PointWithNormal | undefined;
+  bezier = defaultBezierCurve;
+  textPoint = defaultPoint;
+  text = '';
+  textWidth = 0;
 
   constructor(context: StatechartContext) {
     this.context = context;
@@ -210,7 +218,7 @@ export class Statechart implements DataContextObject {
 
   // Derived properties.
   parent: State | undefined;
-  globalPosition: Point;
+  globalPosition = defaultPoint;
 
   constructor(context: StatechartContext) {
     this.context = context;
@@ -342,7 +350,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     items.forEachReverse(item => self.reverseVisitAll(item, visitor));
   }
 
-  visitNonTransitions(item: NonTransitionTypes, visitor: NonTransitionVisitor) : void {
+  visitNonTransitions(item: AllTypes, visitor: NonTransitionVisitor) : void {
     const self = this;
     if (item instanceof State) {
       visitor(item);
@@ -356,10 +364,8 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
 
   updateItem(item: AllTypes) {
-    if (item instanceof State || item instanceof Pseudostate || item instanceof Statechart) {
-      const self = this;
-      this.visitNonTransitions(item, item => self.setGlobalPosition(item));
-    }
+    const self = this;
+    this.visitNonTransitions(item, item => self.setGlobalPosition(item));
   }
 
   getGrandParent(item: AllTypes) : AllTypes | undefined {
@@ -918,7 +924,6 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
       // Remove and reinsert changed transitions.
       const parent = owner.parent;
       if (parent) {
-        this.removeTransition_(owner);
         if (prop === transitionTemplate.src) {
           const oldSrc = oldValue as StateTypes;
           if (oldSrc) {
@@ -1228,13 +1233,13 @@ class Renderer {
 
       height = Math.max(height, stateOffsetY);
     }
-    if (state.entry && this.ctx) {
+    if (state.entry) {
       state.entryText = 'entry/ ' + state.entry;
       state.entryY = height;
       height += lineSpacing;
       width = Math.max(width, this.ctx.measureText(state.entryText).width + 2 * theme.padding);
     }
-    if (state.exit && this.ctx) {
+    if (state.exit) {
       state.exitText = 'exit/ ' + state.exit;
       state.exitY = height;
       height += lineSpacing;
@@ -1399,10 +1404,10 @@ class Renderer {
           ctx.fillText(state.name, x + r, y + textSize);
         }
         if (state.entry) {
-          ctx.fillText(state.entryText!, x + r, y + state.entryY! + textSize);
+          ctx.fillText(state.entryText, x + r, y + state.entryY + textSize);
         }
         if (state.exit) {
-          ctx.fillText(state.exitText!, x + r, y + state.exitY! + textSize);
+          ctx.fillText(state.exitText, x + r, y + state.exitY + textSize);
         }
 
         const statecharts = state.statecharts;
@@ -2057,27 +2062,24 @@ export class StatechartEditor implements CanvasLayer {
     const renderer = this.renderer,
           context = this.context,
           changedItems = this.changedItems;
-    // First layout containers, and then layout transitions which depend on states'
-    // size and location.
     // This function is called during the draw, hitTest, and updateBounds_ methods,
     // so the renderer is started.
-    function layout(item: AllTypes) {
-      context.reverseVisitAll(item, item => {
-        if (!(item instanceof Transition)) {
-          context.updateItem(item);  // TODO derived property updates should be automatic.
-        }
-        renderer.layout(item);
-      });
+    // First layout containers, and then layout transitions which depend on states'
+    // size and location.
+    function layout(item: AllTypes, visitor: StatechartVisitor) {
+      context.reverseVisitAll(item, visitor);
     }
     changedItems.forEach(item => {
-      if (!(item instanceof Transition)) {
-        layout(item);
-      }
+      layout(item, item => {
+        if (!(item instanceof Transition))
+          renderer.layout(item);
+      });
     });
     changedItems.forEach(item => {
-      if (item instanceof Transition) {
-        renderer.layoutTransition(item);
-      }
+      layout(item, item => {
+        if (item instanceof Transition)
+          renderer.layout(item);
+      });
     });
     changedItems.clear();
   }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import * as FC from '../examples/functioncharts.js';
+import * as FC from '../examples/functioncharts/functioncharts.js';
 function stringifyType(type) {
     let s = '[';
     function stringifyName(item) {

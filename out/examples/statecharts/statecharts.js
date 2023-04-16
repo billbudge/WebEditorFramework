@@ -2,6 +2,7 @@ import { SelectionSet } from '../../src/collections.js';
 import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam, circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, diskPath, hitTestDisk, roundRectPath, bezierEdgePath, hitTestBezier, measureNameValuePairs, FileController } from '../../src/diagrams.js';
 import { getExtents, projectPointToCircle, evaluateBezier } from '../../src/geometry.js';
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
+// TODO special context when objects are being constructed, before they are in a context.
 //------------------------------------------------------------------------------
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
@@ -26,6 +27,9 @@ const statechartTemplate = (function () {
     const typeName = 'statechart', x = new ScalarProp('x'), y = new ScalarProp('y'), width = new ScalarProp('width'), height = new ScalarProp('height'), name = new ScalarProp('name'), states = new ChildArrayProp('states'), transitions = new ChildArrayProp('transitions'), properties = [x, y, width, height, name, states, transitions];
     return { typeName, x, y, width, height, name, states, transitions, properties };
 })();
+const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
+    defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
+];
 export class State {
     get x() { return this.template.x.get(this) || 0; }
     set x(value) { this.template.x.set(this, value); }
@@ -44,6 +48,11 @@ export class State {
     get statecharts() { return this.template.statecharts.get(this); }
     constructor(context, id) {
         this.template = stateTemplate;
+        this.globalPosition = defaultPoint;
+        this.entryText = '';
+        this.entryY = 0;
+        this.exitText = '';
+        this.exitY = 0;
         this.context = context;
         this.id = id;
     }
@@ -56,6 +65,7 @@ export class Pseudostate {
     get y() { return this.template.y.get(this) || 0; }
     set y(value) { this.template.y.set(this, value); }
     constructor(template, id, context) {
+        this.globalPosition = defaultPoint;
         this.template = template;
         this.id = id;
         this.context = context;
@@ -80,6 +90,10 @@ export class Transition {
     set tText(value) { this.template.tText.set(this, value); }
     constructor(context) {
         this.template = transitionTemplate;
+        this.bezier = defaultBezierCurve;
+        this.textPoint = defaultPoint;
+        this.text = '';
+        this.textWidth = 0;
         this.context = context;
     }
 }
@@ -98,6 +112,7 @@ export class Statechart {
     get transitions() { return this.template.transitions.get(this); }
     constructor(context) {
         this.template = statechartTemplate;
+        this.globalPosition = defaultPoint;
         this.context = context;
     }
 }
@@ -211,10 +226,8 @@ export class StatechartContext extends EventBase {
         }
     }
     updateItem(item) {
-        if (item instanceof State || item instanceof Pseudostate || item instanceof Statechart) {
-            const self = this;
-            this.visitNonTransitions(item, item => self.setGlobalPosition(item));
-        }
+        const self = this;
+        this.visitNonTransitions(item, item => self.setGlobalPosition(item));
     }
     getGrandParent(item) {
         let result = item.parent;
@@ -710,7 +723,6 @@ export class StatechartContext extends EventBase {
             // Remove and reinsert changed transitions.
             const parent = owner.parent;
             if (parent) {
-                this.removeTransition_(owner);
                 if (prop === transitionTemplate.src) {
                     const oldSrc = oldValue;
                     if (oldSrc) {
@@ -955,13 +967,13 @@ class Renderer {
             });
             height = Math.max(height, stateOffsetY);
         }
-        if (state.entry && this.ctx) {
+        if (state.entry) {
             state.entryText = 'entry/ ' + state.entry;
             state.entryY = height;
             height += lineSpacing;
             width = Math.max(width, this.ctx.measureText(state.entryText).width + 2 * theme.padding);
         }
-        if (state.exit && this.ctx) {
+        if (state.exit) {
             state.exitText = 'exit/ ' + state.exit;
             state.exitY = height;
             height += lineSpacing;
@@ -1651,23 +1663,20 @@ export class StatechartEditor {
         // size and location.
         // This function is called during the draw, hitTest, and updateBounds_ methods,
         // so the renderer is started.
-        function layout(item) {
-            context.reverseVisitAll(item, item => {
-                if (!(item instanceof Transition)) {
-                    context.updateItem(item); // TODO derived property updates should be automatic.
-                }
-                renderer.layout(item);
-            });
+        function layout(item, visitor) {
+            context.reverseVisitAll(item, visitor);
         }
         changedItems.forEach(item => {
-            if (!(item instanceof Transition)) {
-                layout(item);
-            }
+            layout(item, item => {
+                if (!(item instanceof Transition))
+                    renderer.layout(item);
+            });
         });
         changedItems.forEach(item => {
-            if (item instanceof Transition) {
-                renderer.layoutTransition(item);
-            }
+            layout(item, item => {
+                if (item instanceof Transition)
+                    renderer.layout(item);
+            });
         });
         changedItems.clear();
     }
