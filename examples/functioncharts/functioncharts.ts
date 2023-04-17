@@ -25,59 +25,55 @@ import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 // Signature format: [inputs,outputs] with optional names, e.g.
 // [v(a)v(b),v(sum)](+) for a binary addition element.
 
-export interface Pin {
-  name?: string;
+export class Pin {
   typeString: string;
-  type?: AtomizedType;
-  layout?: PinLayout;
-}
-export interface AtomizedType {
   name?: string;
+  type?: Type;
+  y = 0;
+  width = 0;
+  height = 0;
+  baseline = 0;
+  constructor(typeString: string, name?: string, type?: Type) {
+    this.typeString = typeString;
+    this.name = name;
+    this.type = type;
+  }
+}
+
+export class Type {
   typeString: string;
   inputs: Pin[];
   outputs: Pin[];
-  layout?: TypeLayout;
-}
-class PinLayout {
-  y: number;
-  width: number;
-  height: number;
-  constructor(y: number, width: number, height: number) {
-    this.y = y;
-    this.width = width;
-    this.height = height;
-  }
-}
-class TypeLayout {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  constructor(x: number, y: number, width: number, height: number) {
-    this.x = x;
-    this.y = y;
-    this.width = width;
-    this.height = height;
+  name?: string;
+  x = 0;
+  y = 0;
+  width = 0;
+  height = 0;
+  constructor(typeString: string, inputs: Pin[], outputs: Pin[], name?: string) {
+    this.typeString = typeString;
+    this.inputs = inputs;
+    this.outputs = outputs;
+    this.name = name;
   }
 }
 
 export class TypeParser {
-  private readonly map_ = new Map<string, AtomizedType>();
+  private readonly map_ = new Map<string, Type>();
 
-  get(s: string) : AtomizedType | undefined {
+  get(s: string) : Type | undefined {
     return this.map_.get(s);
   }
   has(s: string) {
     return this.map_.has(s);
   }
-  add(s: string) : AtomizedType {
+  add(s: string) : Type {
     const atomized = this.map_.get(s);
     if (atomized)
       return atomized;
 
     const self = this;
 
-    function addType(s: string, type: AtomizedType) {
+    function addType(s: string, type: Type) {
       let result = self.map_.get(s);
       if (!result) {
         self.map_.set(s, type);
@@ -104,25 +100,21 @@ export class TypeParser {
       // value types
       if (s[j] === 'v') {
         j++;
-        return { name: parseName(), typeString: 'v' };
+        return new Pin('v', parseName());
       }
       // wildcard types
       if (s[j] === '*') {
         j++;
-        return { name: parseName(), typeString: '*' };
+        return new Pin('*', parseName());
       }
       // function types
       let type = parseFunction(),
           typeString = s.substring(i, j);
       // Add the pin type, without label.
       addType(typeString, type!);  // TODO fix
-      return {
-        name: parseName(),
-        typeString: typeString,
-        type: type,
-      };
+      return new Pin(typeString, parseName(), type);
     }
-    function parseFunction() : AtomizedType {
+    function parseFunction() : Type {
       let i = j;
       if (s[j] === '[') {
         j++;
@@ -135,12 +127,8 @@ export class TypeParser {
           outputs.push(parsePin());
         }
         j++;
-        const typeString = s.substring(i, j);
-        const type = {
-          typeString,
-          inputs,
-          outputs,
-        };
+        const typeString = s.substring(i, j),
+              type = new Type(typeString, inputs, outputs);
         addType(typeString, type);
         return type;
       }
@@ -156,14 +144,14 @@ export class TypeParser {
     return type;
   }
   // Removes any trailing label. Type may be ill-formed, e.g. '[v(f)'
-  trimType(type: string) : string {
+  trimTypeString(type: string) : string {
     if (type[type.length - 1] === ')')
       type = type.substring(0, type.lastIndexOf('('));
     return type;
   }
 
   // Removes all labels from signature.
-  getUnlabeledType(type: string) : string {
+  getUnlabeledTypeString(type: string) : string {
     let result = '', label = 0;
     while (true) {
       label = type.indexOf('(');
@@ -178,7 +166,7 @@ export class TypeParser {
     return result + type;
   }
 
-  splitType(type: string) : number {
+  splitTypeString(type: string) : number {
     let j = 0, level = 0;
     while (true) {
       if (type[j] === '[')
@@ -194,12 +182,12 @@ export class TypeParser {
     return !type.endsWith(',]');
   }
 
-  addInputToType(type: string, inputType: string) : string {
-    let i = this.splitType(type);
+  addInputToTypeString(type: string, inputType: string) : string {
+    let i = this.splitTypeString(type);
     return type.substring(0, i) + inputType + type.substring(i);
   }
 
-  addOutputToType(type: string, outputType: string) : string {
+  addOutputToTypeString(type: string, outputType: string) : string {
     let i = type.lastIndexOf(']');
     return type.substring(0, i) + outputType + type.substring(i);
   }
@@ -269,14 +257,14 @@ export class Element implements DataContextObject, ReferencedObject {
   set y(value: number) { this.template.y.set(this, value); }
   get name() { return this.template.name.get(this); }
   set name(value: string | undefined) { this.template.name.set(this, value); }
-  get type() { return this.template.type.get(this); }
-  set type(value: string) {
-    if (this.typeInfo !== nullFunction)
+  get typeString() { return this.template.type.get(this); }
+  set typeString(value: string) {
+    if (this.type !== nullFunction)
       throw new Error('Cannot change type of element');  // TODO ?
     this.template.type.set(this, value);
-    this.typeInfo = globalTypeParser_.add(value);
-    this.inWires = new Array<Wire | undefined>(this.typeInfo.inputs.length);
-    this.outWires = new Array<Wire[]>(this.typeInfo.outputs.length);
+    this.type = globalTypeParser_.add(value);
+    this.inWires = new Array<Wire | undefined>(this.type.inputs.length);
+    this.outWires = new Array<Wire[]>(this.type.outputs.length);
     for (let i = 0; i < this.outWires.length; i++)
       this.outWires[i] = [];
   }
@@ -284,7 +272,7 @@ export class Element implements DataContextObject, ReferencedObject {
   // Derived properties.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
-  typeInfo: AtomizedType = nullFunction;
+  type: Type = nullFunction;
   inWires: (Wire | undefined)[];  // one input per pin.
   outWires: Wire[][];             // array of outputs per pin, outputs have fan out.
 
@@ -805,6 +793,51 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
+  replaceElement(element: Element, newElement: Element) {
+    const self = this,
+          type = element.type,
+          newType = newElement.type;
+    // Add newElement right after element. Both should be present as we
+    // rewire them.
+    if (element.parent !== newElement.parent) {
+      this.deleteItem(newElement);
+    }
+    if (element.parent) {
+      this.addItem(newElement, element.parent!);
+    }
+    newElement.x = element.x;
+    newElement.y = element.y;
+
+    // Update all incoming and outgoing wires if possible, otherwise they
+    // will be deleted as dangling wires by makeConsistent.
+    const srcChange = new Array<Wire>(), dstChange = new Array<Wire>();
+    function canRewire(index: number, pins: Pin[], newPins: Pin[]) {
+      if (index >= newPins.length)
+        return false;
+      const type = globalTypeParser_.trimTypeString(pins[index].typeString),
+            newType = globalTypeParser_.trimTypeString(newPins[index].typeString);
+      return type === '*' || type === newType;
+    }
+    this.forInWires(element, wire => {
+      if (canRewire(wire.dstPin, type.inputs, newType.inputs)) {
+        dstChange.push(wire);
+      }
+    });
+    this.forOutWires(element, wire => {
+      if (canRewire(wire.srcPin, type.outputs, newType.outputs)) {
+        srcChange.push(wire);
+      }
+    });
+    srcChange.forEach(wire => {
+      wire.src = newElement;
+    });
+    dstChange.forEach(function(wire) {
+      wire.dst = newElement;
+    });
+
+    this.deleteItem(element);
+  }
+
   private insertElement_(element: Element, parent: Functionchart) {
     this.elements.add(element);
     element.parent = parent;
@@ -853,19 +886,20 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
+  private static removeWireHelper(array: Array<Wire>, wire: Wire) {
+    const index = array.indexOf(wire);
+    if (index >= 0) {
+      array.splice(index, 1);
+    }
+  }
+
   private removeWire_(wire: Wire) {
     this.wires.delete(wire);
     const src = wire.src,
           dst = wire.dst;
-    function remove(array: Array<Wire>, item: Wire) {
-      const index = array.indexOf(item);
-      if (index >= 0) {
-        array.splice(index, 1);
-      }
-    }
     if (src) {
       const outputs = src.outWires[wire.srcPin];
-      remove(outputs, wire);
+      FunctionchartContext.removeWireHelper(outputs, wire);
     }
     if (dst) {
       const inputs = dst.inWires!;
@@ -898,15 +932,35 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   // DataContext interface implementation.
   valueChanged(owner: AllTypes, prop: ScalarPropertyTypes, oldValue: any) : void {
     if (owner instanceof Wire) {
-      // Remove and reinsert changed transitions.
+      // Remove and reinsert changed wires.
       const parent = owner.parent;
       if (parent) {
-        this.removeWire_(owner);
+        if (prop === wireTemplate.src) {
+          const oldSrc = oldValue as Element;
+          if (oldSrc)
+            FunctionchartContext.removeWireHelper(oldSrc.outWires[owner.srcPin], owner);
+        } else if (prop === wireTemplate.dst) {
+          const oldDst = oldValue as Element;
+          if (oldDst)
+            oldDst.inWires[owner.dstPin] = undefined;
+        } else if (prop === wireTemplate.srcPin) {
+          const src = owner.src,
+                oldPin = oldValue as number;
+          if (src) {
+            const oldOutputs = src.outWires[oldPin];
+            FunctionchartContext.removeWireHelper(oldOutputs, owner);
+          }
+        } else if (prop === wireTemplate.dstPin) {
+          const dst = owner.dst,
+                oldPin = oldValue as number;
+          if (dst)
+            dst.inWires[oldPin] = undefined;
+        }
         this.insertWire_(owner, parent);
       }
     }
     this.onValueChanged(owner, prop, oldValue);
-    // this.updateItem(owner);  // Update any derived properties.
+    this.updateItem(owner);  // Update any derived properties.
   }
   elementInserted(owner: Functionchart, prop: ArrayPropertyTypes, index: number) : void {
     const value: AllTypes = prop.get(owner).at(index) as AllTypes;
@@ -970,13 +1024,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
 class FunctionchartTheme extends Theme {
   radius: number;
-  textIndent: number = 8;
-  textLeading: number = 6;
-  knobbyRadius: number = 4;
-  padding: number = 8;
-  spacing: number = 8;
+  textIndent = 8;
+  textLeading = 6;
+  knobbyRadius = 4;
+  padding = 8;
+  spacing = 8;
+  minTypeWidth = 8;
+  minTypeHeight = 8;
 
-  constructor(theme: Theme, radius: number = 8) {
+  constructor(theme: Theme, radius = 8) {
     super();
     Object.assign(this, theme);
 
@@ -999,7 +1055,8 @@ interface Rect {
 class ElementHitResult {
   item: Element;
   inner: RectHitResult;
-  arrow: boolean = false;
+  input: number = -1;
+  output: number = -1;
   constructor(item: Element, inner: RectHitResult) {
     this.item = item;
     this.inner = inner;
@@ -1050,321 +1107,292 @@ class Renderer {
     this.ctx.restore();
   }
 
-  // getBounds(item: NonWireTypes) : Rect {
-  //   const global = item.globalPosition;
-  //   let x = global.x,
-  //       y = global.y;
-  //   if (item instanceof Element) {
-  //     const type = item.typeInfo;
-  //     if (!type.layout)
-  //       this.layoutType(type);
-  //     // Palette items aren't part of any model, so have no translatableModel x or y.
-  //     if (x === undefined) x = item.x;
-  //     if (y === undefined) y = item.y;
-  //     return { x: x, y: y, width: type.width!, height: type.height! };
-  //   }
-  //   if (isGroup(item)) {
-  //     if (!item[_hasLayout])
-  //       this.layoutGroup(item);
-  //     return { x: x, y: y, width: item[_width], height: item[_height] };
-  //   }
-  // }
+  getItemRect(item: NonWireTypes) : Rect {
+    const global = item.globalPosition;
+    let x = global.x,
+        y = global.y;
+    if (item instanceof Element) {
+      const type = item.type;
+      return { x: x, y: y, width: type.width, height: type.height };
+    } else {
+      return { x: x, y: y, width: item.width, height: item.height };
+    }
+  }
 
-  // // setBounds(item, width, height) {
-  // //   assert(!isWire(item));
-  // //   item[_width] = width;
-  // //   item[_height] = height;
-  // // }
+  getBounds(items: NonWireTypes[]) : Rect {
+    let xMin = Number.POSITIVE_INFINITY, yMin = Number.POSITIVE_INFINITY,
+        xMax = -Number.POSITIVE_INFINITY, yMax = -Number.POSITIVE_INFINITY;
+    for (let item of items) {
+      const rect = this.getItemRect(item);
+      xMin = Math.min(xMin, rect.x);
+      yMin = Math.min(yMin, rect.y);
+      xMax = Math.max(xMax, rect.x + rect.width);
+      yMax = Math.max(yMax, rect.y + rect.height);
+    }
+    return { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
+  }
 
-  // // getUnionBounds(items) {
-  // //   let xMin = Number.POSITIVE_INFINITY, yMin = Number.POSITIVE_INFINITY,
-  // //       xMax = -Number.POSITIVE_INFINITY, yMax = -Number.POSITIVE_INFINITY;
-  // //   for (let item of items) {
-  // //     if (isWire(item))
-  // //       continue;
-  // //     const rect = this.getBounds(item);
-  // //     xMin = Math.min(xMin, rect.x);
-  // //     yMin = Math.min(yMin, rect.y);
-  // //     xMax = Math.max(xMax, rect.x + rect.w);
-  // //     yMax = Math.max(yMax, rect.y + rect.h);
-  // //   }
-  // //   return { x: xMin, y: yMin, w: xMax - xMin, h: yMax - yMin };
-  // // }
+  pinToPoint(element: Element, index: number, isInput: boolean) : PointWithNormal {
+    const rect: Rect = this.getItemRect(element),
+          w = rect.width, h = rect.height,
+          type = element.type;
+    let x = rect.x, y = rect.y,
+        pin, nx;
+    if (isInput) {
+      pin = type.inputs[index];
+      nx = -1;
+    } else {
+      pin = type.outputs[index];
+      nx = 1;
+      x += w;
+    }
+    y += pin.y + pin.height / 2;
+    return { x: x, y: y, nx: nx, ny: 0 }
+  }
 
-  // pinToPoint(element: Element, index: number, isInput: boolean) : PointAndNormal {
-  //   const rect: Rect = this.getBounds(element),
-  //         w = rect.width, h = rect.height,
-  //         type = element.typeInfo!;
-  //   let x = rect.x, y = rect.y,
-  //       pin, nx;
-  //   if (isInput) {
-  //     pin = type.inputs[index];
-  //     nx = -1;
-  //   } else {
-  //     pin = type.outputs[index];
-  //     nx = 1;
-  //     x += w;
-  //   }
-  //   let layout = type.layout;
-  //   if (!layout)
-  //     this.layoutPin(type);
-  //   y += pin.y! + pin.height! / 2;
-  //   return { x: x, y: y, nx: nx, ny: 0 }
-  // }
+  // Compute sizes for an element type.
+  layoutType(type: Type) {
+    const self = this,
+          ctx = this.ctx,
+          theme = this.theme,
+          textSize = theme.fontSize,
+          spacing = theme.spacing,
+          name = type.name,
+          inputs = type.inputs,
+          outputs = type.outputs;
+    let height = 0, width = 0;
+    if (name) {
+      width = 2 * spacing + ctx.measureText(name).width;
+      height += textSize + spacing / 2;
+    } else {
+      height += spacing / 2;
+    }
 
-  // // Compute sizes for an element type.
-  // layoutType(type: AtomizedType) {
+    function layoutPins(pins: Pin[]) {
+      let y = height, w = 0;
+      for (let i = 0; i < pins.length; i++) {
+        let pin = pins[i];
+        self.layoutPin(pin);
+        pin.y = y + spacing / 2;
+        let name = pin.name, pw = pin.width, ph = pin.height! + spacing / 2;
+        if (name) {
+          pin.baseline = y + textSize;
+          if (textSize > ph) {
+            pin.y += (textSize - ph) / 2;
+            ph = textSize;
+          } else {
+            pin.baseline += (ph - textSize) / 2;
+          }
+          pw += 2 * spacing + ctx.measureText(name).width;
+        }
+        y += ph;
+        w = Math.max(w, pw);
+      }
+      return [y, w];
+    }
+    const [yIn, wIn] = layoutPins(inputs);
+    const [yOut, wOut] = layoutPins(outputs);
+
+    type.width = Math.round(Math.max(width, wIn + 2 * spacing + wOut, theme.minTypeWidth));
+    type.height = Math.round(Math.max(yIn, yOut, theme.minTypeHeight) + spacing / 2);
+  }
+
+  layoutPin(pin: Pin) {
+    const theme = this.theme;
+    if (pin.typeString === 'v' || pin.typeString === '*') {
+      pin.width = pin.height = 2 * theme.knobbyRadius;
+    } else if (pin.type) {
+      pin.width = pin.type.width;
+      pin.height = pin.type.height;
+    }
+  }
+
+  layoutWire(wire: Wire) {
+    let src = wire.src,
+        dst = wire.dst,
+        p1 = wire.pSrc,
+        p2 = wire.pDst;
+    // Since we intercept change events and not transactions, wires may be in
+    // an inconsistent state, so check before creating the path.
+    if (src && wire.srcPin !== undefined) {
+      p1 = this.pinToPoint(src, wire.srcPin, false);
+    }
+    if (dst && wire.dstPin !== undefined) {
+      p2 = this.pinToPoint(dst, wire.dstPin, true);
+    }
+    if (p1 && p2) {
+      wire.bezier = getEdgeBezier(p1, p2, 64);
+    }
+  }
+
+  // Make sure a group is big enough to enclose its contents.  // TODO Functionchart concept
+  // layoutFunctionchart(functionchart: Functionchart) {
   //   const self = this,
-  //         ctx = this.ctx, theme = this.theme,
-  //         textSize = theme.fontSize, spacing = theme.spacing,
-  //         name = type.name,
-  //         inputs = type.inputs, outputs = type.outputs;
-  //   let height = 0, width = 0;
-  //   if (name) {
-  //     width = 2 * spacing + ctx.measureText(name).width;
-  //     height += textSize + spacing / 2;
-  //   } else {
-  //     height += spacing / 2;
-  //   }
-
-  //   function layoutPins(pins: Pin[]) {
-  //     let y = height, w = 0;
-  //     for (let i = 0; i < pins.length; i++) {
-  //       let pin = pins[i];
-  //       self.layoutPin(pin);
-  //       pin.y = y + spacing / 2;
-  //       let name = pin.name, pw = pin.width, ph = pin.height! + spacing / 2;
-  //       if (name) {
-  //         pin[_baseline] = y + textSize;
-  //         if (textSize > ph) {
-  //           pin[_y] += (textSize - ph) / 2;
-  //           ph = textSize;
-  //         } else {
-  //           pin[_baseline] += (ph - textSize) / 2;
-  //         }
-  //         pw += 2 * spacing + ctx.measureText(name).width;
-  //       }
-  //       y += ph;
-  //       w = Math.max(w, pw);
-  //     }
-  //     return [y, w];
-  //   }
-  //   const [yIn, wIn] = layoutPins(inputs);
-  //   const [yOut, wOut] = layoutPins(outputs);
-
-  //   this.setBounds(
-  //     type,
-  //     Math.round(Math.max(width, wIn + 2 * spacing + wOut, theme.minTypeWidth)),
-  //     Math.round(Math.max(yIn, yOut, theme.minTypeHeight) + spacing / 2));
-
-  //   type[_hasLayout] = true;
-  // }
-
-  // layoutPin(pin: Pin) {
-  //   const theme = this.theme;
-  //   if (pin.typeString === 'v' || pin.typeString === '*') {
-  //     pin.width = pin.height = 2 * theme.knobbyRadius;
-  //   } else {
-  //     const type = pin.type!;
-  //     if (!type[_hasLayout])
-  //       this.layoutType(type);
-  //     pin[_width] = type[_width];
-  //     pin[_height] = type[_height];
-  //   }
-  // }
-
-  // layoutWire(wire) {
-  //   assert(!wire[_hasLayout]);
-  //   let src = this.getWireSrc(wire),
-  //       dst = this.getWireDst(wire),
-  //       p1 = wire[_p1],
-  //       p2 = wire[_p2];
-  //   // Since we intercept change events and not transactions, wires may be in
-  //   // an inconsistent state, so check before creating the path.
-  //   if (src && wire.srcPin !== undefined) {
-  //     p1 = this.pinToPoint(src, wire.srcPin, false);
-  //   }
-  //   if (dst && wire.dstPin !== undefined) {
-  //     p2 = this.pinToPoint(dst, wire.dstPin, true);
-  //   }
-  //   if (p1 && p2) {
-  //     wire[_bezier] = diagrams.getEdgeBezier(p1, p2);
-  //   }
-  //   wire[_hasLayout] = true;
-  // }
-
-  // // Make sure a group is big enough to enclose its contents.
-  // layoutGroup(group) {
-  //   assert(!group[_hasLayout]);
-  //   const self = this, spacing = this.theme.spacing;
-  //   function layout(group) {
-  //     const extents = self.getUnionBounds(group.items),
-  //           translatableModel = self.model.translatableModel,
-  //           groupX = translatableModel.globalX(group),
-  //           groupY = translatableModel.globalY(group),
+  //         spacing = this.theme.spacing;
+  //   function layout(functionChart: Functionchart) {
+  //     const extents = self.getBounds(functionChart.elements.asArray()),
+  //           global = functionChart.globalPosition,
+  //           groupX = global.x,
+  //           groupY = global.y,
   //           margin = 2 * spacing,
-  //           type = getType(group);
-  //     let width = extents.x + extents.w - groupX + margin,
-  //         height = extents.y + extents.h - groupY + margin;
-  //     if (!type[_hasLayout])
-  //       self.layoutType(type);
-  //     width += type[_width];
-  //     height = Math.max(height, type[_height] + margin);
-  //     self.setBounds(group, width, height);
+  //           type = functionChart.type;
+  //     let width = extents.x + extents.width - groupX + margin,
+  //         height = extents.y + extents.height - groupY + margin;
+  //     width += type.width;
+  //     height = Math.max(height, type.height + margin);
+  //     functionChart.width = width;
+  //     functionChart.height = height;
   //   }
-  //   // Visit in reverse order to correctly include sub-group bounds.
-  //   reverseVisitItem(group, function(group) {
+  //   // Visit in reverse order to correctly include sub-functionchart bounds.
+  //   reverseVisitItem(functionchart, function(group) {
   //     layout(group);
   //   }, isGroup);
 
-  //   group[_hasLayout] = true;
+  //   functionchart[_hasLayout] = true;
   // }
 
-  // drawType(type, x, y, fillOutputs) {
-  //   if (!type[_hasLayout])
-  //     this.layoutType(type);
+  drawType(type: Type, x: number, y: number, fillOutputs: boolean) {
+    const self = this, ctx = this.ctx, theme = this.theme,
+          textSize = theme.fontSize, spacing = theme.spacing,
+          name = type.name,
+          w = type.width, h = type.height,
+          right = x + w;
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = theme.textColor;
+    ctx.textBaseline = 'bottom';
+    if (name) {
+      ctx.textAlign = 'center';
+      ctx.fillText(name, x + w / 2, y + textSize + spacing / 2);
+    }
+    type.inputs.forEach(function(pin: Pin, i: number) {
+      const name = pin.name;
+      self.drawPin(pin, x, y + pin.y, false);
+      if (name) {
+        ctx.textAlign = 'left';
+        ctx.fillText(name, x + pin.width + spacing, y + pin.baseline);
+      }
+    });
+    type.outputs.forEach(function(pin) {
+      const name = pin.name,
+            pinLeft = right - pin.width;
+      self.drawPin(pin, pinLeft, y + pin.y, fillOutputs);
+      if (name) {
+        ctx.textAlign = 'right';
+        ctx.fillText(name, pinLeft - spacing, y + pin.baseline);
+      }
+    });
+  }
 
-  //   const self = this, ctx = this.ctx, theme = this.theme,
-  //         textSize = theme.fontSize, spacing = theme.spacing,
-  //         name = type.name,
-  //         w = type[_width], h = type[_height],
-  //         right = x + w;
-  //   ctx.lineWidth = 0.5;
-  //   ctx.fillStyle = theme.textColor;
-  //   ctx.textBaseline = 'bottom';
-  //   if (name) {
-  //     ctx.textAlign = 'center';
-  //     ctx.fillText(name, x + w / 2, y + textSize + spacing / 2);
-  //   }
-  //   type.inputs.forEach(function(pin, i) {
-  //     const name = pin.name;
-  //     self.drawPin(pin, x, y + pin[_y], false);
-  //     if (name) {
-  //       ctx.textAlign = 'left';
-  //       ctx.fillText(name, x + pin[_width] + spacing, y + pin[_baseline]);
-  //     }
-  //   });
-  //   type.outputs.forEach(function(pin) {
-  //     const name = pin.name,
-  //           pinLeft = right - pin[_width];
-  //     self.drawPin(pin, pinLeft, y + pin[_y], fillOutputs);
-  //     if (name) {
-  //       ctx.textAlign = 'right';
-  //       ctx.fillText(name, pinLeft - spacing, y + pin[_baseline]);
-  //     }
-  //   });
-  // }
+  drawPin(pin: Pin, x: number, y: number, fill: boolean) {
+    const ctx = this.ctx,
+          theme = this.theme;
+    ctx.strokeStyle = theme.strokeColor;
+    if (pin.typeString === 'v' || pin.typeString === '*') {
+      const r = theme.knobbyRadius;
+      ctx.beginPath();
+      if (pin.typeString === 'v') {
+        const d = 2 * r;
+        ctx.rect(x, y, d, d);
+      } else {
+        ctx.arc(x + r, y + r, r, 0, Math.PI * 2, true);
+      }
+      ctx.stroke();
+    } else if (pin.type) {
+      const type = pin.type,
+            width = type.width, height = type.height;
+      ctx.beginPath();
+      ctx.rect(x, y, width, height);
+      // if (level == 1) {
+      //   ctx.fillStyle = theme.altBgColor;
+      //   ctx.fill();
+      // }
+      ctx.stroke();
+      this.drawType(type, x, y, false);
+    }
+  }
 
-  // drawPin(pin, x, y, fill) {
-  //   const ctx = this.ctx,
-  //         theme = this.theme;
-  //   ctx.strokeStyle = theme.strokeColor;
-  //   if (pin.type === 'v' || pin.type === '*') {
-  //     const r = theme.knobbyRadius;
-  //     ctx.beginPath();
-  //     if (pin.type === 'v') {
-  //       const d = 2 * r;
-  //       ctx.rect(x, y, d, d);
-  //     } else {
-  //       ctx.arc(x + r, y + r, r, 0, Math.PI * 2, true);
-  //     }
-  //     ctx.stroke();
-  //   } else {
-  //     const type = getType(pin),
-  //           width = type[_width], height = type[_height];
-  //     ctx.beginPath();
-  //     ctx.rect(x, y, width, height);
-  //     // if (level == 1) {
-  //     //   ctx.fillStyle = theme.altBgColor;
-  //     //   ctx.fill();
-  //     // }
-  //     ctx.stroke();
-  //     this.drawType(type, x, y);
-  //   }
-  // }
+  drawElement(element: Element, mode: RenderMode) {
+    const ctx = this.ctx,
+          theme = this.theme,
+          spacing = theme.spacing,
+          rect = this.getItemRect(element),
+          x = rect.x, y = rect.y, w = rect.width, h = rect.height,
+          right = x + w, bottom = y + h;
 
-  // drawElement(element, mode) {
-  //   const ctx = this.ctx,
-  //         theme = this.theme, spacing = theme.spacing,
-  //         rect = this.getBounds(element),
-  //         x = rect.x, y = rect.y, w = rect.w, h = rect.h,
-  //         right = x + w, bottom = y + h;
+    // switch (element.elementKind) {
+    //   case 'input':
+    //     diagrams.inFlagPath(x, y, w, h, spacing, ctx);
+    //     break;
+    //   case 'output':
+    //     diagrams.outFlagPath(x, y, w, h, spacing, ctx);
+    //     break;
+    //   default:
+        ctx.beginPath();
+        ctx.rect(x, y, w, h);
+        // break;
+    // }
 
-  //   switch (element.elementKind) {
-  //     case 'input':
-  //       diagrams.inFlagPath(x, y, w, h, spacing, ctx);
-  //       break;
-  //     case 'output':
-  //       diagrams.outFlagPath(x, y, w, h, spacing, ctx);
-  //       break;
-  //     default:
-  //       ctx.beginPath();
-  //       ctx.rect(x, y, w, h);
-  //       break;
-  //   }
+    switch (mode) {
+      case RenderMode.Normal:
+        ctx.fillStyle = /*element.state === 'palette' ? theme.altBgColor :*/ theme.bgColor;
+        ctx.fill();
+        ctx.strokeStyle = theme.strokeColor;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        this.drawType(element.type, x, y, false);
+        break;
+      case RenderMode.Highlight:
+        ctx.strokeStyle = theme.highlightColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        break;
+      case RenderMode.HotTrack:
+        ctx.strokeStyle = theme.hotTrackColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        break;
+    }
+  }
 
-  //   switch (mode) {
-  //     case normalMode:
-  //       ctx.fillStyle = element.state === 'palette' ? theme.altBgColor : theme.bgColor;
-  //       ctx.fill();
-  //       ctx.strokeStyle = theme.strokeColor;
-  //       ctx.lineWidth = 0.5;
-  //       ctx.stroke();
-  //       let type = getType(element);
-  //       this.drawType(type, x, y, 0);
-  //       break;
-  //     case highlightMode:
-  //       ctx.strokeStyle = theme.highlightColor;
-  //       ctx.lineWidth = 2;
-  //       ctx.stroke();
-  //       break;
-  //     case hotTrackMode:
-  //       ctx.strokeStyle = theme.hotTrackColor;
-  //       ctx.lineWidth = 2;
-  //       ctx.stroke();
-  //       break;
-  //   }
-  // }
+  drawElementPin(element: Element, input: number, output: number, mode: RenderMode) {
+    const theme = this.theme,
+          ctx = this.ctx,
+          rect = this.getItemRect(element),
+          type = element.type;
+    let x = rect.x, y = rect.y, w = rect.width, h = rect.height,
+        right = x + w,
+        pin: Pin;
 
-  // drawElementPin(element, input, output, mode) {
-  //   const theme = this.theme,
-  //         ctx = this.ctx,
-  //         rect = this.getBounds(element),
-  //         type = getType(element);
-  //   let x = rect.x, y = rect.y, w = rect.w, h = rect.h,
-  //       right = x + w,
-  //       pin;
+    if (input !== undefined) {
+      pin = type.inputs[input];
+    } else if (output !== undefined) {
+      pin = type.outputs[output];
+      x = right - pin.width;
+    }
+    ctx.beginPath();
+    ctx.rect(x, y + pin!.y, pin!.width, pin!.height);
 
-  //   if (input !== undefined) {
-  //     pin = type.inputs[input];
-  //   } else if (output !== undefined) {
-  //     pin = type.outputs[output];
-  //     x = right - pin[_width];
-  //   }
-  //   ctx.beginPath();
-  //   ctx.rect(x, y + pin[_y], pin[_width], pin[_height]);
-
-  //   switch (mode) {
-  //     case normalMode:
-  //       ctx.strokeStyle = theme.strokeColor;
-  //       ctx.lineWidth = 1;
-  //       break;
-  //     case highlightMode:
-  //       ctx.strokeStyle = theme.highlightColor;
-  //       ctx.lineWidth = 2;
-  //       break;
-  //     case hotTrackMode:
-  //       ctx.strokeStyle = theme.hotTrackColor;
-  //       ctx.lineWidth = 2;
-  //       break;
-  //   }
-  //   ctx.stroke();
-  // }
+    switch (mode) {
+      case RenderMode.Normal:
+        ctx.strokeStyle = theme.strokeColor;
+        ctx.lineWidth = 1;
+        break;
+      case RenderMode.Highlight:
+        ctx.strokeStyle = theme.highlightColor;
+        ctx.lineWidth = 2;
+        break;
+      case RenderMode.HotTrack:
+        ctx.strokeStyle = theme.hotTrackColor;
+        ctx.lineWidth = 2;
+        break;
+    }
+    ctx.stroke();
+  }
 
   // // Gets the bounding rect for the group instancing element.
   // getGroupInstanceBounds(type, groupRight, groupBottom) {
   //   const theme = this.theme, spacing = theme.spacing,
-  //         width = type[_width], height = type[_height],
+  //         width = type.width, height = type.height,
   //         x = groupRight - width - spacing, y = groupBottom - height - spacing;
   //   return { x: x, y: y, w: width, h: height };
   // }
@@ -1374,7 +1402,7 @@ class Renderer {
   //     this.layoutGroup(group);
   //   const ctx = this.ctx,
   //         theme = this.theme,
-  //         rect = this.getBounds(group),
+  //         rect = this.getItemRect(group),
   //         x = rect.x, y = rect.y, w = rect.w , h = rect.h,
   //         right = x + w, bottom = y + h;
   //   diagrams.roundRectPath(x, y, w, h, theme.spacing, ctx);
@@ -1412,31 +1440,31 @@ class Renderer {
   //   }
   // }
 
-  // hitTestElement(element, p, tol, mode) {
-  //   const rect = this.getBounds(element),
-  //         x = rect.x, y = rect.y, width = rect.w, height = rect.h,
-  //         hitInfo = diagrams.hitTestRect(x, y, width, height, p, tol);
-  //   if (hitInfo) {
-  //     const type = getType(element);
-  //     assert(type[_hasLayout]);
-  //     type.inputs.forEach(function(input, i) {
-  //       if (diagrams.hitTestRect(x, y + input[_y],
-  //                                input[_width], input[_height], p, 0)) {
-  //         hitInfo.input = i;
-  //       }
-  //     });
-  //     type.outputs.forEach(function(output, i) {
-  //       if (diagrams.hitTestRect(x + width - output[_width], y + output[_y],
-  //                                output[_width], output[_height], p, 0)) {
-  //         hitInfo.output = i;
-  //       }
-  //     });
-  //   }
-  //   return hitInfo;
-  // }
+  hitTestElement(element: Element, p: Point, tol: number, mode: RenderMode) :
+                 ElementHitResult | undefined {
+    const rect = this.getItemRect(element),
+          x = rect.x, y = rect.y, width = rect.width, height = rect.height,
+          hitInfo = hitTestRect(x, y, width, height, p, tol);
+    if (hitInfo) {
+      const result = new ElementHitResult(element, hitInfo),
+            type = element.type;
+      type.inputs.forEach(function(input, i) {
+        if (hitTestRect(x, y + input.y, input.width, input.height, p, 0)) {
+          result.input = i;
+        }
+      });
+      type.outputs.forEach(function(output, i) {
+        if (hitTestRect(x + width - output.width, y + output.y,
+                        output.width, output.height, p, 0)) {
+          result.output = i;
+        }
+      });
+      return result;
+    }
+  }
 
   // hitTestGroup(group, p, tol, mode) {
-  //   const rect = this.getBounds(group),
+  //   const rect = this.getItemRect(group),
   //         x = rect.x, y = rect.y, w = rect.w , h = rect.h,
   //         hitInfo = diagrams.hitTestRect(x, y, w, h, p, tol);
   //   if (hitInfo) {
@@ -1454,80 +1482,62 @@ class Renderer {
   //   return hitInfo;
   // }
 
-  // drawWire(wire, mode) {
-  //   if (!wire[_hasLayout])
-  //     this.layoutWire(wire);
-  //   const theme = this.theme,
-  //         ctx = this.ctx;
-  //   diagrams.bezierEdgePath(wire[_bezier], ctx, 0);
-  //   switch (mode) {
-  //     case normalMode:
-  //       ctx.strokeStyle = theme.strokeColor;
-  //       ctx.lineWidth = 1;
-  //       break;
-  //     case highlightMode:
-  //       ctx.strokeStyle = theme.highlightColor;
-  //       ctx.lineWidth = 2;
-  //       break;
-  //     case hotTrackMode:
-  //       ctx.strokeStyle = theme.hotTrackColor;
-  //       ctx.lineWidth = 2;
-  //       break;
-  //   }
-  //   ctx.stroke();
-  // }
+  drawWire(wire: Wire, mode: RenderMode) {
+    const theme = this.theme,
+          ctx = this.ctx;
+    bezierEdgePath(wire.bezier, ctx, 0);
+    switch (mode) {
+      case RenderMode.Normal:
+        ctx.strokeStyle = theme.strokeColor;
+        ctx.lineWidth = 1;
+        break;
+      case RenderMode.Highlight:
+        ctx.strokeStyle = theme.highlightColor;
+        ctx.lineWidth = 2;
+        break;
+      case RenderMode.HotTrack:
+        ctx.strokeStyle = theme.hotTrackColor;
+        ctx.lineWidth = 2;
+        break;
+    }
+    ctx.stroke();
+  }
 
-  // hitTestWire(wire, p, tol, mode) {
-  //   // TODO don't hit test new wire as it's dragged!
-  //   if (!wire[_hasLayout])
-  //     return;
-  //   return diagrams.hitTestBezier(wire[_bezier], p, tol);
-  // }
+  hitTestWire(wire: Wire, p: Point, tol: number, mode: RenderMode) : WireHitResult | undefined {
+    // TODO don't hit test new wire as it's dragged!
+    const hitInfo = hitTestBezier(wire.bezier, p, tol);
+    if (hitInfo) {
+      return new WireHitResult(wire, hitInfo);
+    }
+  }
 
-  // draw(item, mode) {
-  //   switch (item.kind) {
-  //     case 'element':
-  //       this.drawElement(item, mode);
-  //       break;
-  //     case 'group':
-  //       this.drawGroup(item, mode);
-  //       break;
-  //     case 'wire':
-  //       this.drawWire(item, mode);
-  //       break;
-  //   }
-  // }
+  draw(item: AllTypes, mode: RenderMode) {
+    if (item instanceof Element) {
+      this.drawElement(item, mode);
+    } else if (item instanceof Wire) {
+      this.drawWire(item, mode);
+    }
+  }
 
-  // hitTest(item, p, tol, mode) {
-  //   let hitInfo;
-  //   switch (item.kind) {
-  //     case 'element':
-  //       hitInfo = this.hitTestElement(item, p, tol, mode);
-  //       break;
-  //     case 'group':
-  //       hitInfo = this.hitTestGroup(item, p, tol, mode);
-  //       break;
-  //     case 'wire':
-  //       hitInfo = this.hitTestWire(item, p, tol, mode);
-  //       break;
-  //   }
-  //   if (hitInfo && !hitInfo.item)
-  //     hitInfo.item = item;
-  //   return hitInfo;
-  // }
+  hitTest(item: AllTypes, p: Point, tol: number, mode: RenderMode) : HitResultTypes | undefined {
+    let hitInfo: HitResultTypes | undefined;
+    if (item instanceof Element) {
+      hitInfo = this.hitTestElement(item, p, tol, mode);
+    } else if (item instanceof Wire) {
+      hitInfo = this.hitTestWire(item, p, tol, mode);
+    }
+      // case 'group':
+      //   hitInfo = this.hitTestGroup(item, p, tol, mode);
+      //   break;
+    return hitInfo;
+  }
 
-  // layout(item) {
-  //   switch (item.kind) {
-  //     case 'element':
-  //       break;
-  //     case 'group':
-  //       this.layoutGroup(item);
-  //       break;
-  //     case 'wire':
-  //       this.layoutWire(item);
-  //       break;
-  //   }
-  // }
+  layout(item: AllTypes) {
+    // TODO element layout?
+    if (item instanceof Wire) {
+      this.layoutWire(item);
+    }
+  }
 
   // drawHoverInfo(item, p) {
   //   const self = this, theme = this.theme, ctx = this.ctx,
@@ -1535,7 +1545,7 @@ class Renderer {
   //   ctx.fillStyle = theme.hoverColor;
   //   if (isGroupInstance(item)) {
   //     const groupItems = getDefinition(item);
-  //     let r = this.getUnionBounds(groupItems);
+  //     let r = this.getBounds(groupItems);
   //     ctx.translate(x - r.x, y - r.y);
   //     let border = 4;
   //     ctx.fillRect(r.x - border, r.y - border, r.w + 2 * border, r.h + 2 * border);
@@ -1568,564 +1578,12 @@ class Renderer {
 }
 
 /*
-// FunctionCharts module.
 
-const functionCharts = (function() {
-'use strict';
-
-function isFunctionChart(item) {
-  return item.kind === 'functionChart';
-}
-
-function isContainer(item) {
-  return item.kind === 'functionChart' || item.kind === 'group';
-}
-
-function isElement(item) {
-  return item.kind === 'element';
-}
-
-function isGroup(item) {
-  return item.kind === 'group';
-}
-
-function isElementOrGroup(item) {
-  return isElement(item) || isGroup(item);
-}
-
-function isGroupInstance(item) {
-  return isElement(item) && item.definitionId;
-}
-
-function isWire(item) {
-  return item.kind === 'wire';
-}
-
-function isLiteral(item) {
-  return item.elementKind === 'literal';
-}
-
-function isJunction(item) {
-  return item.elementKind === 'input' || item.elementKind === 'output';
-}
-
-function isClosed(item) {
-  return item.elementKind === 'closed';
-}
-
-function isAbstract(item) {
-  return item.elementKind === 'abstract';
-}
-
-function isInput(item) {
-  return item.elementKind === 'input';
-}
-
-function isOutput(item) {
-  return item.elementKind === 'output';
-}
-
-function isInputPinLabeled(item) {
-  return isOutput(item) || isAbstract(item);
-}
-
-function isOutputPinLabeled(item) {
-  return isInput(item) || isLiteral(item) || isClosed(item);
-}
-
-function isPaletted(item) {
-  return item.state === 'palette';
-}
-
-function isFunctionType(type) {
-  return type[0] === '[';
-}
-
-// Visits in pre-order.
-function visitItem(item, fn, filter) {
-  if (!filter || filter(item)) {
-    fn(item);
-  }
-  if (isContainer(item) && item.items) {
-    visitItems(item.items, fn, filter);
-  }
-}
-
-function visitItems(items, fn, filter) {
-  items.forEach(item => visitItem(item, fn, filter));
-}
-
-// Visits in post-order.
-function reverseVisitItem(item, fn, filter) {
-  if (isContainer(item) && item.items) {
-    reverseVisitItems(item.items, fn, filter);
-  }
-  if (!filter || filter(item)) {
-    fn(item);
-  }
-}
-
-function reverseVisitItems(items, fn, filter) {
-  for (let i = items.length - 1; i >= 0; i--) {
-    reverseVisitItem(items[i], fn, filter);
-  }
-}
-
-const inputElementType = '[,*]',
-      outputElementType = '[*,]';
-
-const _type = Symbol('type'),
-      _contextType = Symbol('contextType');
-
-const _x = Symbol('x'),
-      _y = Symbol('y'),
-      _baseline = Symbol('baseline'),
-      _width = Symbol('width'),
-      _height = Symbol('height'),
-      _p1 = Symbol('p1'),
-      _p2 = Symbol('p2'),
-      _bezier = Symbol('bezier'),
-      _hasLayout = Symbol('hasLayout');
-
-function extendTheme(theme) {
-  const extensions = {
-    spacing: 6,
-    knobbyRadius: 4,
-
-    minTypeWidth: 8,
-    minTypeHeight: 8,
-  }
-  return Object.assign(diagrams.theme.createDefault(), extensions, theme);
-}
-
-//------------------------------------------------------------------------------
-
-
-
-//------------------------------------------------------------------------------
-
-const _definition = Symbol('definition'),
-      _definitionsAttr = 'definitions';
-
-function getDefinition(item) {
-  return item[_definition];
-}
-
-//------------------------------------------------------------------------------
-
-// Maintains:
-// - maps from element to connected input and output wires.
-// - information about graphs and subgraphs.
-
-const _inputs = Symbol('inputs'),
-      _outputs = Symbol('outputs');
-
-const functionChartModel = (function() {
-
-  const proto = {
-    getInputs: function(element) {
-      assert(isElement(element));
-      return element[_inputs];
-    },
-
-    getOutputs: function(element) {
-      assert(isElement(element));
-      return element[_outputs];
-    },
-
-    forInputWires: function(element, fn) {
-      const inputs = this.getInputs(element);
-      if (!inputs)
-        return;
-      inputs.forEach((input, i) => { if (input) fn(input, i); });
-    },
-
-    forOutputWires: function(element, fn) {
-      const arrays = this.getOutputs(element);
-      if (!arrays)
-        return;
-      arrays.forEach((outputs, i) => outputs.forEach(output => fn(output, i)));
-    },
-
-    getGraphInfo: function() {
-      return {
-        elementsAndGroups: this.elementsAndGroups_,
-        wires: this.wires_,
-        interiorWires: this.wires_,
-        incomingWires: new diagrammar.collections.EmptySet(),
-        outgoingWires: new diagrammar.collections.EmptySet(),
-      }
-    },
-
-    getSubgraphInfo: function(items) {
-      const self = this,
-            elementsAndGroups = new Set(),
-            wires = new Set(),
-            interiorWires = new Set(),
-            incomingWires = new Set(),
-            outgoingWires = new Set();
-      // First collect elements and groups.
-      visitItems(items, function(item) {
-        elementsAndGroups.add(item);
-      }, isElementOrGroup);
-      // Now collect and classify wires that connect to elements.
-      visitItems(items, function(element) {
-        function addWire(wire) {
-          wires.add(wire);
-          const src = self.getWireSrc(wire),
-                dst = self.getWireDst(wire),
-                srcInside = elementsAndGroups.has(src),
-                dstInside = elementsAndGroups.has(dst);
-          if (srcInside) {
-            if (dstInside) {
-              interiorWires.add(wire);
-            } else {
-              outgoingWires.add(wire);
-            }
-          }
-          if (dstInside) {
-            if (!srcInside) {
-              incomingWires.add(wire);
-            }
-          }
-        }
-        self.forInputWires(element, addWire);
-        self.forOutputWires(element, addWire);
-      }, isElement);
-
-      return {
-        elementsAndGroups: elementsAndGroups,
-        wires: wires,
-        interiorWires: interiorWires,
-        incomingWires: incomingWires,
-        outgoingWires: outgoingWires,
-      }
-    },
-
-    getConnectedElements: function(elements, upstream, downstream) {
-      const self = this,
-            result = new Set();
-      while (elements.length > 0) {
-        const element = elements.pop();
-        if (!isElement(element))
-          continue;
-
-        result.add(element);
-
-        if (upstream) {
-          this.forInputWires(element, function(wire) {
-            const src = self.getWireSrc(wire);
-            if (!result.has(src))
-              elements.push(src);
-          });
-        }
-        if (downstream) {
-          this.forOutputWires(element, function(wire) {
-            const dst = self.getWireDst(wire);
-            if (!result.has(dst))
-              elements.push(dst);
-          });
-        }
-      }
-      return result;
-    },
-
-    insertElement_: function(element) {
-      this.elementsAndGroups_.add(element);
-      const type = getType(element);
-      // Initialize maps for new elements.
-      if (element[_inputs] === undefined) {
-        assert(element[_outputs] === undefined);
-        // array of incoming wires.
-        element[_inputs] = new Array(type.inputs.length).fill(null);
-        // array of arrays of outgoing wires.
-        const arrays = [...Array(type.outputs.length)].map(() => new Array());
-        element[_outputs] = arrays;
-      }
-    },
-
-    addWireToInputs_: function(wire, element, pin) {
-      if (!element || pin === undefined) return;
-      const inputs = this.getInputs(element);
-      inputs[pin] = wire;
-    },
-
-    addWireToOutputs_: function(wire, element, pin) {
-      if (!element || pin === undefined) return;
-      const outputs = this.getOutputs(element);
-      outputs[pin].push(wire);
-    },
-
-    insertWire_: function(wire) {
-      this.wires_.add(wire);
-      this.addWireToOutputs_(wire, this.getWireSrc(wire), wire.srcPin);
-      this.addWireToInputs_(wire, this.getWireDst(wire), wire.dstPin);
-    },
-
-    insertItem_: function(item) {
-      if (isElement(item)) {
-        this.insertElement_(item);
-      } else if (isWire(item)) {
-        this.insertWire_(item);
-      } else if (isGroup(item)) {
-        this.elementsAndGroups_.add(item);
-        const self = this;
-        item.items.forEach(subItem => self.insertItem_(subItem));
-      }
-    },
-
-    removeElement_: function(element) {
-      this.elementsAndGroups_.delete(element);
-    },
-
-    removeWireFromInputs_: function(wire, element, pin) {
-      if (!element || pin === undefined) return;
-      const inputs = this.getInputs(element);
-      if (inputs)
-        inputs[pin] = null;
-    },
-
-    removeWireFromOutputs_: function(wire, element, pin) {
-      if (!element || pin === undefined) return;
-      const outputArrays = this.getOutputs(element);
-      if (outputArrays) {
-        const outputs = outputArrays[pin];
-        const index = outputs.indexOf(wire);
-        if (index >= 0) {
-          outputs.splice(index, 1);
-        }
-      }
-    },
-
-    removeWire_: function(wire) {
-      this.wires_.delete(wire);
-      this.removeWireFromOutputs_(wire, this.getWireSrc(wire), wire.srcPin);
-      this.removeWireFromInputs_(wire, this.getWireDst(wire), wire.dstPin);
-    },
-
-    removeItem_: function(item) {
-      if (isElement(item)) {
-        this.removeElement_(item);
-      } else if (isWire(item)) {
-        this.removeWire_(item);
-      } else if (isGroup(item)) {
-        this.elementsAndGroups_.delete(item);
-        const self = this;
-        item.items.forEach(subItem => self.removeItem_(subItem));
-      }
-    },
-
-    // May be called inside transactions, to update wires during drags.
-    updateLayout: function() {
-      const self = this,
-            functionChartModel = this.model.functionChartModel;
-      this.changedElements_.forEach(function(element) {
-        function markWire(wire) {
-          wire[_hasLayout] = false;
-        }
-        functionChartModel.forInputWires(element, markWire);
-        functionChartModel.forOutputWires(element, markWire);
-      });
-      this.changedElements_.clear();
-    },
-
-    // Called at the end of transactions and undo/redo, to update bounds.
-    updateGroupLayout: function() {
-      this.changedTopLevelGroups_.forEach(group => group[_hasLayout] = false);
-      this.changedTopLevelGroups_.clear();
-    },
-
-    addTopLevelGroup_: function(item) {
-      let hierarchicalModel = this.model.hierarchicalModel,
-          ancestor = item;
-      do {
-        item = ancestor;
-        ancestor = hierarchicalModel.getParent(ancestor);
-      } while (ancestor && !isFunctionChart(ancestor));
-
-      if (isGroup(item)) {
-        this.changedTopLevelGroups_.add(item);
-      }
-    },
-
-    updateLayout_: function(item) {
-      const self = this;
-      if (isWire(item)) {
-        item[_hasLayout] = false;
-      } else if (isElement(item)) {
-        this.changedElements_.add(item);
-        this.addTopLevelGroup_(item);
-        if (item.items) {
-          visitItems(item.items, child => self.updateLayout_(child));
-        }
-      } else if (isGroup(item)) {
-        visitItems(item.items, child => self.updateLayout_(child));
-      }
-    },
-
-    onChanged_: function (change) {
-      const item = change.item,
-            attr = change.attr;
-      this.updateLayout_(item);
-      switch (change.type) {
-        case 'change': {
-          if (isWire(item)) {
-            // Changed wires need layout.
-            item[_hasLayout] = false;
-            // Wires may pass through invalid states, since each connection
-            // requires two edits to change. insertWire_ and removeWire_ should
-            // handle non-existent connections.
-            if (attr == 'srcId' || attr == 'srcPin' ||
-                attr == 'dstId' || attr == 'dstPin') {
-              const referencingModel = this.model.referencingModel,
-                    oldValue = change.oldValue,
-                    newValue = item[attr];
-              item[attr] = oldValue;
-              referencingModel.resolveReference(item, 'srcId');
-              referencingModel.resolveReference(item, 'dstId');
-              this.removeWire_(item);
-
-              item[attr] = newValue;
-              referencingModel.resolveReference(item, 'srcId');
-              referencingModel.resolveReference(item, 'dstId');
-              this.insertWire_(item);
-            }
-          } else if (isElementOrGroup(item) && attr == 'type') {
-            // Type changed due to update or relabeling.
-            updateType(item);
-            item[_hasLayout] = false;
-          }
-          break;
-        }
-        case 'insert': {
-          const newValue = item[attr][change.index];
-          this.updateLayout_(newValue);
-          this.insertItem_(newValue);
-          break;
-        }
-        case 'remove': {
-          const oldValue = change.oldValue;
-          this.removeItem_(oldValue);
-        }
-      }
-    },
-
-    checkConsistency: function() {
-      const self = this,
-            mappedWires = new Set();
-      this.elementsAndGroups_.forEach(function(element) {
-        if (!isElement(element)) return;
-        self.getInputs(element).forEach(function(wire) {
-          if (wire) mappedWires.add(wire);
-        });
-        self.getOutputs(element).forEach(function(wires) {
-          wires.forEach(function(wire) {
-            if (wire) mappedWires.add(wire);
-          });
-        });
-      });
-      return true;
-    },
-  }
-
-  function extend(model) {
-    if (model.functionChartModel)
-      return model.functionChartModel;
-
-    dataModels.observableModel.extend(model);
-    dataModels.referencingModel.extend(model);
-    dataModels.hierarchicalModel.extend(model);
-
-    let instance = Object.create(proto);
-    instance.model = model;
-    instance.functionChart = model.root;
-
-    instance.elementsAndGroups_ = new Set();
-    instance.wires_ = new Set();
-
-    instance.changedElements_ = new Set();
-    instance.changedTopLevelGroups_ = new Set();
-
-    instance.functionChart.items.forEach(item => instance.updateLayout_(item));
-
-    model.observableModel.addHandler('changed',
-                                     change => instance.onChanged_(change));
-
-    const transactionModel = model.transactionModel;
-    if (transactionModel) {
-      function update() {
-        instance.updateGroupLayout();
-      }
-      transactionModel.addHandler('transactionEnded', update);
-      transactionModel.addHandler('didUndo', update);
-      transactionModel.addHandler('didRedo', update);
-    }
-
-    instance.getWireSrc = model.referencingModel.getReferenceFn('srcId');
-    instance.getWireDst = model.referencingModel.getReferenceFn('dstId');
-
-    // Initialize elements and wires.
-    visitItem(instance.functionChart, function(element) {
-      instance.insertElement_(element);
-    }, isElement);
-    visitItem(instance.functionChart, function(wire) {
-      instance.insertWire_(wire);
-    }, isWire);
-
-    model.functionChartModel = instance;
-    return instance;
-  }
-
-  return {
-    extend: extend,
-  }
-})();
 
 //------------------------------------------------------------------------------
 
 const editingModel = (function() {
   const proto = {
-    getParent: function(item) {
-      return this.model.hierarchicalModel.getParent(item);
-    },
-
-    reduceSelection: function () {
-      let model = this.model;
-      model.selectionModel.set(model.hierarchicalModel.reduceSelection());
-    },
-
-    selectInteriorWires: function() {
-      const model = this.model,
-            selectionModel = model.selectionModel,
-            graphInfo = model.functionChartModel.getSubgraphInfo(selectionModel.contents());
-      selectionModel.add(graphInfo.interiorWires);
-    },
-
-    newItem: function(item) {
-      const dataModel = this.model.dataModel;
-      dataModel.assignId(item);
-      dataModel.initialize(item);
-      return item;
-    },
-
-    newItems: function(items) {
-      const self = this;
-      items.forEach(item => self.newItem(item));
-    },
-
-    newElement: function(type, x, y, elementKind) {
-      const result = {
-        kind: 'element',
-        type: type,
-        state: 'normal',
-        x: x,
-        y: y,
-      }
-      if (elementKind)
-        result.elementKind = elementKind;
-
-      return this.newItem(result);
-    },
 
     newGroup: function(x, y) {
       // Create the new group element.
@@ -2145,150 +1603,7 @@ const editingModel = (function() {
       return result;
     },
 
-    newWire: function(srcId, srcPin, dstId, dstPin) {
-      const result = {
-        kind: 'wire',
-        srcId: srcId,
-        srcPin: srcPin,
-        dstId: dstId,
-        dstPin: dstPin,
-      }
-      return this.newItem(result);
-    },
 
-    getItemIndex: function(item) {
-      const parent = this.getParent(item);
-      assert(parent);
-      return parent.items.indexOf(item);
-    },
-
-    deleteItem: function(item) {
-      const model = this.model,
-            parent = this.getParent(item),
-            index = this.getItemIndex(item);
-      assert(index >= 0);
-      model.observableModel.removeElement(parent, 'items', index);
-      model.selectionModel.remove(item);
-      return index;
-    },
-
-    deleteItems: function(items) {
-      const self = this;
-      items.forEach(item => self.deleteItem(item));
-    },
-
-    doDelete: function() {
-      this.reduceSelection();
-      this.model.copyPasteModel.doDelete(this.deleteItems.bind(this));
-    },
-
-    copyItems: function(items, map) {
-      const model = this.model,
-            diagram = this.diagram,
-            dataModel = model.dataModel,
-            translatableModel = model.translatableModel,
-            copies = this.model.copyPasteModel.cloneItems(items, map);
-      items.forEach(function(item) {
-        const copy = map.get(dataModel.getId(item));
-        if (isElementOrGroup(copy)) {
-          // De-palettize clone.
-          copy.state = 'normal';
-          // Clone coordinates should be in functionChart-space. Get global position
-          // from original item.
-          const translation = translatableModel.getToParent(item, diagram);
-          copy.x += translation.x;
-          copy.y += translation.y;
-        }
-      });
-      return copies;
-    },
-
-    addItem: function(item, parent, index) {
-      const model = this.model,
-            translatableModel = model.translatableModel,
-            oldParent = this.getParent(item);
-      if (!parent)
-        parent = this.diagram;
-      if (oldParent === parent)
-        return;
-      if (isFunctionChart(parent) || isGroup(parent)) {
-        if (!Array.isArray(parent.items))
-          model.observableModel.changeValue(parent, 'items', []);
-      }
-      if (oldParent !== parent) {
-        if (isElementOrGroup(item)) {
-          let translation = translatableModel.getToParent(item, parent);
-          model.observableModel.changeValue(item, 'x', item.x + translation.x);
-          model.observableModel.changeValue(item, 'y', item.y + translation.y);
-        }
-
-        if (oldParent)
-          this.deleteItem(item);
-        if (index === undefined)
-          index = parent.items.length;
-        model.observableModel.insertElement(parent, 'items', index, item);
-      }
-      return item;
-    },
-
-    addItems: function(items, parent) {
-      // Add elements and groups first, then wires, so functionChartModel can update.
-      for (let item of items) {
-        if (!isWire(item)) this.addItem(item, parent);
-      }
-      for (let item of items) {
-        if (isWire(item)) this.addItem(item, parent);
-      }
-    },
-
-    replaceElement: function(element, newElement) {
-      const self = this, model = this.model,
-            observableModel = model.observableModel,
-            functionChartModel = model.functionChartModel,
-            type = getType(element),
-            newId = model.dataModel.getId(newElement),
-            newType = getType(newElement),
-            parent = this.getParent(newElement),
-            newParent = this.getParent(element),
-            index = this.getItemIndex(element);
-      // Add newElement right after element. Both should be present as we
-      // rewire them.
-      if (parent) {
-        self.deleteItem(newElement);
-      }
-      self.addItem(newElement, newParent, index + 1);
-      observableModel.changeValue(newElement, 'x', element.x);
-      observableModel.changeValue(newElement, 'y', element.y);
-
-      // Update all incoming and outgoing wires if possible, otherwise they
-      // will be deleted as dangling wires by makeConsistent.
-      const srcChange = [], dstChange = [];
-      function canRewire(index, pins, newPins) {
-        if (index >= newPins.length)
-          return false;
-        const type = globalTypeParser_.trimType(pins[index].type),
-              newType = globalTypeParser_.trimType(newPins[index].type);
-        return type === '*' || type === newType;
-      }
-      functionChartModel.forInputWires(element, function(wire, pin) {
-        if (canRewire(wire.dstPin, type.inputs, newType.inputs)) {
-          dstChange.push(wire);
-        }
-      });
-      functionChartModel.forOutputWires(element, function(wire, pin) {
-        if (canRewire(wire.srcPin, type.outputs, newType.outputs)) {
-          srcChange.push(wire);
-        }
-      });
-      srcChange.forEach(function(wire) {
-        observableModel.changeValue(wire, 'srcId', newId);
-      });
-      dstChange.forEach(function(wire) {
-        observableModel.changeValue(wire, 'dstId', newId);
-      });
-
-      this.deleteItem(element);
-    },
 
     connectInput: function(element, pin, p) {
       const renderer = this.model.renderer,
@@ -2514,7 +1829,7 @@ const editingModel = (function() {
             }
           });
         }// else if (isGroup(item)) {
-         // const y = renderer.getBounds(item).y;
+         // const y = renderer.getItemRect(item).y;
          // outputs.push(makePin(item, item.type, y));
         //}
       });
@@ -2602,7 +1917,7 @@ const editingModel = (function() {
       const self = this,
             model = this.model,
             graphInfo = model.functionChartModel.getSubgraphInfo(items),
-            extents = model.renderer.getUnionBounds(graphInfo.elementsAndGroups),
+            extents = model.renderer.getBounds(graphInfo.elementsAndGroups),
             spacing = this.theme.spacing,
             x = extents.x - spacing,
             y = extents.y - spacing;
@@ -3066,7 +2381,7 @@ const editingModel = (function() {
         this.junctions.forEach(function (junction) {
           junction.x = x;
           junction.y = y;
-          let r = renderer.getBounds(junction);
+          let r = renderer.getItemRect(junction);
           x += r.w + spacing;
           h = Math.max(h, r.h);
         });
@@ -3077,7 +2392,7 @@ const editingModel = (function() {
         this.primitives.forEach(function (primitive) {
           primitive.x = x;
           primitive.y = y;
-          let r = renderer.getBounds(primitive);
+          let r = renderer.getItemRect(primitive);
           x += r.w + spacing;
           h = Math.max(h, r.h);
           if (x > 208) {
@@ -3165,7 +2480,7 @@ const editingModel = (function() {
         elements.push(item);
       }, isElementOrGroup);
 
-      const bounds = renderer.getBounds(elements);
+      const bounds = renderer.getItemRect(elements);
       // Adjust all edges 1 pixel out.
       const ctx = new C2S(bounds.width * 2 + 4, bounds.height * 2 + 4);
       ctx.scale(1.5, 1.5);
@@ -3632,7 +2947,7 @@ const editingModel = (function() {
             {
               // // Render the selected elements using Canvas2SVG to convert to SVG format.
               // // Clip to the selection bounding box.
-              // let bounds = renderer.getUnionBounds(selectionModel.contents());
+              // let bounds = renderer.getBounds(selectionModel.contents());
               // let ctx = new C2S(bounds.w, bounds.h);
               // ctx.translate(-bounds.x, -bounds.y);
               this.print();

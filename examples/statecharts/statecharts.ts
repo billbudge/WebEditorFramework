@@ -868,23 +868,24 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
+  private static removeTransitionHelper(array: Array<Transition>, transition: Transition) {
+    const index = array.indexOf(transition);
+    if (index >= 0) {
+      array.splice(index, 1);
+    }
+  }
+
   private removeTransition_(transition: Transition) {
     this.transitions.delete(transition);
     const src = transition.src,
           dst = transition.dst;
-    function remove(array: Array<Transition>, transition: Transition) {
-      const index = array.indexOf(transition);
-      if (index >= 0) {
-        array.splice(index, 1);
-      }
-    }
     if (src) {
       const outputs = src.outTransitions;
-      remove(outputs, transition);
+      StatechartContext.removeTransitionHelper(outputs, transition);
     }
     if (dst) {
       const inputs = dst.inTransitions;
-      remove(inputs, transition);
+      StatechartContext.removeTransitionHelper(inputs, transition);
     }
   }
 
@@ -922,20 +923,12 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
       if (parent) {
         if (prop === transitionTemplate.src) {
           const oldSrc = oldValue as StateTypes;
-          if (oldSrc) {
-            const outputs = oldSrc.outTransitions;
-            const index = outputs.indexOf(owner);
-            if (index >= 0)
-              outputs.splice(index, 1);
-          }
+          if (oldSrc)
+            StatechartContext.removeTransitionHelper(oldSrc.outTransitions, owner);
         } else if (prop === transitionTemplate.dst) {
           const oldDst = oldValue as StateTypes;
-          if (oldDst) {
-            const inputs = oldDst.inTransitions;
-            const index = inputs.indexOf(owner);
-            if (index >= 0)
-              inputs.splice(index, 1);
-          }
+          if (oldDst)
+            StatechartContext.removeTransitionHelper(oldDst.inTransitions, owner);
         }
         this.insertTransition_(owner, parent);
       }
