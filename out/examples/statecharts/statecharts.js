@@ -11,12 +11,12 @@ const stateTemplate = (function () {
     return { typeName, id, x, y, width, height, name, entry, exit, statecharts, properties };
 })();
 const pseudostateTemplate = (function () {
-    const id = new IdProp('id'), x = new ScalarProp('x'), y = new ScalarProp('y'), properties = [id, x, y];
+    const id = new IdProp('id'), x = new ScalarProp('x'), y = new ScalarProp('y'), properties = [id, x, y], start = 'start', stop = 'stop', history = 'history', deepHistory = 'history*';
     return {
-        start: { typeName: 'start', id, x, y, properties },
-        stop: { typeName: 'stop', id, x, y, properties },
-        history: { typeName: 'history', id, x, y, properties },
-        deepHistory: { typeName: 'history*', id, x, y, properties },
+        start: { typeName: start, id, x, y, properties },
+        stop: { typeName: stop, id, x, y, properties },
+        history: { typeName: history, id, x, y, properties },
+        deepHistory: { typeName: deepHistory, id, x, y, properties },
     };
 })();
 const transitionTemplate = (function () {

@@ -192,15 +192,6 @@ export class TypeParser {
 const globalTypeParser_ = new TypeParser(),
       nullFunction = globalTypeParser_.add('[,]');
 
-// function isLiteral(typeString: string) {
-//   if (!typeString.startsWith('[,v('))
-//     return false;
-//   if (!typeString.endsWith(')]'))
-//     return false;
-//   const value = typeString.substring(4, typeString.length - 2);
-//   return
-// }
-
 //------------------------------------------------------------------------------
 
 // Implement type-safe interfaces as well as a raw data interface for
@@ -225,7 +216,7 @@ type PseudoelementTemplate = {
   readonly y: ScalarProp,
   readonly properties: PropertyTypes[],
 }
-const pseudostateTemplate = (function() {
+const pseudoelementTemplate = (function() {
   const id = new IdProp('id'),
         x = new ScalarProp('x'),
         y = new ScalarProp('y'),
@@ -310,16 +301,48 @@ export class Element implements DataContextObject, ReferencedObject {
   }
 }
 
+export class Pseudoelement implements DataContextObject, ReferencedObject {
+  readonly template: PseudoelementTemplate;
+  readonly context: FunctionchartContext;
+
+  readonly id: number;
+
+  get x() { return this.template.x.get(this) || 0; }
+  set x(value: number) { this.template.x.set(this, value); }
+  get y() { return this.template.y.get(this) || 0; }
+  set y(value: number) { this.template.y.set(this, value); }
+  get typeString() : string {
+    switch (this.template.typeName) {
+      case 'input': return '[*,]';
+      case 'output': return '[,*]';
+      case 'literal': return '[,v]';
+    }
+  }
+
+  // Derived properties.
+  parent: Functionchart | undefined;
+  globalPosition = defaultPoint;
+  type: Type = globalTypeParser_.add(this.typeString);
+  inWires: (Wire | undefined)[];  // one input per pin.
+  outWires: Wire[][];             // array of outputs per pin, outputs have fan out.
+
+  constructor(template: PseudoelementTemplate, id: number, context: FunctionchartContext) {
+    this.template = template;
+    this.id = id;
+    this.context = context;
+  }
+}
+
 export class Wire implements DataContextObject {
   readonly template = wireTemplate;
   readonly context: FunctionchartContext;
 
-  get src() { return this.template.src.get(this) as Element | undefined; }
-  set src(value: Element | undefined) { this.template.src.set(this, value); }
+  get src() { return this.template.src.get(this) as ElementTypes | undefined; }
+  set src(value: ElementTypes | undefined) { this.template.src.set(this, value); }
   get srcPin() { return this.template.srcPin.get(this) || -1; }
   set srcPin(value: number) { this.template.srcPin.set(this, value); }
-  get dst() { return this.template.dst.get(this) as Element | undefined; }
-  set dst(value: Element | undefined) { this.template.dst.set(this, value); }
+  get dst() { return this.template.dst.get(this) as ElementTypes | undefined; }
+  set dst(value: ElementTypes | undefined) { this.template.dst.set(this, value); }
   get dstPin() { return this.template.dstPin.get(this) || -1; }
   set dstPin(value: number) { this.template.dstPin.set(this, value); }
 
@@ -349,7 +372,7 @@ export class Functionchart implements DataContextObject {
   get name() { return this.template.name.get(this) || ''; }
   set name(value: string | undefined) { this.template.name.set(this, value); }
 
-  get elements() { return this.template.elements.get(this) as List<Element>; }
+  get elements() { return this.template.elements.get(this) as List<ElementTypes>; }
   get wires() { return this.template.wires.get(this) as List<Wire>; }
   get functioncharts() { return this.template.functioncharts.get(this) as List<Functionchart>; }
 
@@ -362,15 +385,16 @@ export class Functionchart implements DataContextObject {
   }
 }
 
-type NonWireTypes = Element | Functionchart;
-type AllTypes = Element | Wire | Functionchart;
+type ElementTypes = Element | Pseudoelement;
+type NonWireTypes = ElementTypes | Functionchart;
+type AllTypes = ElementTypes | Wire | Functionchart;
 
 export type FunctionchartVisitor = (item: AllTypes) => void;
 export type NonWireVisitor = (nonwire: NonWireTypes) => void;
 export type WireVisitor = (wire: Wire) => void;
 
 export interface GraphInfo {
-  elements: Set<Element>;
+  elements: Set<ElementTypes>;
   functioncharts: Set<Functionchart>;
   wires: Set<Wire>;
   interiorWires: Set<Wire>;
@@ -381,10 +405,10 @@ export interface GraphInfo {
 export class FunctionchartContext extends EventBase<Change, ChangeEvents>
                                   implements DataContext {
   private highestId: number = 0;  // 0 stands for no id.
-  private readonly referentMap = new Map<number, Element>();
+  private readonly referentMap = new Map<number, ElementTypes>();
 
   private functionchart: Functionchart;  // The root functionchart.
-  private elements = new Set<Element>;
+  private elements = new Set<ElementTypes>;
   private functioncharts = new Set<Functionchart>;
   private wires = new Set<Wire>;
 
@@ -423,7 +447,19 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.referentMap.set(nextId, result);
     return result;
   }
-
+  newPseudoelement(typeName: PseudoelementSubtype) : Pseudoelement {
+    const nextId = ++this.highestId;
+    let template: PseudoelementTemplate;
+    switch (typeName) {
+      case 'input': template = pseudoelementTemplate.input; break;
+      case 'output': template = pseudoelementTemplate.output; break;
+      case 'literal': template = pseudoelementTemplate.literal; break;
+      default: throw new Error('Unknown pseudoelement type: ' + typeName);
+    }
+    const result: Pseudoelement = new Pseudoelement(template, nextId, this);
+    this.referentMap.set(nextId, result);
+    return result;
+  }
   newWire(src: Element | undefined, srcPin: number, dst: Element | undefined, dstPin: number) : Wire {
     const result = new Wire(this);
     result.src = src;
@@ -432,7 +468,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     result.dstPin = dstPin;
     return result;
   }
-
   newFunctionchart() : Functionchart {
     return new Functionchart(this);
   }
@@ -484,7 +519,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
-  forInWires(element: Element, visitor: WireVisitor) {
+  forInWires(element: ElementTypes, visitor: WireVisitor) {
     const inputs = element.inWires;
     if (!inputs)
       return;
@@ -494,7 +529,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  forOutWires(element: Element, visitor: WireVisitor) {
+  forOutWires(element: ElementTypes, visitor: WireVisitor) {
     const outputs = element.outWires;
     if (!outputs)
       return;
@@ -550,13 +585,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   getSubgraphInfo(items: Element[]) : GraphInfo {
     const self = this,
-          elements = new Set<Element>(),
+          elements = new Set<ElementTypes>(),
           functioncharts = new Set<Functionchart>(),
           wires = new Set<Wire>(),
           interiorWires = new Set<Wire>(),
           inWires = new Set<Wire>(),
           outWires = new Set<Wire>();
-    // First collect states and Functioncharts.
+    // First collect elements and Functioncharts.
     items.forEach(item => {
       this.visitAll(item, item => {
         if (item instanceof Element)
@@ -568,11 +603,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // Now collect and classify transitions that connect to them.
     items.forEach(item => {
       function addWire(wire: Wire) {
-        // Stop if we've already processed this transtion (handle transitions from a state to itself.)
+        // Stop if we've already processed this transtion (handle transitions from a element to itself.)
         if (wires.has(wire)) return;
         wires.add(wire);
-        const src: Element = wire.src!,
-              dst: Element = wire.dst!,
+        const src: ElementTypes = wire.src!,
+              dst: ElementTypes = wire.dst!,
               srcInside = elements.has(src),
               dstInside = elements.has(dst);
         if (srcInside) {
@@ -604,8 +639,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  getConnectedElements(elements: Element[], upstream: boolean, downstream: boolean) : Set<Element> {
-    const result = new Set<Element>();
+  getConnectedElements(elements: ElementTypes[], upstream: boolean, downstream: boolean) : Set<ElementTypes> {
+    const result = new Set<ElementTypes>();
     elements = elements.slice(0);  // Copy input array
     while (elements.length > 0) {
       const element = elements.pop();
@@ -614,7 +649,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       result.add(element);
       if (upstream) {
         this.forInWires(element, wire => {
-          const src: Element = wire.src!;
+          const src = wire.src!;
           if (!result.has(src))
             elements.push(src);
         });
@@ -731,7 +766,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   addItems(items: AllTypes[], parent: Functionchart) {
-    // Add states first, then transitions, so the context can track transitions.
+    // Add elements first, then transitions, so the context can track transitions.
     for (let item of items) {
       if (item instanceof Element)
         this.addItem(item, parent);
@@ -866,7 +901,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.deleteItem(element);
   }
 
-  private insertElement_(element: Element, parent: Functionchart) {
+  private insertElement_(element: ElementTypes, parent: Functionchart) {
     this.elements.add(element);
     element.parent = parent;
     this.updateItem(element);
@@ -877,7 +912,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       element.outWires = new Array<Wire[]>();
   }
 
-  private removeElement_(element: Element) {
+  private removeElement_(element: ElementTypes) {
     this.elements.delete(element);
   }
 
@@ -999,8 +1034,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.removeItem_(oldValue);
     this.onElementRemoved(owner, prop, index, oldValue);
   }
-  resolveReference(owner: AllTypes, prop: ReferenceProp) : Element | undefined {
-    // Look up state id.
+  resolveReference(owner: AllTypes, prop: ReferenceProp) : ElementTypes | undefined {
+    // Look up element id.
     const id: number = prop.getId(owner);
     if  (!id)
       return undefined;
@@ -1009,12 +1044,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   construct(typeName: string) : AllTypes {
     switch (typeName) {
       case 'element': return this.newElement();
-      // case 'start':
-      // case 'stop':
-      // case 'history':
-      // case 'history*': return this.newPseudostate(typeName);
-      // case 'transition': return this.newWire(undefined, undefined);
-      // case 'Functionchart': return this.newFunctionchart();
+      case 'input': return this.newPseudoelement('input');
+      case 'output': return this.newPseudoelement('output');
+      case 'literal': return this.newPseudoelement('literal');
+      case 'Functionchart': return this.newFunctionchart();
     }
     throw new Error('Unknown type');
   }
@@ -1139,7 +1172,7 @@ class Renderer {
     const global = item.globalPosition;
     let x = global.x,
         y = global.y;
-    if (item instanceof Element) {
+    if (item instanceof Element || item instanceof Pseudoelement) {
       const type = item.type;
       return { x: x, y: y, width: type.width, height: type.height };
     } else {
@@ -1160,7 +1193,7 @@ class Renderer {
     return { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
   }
 
-  pinToPoint(element: Element, index: number, isInput: boolean) : PointWithNormal {
+  pinToPoint(element: ElementTypes, index: number, isInput: boolean) : PointWithNormal {
     const rect: Rect = this.getItemRect(element),
           w = rect.width, h = rect.height,
           type = element.type;
