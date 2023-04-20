@@ -1595,7 +1595,6 @@ export class StatechartEditor {
         }
         else {
             const renderer = this.renderer;
-            // assert(canvasController === this.paletteController);
             renderer.begin(canvasController.getCtx());
             // Layout the palette items and their parent statechart.
             renderer.begin(canvasController.getCtx());

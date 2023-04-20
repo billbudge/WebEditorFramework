@@ -40,6 +40,7 @@ const stateTemplate = (function() {
   return { typeName, id, x, y, width, height, name, entry, exit, statecharts, properties };
 })();
 
+// TODO use this or remove it.
 export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
 type PseudostateTemplate = {
   readonly typeName: string,
@@ -52,12 +53,16 @@ const pseudostateTemplate = (function() {
   const id = new IdProp('id'),
         x = new ScalarProp('x'),
         y = new ScalarProp('y'),
-        properties = [id, x, y];
+        properties = [id, x, y],
+        start: PseudostateSubtype = 'start',
+        stop: PseudostateSubtype = 'stop',
+        history: PseudostateSubtype = 'history',
+        deepHistory: PseudostateSubtype = 'history*';
   return {
-    start: { typeName: 'start', id, x, y, properties },
-    stop: { typeName: 'stop', id, x, y, properties },
-    history: { typeName: 'history', id, x, y, properties },
-    deepHistory: { typeName: 'history*', id, x, y, properties },
+    start: { typeName: start, id, x, y, properties },
+    stop: { typeName: stop, id, x, y, properties },
+    history: { typeName: history, id, x, y, properties },
+    deepHistory: { typeName: deepHistory, id, x, y, properties },
   };
 })();
 
@@ -295,7 +300,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.stateMap.set(nextId, result);
     return result;
   }
-  newPseudostate(typeName: string) : Pseudostate {
+  newPseudostate(typeName: PseudostateSubtype) : Pseudostate {
     const nextId = ++this.highestId;
     let template: PseudostateTemplate;
     switch (typeName) {
@@ -1990,7 +1995,6 @@ export class StatechartEditor implements CanvasLayer {
     if (canvasController === this.canvasController) {
     } else {
       const renderer = this.renderer;
-      // assert(canvasController === this.paletteController);
       renderer.begin(canvasController.getCtx());
       // Layout the palette items and their parent statechart.
       renderer.begin(canvasController.getCtx());

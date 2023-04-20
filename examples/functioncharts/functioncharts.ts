@@ -19,11 +19,7 @@ import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
 //------------------------------------------------------------------------------
 
-// A map from type strings to type objects. The type objects are "atomized" so
-// there will only be one type object for each possible type string.
-
-// Signature format: [inputs,outputs] with optional names, e.g.
-// [v(a)v(b),v(sum)](+) for a binary addition element.
+// Parse type strings into type objects.
 
 export class Pin {
   typeString: string;
@@ -196,6 +192,15 @@ export class TypeParser {
 const globalTypeParser_ = new TypeParser(),
       nullFunction = globalTypeParser_.add('[,]');
 
+// function isLiteral(typeString: string) {
+//   if (!typeString.startsWith('[,v('))
+//     return false;
+//   if (!typeString.endsWith(')]'))
+//     return false;
+//   const value = typeString.substring(4, typeString.length - 2);
+//   return
+// }
+
 //------------------------------------------------------------------------------
 
 // Implement type-safe interfaces as well as a raw data interface for
@@ -210,6 +215,29 @@ const elementTemplate = (function() {
         type = new ScalarProp('type'),
         properties = [id, x, y, name, type];
   return { typeName, id, x, y, name, type, properties };
+})();
+
+export type PseudoelementSubtype = 'input' | 'output' | 'literal';
+type PseudoelementTemplate = {
+  readonly typeName: PseudoelementSubtype,
+  readonly id: IdProp,
+  readonly x: ScalarProp,
+  readonly y: ScalarProp,
+  readonly properties: PropertyTypes[],
+}
+const pseudostateTemplate = (function() {
+  const id = new IdProp('id'),
+        x = new ScalarProp('x'),
+        y = new ScalarProp('y'),
+        properties = [id, x, y],
+        input: PseudoelementSubtype = 'input',
+        output: PseudoelementSubtype = 'output',
+        literal: PseudoelementSubtype = 'literal';
+  return {
+    input: { typeName: input, id, x, y, properties },
+    output: { typeName: output, id, x, y, properties },
+    literal: { typeName: literal, id, x, y, properties },
+  };
 })();
 
 const wireTemplate = (function() {
@@ -528,7 +556,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           interiorWires = new Set<Wire>(),
           inWires = new Set<Wire>(),
           outWires = new Set<Wire>();
-    // First collect states and statecharts.
+    // First collect states and Functioncharts.
     items.forEach(item => {
       this.visitAll(item, item => {
         if (item instanceof Element)
@@ -715,7 +743,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   copy() : AllTypes[] {
-    const statechart = this.functionchart,
+    const Functionchart = this.functionchart,
           selection = this.selection;
 
     selection.set(this.selectedElements());
@@ -730,7 +758,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (item instanceof Element) {
         const copy = map.get(item.id);
         if (copy) {
-          const translation = this.getToParent(item, statechart);
+          const translation = this.getToParent(item, Functionchart);
           copy.x += translation.x;
           copy.y += translation.y;
         }
@@ -765,7 +793,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   makeConsistent () {
     const self = this,
-          statechart = this.functionchart,
+          Functionchart = this.functionchart,
           graphInfo = this.getGraphInfo();
     // Eliminate dangling transitions.
     graphInfo.wires.forEach(wire => {
@@ -985,8 +1013,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       // case 'stop':
       // case 'history':
       // case 'history*': return this.newPseudostate(typeName);
-      // case 'transition': return this.newTransition(undefined, undefined);
-      // case 'statechart': return this.newStatechart();
+      // case 'transition': return this.newWire(undefined, undefined);
+      // case 'Functionchart': return this.newFunctionchart();
     }
     throw new Error('Unknown type');
   }
@@ -1226,30 +1254,28 @@ class Renderer {
   }
 
   // Make sure a group is big enough to enclose its contents.  // TODO Functionchart concept
-  // layoutFunctionchart(functionchart: Functionchart) {
-  //   const self = this,
-  //         spacing = this.theme.spacing;
-  //   function layout(functionChart: Functionchart) {
-  //     const extents = self.getBounds(functionChart.elements.asArray()),
-  //           global = functionChart.globalPosition,
-  //           groupX = global.x,
-  //           groupY = global.y,
-  //           margin = 2 * spacing,
-  //           type = functionChart.type;
-  //     let width = extents.x + extents.width - groupX + margin,
-  //         height = extents.y + extents.height - groupY + margin;
-  //     width += type.width;
-  //     height = Math.max(height, type.height + margin);
-  //     functionChart.width = width;
-  //     functionChart.height = height;
-  //   }
-  //   // Visit in reverse order to correctly include sub-functionchart bounds.
-  //   reverseVisitItem(functionchart, function(group) {
-  //     layout(group);
-  //   }, isGroup);
-
-  //   functionchart[_hasLayout] = true;
-  // }
+  layoutFunctionchart(functionchart: Functionchart) {
+    const self = this,
+          spacing = this.theme.spacing;
+    function layout(functionChart: Functionchart) {
+      const extents = self.getBounds(functionChart.elements.asArray()),
+            global = functionChart.globalPosition,
+            groupX = global.x,
+            groupY = global.y,
+            margin = 2 * spacing;
+      let width = extents.x + extents.width - groupX + margin,
+          height = extents.y + extents.height - groupY + margin;
+      // width += type.width;  // TODO Functionchart type and export
+      // height = Math.max(height, type.height + margin);
+      functionChart.width = width;
+      functionChart.height = height;
+    }
+    // Visit in reverse order to correctly include sub-functionchart bounds.
+    functionchart.context.reverseVisitAll(functionchart, item => {
+      if (item instanceof Functionchart)
+        layout(item);
+    });
+  }
 
   drawType(type: Type, x: number, y: number, fillOutputs: boolean) {
     const self = this, ctx = this.ctx, theme = this.theme,
@@ -1577,6 +1603,366 @@ class Renderer {
   // }
 }
 
+// --------------------------------------------------------------------------------------------
+
+function isDropTarget(hitInfo: HitResultTypes) : boolean {
+  const item = hitInfo.item,
+        selection = item.context.selection;
+  return (hitInfo instanceof ElementHitResult || hitInfo instanceof FunctionchartHitResult) &&
+          !selection.has(item) && !ancestorInSet(item, selection);
+}
+
+function isClickable(hitInfo: HitResultTypes) : boolean {
+  return true;
+}
+
+function isDraggable(hitInfo: HitResultTypes) : boolean {
+  return hitInfo instanceof ElementHitResult;
+}
+
+function hasProperties(hitInfo: HitResultTypes) : boolean {
+  return !(hitInfo instanceof Wire);
+}
+
+type ElementDragType = 'copyPalette' | 'moveSelection' | 'moveCopySelection' | 'resizeState';
+class ElementDrag {
+  items: AllTypes[];
+  type: ElementDragType;
+  description: string;
+  constructor(items: Element[], type: ElementDragType, description: string) {
+    this.items = items;
+    this.type = type;
+    this.description = description;
+  }
+}
+
+type WireDragType = 'newWire' | 'connectWireSrc' | 'connectWireDst';
+class WireDrag {
+  transition: Wire;
+  type: WireDragType;
+  description: string;
+  constructor(transition: Wire, type: WireDragType, description: string) {
+    this.transition = transition;
+    this.type = type;
+    this.description = description;
+  }
+}
+
+type DragTypes = ElementDrag | WireDrag;
+
+export class FunctionchartEditor /*implements CanvasLayer*/ {
+  private theme: FunctionchartTheme;
+  private canvasController: CanvasController;
+  private paletteController: CanvasController;
+  private propertyGridController: PropertyGridController;
+  private fileController: FileController;
+  private hitTolerance: number;
+  private changedItems: Set<AllTypes>;
+  private changedTopLevelFunctioncharts: Set<Functionchart>;
+  private renderer: Renderer;
+  private palette: Functionchart;  // Functionchart to simplify layout of palette items.
+  private context: FunctionchartContext;
+  private functionchart: Functionchart;
+  private scrap: AllTypes[] = []
+
+  private pointerHitInfo: HitResultTypes | undefined;
+  private draggableHitInfo: HitResultTypes | undefined;
+  private clickInPalette: boolean = false;
+  private moveCopy: boolean = false;
+  private dragInfo: DragTypes | undefined;
+  private hotTrackInfo: HitResultTypes | undefined;
+  private hoverHitInfo: HitResultTypes | undefined;
+  private hoverPoint: Point;
+  private propertyInfo = new Map<string, PropertyInfo[]>();
+
+  constructor(theme: Theme,
+              canvasController: CanvasController,
+              paletteController: CanvasController,
+              propertyGridController: PropertyGridController) {
+    const self = this;
+    this.theme = new FunctionchartTheme(theme);
+    this.canvasController = canvasController;
+    this.paletteController = paletteController;
+    this.propertyGridController = propertyGridController;
+    this.fileController = new FileController();
+
+    this.hitTolerance = 8;
+
+    // Change tracking for layout.
+    // Changed items that must be updated before drawing and hit testing.
+    this.changedItems = new Set();
+    // Changed top level functioncharts that must be laid out after transactions and undo/redo.
+    this.changedTopLevelFunctioncharts = new Set();
+
+    const renderer = new Renderer(theme);
+    this.renderer = renderer;
+
+    // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
+    const context = new FunctionchartContext(),
+          Functionchart = context.newFunctionchart();/*,
+          start = context.newPseudostate('start'),
+          stop = context.newPseudostate('stop'),
+          history = context.newPseudostate('history'),
+          historyDeep = context.newPseudostate('history*'),
+          newState = context.newState();
+
+    start.x = start.y = 8;
+    stop.x = 40; stop.y = 8;
+    history.x = 72; history.y = 8;
+    historyDeep.x = 104; historyDeep.y = 8;
+    newState.x = 8; newState.y = 32;
+    newState.width = 100; newState.height = 60;
+
+    Functionchart.elements.append(start);
+    Functionchart.elements.append(stop);
+    Functionchart.elements.append(history);
+    Functionchart.elements.append(historyDeep);
+    Functionchart.elements.append(newState);*/
+    context.setRoot(Functionchart);
+    this.palette = Functionchart;
+
+    // Default Functionchart.
+    this.context = new FunctionchartContext();
+    this.initializeContext(this.context);
+    this.functionchart = this.context.root();
+
+    // Register property grid layouts.
+    function getAttr(info: PropertyInfo) : string | undefined {
+      switch (info.label) {
+        case 'name':
+          return 'name';
+        case 'entry':
+          return 'entry';
+        case 'exit':
+          return 'exit';
+        case 'event':
+          return 'event';
+        case 'guard':
+          return 'guard';
+        case 'action':
+          return 'action';
+      }
+    }
+    function getter(info: PropertyInfo, item: AllTypes) {
+      const attr = getAttr(info);
+      if (item && attr)
+        return (item as any)[attr];
+      return '';
+    }
+    function setter(info: PropertyInfo, item: AllTypes, value: any) {
+      const canvasController = self.canvasController;
+      if (item) {
+        const attr = getAttr(info);
+        if (attr) {
+          const description = 'change ' + attr,
+                transactionManager = self.context.transactionManager;
+          transactionManager.beginTransaction(description);
+          (item as any)[attr] = value;
+          transactionManager.endTransaction();
+          canvasController.draw();
+       }
+      }
+    }
+    this.propertyInfo.set('state', [
+      {
+        label: 'name',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+      },
+      {
+        label: 'entry',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+      },
+      {
+        label: 'exit',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+      },
+    ]);
+    this.propertyInfo.set('transition', [
+      {
+        label: 'event',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+      },
+      {
+        label: 'guard',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+      },
+      {
+        label: 'action',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+      },
+    ]);
+    this.propertyInfo.set('Functionchart', [
+      {
+        label: 'name',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+      },
+    ]);
+
+    this.propertyInfo.forEach((info, key) => {
+      propertyGridController.register(key, info);
+    });
+  }
+  initializeContext(context: FunctionchartContext) {
+    const self = this;
+
+    // On attribute changes and item insertions, dynamically layout affected items.
+    // This allows us to layout transitions as their src or dst elements are dragged.
+    context.addHandler('changed', change => self.onChanged_(change));
+
+    // On ending transactions and undo/redo, layout the changed top level functioncharts.
+    function updateBounds() {
+      self.updateBounds_();
+    }
+    context.transactionManager.addHandler('transactionEnding', updateBounds);
+    context.transactionManager.addHandler('didUndo', updateBounds);
+    context.transactionManager.addHandler('didRedo', updateBounds);
+  }
+  setContext(context: FunctionchartContext) {
+    const functionchart = context.root(),
+          renderer = this.renderer;
+
+    this.context = context;
+    this.functionchart = functionchart;
+
+    this.changedItems.clear();
+    this.changedTopLevelFunctioncharts.clear();
+
+    // renderer.setModel(model);
+
+    // Layout any items in the functionchart.
+    renderer.begin(this.canvasController.getCtx());
+    context.reverseVisitAll(this.functionchart, item => renderer.layout(item));
+    renderer.end();
+  }
+  initialize(canvasController: CanvasController) {
+    if (canvasController === this.canvasController) {
+    } else {
+      const renderer = this.renderer;
+      renderer.begin(canvasController.getCtx());
+      // Layout the palette items and their parent functionchart.
+      renderer.begin(canvasController.getCtx());
+      this.context.reverseVisitAll(this.palette, item => renderer.layout(item));
+      // Draw the palette items.
+      this.context.visitAll(this.palette, item => renderer.draw(item, RenderMode.Normal));
+      renderer.end();
+    }
+  }
+  onChanged_(change: Change) {
+    const functionchart = this.functionchart,
+          context = this.context, changedItems = this.changedItems,
+          changedTopLevelStates = this.changedTopLevelFunctioncharts,
+          item: AllTypes = change.item as AllTypes, prop = change.prop;
+
+    // Track all top level functioncharts which contain changes. On ending a transaction,
+    // update the layout of functioncharts.
+    let ancestor: AllTypes | undefined = item,
+        topLevel;
+    do {
+      topLevel = ancestor;
+      ancestor = ancestor.parent;
+    } while (ancestor && ancestor !== functionchart);
+
+    if (ancestor === functionchart && topLevel instanceof Functionchart) {
+      changedTopLevelStates.add(topLevel);
+    }
+
+    function addItems(item: AllTypes) {
+      if (item instanceof Element) {
+        // Layout the state's incoming and outgoing transitions.
+        context.forInWires(item, addItems);
+        context.forOutWires(item, addItems);
+      }
+      changedItems.add(item);
+    }
+
+    switch (change.type) {
+      case 'valueChanged': {
+        const attr = prop.name;
+        // For changes to x, y, width, or height, layout affected transitions.
+        if (attr == 'x' || attr == 'y' || attr == 'width' || attr == 'height') {
+          // Visit item and sub-items to layout all affected transitions.
+          context.visitAll(item, addItems);
+        } else if (item instanceof Wire) {
+          addItems(item);
+        }
+        break;
+      }
+      case 'elementInserted': {
+        // Update item subtrees as they are inserted.
+        context.reverseVisitAll(prop.get(item).at(change.index), addItems);
+        break;
+      }
+    }
+  }
+  updateLayout_() {
+    const renderer = this.renderer,
+          context = this.context,
+          changedItems = this.changedItems;
+    // This function is called during the draw, hitTest, and updateBounds_ methods,
+    // so the renderer is started.
+    // First layout containers, and then layout wires which depend on elements'
+    // size and location.
+    function layout(item: AllTypes, visitor: FunctionchartVisitor) {
+      context.reverseVisitAll(item, visitor);
+    }
+    changedItems.forEach(item => {
+      layout(item, item => {
+        if (!(item instanceof Wire))
+          renderer.layout(item);
+      });
+    });
+    changedItems.forEach(item => {
+      layout(item, item => {
+        if (item instanceof Wire)
+          renderer.layout(item);
+      });
+    });
+    changedItems.clear();
+  }
+  updateBounds_() {
+    const ctx = this.canvasController.getCtx(),
+          renderer = this.renderer,
+          context = this.context,
+          functionchart = this.functionchart,
+          changedTopLevelStates = this.changedTopLevelFunctioncharts;
+    renderer.begin(ctx);
+    // Update any changed items first.
+    this.updateLayout_();
+    // Then update the bounds of super states, bottom up.
+    changedTopLevelStates.forEach(
+      state => context.reverseVisitAll(state, item => {
+        if (!(item instanceof Wire))
+          renderer.layout(item);
+    }));
+    // Finally update the root functionchart's bounds.
+    renderer.layoutFunctionchart(functionchart);
+    renderer.end();
+    changedTopLevelStates.clear();
+    // Make sure the canvas is large enough to contain the root functionchart.
+    const canvasController = this.canvasController,
+          canvasSize = canvasController.getSize();
+    let width = functionchart.width, height = functionchart.height;
+    if (width > canvasSize.width || height > canvasSize.height) {
+      width = Math.max(width, canvasSize.width);
+      height = Math.max(height, canvasSize.height);
+      canvasController.setSize(width, height);
+    }
+  }
+}
 /*
 
 
