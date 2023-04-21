@@ -1744,7 +1744,8 @@ function readRaw(raw: any, context: StatechartContext) : void {
 //------------------------------------------------------------------------------
 
 function isStateBorder(hitInfo: HitResultTypes) : boolean {
-  return hitInfo instanceof StateHitResult && hitInfo.inner.border;
+  return (hitInfo instanceof StateHitResult || hitInfo instanceof PseudostateHitResult)
+          && hitInfo.inner.border;
 }
 
 function isDropTarget(hitInfo: HitResultTypes) : boolean {

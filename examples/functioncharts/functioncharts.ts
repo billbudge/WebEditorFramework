@@ -3,8 +3,9 @@ import { SelectionSet } from '../../src/collections.js'
 import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, RectHitResult,
          diskPath, hitTestDisk, DiskHitResult, roundRectPath, bezierEdgePath,
-         hitTestBezier, measureNameValuePairs, CanvasController, CanvasLayer,
-         PropertyGridController, PropertyInfo, FileController } from '../../src/diagrams.js'
+         hitTestBezier, inFlagPath, outFlagPath, measureNameValuePairs,
+         CanvasController, CanvasLayer, PropertyGridController, PropertyInfo,
+         FileController } from '../../src/diagrams.js'
 
 import { PointWithNormal, getExtents, projectPointToCircle, BezierCurve,
          evaluateBezier, CurveHitResult } from '../../src/geometry.js'
@@ -1114,11 +1115,11 @@ interface Rect {
 }
 
 class ElementHitResult {
-  item: Element;
+  item: ElementTypes;
   inner: RectHitResult;
   input: number = -1;
   output: number = -1;
-  constructor(item: Element, inner: RectHitResult) {
+  constructor(item: ElementTypes, inner: RectHitResult) {
     this.item = item;
     this.inner = inner;
   }
@@ -1170,8 +1171,8 @@ class Renderer {
 
   getItemRect(item: NonWireTypes) : Rect {
     const global = item.globalPosition;
-    let x = global.x,
-        y = global.y;
+    const x = global.x,
+          y = global.y;
     if (item instanceof Element || item instanceof Pseudoelement) {
       const type = item.type;
       return { x: x, y: y, width: type.width, height: type.height };
@@ -1370,7 +1371,7 @@ class Renderer {
     }
   }
 
-  drawElement(element: Element, mode: RenderMode) {
+  drawElement(element: ElementTypes, mode: RenderMode) {
     const ctx = this.ctx,
           theme = this.theme,
           spacing = theme.spacing,
@@ -1378,18 +1379,23 @@ class Renderer {
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
           right = x + w, bottom = y + h;
 
-    // switch (element.elementKind) {
-    //   case 'input':
-    //     diagrams.inFlagPath(x, y, w, h, spacing, ctx);
-    //     break;
-    //   case 'output':
-    //     diagrams.outFlagPath(x, y, w, h, spacing, ctx);
-    //     break;
-    //   default:
-        ctx.beginPath();
-        ctx.rect(x, y, w, h);
-        // break;
-    // }
+    if (element instanceof Pseudoelement) {
+      switch (element.template.typeName) {
+        case 'input':
+          inFlagPath(x, y, w, h, spacing, ctx);
+          break;
+        case 'output':
+          outFlagPath(x, y, w, h, spacing, ctx);
+          break;
+        case 'literal':
+          ctx.beginPath();
+          ctx.rect(x, y, w, h);
+          break;
+      }
+    } else {
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+    }
 
     switch (mode) {
       case RenderMode.Normal:
@@ -1413,7 +1419,7 @@ class Renderer {
     }
   }
 
-  drawElementPin(element: Element, input: number, output: number, mode: RenderMode) {
+  drawElementPin(element: ElementTypes, input: number, output: number, mode: RenderMode) {
     const theme = this.theme,
           ctx = this.ctx,
           rect = this.getItemRect(element),
@@ -1499,7 +1505,7 @@ class Renderer {
   //   }
   // }
 
-  hitTestElement(element: Element, p: Point, tol: number, mode: RenderMode) :
+  hitTestElement(element: ElementTypes, p: Point, tol: number, mode: RenderMode) :
                  ElementHitResult | undefined {
     const rect = this.getItemRect(element),
           x = rect.x, y = rect.y, width = rect.width, height = rect.height,
@@ -1580,7 +1586,7 @@ class Renderer {
 
   hitTest(item: AllTypes, p: Point, tol: number, mode: RenderMode) : HitResultTypes | undefined {
     let hitInfo: HitResultTypes | undefined;
-    if (item instanceof Element) {
+    if (item instanceof Element || item instanceof Pseudoelement) {
       hitInfo = this.hitTestElement(item, p, tol, mode);
     } else if (item instanceof Wire) {
       hitInfo = this.hitTestWire(item, p, tol, mode);
@@ -1598,6 +1604,28 @@ class Renderer {
     }
   }
 
+  drawHoverText(item: AllTypes, p: Point, nameValuePairs: { name: string, value: any }[]) {
+    const self = this,
+          ctx = this.ctx,
+          theme = this.theme,
+          textSize = theme.fontSize,
+          gap = 16,
+          border = 4,
+          height = textSize * nameValuePairs.length + 2 * border,
+          maxWidth = measureNameValuePairs(nameValuePairs, gap, ctx) + 2 * border;
+    let x = p.x, y = p.y;
+    ctx.fillStyle = theme.hoverColor;
+    ctx.fillRect(x, y, maxWidth, height);
+    ctx.fillStyle = theme.hoverTextColor;
+    nameValuePairs.forEach(function (pair) {
+      ctx.textAlign = 'left';
+      ctx.fillText(pair.name, x + border, y + textSize);
+      ctx.textAlign = 'right';
+      ctx.fillText(pair.value, x + maxWidth - border, y + textSize);
+      y += textSize;
+    });
+  }
+
   // drawHoverInfo(item, p) {
   //   const self = this, theme = this.theme, ctx = this.ctx,
   //         x = p.x, y = p.y;
@@ -1612,26 +1640,6 @@ class Renderer {
   //     visitItems(groupItems, item => self.draw(item, normalMode), isElementOrGroup);
   //     visitItems(groupItems, wire => self.draw(wire, normalMode), isWire);
   //   } else {
-  //     // // Just list properties as text.
-  //     // let props = [];
-  //     // this.model.dataModel.visitProperties(item, function(item, attr) {
-  //     //   let value = item[attr];
-  //     //   if (Array.isArray(value))
-  //     //     return;
-  //     //   props.push({ name: attr, value: value });
-  //     // });
-  //     // let textSize = theme.fontSize, gap = 16, border = 4,
-  //     //     height = textSize * props.length + 2 * border,
-  //     //     maxWidth = diagrams.measureNameValuePairs(props, gap, ctx) + 2 * border;
-  //     // ctx.fillRect(x, y, maxWidth, height);
-  //     // ctx.fillStyle = theme.hoverTextColor;
-  //     // props.forEach(function(prop) {
-  //     //   ctx.textAlign = 'left';
-  //     //   ctx.fillText(prop.name, x + border, y + textSize);
-  //     //   ctx.textAlign = 'right';
-  //     //   ctx.fillText(prop.value, x + maxWidth - border, y + textSize);
-  //     //   y += textSize;
-  //     // });
   //   }
   // }
 }
@@ -1732,25 +1740,22 @@ export class FunctionchartEditor /*implements CanvasLayer*/ {
 
     // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
     const context = new FunctionchartContext(),
-          Functionchart = context.newFunctionchart();/*,
-          start = context.newPseudostate('start'),
-          stop = context.newPseudostate('stop'),
-          history = context.newPseudostate('history'),
-          historyDeep = context.newPseudostate('history*'),
-          newState = context.newState();
+          Functionchart = context.newFunctionchart(),
+          input = context.newPseudoelement('input'),
+          output = context.newPseudoelement('output'),
+          literal = context.newPseudoelement('literal'),
+          newElement = context.newElement();
 
-    start.x = start.y = 8;
-    stop.x = 40; stop.y = 8;
-    history.x = 72; history.y = 8;
-    historyDeep.x = 104; historyDeep.y = 8;
-    newState.x = 8; newState.y = 32;
-    newState.width = 100; newState.height = 60;
+    input.x = input.y = 8;
+    output.x = 40; output.y = 8;
+    literal.x = 72; literal.y = 8;
+    newElement.x = 8; newElement.y = 32;
+    // newElement.width = 100; newElement.height = 60;
 
-    Functionchart.elements.append(start);
-    Functionchart.elements.append(stop);
-    Functionchart.elements.append(history);
-    Functionchart.elements.append(historyDeep);
-    Functionchart.elements.append(newState);*/
+    Functionchart.elements.append(input);
+    Functionchart.elements.append(output);
+    Functionchart.elements.append(literal);
+    Functionchart.elements.append(newElement);
     context.setRoot(Functionchart);
     this.palette = Functionchart;
 
@@ -1914,7 +1919,7 @@ export class FunctionchartEditor /*implements CanvasLayer*/ {
     }
 
     function addItems(item: AllTypes) {
-      if (item instanceof Element) {
+      if (item instanceof Element || item instanceof Pseudoelement) {  // TODO class hierarchy for Elements?
         // Layout the state's incoming and outgoing transitions.
         context.forInWires(item, addItems);
         context.forOutWires(item, addItems);
@@ -1995,6 +2000,226 @@ export class FunctionchartEditor /*implements CanvasLayer*/ {
       canvasController.setSize(width, height);
     }
   }
+  draw(canvasController: CanvasController) {
+    const renderer = this.renderer,
+          functionchart = this.functionchart,
+          context = this.context;
+    if (canvasController === this.canvasController) {
+      // Draw a dashed border around the canvas.
+      const ctx = canvasController.getCtx(),
+            size = canvasController.getSize();
+      ctx.strokeStyle = this.theme.strokeColor;
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([6, 3]);
+      ctx.strokeRect(0, 0, size.width, size.height);
+      ctx.setLineDash([]);
+
+      // Now draw the functionchart.
+      renderer.begin(ctx);
+      this.updateLayout_();
+      canvasController.applyTransform();
+
+      context.visitAll(functionchart, item => {
+        if (!(item instanceof Wire))
+          renderer.draw(item, RenderMode.Normal);
+      });
+      context.visitAll(functionchart, item => {
+        if (item instanceof Wire)
+          renderer.draw(item, RenderMode.Normal);
+      });
+
+      context.selection.forEach(function (item) {
+        renderer.draw(item, RenderMode.Highlight);
+      });
+
+      if (this.hotTrackInfo)
+        renderer.draw(this.hotTrackInfo.item, RenderMode.HotTrack);
+
+      const hoverHitInfo = this.hoverHitInfo;
+      if (hoverHitInfo) {
+        const item = hoverHitInfo.item,
+              propertyInfo = this.propertyInfo.get(item.template.typeName),
+              nameValuePairs = [];
+        if (propertyInfo) {
+          for (let info of propertyInfo) {
+            const name = info.label,
+                  value = info.getter(info, item);
+            if (value !== undefined) {
+              nameValuePairs.push({ name, value });
+            }
+          }
+          renderer.drawHoverText(hoverHitInfo.item, this.hoverPoint, nameValuePairs);
+        }
+      }
+      renderer.end();
+    } else if (canvasController === this.paletteController) {
+      // Palette drawing occurs during drag and drop. If the palette has the drag,
+      // draw the canvas underneath so the new object will appear on the canvas.
+      this.canvasController.draw();
+      const ctx = this.paletteController.getCtx();
+      renderer.begin(ctx);
+      canvasController.applyTransform();
+      context.visitAll(this.palette, item => {
+        renderer.draw(item, RenderMode.Print);
+      });
+      // Draw the new object in the palette. Translate object to palette coordinates.
+      const offset = canvasController.offsetToOtherCanvas(this.canvasController);
+      ctx.translate(offset.x, offset.y);
+      context.selection.forEach(item => {
+        renderer.draw(item, RenderMode.Normal);
+        renderer.draw(item, RenderMode.Highlight);
+      });
+      renderer.end();
+    }
+  }
+  // print() {
+  //   const renderer = this.renderer,
+  //         context = this.context,
+  //         statechart = this.statechart,
+  //         canvasController = this.canvasController;
+
+  //   // Calculate document bounds.
+  //   const items: AllTypes[] = new Array();
+  //   context.visitAll(statechart, function (item) {
+  //     items.push(item);
+  //   });
+
+  //   const bounds = renderer.getBounds(items);
+  //   // Adjust all edges 1 pixel out.
+  //   const ctx = new (window as any).C2S(bounds.width + 2, bounds.height + 2);
+  //   ctx.translate(-bounds.x + 1, -bounds.y + 1);
+
+  //   renderer.begin(ctx);
+  //   canvasController.applyTransform();
+
+  //   context.visitAllItems(statechart.states, state => {
+  //     renderer.draw(state, RenderMode.Print);
+  //   });
+  //   context.visitAllItems(statechart.transitions, transition => {
+  //     renderer.draw(transition, RenderMode.Print);
+  //   });
+
+  //   renderer.end();
+
+  //   // Write out the SVG file.
+  //   const serializedSVG = ctx.getSerializedSvg();
+  //   const blob = new Blob([serializedSVG], {
+  //     type: 'text/plain'
+  //   });
+  //   (window as any).saveAs(blob, 'statechart.svg', true);
+  // }
+  getCanvasPosition(canvasController: CanvasController, p: Point) {
+    // When dragging from the palette, convert the position from pointer events
+    // into the canvas space to render the drag and drop.
+    return this.canvasController.viewToOtherCanvasView(canvasController, p);
+  }
+  hitTestCanvas(p: Point) {
+    const renderer = this.renderer,
+          context = this.context,
+          tol = this.hitTolerance,
+          functionchart = this.functionchart,
+          canvasController = this.canvasController,
+          cp = this.getCanvasPosition(canvasController, p),
+          ctx = canvasController.getCtx(),
+          hitList: Array<HitResultTypes> = [];
+    function pushInfo(info: HitResultTypes | undefined) {
+      if (info)
+        hitList.push(info);
+    }
+    renderer.begin(ctx);
+    this.updateLayout_();
+    // TODO hit test selection first, in highlight, first.
+    // Skip the root statechart, as hits there should go to the underlying canvas controller.
+    // Hit test transitions first.
+    context.reverseVisitAll(functionchart, (item: AllTypes) => {
+      if (item instanceof Wire)
+        pushInfo(renderer.hitTestWire(item, cp, tol, RenderMode.Normal));
+    });
+    context.reverseVisitAll(functionchart, (item: AllTypes) => {
+      if (!(item instanceof Wire))
+        pushInfo(renderer.hitTest(item, cp, tol, RenderMode.Normal));
+    });
+    renderer.end();
+    return hitList;
+  }
+  hitTestPalette(p: Point) {
+    const renderer = this.renderer,
+          context = this.context,
+          tol = this.hitTolerance,
+          ctx = this.paletteController.getCtx(),
+          hitList: Array<HitResultTypes> = [];
+    function pushInfo(info: HitResultTypes | undefined) {
+      if (info)
+        hitList.push(info);
+    }
+    renderer.begin(ctx);
+    context.reverseVisitAllItems(this.palette.elements, state => {
+      pushInfo(renderer.hitTest(state, p, tol, RenderMode.Normal));
+    });
+    renderer.end();
+    return hitList;
+  }
+  getFirstHit(
+      hitList: Array<HitResultTypes>, filterFn: (hitInfo: HitResultTypes) => boolean):
+      HitResultTypes | undefined {
+    for (let hitInfo of hitList) {
+      if (filterFn(hitInfo))
+        return hitInfo;
+    }
+  }
+  getDraggableAncestor(hitList: Array<HitResultTypes>, hitInfo: HitResultTypes | undefined) {
+    while (hitInfo && !isDraggable(hitInfo)) {
+      const parent = hitInfo.item.parent;
+      hitInfo = this.getFirstHit(hitList, info => { return info.item === parent; })
+    }
+    return hitInfo;
+  }
+  setPropertyGrid() {
+    const context = this.context,
+          item = context.selection.lastSelected(),
+          type = item ? item.template.typeName : undefined;
+    this.propertyGridController.show(type, item);
+  }
+  onClick(canvasController: CanvasController) {
+    const context = this.context,
+          selection = context.selection,
+          shiftKeyDown = this.canvasController.shiftKeyDown,
+          cmdKeyDown = this.canvasController.cmdKeyDown,
+          p = canvasController.getClickPointerPosition(),
+          cp = canvasController.viewToCanvas(p);
+    let hitList;
+    if (canvasController === this.paletteController) {
+      hitList = this.hitTestPalette(cp);
+      this.clickInPalette = true;
+    } else {
+      hitList = this.hitTestCanvas(cp);
+      this.clickInPalette = false;
+    }
+    const pointerHitInfo = this.pointerHitInfo = this.getFirstHit(hitList, isClickable);
+    if (pointerHitInfo) {
+      this.draggableHitInfo = this.getDraggableAncestor(hitList, pointerHitInfo);
+      const item = pointerHitInfo.item;
+      if (this.clickInPalette) {
+        selection.clear();
+      } else if (cmdKeyDown) {
+        selection.toggle(item);
+      } else if (shiftKeyDown) {
+        selection.add(item);
+        this.moveCopy = true;
+      } else if (!selection.has(item)) {
+        selection.set(item);
+      } else {
+        selection.add(item);
+      }
+    } else {
+      if (!shiftKeyDown) {
+        selection.clear();
+      }
+    }
+    this.setPropertyGrid();
+    return pointerHitInfo !== undefined;
+  }
+
 }
 /*
 

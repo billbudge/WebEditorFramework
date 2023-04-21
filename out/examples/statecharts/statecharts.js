@@ -1403,7 +1403,8 @@ function readRaw(raw, context) {
 }
 //------------------------------------------------------------------------------
 function isStateBorder(hitInfo) {
-    return hitInfo instanceof StateHitResult && hitInfo.inner.border;
+    return (hitInfo instanceof StateHitResult || hitInfo instanceof PseudostateHitResult)
+        && hitInfo.inner.border;
 }
 function isDropTarget(hitInfo) {
     const item = hitInfo.item, selection = item.context.selection;
