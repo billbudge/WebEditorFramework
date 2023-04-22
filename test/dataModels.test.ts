@@ -251,6 +251,32 @@ describe('TransactionManager', () => {
     expect(item.x).toBe(3);
     expect(item.reference).toBe(newReference);
   });
+  test('array op coalescing', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          child = new TestDataContextObject(context),
+          transactionManager = new Data.TransactionManager();
+
+    context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+    let transaction = transactionManager.beginTransaction('test');
+    expect(transaction.ops.length).toBe(0);
+
+    // insert then remove should cancel.
+    item.array.append(child);
+    expect(transaction.ops.length).toBe(1);
+    item.array.remove(child);
+    expect(transaction.ops.length).toBe(0);
+    item.array.append(child);
+    expect(transaction.ops.length).toBe(1);
+    transactionManager.endTransaction();
+
+    // remove then insert should cancel.
+    transaction = transactionManager.beginTransaction('test');
+    item.array.remove(child);
+    expect(transaction.ops.length).toBe(1);
+    item.array.append(child);
+    expect(transaction.ops.length).toBe(0);
+  });
 });
 
 
