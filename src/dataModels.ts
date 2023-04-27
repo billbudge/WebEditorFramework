@@ -22,7 +22,7 @@ export interface DataContextObject {
 
 export interface DataObjectTemplate {
   readonly typeName: string;
-  readonly properties: Array<PropertyTypes>;
+  readonly properties: PropertyTypes[];
   readonly idProp?: IdProp;
 }
 
@@ -123,7 +123,7 @@ class DataList implements List {
       this.removeAt(index);
     return index;
   }
-  asArray(): Array<any> {
+  asArray(): DataContextObject[] {
     return this.array || [];
   }
   forEach(visitor: (element: any) => void) : void {
@@ -377,6 +377,8 @@ export function getHeight<T extends Parented<T>>(item: Parented<T> | undefined) 
 
 export function getLowestCommonAncestor<T extends Parented<T>>(
     ...items: Array<T>) : T | undefined {
+  if (items.length == 0)
+    return undefined;
   let lca = items[0];
   let heightLCA = getHeight(lca);
   for (let i = 1; i < items.length; i++) {
@@ -399,7 +401,8 @@ export function getLowestCommonAncestor<T extends Parented<T>>(
       heightLCA--;
       nextHeight--;
     }
-    if (heightLCA == 0 || nextHeight == 0) return undefined;
+    if (heightLCA == 0 || nextHeight == 0)
+      return undefined;
   }
   return lca;
 }
@@ -418,7 +421,7 @@ export function ancestorInSet<T extends Parented<T>>(item: T, set: SetLike<T>) {
   return false;
 }
 
-export function reduceToRoots<T extends Parented<T>>(items: Array<T>, set: SetLike<T>) : Array<T> {
+export function reduceToRoots<T extends Parented<T>>(items: T[], set: SetLike<T>) : T[] {
   const roots = new Array();
   items.forEach(function(item: T) {
     if (!ancestorInSet(item, set)) {
@@ -433,7 +436,7 @@ export function reduceToRoots<T extends Parented<T>>(items: Array<T>, set: SetLi
 // EventBase class.
 
 type EventHandler<T> = (event: T) => void;
-type EventHandlers<T> = Array<EventHandler<T>>;
+type EventHandlers<T> = EventHandler<T>[];
 
 export class EventBase<TArg, TEvents> {
   private events = new Map<TEvents, EventHandlers<TArg>>();
@@ -539,8 +542,8 @@ class ChangeOp implements Operation {
 
 class SelectionOp implements Operation {
   private selectionSet: SelectionSet<DataContextObject>;
-  private startingSelection: Array<DataContextObject>;
-  private endingSelection: Array<DataContextObject>;
+  private startingSelection: DataContextObject[];
+  private endingSelection: DataContextObject[];
 
   undo() {
     this.selectionSet.set(this.startingSelection);
@@ -549,17 +552,16 @@ class SelectionOp implements Operation {
     this.selectionSet.set(this.endingSelection);
   }
   constructor(selectionSet: SelectionSet<DataContextObject>,
-              startingSelection: Array<any>,
-              endingSelection: Array<any>) {
+              startingSelection: DataContextObject[]) {
     this.selectionSet = selectionSet;
     this.startingSelection = startingSelection;
-    this.endingSelection = endingSelection;
+    this.endingSelection = selectionSet.contents();
   }
 }
 
 export class CompoundOp implements Operation {
   readonly name: string;
-  readonly ops: Array<Operation>;
+  readonly ops: Operation[];
 
   add(op: Operation) {
     this.ops.push(op);
@@ -714,11 +716,11 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
 }
 
 export class HistoryManager {
-  private done: Array<CompoundOp> = [];
-  private undone: Array<CompoundOp> = [];
+  private done: CompoundOp[] = [];
+  private undone: CompoundOp[] = [];
   private transactionManager: TransactionManager;
   private selectionSet: SelectionSet<DataContextObject>;
-  private startingSelection: Array<any> = [];
+  private startingSelection: DataContextObject[];
 
   getRedo() {
     const length = this.undone.length;
@@ -762,7 +764,7 @@ export class HistoryManager {
       return;  // endingSelection and startingSelection are the same.
     }
 
-    const selectionOp = new SelectionOp(selectionSet, startingSelection, endingSelection);
+    const selectionOp = new SelectionOp(selectionSet, startingSelection);
     op.add(selectionOp);
     this.startingSelection = [];
   }

@@ -1,4 +1,3 @@
-// TODO make _ methods private.
 //------------------------------------------------------------------------------
 // Linked list.
 export class LinkedListNode {
@@ -55,7 +54,7 @@ export class LinkedList {
         return node;
     }
     insertAfter(value, prev) {
-        const node = (value instanceof (LinkedListNode)) ? value : new LinkedListNode(value);
+        const node = (value instanceof LinkedListNode) ? value : new LinkedListNode(value);
         if (typeof prev === 'undefined')
             prev = this.back_;
         const next = prev ? prev.next : undefined;
@@ -63,7 +62,7 @@ export class LinkedList {
         return node;
     }
     insertBefore(value, next) {
-        const node = (value instanceof (LinkedListNode)) ? value : new LinkedListNode(value);
+        const node = (value instanceof LinkedListNode) ? value : new LinkedListNode(value);
         if (typeof next === 'undefined')
             next = this.front_;
         const prev = next ? next.prev : undefined;

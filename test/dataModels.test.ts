@@ -56,6 +56,7 @@ class TestDataContext extends Data.EventBase<Data.Change, Data.ChangeEvents>
       item: TestDataContextObject, prop: Data.ArrayPropertyTypes, index: number) {
     const change: Data.Change =
         { type: 'elementInserted', item: item, prop: prop, index: index, oldValue: undefined };
+    item.array.at(index).parent = item;
     super.onEvent('elementInserted', change);
     return this.onChanged(change);
   }
@@ -93,7 +94,8 @@ class TestDataObjectTemplate implements Data.DataObjectTemplate {
   }
 }
 
-class TestDataContextObject implements Data.DataContextObject, Data.ReferencedObject {
+class TestDataContextObject implements Data.DataContextObject, Data.ReferencedObject,
+                                       Data.Parented<TestDataContextObject> {
   context: TestDataContext;
   template: TestDataObjectTemplate;
 
@@ -111,6 +113,8 @@ class TestDataContextObject implements Data.DataContextObject, Data.ReferencedOb
   get array() { return this.template.array.get(this) as Data.List<TestDataContextObject>; }
   get reference() { return this.template.reference.get(this) as TestDataContextObject; }
   set reference(value: TestDataContextObject) { this.template.reference.set(this, value); }
+
+  parent: TestDataContextObject | undefined;
 }
 
 describe('DataContext', () => {
@@ -193,6 +197,32 @@ describe('DataContext', () => {
 
 //------------------------------------------------------------------------------
 
+describe('Hierarchy', () => {
+  test('getLowestCommonAncestor', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          child1 = new TestDataContextObject(context),
+          child2 = new TestDataContextObject(context),
+          child3 = new TestDataContextObject(context);
+
+    expect(Data.getLowestCommonAncestor()).toBeUndefined();
+
+    item.array.append(child3);
+    child3.array.append(child1);
+    child3.array.append(child2);
+
+    expect(Data.getLineage<TestDataContextObject>(item)).toEqual([ item ]);
+    expect(Data.getLowestCommonAncestor(item, item)).toBe(item);
+    expect(Data.getLineage(child1)).toEqual([ child1, child3, item ]);
+    expect(Data.getLowestCommonAncestor(item, child1)).toBe(item);
+    expect(Data.getLowestCommonAncestor(child3, child1)).toBe(child3);
+    expect(Data.getLowestCommonAncestor(child1, child2)).toBe(child3);
+    expect(Data.getLowestCommonAncestor(child3, child1, item)).toBe(item);
+  });
+});
+
+//------------------------------------------------------------------------------
+
 describe('EventBase', () => {
   test('addHandler, removeHandler, onEvent', () => {
     let count = 0;
@@ -215,6 +245,62 @@ describe('EventBase', () => {
 //------------------------------------------------------------------------------
 
 describe('TransactionManager', () => {
+  test('recording', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          transactionManager = new Data.TransactionManager();
+
+    context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+
+    // No transaction, so no recording.
+    item.x = 1;
+    const transaction = transactionManager.beginTransaction('test');
+    expect(transaction.ops.length).toBe(0);
+    // Transaction, so record the operation, even though it doesn't change the value.
+    item.x = 1;
+    expect(transaction.ops.length).toBe(1);
+  });
+  test('end or cancel only in transaction', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          transactionManager = new Data.TransactionManager();
+    expect(() => transactionManager.endTransaction()).toThrow(Error);
+    expect(() => transactionManager.cancelTransaction()).toThrow(Error);
+  });
+  test('cancel transaction', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          transactionManager = new Data.TransactionManager();
+    context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+    const transaction = transactionManager.beginTransaction('test');
+    item.x = 1;
+    transactionManager.cancelTransaction();
+    expect(item.x).toBe(undefined);
+  });
+  test('ChangeOp', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          child = new TestDataContextObject(context),
+          transactionManager = new Data.TransactionManager();
+    context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+    item.array.append(child);  // outside transaction.
+    const transaction1 = transactionManager.beginTransaction('test');
+    item.array.remove(child);
+    transactionManager.endTransaction();
+    expect(item.array.length).toBe(0);
+    transaction1.undo();
+    expect(item.array.at(0)).toBe(child);
+    transaction1.redo();
+    expect(item.array.length).toBe(0);
+    const transaction2 = transactionManager.beginTransaction('test');
+    item.array.append(child);  // inside transaction.
+    transactionManager.endTransaction();
+    expect(item.array.at(0)).toBe(child);
+    transaction2.undo();
+    expect(item.array.length).toBe(0);
+    transaction2.redo();
+    expect(item.array.at(0)).toBe(child);
+  });
   test('value change coalescing', () => {
     const context = new TestDataContext(),
           item = new TestDataContextObject(context),
@@ -554,25 +640,6 @@ describe('TransactionManager', () => {
 //     expect(hierarchyModel.getParent(child)).toBe(root);
 //     expect(hierarchyModel.getParent(child.children[0])).toBe(child);
 //     expect(hierarchyModel.getParent(child.children[1])).toBe(child);
-//   });
-//   test('getLineage, getLowestCommonAncestor', () => {
-//     const child1 = {},
-//           child2 = {},
-//           child3 = { items: [ child1, child2 ] },
-//           root: any = {
-//             items: [ child3 ]
-//           },
-//           dataModel = new Data.DataModel(root),
-//           observableModel = new Data.ObservableModel(),
-//           hierarchyModel = new Data.HierarchyModel(dataModel, observableModel);
-
-//     expect(hierarchyModel.getLineage(root)).toEqual([ root ]);
-//     expect(hierarchyModel.getLowestCommonAncestor(root, root)).toBe(root);
-//     expect(hierarchyModel.getLineage(child1)).toEqual([ child1, child3, root ]);
-//     expect(hierarchyModel.getLowestCommonAncestor(root, child1)).toBe(root);
-//     expect(hierarchyModel.getLowestCommonAncestor(child3, child1)).toBe(child3);
-//     expect(hierarchyModel.getLowestCommonAncestor(child1, child2)).toBe(child3);
-//     expect(hierarchyModel.getLowestCommonAncestor(child3, child1, root)).toBe(root);
 //   });
 // });
 

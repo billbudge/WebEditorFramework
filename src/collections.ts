@@ -1,8 +1,6 @@
 type VisitorFunction<T> = (value: T) => void;
 type CompareFunction<T> = (val1: T, val2: T) => number;
 
-// TODO make _ methods private.
-
 //------------------------------------------------------------------------------
 // Linked list.
 
@@ -70,7 +68,7 @@ export class LinkedList<T> {
   }
 
   insertAfter(value: T | LinkedListNode<T>, prev?: LinkedListNode<T>) : LinkedListNode<T> {
-    const node = (value instanceof LinkedListNode<T>) ? value : new LinkedListNode(value);
+    const node = (value instanceof LinkedListNode) ? value : new LinkedListNode(value);
     if (typeof prev === 'undefined')
       prev = this.back_;
     const next = prev ? prev.next : undefined;
@@ -79,7 +77,7 @@ export class LinkedList<T> {
   }
 
   insertBefore(value: T | LinkedListNode<T>, next?: LinkedListNode<T>) : LinkedListNode<T> {
-    const node = (value instanceof LinkedListNode<T>) ? value : new LinkedListNode(value);
+    const node = (value instanceof LinkedListNode) ? value : new LinkedListNode(value);
     if (typeof next === 'undefined')
       next = this.front_;
     const prev = next ? next.prev : undefined;
