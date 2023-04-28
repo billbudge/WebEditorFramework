@@ -275,6 +275,8 @@ export function getHeight(item) {
     return height;
 }
 export function getLowestCommonAncestor(...items) {
+    if (items.length == 0)
+        return undefined;
     let lca = items[0];
     let heightLCA = getHeight(lca);
     for (let i = 1; i < items.length; i++) {
@@ -396,10 +398,10 @@ class SelectionOp {
     redo() {
         this.selectionSet.set(this.endingSelection);
     }
-    constructor(selectionSet, startingSelection, endingSelection) {
+    constructor(selectionSet, startingSelection) {
         this.selectionSet = selectionSet;
         this.startingSelection = startingSelection;
-        this.endingSelection = endingSelection;
+        this.endingSelection = selectionSet.contents();
     }
 }
 export class CompoundOp {
@@ -580,7 +582,7 @@ export class HistoryManager {
             })) {
             return; // endingSelection and startingSelection are the same.
         }
-        const selectionOp = new SelectionOp(selectionSet, startingSelection, endingSelection);
+        const selectionOp = new SelectionOp(selectionSet, startingSelection);
         op.add(selectionOp);
         this.startingSelection = [];
     }
@@ -597,7 +599,6 @@ export class HistoryManager {
     constructor(transactionManager, selectionSet) {
         this.done = [];
         this.undone = [];
-        this.startingSelection = [];
         this.transactionManager = transactionManager;
         this.selectionSet = selectionSet;
         transactionManager.addHandler('transactionBegan', this.onTransactionBegan_.bind(this));

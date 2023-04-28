@@ -197,6 +197,69 @@ describe('DataContext', () => {
 
 //------------------------------------------------------------------------------
 
+describe('Cloning', () => {
+  test('copyItems', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          child1 = new TestDataContextObject(context),
+          child2 = new TestDataContextObject(context),
+          child3 = new TestDataContextObject(context);
+
+    item.array.append(child3);
+    child3.array.append(child1);
+    child1.reference = item;
+    child3.array.append(child2);
+    child2.reference = child1;
+
+    const copies = Data.copyItems([child3], context);
+    expect(copies.length).toBe(1);
+    expect(copies[0] instanceof TestDataContextObject).toBe(true);
+    const itemCopy = copies[0] as TestDataContextObject;
+    expect(itemCopy.array.length).toBe(2);
+    expect(itemCopy.array.at(0) instanceof TestDataContextObject).toBe(true);
+    expect(itemCopy.array.at(1) instanceof TestDataContextObject).toBe(true);
+    const child1Copy = itemCopy.array.at(0) as TestDataContextObject,
+          child2Copy = itemCopy.array.at(1) as TestDataContextObject;
+    expect(child1Copy).not.toBe(child1);
+    expect(child2Copy).not.toBe(child2);
+    expect(child1Copy.reference).toBe(item);  // not itemCopy, since item is outside the cloned graph.
+    expect(child2Copy.reference).toBe(child1Copy);
+  });
+});
+
+//------------------------------------------------------------------------------
+
+describe('Serialization, deserialization', () => {
+  test('copyItems', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          child1 = new TestDataContextObject(context),
+          child2 = new TestDataContextObject(context),
+          child3 = new TestDataContextObject(context);
+
+    item.array.append(child3);
+    child3.array.append(child1);
+    child1.reference = item;
+    child3.array.append(child2);
+    child2.reference = child1;
+
+    const blob = Data.Serialize(item);
+    const copy = Data.Deserialize(blob, context);
+    expect(copy instanceof TestDataContextObject).toBe(true);
+    const itemCopy = copy as TestDataContextObject;
+    expect(itemCopy.array.length).toBe(1);
+    expect(itemCopy.array.at(0) instanceof TestDataContextObject).toBe(true);
+    const child3Copy = itemCopy.array.at(0) as TestDataContextObject;
+    expect(child3Copy.array.length).toBe(2);
+    const child1Copy = child3Copy.array.at(0) as TestDataContextObject,
+          child2Copy = child3Copy.array.at(1) as TestDataContextObject;
+    // expect(child1Copy.reference).toBe(itemCopy);
+    // expect(child2Copy.reference).toBe(child1Copy);  // TODO fix.
+  });
+});
+
+//------------------------------------------------------------------------------
+
 describe('Hierarchy', () => {
   test('getLowestCommonAncestor', () => {
     const context = new TestDataContext(),
