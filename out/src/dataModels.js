@@ -208,7 +208,7 @@ function serializeItem(original) {
         type: original.template.typeName,
     };
     for (let prop of original.template.properties) {
-        if (prop instanceof ScalarProp) {
+        if (prop instanceof ScalarProp || prop instanceof IdProp) {
             const value = prop.get(original);
             if (value !== undefined)
                 result[prop.name] = value;
@@ -230,7 +230,8 @@ function serializeItem(original) {
 export function Serialize(item) {
     return serializeItem(item);
 }
-function deserializeItem(raw, context) {
+// First pass, create objects, copy properties, and build the reference fixup map.
+function deserializeItem1(raw, map, context) {
     const type = raw.type, item = context.construct(type);
     for (let prop of item.template.properties) {
         if (prop instanceof ScalarProp) {
@@ -238,15 +239,16 @@ function deserializeItem(raw, context) {
             if (value !== undefined)
                 prop.set(item, value);
         }
-        else if (prop instanceof ReferenceProp) {
-            const value = raw[prop.name] || 0;
-            prop.setId(item, value);
+        else if (prop instanceof IdProp) {
+            const id = raw[prop.name];
+            if (id !== undefined)
+                map.set(id, item);
         }
         else if (prop instanceof ChildArrayProp) {
             const rawList = raw[prop.name], list = prop.get(item);
             if (rawList) {
                 for (let rawChild of rawList) {
-                    const child = deserializeItem(rawChild, context);
+                    const child = deserializeItem1(rawChild, map, context);
                     list.append(child);
                 }
             }
@@ -254,8 +256,23 @@ function deserializeItem(raw, context) {
     }
     return item;
 }
+// Second pass; copy and remap references.
+function deserializeItem2(item, map, context) {
+    for (let prop of item.template.properties) {
+        if (prop instanceof ReferenceProp) {
+            const id = prop.getId(item);
+            prop.set(item, map.get(id));
+        }
+        else if (prop instanceof ChildArrayProp) {
+            const list = prop.get(item);
+            list.forEach(child => deserializeItem2(child, map, context));
+        }
+    }
+    return item;
+}
 export function Deserialize(raw, context) {
-    return deserializeItem(raw, context);
+    const map = new Map();
+    return deserializeItem2(raw, map, context);
 }
 ;
 export function getLineage(item) {

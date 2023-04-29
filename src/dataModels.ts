@@ -297,7 +297,7 @@ function serializeItem(original: DataContextObject) : object {
     type: original.template.typeName,
   };
   for (let prop of original.template.properties) {
-    if (prop instanceof ScalarProp) {
+    if (prop instanceof ScalarProp || prop instanceof IdProp) {
       const value = prop.get(original);
       if (value !== undefined)
         result[prop.name] = value;
@@ -320,7 +320,10 @@ export function Serialize(item: DataContextObject) : any {
   return serializeItem(item);
 }
 
-function deserializeItem(raw: any, context: DataContext) : DataContextObject {
+// First pass, create objects, copy properties, and build the reference fixup map.
+function deserializeItem1(
+    raw: any, map: Map<number, ReferencedObject>, context: DataContext) :
+    DataContextObject {
   const type = raw.type,
         item = context.construct(type);
   for (let prop of item.template.properties) {
@@ -328,15 +331,20 @@ function deserializeItem(raw: any, context: DataContext) : DataContextObject {
       const value = raw[prop.name];
       if (value !== undefined)
         prop.set(item, value);
+    } else if (prop instanceof IdProp) {
+      const id = raw[prop.name];
+      if (id !== undefined)
+        map.set(id, item as ReferencedObject);
     } else if (prop instanceof ReferenceProp) {
-      const value = raw[prop.name] || 0;
-      prop.setId(item, value);
+      // Copy the old id, to be remapped in the second pass.
+      const id = raw[prop.name];
+      prop.setId(item, id);
     } else if (prop instanceof ChildArrayProp) {
       const rawList = raw[prop.name],
             list = prop.get(item);
       if (rawList) {
         for (let rawChild of rawList) {
-          const child = deserializeItem(rawChild, context);
+          const child = deserializeItem1(rawChild, map, context);
           list.append(child);
         }
       }
@@ -345,8 +353,25 @@ function deserializeItem(raw: any, context: DataContext) : DataContextObject {
   return item;
 }
 
+// Second pass; copy and remap references.
+function deserializeItem2(
+    item: DataContextObject, map: Map<number, ReferencedObject>, context: DataContext) {
+  for (let prop of item.template.properties) {
+    if (prop instanceof ReferenceProp) {
+      const id = prop.getId(item);
+      prop.set(item, map.get(id));
+    } else if (prop instanceof ChildArrayProp) {
+      const list = prop.get(item);
+      list.forEach(child => deserializeItem2(child, map, context));
+    }
+  }
+  return item;
+}
+
 export function Deserialize(raw: any, context: DataContext) : DataContextObject {
-  return deserializeItem(raw, context);
+  const map = new Map<number, ReferencedObject>(),
+        root = deserializeItem1(raw, map, context);
+  return deserializeItem2(root, map, context);
 }
 
 //------------------------------------------------------------------------------

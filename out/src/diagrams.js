@@ -568,8 +568,8 @@ export class CanvasController {
         if (document.activeElement !== document.body)
             return false;
         let self = this;
-        // this.shiftKeyDown = e.shiftKey;
-        // this.cmdKeyDown = e.ctrlKey || e.metaKey;
+        this.shiftKeyDown = e.shiftKey;
+        this.cmdKeyDown = e.ctrlKey || e.metaKey;
         this.layers.some(function (layer) {
             if (!layer.onKeyDown(e))
                 return false;
@@ -584,8 +584,8 @@ export class CanvasController {
         return this.keyOwner;
     }
     onKeyUp(e) {
-        // this.shiftKeyDown = e.shiftKey;
-        // this.cmdKeyDown = e.ctrlKey || e.metaKey;
+        this.shiftKeyDown = e.shiftKey;
+        this.cmdKeyDown = e.ctrlKey || e.metaKey;
         let keyOwner = this.keyOwner;
         if (keyOwner) {
             if (keyOwner.onKeyUp)

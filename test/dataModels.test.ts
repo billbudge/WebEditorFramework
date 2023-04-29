@@ -239,9 +239,12 @@ describe('Serialization, deserialization', () => {
 
     item.array.append(child3);
     child3.array.append(child1);
+    child1.x = 1;
     child1.reference = item;
     child3.array.append(child2);
+    child2.x = 2;
     child2.reference = child1;
+    child3.x = 3
 
     const blob = Data.Serialize(item);
     const copy = Data.Deserialize(blob, context);
@@ -251,10 +254,13 @@ describe('Serialization, deserialization', () => {
     expect(itemCopy.array.at(0) instanceof TestDataContextObject).toBe(true);
     const child3Copy = itemCopy.array.at(0) as TestDataContextObject;
     expect(child3Copy.array.length).toBe(2);
+    expect(child3Copy.x).toBe(3);
     const child1Copy = child3Copy.array.at(0) as TestDataContextObject,
           child2Copy = child3Copy.array.at(1) as TestDataContextObject;
-    // expect(child1Copy.reference).toBe(itemCopy);
-    // expect(child2Copy.reference).toBe(child1Copy);  // TODO fix.
+    expect(child1Copy.reference).toBe(itemCopy);
+    expect(child1Copy.x).toBe(1);
+    expect(child2Copy.x).toBe(2);
+    expect(child2Copy.reference).toBe(child1Copy);  // TODO fix.
   });
 });
 
@@ -281,6 +287,10 @@ describe('Hierarchy', () => {
     expect(Data.getLowestCommonAncestor(child3, child1)).toBe(child3);
     expect(Data.getLowestCommonAncestor(child1, child2)).toBe(child3);
     expect(Data.getLowestCommonAncestor(child3, child1, item)).toBe(item);
+
+    // Ill defined tree.
+    const child4 = new TestDataContextObject(context);
+    expect(Data.getLowestCommonAncestor(child3, child4)).toBeUndefined();
   });
 });
 
