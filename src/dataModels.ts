@@ -564,25 +564,6 @@ class ChangeOp implements Operation {
   }
 }
 
-class SelectionOp implements Operation {
-  private selectionSet: SelectionSet<DataContextObject>;
-  private startingSelection: DataContextObject[];
-  private endingSelection: DataContextObject[];
-
-  undo() {
-    this.selectionSet.set(this.startingSelection);
-  }
-  redo() {
-    this.selectionSet.set(this.endingSelection);
-  }
-  constructor(selectionSet: SelectionSet<DataContextObject>,
-              startingSelection: DataContextObject[]) {
-    this.selectionSet = selectionSet;
-    this.startingSelection = startingSelection;
-    this.endingSelection = selectionSet.contents();
-  }
-}
-
 export class CompoundOp implements Operation {
   readonly name: string;
   readonly ops: Operation[];
@@ -675,10 +656,8 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
     return snapshot;
   }
   private recordChange(change: Change) {
-    if (!this.transaction)
-      return;
     // Combine value changes, combine nop insert/remove changes.
-    const ops = this.transaction.ops;
+    const ops = this.transaction!.ops;
     for (let i = 0; i < ops.length; ++i) {
       const op = ops[i];
       if (op instanceof ChangeOp) {
@@ -708,7 +687,7 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
       }
     }
     const op = new ChangeOp(change);
-    this.transaction.add(op);
+    this.transaction!.add(op);
   }
 
   onChanged(change: Change) {
@@ -739,6 +718,25 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
   }
 }
 
+class SelectionOp implements Operation {
+  private selectionSet: SelectionSet<DataContextObject>;
+  private startingSelection: DataContextObject[];
+  private endingSelection: DataContextObject[];
+
+  undo() {
+    this.selectionSet.set(this.startingSelection);
+  }
+  redo() {
+    this.selectionSet.set(this.endingSelection);
+  }
+  constructor(selectionSet: SelectionSet<DataContextObject>,
+              startingSelection: DataContextObject[]) {
+    this.selectionSet = selectionSet;
+    this.startingSelection = startingSelection;
+    this.endingSelection = selectionSet.contents();
+  }
+}
+
 export class HistoryManager {
   private done: CompoundOp[] = [];
   private undone: CompoundOp[] = [];
@@ -748,12 +746,12 @@ export class HistoryManager {
 
   getRedo() {
     const length = this.undone.length;
-    return length > 0 ? this.undone[length - 1] : null;
+    return length > 0 ? this.undone[length - 1] : undefined;
   }
 
   getUndo() {
     const length = this.done.length;
-    return length > 0 ? this.done[length - 1] : null;
+    return length > 0 ? this.done[length - 1] : undefined;
   }
 
   redo() {
