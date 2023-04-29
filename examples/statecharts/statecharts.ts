@@ -2338,7 +2338,7 @@ export class StatechartEditor implements CanvasLayer {
     // First check for a drag that creates a new transition.
     if ((pointerHitInfo instanceof StateHitResult || pointerHitInfo instanceof PseudostateHitResult) &&
          pointerHitInfo.arrow) {
-      const state = (dragItem as State | Pseudostate),
+      const state = (dragItem as StateTypes),
             cp0 = this.getCanvasPosition(canvasController, p0);
       // Start the new transition as connecting the src state to itself.
       newTransition = context.newTransition(state, undefined);
@@ -2346,11 +2346,11 @@ export class StatechartEditor implements CanvasLayer {
       newTransition.tText = 0.5; // initial property attachment at midpoint.
       drag = new TransitionDrag(newTransition, 'newTransition', 'Add new transition');
     } else if (pointerHitInfo instanceof TransitionHitResult) {
-      if (pointerHitInfo.inner.t === 0)
+      if (pointerHitInfo.inner.t === 0) {
         drag = new TransitionDrag(dragItem as Transition, 'connectTransitionSrc', 'Edit transition');
-      else if (pointerHitInfo.inner.t === 1)
+      } else if (pointerHitInfo.inner.t === 1) {
         drag = new TransitionDrag(dragItem as Transition, 'connectTransitionDst', 'Edit transition');
-      else {
+      } else {
         drag = new TransitionDrag(dragItem as Transition, 'moveTransitionPoint', 'Drag transition attachment point');
       }
     } else if (this.draggableHitInfo) {
@@ -2464,7 +2464,7 @@ export class StatechartEditor implements CanvasLayer {
         case 'connectTransitionSrc': {
           const dst = transition.dst,
                 hitInfo = this.getFirstHit(hitList, isStateBorder),
-                src = hitInfo ? hitInfo.item as State | Pseudostate : undefined;
+                src = hitInfo ? hitInfo.item as StateTypes : undefined;
           if (src && dst && context.isValidTransition(src, dst)) {
             transition.src = src;
             const t1 = renderer.statePointToParam(src, cp);
@@ -2479,7 +2479,7 @@ export class StatechartEditor implements CanvasLayer {
         case 'connectTransitionDst': {
           const src = transition.src,
                 hitInfo = this.getFirstHit(hitList, isStateBorder),
-                dst = hitInfo ? hitInfo.item as State | Pseudostate : undefined;
+                dst = hitInfo ? hitInfo.item as StateTypes : undefined;
           if (src && drag.type === 'newTransition') {
             transition.tSrc = renderer.statePointToParam(src, cp);
           }

@@ -1661,35 +1661,43 @@ function isDraggable(hitInfo: HitResultTypes) : boolean {
   return hitInfo instanceof ElementHitResult;
 }
 
+function isElementInputPin(hitInfo: HitResultTypes) : boolean {
+  return hitInfo instanceof ElementHitResult && hitInfo.input >= 0;
+}
+
+function isElementOutputPin(hitInfo: HitResultTypes) : boolean {
+  return hitInfo instanceof ElementHitResult && hitInfo.output >= 0;
+}
+
 function hasProperties(hitInfo: HitResultTypes) : boolean {
   return !(hitInfo instanceof Wire);
 }
 
-type ElementDragType = 'copyPalette' | 'moveSelection' | 'moveCopySelection' | 'resizeState';
-class ElementDrag {
-  items: AllTypes[];
-  type: ElementDragType;
+type NonWireDragType = 'copyPalette' | 'moveSelection' | 'moveCopySelection' | 'resizeFunctionchart';
+class NonWireDrag {
+  items: NonWireTypes[];
+  type: NonWireDragType;
   description: string;
-  constructor(items: Element[], type: ElementDragType, description: string) {
+  constructor(items: NonWireTypes[], type: NonWireDragType, description: string) {
     this.items = items;
     this.type = type;
     this.description = description;
   }
 }
 
-type WireDragType = 'newWire' | 'connectWireSrc' | 'connectWireDst';
+type WireDragType = 'connectWireSrc' | 'connectWireDst';
 class WireDrag {
-  transition: Wire;
+  wire: Wire;
   type: WireDragType;
   description: string;
   constructor(transition: Wire, type: WireDragType, description: string) {
-    this.transition = transition;
+    this.wire = transition;
     this.type = type;
     this.description = description;
   }
 }
 
-type DragTypes = ElementDrag | WireDrag;
+type DragTypes = NonWireDrag | WireDrag;
 
 export class FunctionchartEditor /*implements CanvasLayer*/ {
   private theme: FunctionchartTheme;
@@ -2219,6 +2227,222 @@ export class FunctionchartEditor /*implements CanvasLayer*/ {
     this.setPropertyGrid();
     return pointerHitInfo !== undefined;
   }
+  onBeginDrag(canvasController: CanvasController) {
+    let pointerHitInfo = this.pointerHitInfo;
+    if (!pointerHitInfo)
+      return false;
+
+    const context = this.context,
+          selection = context.selection,
+          p0 = canvasController.getClickPointerPosition();
+    let dragItem = pointerHitInfo.item;
+    let drag: DragTypes | undefined, newWire: Wire | undefined;
+    // First check for a drag that creates a new transition.
+    if ((pointerHitInfo instanceof ElementHitResult)) {
+      const element = (dragItem as Element),
+            cp0 = this.getCanvasPosition(canvasController, p0);
+      if (pointerHitInfo.input >= 0) {
+        newWire = context.newWire(undefined, -1, element, pointerHitInfo.input);
+        newWire.pSrc = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };
+        drag = new WireDrag(newWire, 'connectWireSrc', 'Add new wire');
+      } else if (pointerHitInfo.output >= 0) {
+        newWire = context.newWire(element, pointerHitInfo.output, undefined, -1);
+        newWire.pDst = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };
+        drag = new WireDrag(newWire, 'connectWireDst', 'Add new wire');
+      }
+    } else if (pointerHitInfo instanceof WireHitResult) {
+      if (pointerHitInfo.inner.t === 0) {
+        drag = new WireDrag(dragItem as Wire, 'connectWireSrc', 'Edit wire');
+      } else if (pointerHitInfo.inner.t === 1) {
+        drag = new WireDrag(dragItem as Wire, 'connectWireDst', 'Edit wire');
+      }
+    } else if (this.draggableHitInfo) {
+      pointerHitInfo = this.pointerHitInfo = this.draggableHitInfo;
+      if (pointerHitInfo instanceof ElementHitResult) {
+        if (this.clickInPalette) {
+          this.clickInPalette = false;  // TODO fix
+          drag = new NonWireDrag([pointerHitInfo.item], 'copyPalette', 'Create new state or pseudostate');
+        } else if (this.moveCopy) {
+          this.moveCopy = false;  // TODO fix
+          drag = new NonWireDrag(context.selectedElements(), 'moveCopySelection', 'Move copy of selection');
+        } else {
+          // TODO use code for resizing functionchart.
+          // if (pointerHitInfo.item instanceof Element && pointerHitInfo.inner.border) {
+          //   drag = new ElementDrag([pointerHitInfo.item], 'resizeFunctionchart', 'Resize functionchart');
+          // } else {
+            drag = new NonWireDrag(context.selectedElements(), 'moveSelection', 'Move selection');
+          // }
+        }
+      }
+    }
+
+    this.dragInfo = drag;
+    if (drag) {
+      if (drag.type === 'moveSelection' || drag.type === 'moveCopySelection') {
+        context.reduceSelection();
+      }
+      if (drag.type == 'copyPalette') {
+        // Transform palette items into the canvas coordinate system.
+        const offset = this.paletteController.offsetToOtherCanvas(this.canvasController),
+              copies = copyItems(drag.items, context) as NonWireTypes[];
+        copies.forEach(copy => {
+          if (copy instanceof Element || copy instanceof Pseudoelement ||
+              copy instanceof Functionchart) {
+            copy.x -= offset.x;
+            copy.y -= offset.y;
+          }
+        });
+        drag.items = copies;
+      } else if (drag.type == 'moveCopySelection') {
+        const copies = context.copy() as NonWireTypes[];  // TODO fix
+        drag.items = copies;
+      }
+
+      context.transactionManager.beginTransaction(drag.description);
+      if (newWire) {
+        context.addItem(newWire, this.functionchart);
+        selection.set(newWire);
+      } else {
+        if (drag.type == 'copyPalette' || drag.type == 'moveCopySelection') {
+          context.addItems(drag.items, this.functionchart);
+          selection.set(drag.items);
+        }
+      }
+    }
+  }
+  onDrag(canvasController: CanvasController) {
+    const drag = this.dragInfo;
+    if (!drag)
+      return;
+    const context = this.context,
+          transactionManager = context.transactionManager,
+          renderer = this.renderer,
+          p0 = canvasController.getClickPointerPosition(),
+          cp0 = this.getCanvasPosition(canvasController, p0),
+          p = canvasController.getCurrentPointerPosition(),
+          cp = this.getCanvasPosition(canvasController, p),
+          dx = cp.x - cp0.x,
+          dy = cp.y - cp0.y,
+          pointerHitInfo = this.pointerHitInfo!,
+          hitList = this.hitTestCanvas(cp);
+    let hitInfo;
+    if (drag instanceof NonWireDrag) {
+      switch (drag.type) {
+        case 'copyPalette':
+        case 'moveCopySelection':
+        case 'moveSelection': {
+          hitInfo = this.getFirstHit(hitList, isDropTarget) as ElementHitResult | FunctionchartHitResult;
+          context.selection.forEach(item => {
+            if (item instanceof Wire) return;
+            const oldX = transactionManager.getOldValue(item, 'x'),
+                  oldY = transactionManager.getOldValue(item, 'y');
+            item.x = oldX + dx;
+            item.y = oldY + dy;
+          });
+          break;
+        }
+        case 'resizeFunctionchart': {
+          const hitInfo = pointerHitInfo as ElementHitResult,
+                item = drag.items[0] as Functionchart,
+                oldX = transactionManager.getOldValue(item, 'x'),
+                oldY = transactionManager.getOldValue(item, 'y'),
+                oldWidth =  transactionManager.getOldValue(item, 'width'),
+                oldHeight =  transactionManager.getOldValue(item, 'height');
+        if (hitInfo.inner.left) {
+            item.x = oldX + dx;
+            item.width = oldWidth - dx;
+          }
+          if (hitInfo.inner.top) {
+            item.y = oldY + dy;
+            item.height = oldHeight - dy;
+          }
+          if (hitInfo.inner.right)
+            item.width = oldWidth + dx;
+          if (hitInfo.inner.bottom)
+            item.height = oldHeight + dy;
+          break;
+        }
+      }
+    } else if (drag instanceof WireDrag) {
+      const wire = drag.wire;
+      switch (drag.type) {
+        case 'connectWireSrc': {
+          const dst = wire.dst,
+                dstPin = wire.dstPin,
+                hitInfo = this.getFirstHit(hitList, isElementInputPin) as ElementHitResult,
+                src = hitInfo ? hitInfo.item as ElementTypes : undefined;
+          if (src && dst) {
+            wire.src = src;
+            wire.srcPin = hitInfo.input;
+          } else {
+            wire.src = undefined;  // This notifies observers to update the layout.
+            wire.srcPin = -1;
+            wire.pSrc = { x: cp.x, y: cp.y, nx: 0, ny: 0 };
+          }
+          break;
+        }
+        case 'connectWireDst': {
+          const src = wire.src,
+                hitInfo = this.getFirstHit(hitList, isElementOutputPin) as ElementHitResult,
+                dst = hitInfo ? hitInfo.item as ElementTypes : undefined;
+          if (src && dst) {
+            wire.dst = dst;
+            wire.dstPin = hitInfo.output;
+          } else {
+            wire.dst = undefined;  // This notifies observers to update the layout.
+            wire.pDst = { x: cp.x, y: cp.y, nx: 0, ny: 0 };
+          }
+          break;
+        }
+      }
+    }
+    this.hotTrackInfo = (hitInfo && hitInfo.item !== this.functionchart) ? hitInfo : undefined;
+  }
+  onEndDrag(canvasController: CanvasController) {
+    const drag = this.dragInfo;
+    if (!drag)
+      return;
+    const context = this.context,
+          functionchart = this.functionchart,
+          selection = context.selection,
+          transactionManager = context.transactionManager,
+          p = canvasController.getCurrentPointerPosition(),
+          cp = this.getCanvasPosition(canvasController, p);
+    if (drag instanceof WireDrag) {
+      drag.wire.pSrc = drag.wire.pDst = undefined;
+    } else if (drag instanceof NonWireDrag &&
+              (drag.type == 'copyPalette' || drag.type === 'moveSelection' ||
+               drag.type === 'moveCopySelection')) {
+      // Find state beneath mouse.
+      const hitList = this.hitTestCanvas(cp),
+            hitInfo = this.getFirstHit(hitList, isDropTarget);
+      let parent: Functionchart = functionchart;
+      if (hitInfo && (hitInfo instanceof FunctionchartHitResult)) {
+        parent = hitInfo.item;
+      }
+      // Reparent items.
+      selection.contents().forEach(item => {
+        // if (!(item instanceof Functionchart))
+          context.addItem(item, parent);
+      });
+    }
+
+    // if (context.isValidStatechart(functionchart)) {
+      transactionManager.endTransaction();
+    // } else {
+    //   transactionManager.cancelTransaction();
+    // }
+
+    this.setPropertyGrid();
+
+    this.dragInfo = undefined;
+    this.pointerHitInfo = undefined;
+    this.draggableHitInfo = undefined;
+    this.hotTrackInfo = undefined;
+
+    this.canvasController.draw();
+  }
+
 
 }
 /*
