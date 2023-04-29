@@ -129,7 +129,8 @@ describe('DataContext', () => {
     expect(context.valueChange.prop).toBe(item.template.x);
     expect(context.valueChange.oldValue).toBeUndefined();
   });
-  test('ArrayProp', () => {
+  // TODO IdProp.
+  test('ChildArrayProp', () => {
     const context = new TestDataContext(),
           item = new TestDataContextObject(context);
 
@@ -151,12 +152,19 @@ describe('DataContext', () => {
     expect(item.array.at(1)).toBe(child1);
     expect(item.array.indexOf(child1)).toBe(1);
     expect(item.array.indexOf(child2)).toBe(0);
+    const forward = new Array<TestDataContextObject>();
+    item.array.forEach((child) => forward.push(child));
+    expect(forward).toEqual([child2, child1]);
+    const reverse = new Array<TestDataContextObject>();
+    item.array.forEachReverse((child) => reverse.push(child));
+    expect(reverse).toEqual([child1, child2]);
 
     item.array.remove(child2);
     expect(context.elementRemove.owner).toBe(item);
     expect(context.elementRemove.prop).toBe(item.template.array);
     expect(context.elementRemove.index).toBe(0);
     expect(context.elementRemove.oldValue).toBe(child2);
+    expect(() => item.array.removeAt(1)).toThrow(RangeError);
   });
   test('ReferenceProp', () => {
     const context = new TestDataContext(),
@@ -166,8 +174,8 @@ describe('DataContext', () => {
     expect(item.reference).toBeUndefined();
     item.reference = child1;
     expect(item.reference).toBe(child1);
-    // expect(context.resolvedReference.owner).toBe(item);
-    // expect(context.resolvedReference.id).toBe(child1.id);
+    expect(context.resolvedReference.owner).toBe(item);
+    expect(context.resolvedReference.id).toBe(child1.id);
   });
   test('cloning', () => {
     const context = new TestDataContext(),

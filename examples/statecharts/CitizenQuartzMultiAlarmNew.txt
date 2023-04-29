@@ -1,0 +1,1842 @@
+{
+  "type": "statechart",
+  "x": 0,
+  "y": 0,
+  "width": 2370.1604413986206,
+  "height": 1768.1783672438546,
+  "states": [
+    {
+      "type": "state",
+      "id": 1,
+      "x": 227.43892574310303,
+      "y": 59.723005294799805,
+      "width": 2134.7215156555176,
+      "height": 1700.4553619490548,
+      "name": "Citizen quartz multi-alarm",
+      "statecharts": [
+        {
+          "type": "statechart",
+          "x": 0,
+          "y": 20,
+          "width": 2091.165271759033,
+          "height": 1680.4553619490548,
+          "states": [
+            {
+              "type": "state",
+              "id": 2,
+              "x": 162.25554656982422,
+              "y": 47.49747180938721,
+              "width": 1920.909725189209,
+              "height": 1620.9203916655465,
+              "name": "main",
+              "statecharts": [
+                {
+                  "type": "statechart",
+                  "x": 0,
+                  "y": 20,
+                  "width": 1914.0607261657715,
+                  "height": 1139.7111136215929,
+                  "states": [
+                    {
+                      "type": "state",
+                      "id": 3,
+                      "x": 28.000015258789062,
+                      "y": 40.063201904296875,
+                      "width": 1558.9417448043823,
+                      "height": 1091.647911717296,
+                      "name": "displays",
+                      "statecharts": [
+                        {
+                          "type": "statechart",
+                          "x": 0,
+                          "y": 20,
+                          "width": 1557.9792203903198,
+                          "height": 1071.647911717296,
+                          "states": [
+                            {
+                              "type": "state",
+                              "id": 4,
+                              "x": 308.0028076171875,
+                              "y": 85.69398498535156,
+                              "width": 816.9736709594727,
+                              "height": 537.2443237304688,
+                              "name": "regular",
+                              "statecharts": [
+                                {
+                                  "type": "statechart",
+                                  "x": 0,
+                                  "y": 20,
+                                  "width": 811.103645324707,
+                                  "height": 334.7137451171875,
+                                  "states": [
+                                    {
+                                      "type": "state",
+                                      "id": 5,
+                                      "x": 19.946678161621094,
+                                      "y": 40.79829406738281,
+                                      "width": 416.14978408813477,
+                                      "height": 285.9154510498047,
+                                      "name": "update",
+                                      "statecharts": [
+                                        {
+                                          "type": "statechart",
+                                          "x": 0,
+                                          "y": 20,
+                                          "width": 416.14978408813477,
+                                          "height": 265.9154510498047,
+                                          "states": [
+                                            {
+                                              "type": "history",
+                                              "id": 6,
+                                              "x": 12.977340698242188,
+                                              "y": 204.8785572052002
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 7,
+                                              "x": 306.49853515625,
+                                              "y": 34.030548095703125,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "second",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 8,
+                                              "x": 305.1455383300781,
+                                              "y": 116.12570190429688,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "minute",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 9,
+                                              "x": 169.47084426879883,
+                                              "y": 34.17967224121094,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "hour",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 10,
+                                              "x": 172.05606079101562,
+                                              "y": 114.31109619140625,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "10 minute",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 11,
+                                              "x": 37.869293212890625,
+                                              "y": 35.24146270751953,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "month",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 12,
+                                              "x": 42.87287139892578,
+                                              "y": 117.20879364013672,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "date",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 13,
+                                              "x": 44.41407775878906,
+                                              "y": 197.86930084228516,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "day",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 14,
+                                              "x": 174.82952117919922,
+                                              "y": 196.1576690673828,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "year",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 15,
+                                              "x": 308.14978408813477,
+                                              "y": 197.9154510498047,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "mode",
+                                              "statecharts": []
+                                            }
+                                          ],
+                                          "transitions": [
+                                            {
+                                              "type": "transition",
+                                              "src": 7,
+                                              "tSrc": 1.526403803190315,
+                                              "dst": 8,
+                                              "tDst": 3.4855220952077075,
+                                              "event": "c",
+                                              "tText": 0
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 8,
+                                              "tSrc": 2.4713006893036593,
+                                              "dst": 10,
+                                              "tDst": 0.5583664814959567,
+                                              "event": "c",
+                                              "tText": 0.7450169753588698
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 10,
+                                              "tSrc": 3.486890673022117,
+                                              "dst": 9,
+                                              "tDst": 1.4845341627564321,
+                                              "event": "c",
+                                              "tText": 1
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 9,
+                                              "tSrc": 2.4729841474798184,
+                                              "dst": 11,
+                                              "tDst": 0.524590193844192,
+                                              "event": "c",
+                                              "tText": 0.5
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 11,
+                                              "tSrc": 1.469556780894152,
+                                              "dst": 12,
+                                              "tDst": 3.4881931728686455,
+                                              "event": "c",
+                                              "tText": 0
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 12,
+                                              "tSrc": 1.4967184859609588,
+                                              "dst": 13,
+                                              "tDst": 3.490988118158392,
+                                              "event": "c",
+                                              "tText": 0
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 13,
+                                              "tSrc": 0.4893178826690096,
+                                              "dst": 14,
+                                              "tDst": 2.4886683460245957,
+                                              "event": "c",
+                                              "tText": 0
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 14,
+                                              "tSrc": 0.5430547491352579,
+                                              "dst": 15,
+                                              "tDst": 2.4949720198367205,
+                                              "event": "c",
+                                              "tText": 0
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "start",
+                                      "id": 16,
+                                      "x": 500.5077819824219,
+                                      "y": 87.47017669677734
+                                    },
+                                    {
+                                      "type": "state",
+                                      "id": 17,
+                                      "x": 703.103645324707,
+                                      "y": 42.52771759033203,
+                                      "width": 100,
+                                      "height": 60,
+                                      "name": "date",
+                                      "statecharts": []
+                                    },
+                                    {
+                                      "type": "state",
+                                      "id": 18,
+                                      "x": 523.381462097168,
+                                      "y": 142.0313491821289,
+                                      "width": 100,
+                                      "height": 94.78338623046875,
+                                      "name": "time",
+                                      "statecharts": []
+                                    }
+                                  ],
+                                  "transitions": [
+                                    {
+                                      "type": "transition",
+                                      "src": 5,
+                                      "tSrc": 2.0158323571029055,
+                                      "dst": 6,
+                                      "tDst": 2.0294513040003617,
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 5,
+                                      "tSrc": 0.4351742498219243,
+                                      "dst": 18,
+                                      "tDst": 2.667613372025339,
+                                      "event": "b",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 18,
+                                      "tSrc": 2.429082560677907,
+                                      "dst": 5,
+                                      "tDst": 0.5156331847630403,
+                                      "event": "c",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 5,
+                                      "tSrc": 0.712727034350665,
+                                      "dst": 18,
+                                      "tDst": 2.1427589850739848,
+                                      "event": "2 min in update",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 16,
+                                      "tSrc": 1.1832268772725467,
+                                      "dst": 18,
+                                      "tDst": 3.0019798302079606,
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 17,
+                                      "tSrc": 1.814378736235701,
+                                      "dst": 18,
+                                      "tDst": 0.34975325178157723,
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 18,
+                                      "tSrc": 3.797166929067446,
+                                      "dst": 17,
+                                      "tDst": 2.4070170305111724,
+                                      "event": "d (b up)",
+                                      "tText": 0.3816292995687798
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 17,
+                                      "tSrc": 1.5603555160743268,
+                                      "dst": 18,
+                                      "tDst": 0.7311467564069171,
+                                      "event": "2 min in date",
+                                      "tText": 0.5
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "statechart",
+                                  "x": 0,
+                                  "y": 354.7137451171875,
+                                  "width": 811.103645324707,
+                                  "height": 182.53057861328125,
+                                  "name": "beep-test",
+                                  "states": [
+                                    {
+                                      "type": "start",
+                                      "id": 19,
+                                      "x": 143.7557830810547,
+                                      "y": 19.888351440429688
+                                    },
+                                    {
+                                      "type": "state",
+                                      "id": 20,
+                                      "x": 176.40209197998047,
+                                      "y": 52.72149658203125,
+                                      "width": 100,
+                                      "height": 60,
+                                      "name": "00",
+                                      "statecharts": []
+                                    },
+                                    {
+                                      "type": "state",
+                                      "id": 21,
+                                      "x": 324.6052474975586,
+                                      "y": 10.2889404296875,
+                                      "width": 100,
+                                      "height": 60,
+                                      "name": "10",
+                                      "statecharts": []
+                                    },
+                                    {
+                                      "type": "state",
+                                      "id": 22,
+                                      "x": 323.5363082885742,
+                                      "y": 112.61495971679688,
+                                      "width": 100,
+                                      "height": 60,
+                                      "name": "01",
+                                      "statecharts": []
+                                    },
+                                    {
+                                      "type": "state",
+                                      "id": 23,
+                                      "x": 502.35726165771484,
+                                      "y": 54.30523681640625,
+                                      "width": 100,
+                                      "height": 60,
+                                      "name": "11",
+                                      "statecharts": []
+                                    }
+                                  ],
+                                  "transitions": [
+                                    {
+                                      "type": "transition",
+                                      "src": 19,
+                                      "tSrc": 0.411412917085447,
+                                      "dst": 20,
+                                      "tDst": 2.8060609351168586,
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 20,
+                                      "tSrc": 3.7780576440151568,
+                                      "dst": 21,
+                                      "tDst": 2.8138386370337143,
+                                      "event": "b",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 20,
+                                      "tSrc": 1.2262738485346387,
+                                      "dst": 22,
+                                      "tDst": 2.362465526585538,
+                                      "event": "d",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 21,
+                                      "tSrc": 2.0013166723746694,
+                                      "dst": 20,
+                                      "tDst": 0.4727985993889879,
+                                      "event": "b^",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 22,
+                                      "tSrc": 2.9615389023479572,
+                                      "dst": 20,
+                                      "tDst": 0.6910070993912043,
+                                      "event": "d^",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 21,
+                                      "tSrc": 0.141417838533817,
+                                      "dst": 23,
+                                      "tDst": 3.2309935406502612,
+                                      "event": "d",
+                                      "tText": 0.36894969761377816
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 23,
+                                      "tSrc": 2.55603271210832,
+                                      "dst": 21,
+                                      "tDst": 0.9456859457348005,
+                                      "event": "d^",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 22,
+                                      "tSrc": 0.7033151300794007,
+                                      "dst": 23,
+                                      "tDst": 1.7747856569546425,
+                                      "event": "b",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 23,
+                                      "tSrc": 2.279735635972532,
+                                      "dst": 22,
+                                      "tDst": 0.005262908812480423,
+                                      "event": "b^",
+                                      "tText": 0.5
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "start",
+                              "id": 24,
+                              "x": 1145.3201160430908,
+                              "y": 56.62185478210449
+                            },
+                            {
+                              "type": "state",
+                              "id": 25,
+                              "x": 705.6574401855469,
+                              "y": 8,
+                              "width": 100,
+                              "height": 60.60765075683594,
+                              "name": "wait",
+                              "statecharts": []
+                            },
+                            {
+                              "type": "state",
+                              "id": 26,
+                              "x": 25.947853088378906,
+                              "y": 671.0180473327637,
+                              "width": 346.77060985565186,
+                              "height": 342.83103942871094,
+                              "name": "stopwatch",
+                              "statecharts": [
+                                {
+                                  "type": "statechart",
+                                  "x": 0,
+                                  "y": 20,
+                                  "width": 346.77060985565186,
+                                  "height": 322.83103942871094,
+                                  "states": [
+                                    {
+                                      "type": "state",
+                                      "id": 27,
+                                      "x": 123.9723072052002,
+                                      "y": 34.52076721191406,
+                                      "width": 100,
+                                      "height": 60,
+                                      "name": "zero",
+                                      "statecharts": []
+                                    },
+                                    {
+                                      "type": "start",
+                                      "id": 28,
+                                      "x": 257.8678894042969,
+                                      "y": 24.79690170288086
+                                    },
+                                    {
+                                      "type": "state",
+                                      "id": 29,
+                                      "x": 22.016326904296875,
+                                      "y": 122.6776351928711,
+                                      "width": 316.754282951355,
+                                      "height": 192.15340423583984,
+                                      "name": "display",
+                                      "statecharts": [
+                                        {
+                                          "type": "statechart",
+                                          "x": 0,
+                                          "y": 20,
+                                          "width": 313.7038679122925,
+                                          "height": 93.88423919677734,
+                                          "states": [
+                                            {
+                                              "type": "state",
+                                              "id": 30,
+                                              "x": 18.512782096862793,
+                                              "y": 25.51776123046875,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "reg",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 31,
+                                              "x": 205.70386791229248,
+                                              "y": 25.884239196777344,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "lap",
+                                              "statecharts": []
+                                            }
+                                          ],
+                                          "transitions": [
+                                            {
+                                              "type": "transition",
+                                              "src": 30,
+                                              "tSrc": 0.429843800581505,
+                                              "dst": 31,
+                                              "tDst": 2.6001183589533277,
+                                              "event": "d (in on)",
+                                              "tText": 0.20910452008402106
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 31,
+                                              "tSrc": 2.2389782764490844,
+                                              "dst": 30,
+                                              "tDst": 0.7581535548522605,
+                                              "event": "d",
+                                              "tText": 0.7683949212225275
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "statechart",
+                                          "x": 0,
+                                          "y": 113.88423919677734,
+                                          "width": 313.7038679122925,
+                                          "height": 78.2691650390625,
+                                          "states": [
+                                            {
+                                              "type": "state",
+                                              "id": 32,
+                                              "x": 20.44105815887451,
+                                              "y": 9.1597900390625,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "on",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 33,
+                                              "x": 204.47152996063232,
+                                              "y": 10.2691650390625,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "off",
+                                              "statecharts": []
+                                            }
+                                          ],
+                                          "transitions": [
+                                            {
+                                              "type": "transition",
+                                              "src": 32,
+                                              "tSrc": 0.47514559365318154,
+                                              "dst": 33,
+                                              "tDst": 2.5497220459926213,
+                                              "event": "b",
+                                              "tText": 0.5
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 33,
+                                              "tSrc": 2.23692659187946,
+                                              "dst": 32,
+                                              "tDst": 0.7704542860688776,
+                                              "event": "b",
+                                              "tText": 0.5
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "history*",
+                                      "id": 34,
+                                      "x": 307.7187604904175,
+                                      "y": 79.98858642578125
+                                    }
+                                  ],
+                                  "transitions": [
+                                    {
+                                      "type": "transition",
+                                      "src": 30,
+                                      "tSrc": 3.0653609684122056,
+                                      "dst": 27,
+                                      "tDst": 2.3868934489181264,
+                                      "event": "d (in off)",
+                                      "tText": 0.5326266030032943
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 27,
+                                      "tSrc": 1.1413159102913344,
+                                      "dst": 30,
+                                      "tDst": 0.018372617023955585,
+                                      "event": "b",
+                                      "tText": 0.20196732795113867
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 27,
+                                      "tSrc": 0.6111120203528079,
+                                      "dst": 32,
+                                      "tDst": 0.1553224736635407,
+                                      "event": "b",
+                                      "tText": 0.2432054127377244
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 28,
+                                      "tSrc": 2.7510643843513036,
+                                      "dst": 27,
+                                      "tDst": 0.06436670146368086,
+                                      "tText": 0.5
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "state",
+                              "id": 35,
+                              "x": 403.3805341720581,
+                              "y": 667.945629119873,
+                              "width": 1146.5986862182617,
+                              "height": 390.8021055954698,
+                              "name": "out",
+                              "statecharts": [
+                                {
+                                  "type": "statechart",
+                                  "x": 0,
+                                  "y": 20,
+                                  "width": 1146.5986862182617,
+                                  "height": 370.8021055954698,
+                                  "states": [
+                                    {
+                                      "type": "state",
+                                      "id": 36,
+                                      "x": 22.329566955566406,
+                                      "y": 78.18655502224249,
+                                      "width": 176.6033070066452,
+                                      "height": 225.8692626953124,
+                                      "name": "chime",
+                                      "statecharts": [
+                                        {
+                                          "type": "statechart",
+                                          "x": 0,
+                                          "y": 20,
+                                          "width": 169.24288940429688,
+                                          "height": 205.8692626953124,
+                                          "states": [
+                                            {
+                                              "type": "state",
+                                              "id": 37,
+                                              "x": 38.5511474609375,
+                                              "y": 55.11712646484375,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "off",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 38,
+                                              "x": 39.719451904296875,
+                                              "y": 137.8692626953125,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "on",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "start",
+                                              "id": 39,
+                                              "x": 10.113639831542969,
+                                              "y": 26.860076904296875
+                                            },
+                                            {
+                                              "type": "history",
+                                              "id": 40,
+                                              "x": 145.24288940429688,
+                                              "y": 28.085235595703125
+                                            }
+                                          ],
+                                          "transitions": [
+                                            {
+                                              "type": "transition",
+                                              "src": 39,
+                                              "tSrc": 1.1414005654225818,
+                                              "dst": 37,
+                                              "tDst": 2.987389001096416,
+                                              "tText": 0.5
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 37,
+                                              "tSrc": 2.369207196900852,
+                                              "dst": 38,
+                                              "tDst": 2.5378402935594804,
+                                              "event": "d",
+                                              "tText": 0.5
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 38,
+                                              "tSrc": 0.54410571903211,
+                                              "dst": 37,
+                                              "tDst": 0.6474756600991055,
+                                              "event": "d",
+                                              "tText": 0.5
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "state",
+                                      "id": 41,
+                                      "x": 234.1228485107422,
+                                      "y": 79.23764144802374,
+                                      "width": 170.20023505456106,
+                                      "height": 220.75421142578114,
+                                      "name": "alarm2",
+                                      "statecharts": [
+                                        {
+                                          "type": "statechart",
+                                          "x": 0,
+                                          "y": 20,
+                                          "width": 169.22516632080078,
+                                          "height": 200.75421142578114,
+                                          "states": [
+                                            {
+                                              "type": "state",
+                                              "id": 42,
+                                              "x": 32.48129615712935,
+                                              "y": 55.49212646484375,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "off",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 43,
+                                              "x": 31.639651870019975,
+                                              "y": 132.75421142578125,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "on",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "start",
+                                              "id": 44,
+                                              "x": 134.7265739440918,
+                                              "y": 22.534820556640625
+                                            },
+                                            {
+                                              "type": "history",
+                                              "id": 45,
+                                              "x": 145.22516632080078,
+                                              "y": 48.951690673828125
+                                            }
+                                          ],
+                                          "transitions": [
+                                            {
+                                              "type": "transition",
+                                              "src": 42,
+                                              "tSrc": 2.369207196900852,
+                                              "dst": 43,
+                                              "tDst": 2.5378402935594804,
+                                              "event": "d",
+                                              "tText": 0.5
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 43,
+                                              "tSrc": 0.54410571903211,
+                                              "dst": 42,
+                                              "tDst": 0.7584214925720286,
+                                              "event": "d",
+                                              "tText": 0.5
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 44,
+                                              "tSrc": 1.2136159155058186,
+                                              "dst": 45,
+                                              "tDst": 3.3347347326518473,
+                                              "tText": 0.5
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 45,
+                                              "tSrc": 1.9320167519024511,
+                                              "dst": 42,
+                                              "tDst": 0.5049633350429321,
+                                              "tText": 0.5
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "state",
+                                      "id": 46,
+                                      "x": 436.2960739135742,
+                                      "y": 80.96347152614874,
+                                      "width": 230.439697265625,
+                                      "height": 243.1953124999999,
+                                      "name": "update2",
+                                      "statecharts": [
+                                        {
+                                          "type": "statechart",
+                                          "x": 0,
+                                          "y": 20,
+                                          "width": 230.1982421875,
+                                          "height": 223.1953124999999,
+                                          "states": [
+                                            {
+                                              "type": "state",
+                                              "id": 47,
+                                              "x": 16.267776489257812,
+                                              "y": 32.39349365234375,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "hour",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "history",
+                                              "id": 48,
+                                              "x": 174.88079071044922,
+                                              "y": 41.554718017578125
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 49,
+                                              "x": 122.1982421875,
+                                              "y": 91.22515869140625,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "10 min",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 50,
+                                              "x": 14.396484375,
+                                              "y": 155.1953125,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "minute",
+                                              "statecharts": []
+                                            }
+                                          ],
+                                          "transitions": [
+                                            {
+                                              "type": "transition",
+                                              "src": 47,
+                                              "tSrc": 0.5517471196626357,
+                                              "dst": 49,
+                                              "tDst": 3.4176378374937784,
+                                              "event": "c",
+                                              "tText": 0.5
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 49,
+                                              "tSrc": 1.5700738894932922,
+                                              "dst": 50,
+                                              "tDst": 0.6755027760605287,
+                                              "event": "c",
+                                              "tText": 0.5
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "state",
+                                      "id": 51,
+                                      "x": 705.9857635498047,
+                                      "y": 81.53738510036749,
+                                      "width": 170.20023505456106,
+                                      "height": 220.75421142578114,
+                                      "name": "alarm1",
+                                      "statecharts": [
+                                        {
+                                          "type": "statechart",
+                                          "x": 0,
+                                          "y": 20,
+                                          "width": 169.22516632080078,
+                                          "height": 200.75421142578114,
+                                          "states": [
+                                            {
+                                              "type": "state",
+                                              "id": 52,
+                                              "x": 32.48129615712935,
+                                              "y": 55.49212646484375,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "off",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 53,
+                                              "x": 31.639651870019975,
+                                              "y": 132.75421142578125,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "on",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "start",
+                                              "id": 54,
+                                              "x": 134.7265739440918,
+                                              "y": 22.534820556640625
+                                            },
+                                            {
+                                              "type": "history",
+                                              "id": 55,
+                                              "x": 145.22516632080078,
+                                              "y": 48.951690673828125
+                                            }
+                                          ],
+                                          "transitions": [
+                                            {
+                                              "type": "transition",
+                                              "src": 52,
+                                              "tSrc": 2.369207196900852,
+                                              "dst": 53,
+                                              "tDst": 2.5378402935594804,
+                                              "event": "d",
+                                              "tText": 0.5
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 53,
+                                              "tSrc": 0.54410571903211,
+                                              "dst": 52,
+                                              "tDst": 0.7584214925720286,
+                                              "event": "d",
+                                              "tText": 0.5
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 54,
+                                              "tSrc": 1.2136159155058186,
+                                              "dst": 55,
+                                              "tDst": 3.3347347326518473,
+                                              "tText": 0.5
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 55,
+                                              "tSrc": 1.9320167519024511,
+                                              "dst": 52,
+                                              "tDst": 0.5049633350429321,
+                                              "tText": 0.5
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "state",
+                                      "id": 56,
+                                      "x": 908.1589889526367,
+                                      "y": 83.26321517849249,
+                                      "width": 230.439697265625,
+                                      "height": 243.1953124999999,
+                                      "name": "update1",
+                                      "statecharts": [
+                                        {
+                                          "type": "statechart",
+                                          "x": 0,
+                                          "y": 20,
+                                          "width": 230.1982421875,
+                                          "height": 223.1953124999999,
+                                          "states": [
+                                            {
+                                              "type": "state",
+                                              "id": 57,
+                                              "x": 16.267776489257812,
+                                              "y": 32.39349365234375,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "hour",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "history",
+                                              "id": 58,
+                                              "x": 174.88079071044922,
+                                              "y": 41.554718017578125
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 59,
+                                              "x": 122.1982421875,
+                                              "y": 91.22515869140625,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "10 min",
+                                              "statecharts": []
+                                            },
+                                            {
+                                              "type": "state",
+                                              "id": 60,
+                                              "x": 14.396484375,
+                                              "y": 155.1953125,
+                                              "width": 100,
+                                              "height": 60,
+                                              "name": "minute",
+                                              "statecharts": []
+                                            }
+                                          ],
+                                          "transitions": [
+                                            {
+                                              "type": "transition",
+                                              "src": 57,
+                                              "tSrc": 0.5517471196626357,
+                                              "dst": 59,
+                                              "tDst": 3.4176378374937784,
+                                              "event": "c",
+                                              "tText": 0.5
+                                            },
+                                            {
+                                              "type": "transition",
+                                              "src": 59,
+                                              "tSrc": 1.5700738894932922,
+                                              "dst": 60,
+                                              "tDst": 0.6755027760605287,
+                                              "event": "c",
+                                              "tText": 0.5
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ],
+                                  "transitions": [
+                                    {
+                                      "type": "transition",
+                                      "src": 41,
+                                      "tSrc": 2.9429650554823716,
+                                      "dst": 40,
+                                      "tDst": 0.36577739611546,
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 46,
+                                      "tSrc": 0.3078202670214543,
+                                      "dst": 48,
+                                      "tDst": 3.68094191591637,
+                                      "event": "d",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 50,
+                                      "tSrc": 2.461769780635962,
+                                      "dst": 41,
+                                      "tDst": 0.8654633270741464,
+                                      "event": "c",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 41,
+                                      "tSrc": 0.3223306644579422,
+                                      "dst": 47,
+                                      "tDst": 2.374437494815106,
+                                      "event": "c",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 46,
+                                      "tSrc": 1.8494794549914892,
+                                      "dst": 41,
+                                      "tDst": 1.3058244465124185,
+                                      "event": "b",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 56,
+                                      "tSrc": 0.3078202670214543,
+                                      "dst": 58,
+                                      "tDst": 3.68094191591637,
+                                      "event": "d",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 51,
+                                      "tSrc": 0.3223306644579422,
+                                      "dst": 57,
+                                      "tDst": 2.374437494815106,
+                                      "event": "c",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 56,
+                                      "tSrc": 1.8494794549914892,
+                                      "dst": 51,
+                                      "tDst": 1.3058244465124185,
+                                      "event": "b",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 60,
+                                      "tSrc": 2.461769780635962,
+                                      "dst": 51,
+                                      "tDst": 0.8654633270741464,
+                                      "event": "c",
+                                      "tText": 0.5
+                                    },
+                                    {
+                                      "type": "transition",
+                                      "src": 51,
+                                      "tSrc": 3.00882781341297,
+                                      "dst": 41,
+                                      "tDst": 3.9978872354210986,
+                                      "event": "a",
+                                      "tText": 0.5
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "history*",
+                              "id": 61,
+                              "x": 1500.53910446167,
+                              "y": 268.1085424423218
+                            }
+                          ],
+                          "transitions": [
+                            {
+                              "type": "transition",
+                              "src": 24,
+                              "tSrc": 2.0521575510668084,
+                              "dst": 4,
+                              "tDst": 0.00807298286087612,
+                              "tText": 0.5
+                            },
+                            {
+                              "type": "transition",
+                              "src": 25,
+                              "tSrc": 2.402050781993443,
+                              "dst": 7,
+                              "tDst": 3.278664297527731,
+                              "event": "2 sec in wait",
+                              "tText": 0.347071613386993
+                            },
+                            {
+                              "type": "transition",
+                              "src": 25,
+                              "tSrc": 0.5767542547094654,
+                              "dst": 18,
+                              "tDst": 3.614267017860261,
+                              "event": "c^",
+                              "tText": 0.5
+                            },
+                            {
+                              "type": "transition",
+                              "src": 18,
+                              "tSrc": 3.3586429949528256,
+                              "dst": 25,
+                              "tDst": 0.8058631957969731,
+                              "event": "c",
+                              "tText": 0.42132487169808336
+                            },
+                            {
+                              "type": "transition",
+                              "src": 26,
+                              "tSrc": 3.8586682788047133,
+                              "dst": 4,
+                              "tDst": 1.9766438035670686,
+                              "event": "a",
+                              "tText": 0.5
+                            },
+                            {
+                              "type": "transition",
+                              "src": 36,
+                              "tSrc": 2.7483570783087954,
+                              "dst": 34,
+                              "tDst": 1.1248582015853794,
+                              "tText": 0.5
+                            },
+                            {
+                              "type": "transition",
+                              "src": 18,
+                              "tSrc": 0.9053523898157214,
+                              "dst": 51,
+                              "tDst": 3.3741173793283363,
+                              "event": "a",
+                              "tText": 0.5
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "start",
+                      "id": 62,
+                      "x": 1620.2414817810059,
+                      "y": 41.27416229248047
+                    },
+                    {
+                      "type": "state",
+                      "id": 63,
+                      "x": 1735.8283348083496,
+                      "y": 224.0167007446289,
+                      "width": 170.23239135742188,
+                      "height": 492.4921875,
+                      "name": "alarms-beep",
+                      "statecharts": [
+                        {
+                          "type": "statechart",
+                          "x": 0,
+                          "y": 20,
+                          "width": 152.2471923828125,
+                          "height": 472.4921875,
+                          "states": [
+                            {
+                              "type": "state",
+                              "id": 64,
+                              "x": 27.063232421875,
+                              "y": 30.617889404296875,
+                              "width": 113.828125,
+                              "height": 60,
+                              "name": "alarm1 beeps",
+                              "statecharts": []
+                            },
+                            {
+                              "type": "state",
+                              "id": 65,
+                              "x": 27.1683349609375,
+                              "y": 215.98580932617188,
+                              "width": 113.828125,
+                              "height": 60,
+                              "name": "alarm2 beeps",
+                              "statecharts": []
+                            },
+                            {
+                              "type": "state",
+                              "id": 66,
+                              "x": 30.4190673828125,
+                              "y": 404.4921875,
+                              "width": 113.828125,
+                              "height": 60,
+                              "name": "both beep",
+                              "statecharts": []
+                            }
+                          ],
+                          "transitions": []
+                        }
+                      ]
+                    }
+                  ],
+                  "transitions": [
+                    {
+                      "type": "transition",
+                      "src": 62,
+                      "tSrc": 3.0630111487817953,
+                      "dst": 3,
+                      "tDst": 0.007287459153002837,
+                      "tText": 0.5
+                    },
+                    {
+                      "type": "transition",
+                      "src": 3,
+                      "tSrc": 0.19359949614646835,
+                      "dst": 63,
+                      "tDst": 2.9403794611343574,
+                      "event": "T hits T1 (P1)",
+                      "tText": 0.11613253376448508
+                    },
+                    {
+                      "type": "transition",
+                      "src": 63,
+                      "tSrc": 2.829184529210978,
+                      "dst": 61,
+                      "tDst": 1.5645786734773794,
+                      "event": "any button pressed",
+                      "tText": 0.7681581425962024
+                    },
+                    {
+                      "type": "transition",
+                      "src": 63,
+                      "tSrc": 2.71408650401919,
+                      "dst": 61,
+                      "tDst": 1.3189991597231976,
+                      "event": "30 sec in alarms beep",
+                      "tText": 0.47748694644621403
+                    },
+                    {
+                      "type": "transition",
+                      "src": 3,
+                      "tSrc": 0.3553470395605838,
+                      "dst": 63,
+                      "tDst": 2.592664998998702,
+                      "event": "T hits T2 (P2)",
+                      "tText": 0.10457760236404275
+                    },
+                    {
+                      "type": "transition",
+                      "src": 3,
+                      "tSrc": 0.44849020539231627,
+                      "dst": 63,
+                      "tDst": 2.3951035326507624,
+                      "event": "T hits T1 (P)",
+                      "tText": 0.09097286859965895
+                    }
+                  ]
+                },
+                {
+                  "type": "statechart",
+                  "x": 0,
+                  "y": 1159.7111136215929,
+                  "width": 1914.0607261657715,
+                  "height": 79.61026000976562,
+                  "name": "alarm1-status",
+                  "states": [
+                    {
+                      "type": "start",
+                      "id": 67,
+                      "x": 110.59891510009766,
+                      "y": 25.925323486328125
+                    },
+                    {
+                      "type": "state",
+                      "id": 68,
+                      "x": 172.62243938446045,
+                      "y": 11.610260009765625,
+                      "width": 100,
+                      "height": 60,
+                      "name": "disabled",
+                      "statecharts": []
+                    },
+                    {
+                      "type": "state",
+                      "id": 69,
+                      "x": 507.3561429977417,
+                      "y": 9.415618896484375,
+                      "width": 100,
+                      "height": 60,
+                      "name": "enabled",
+                      "statecharts": []
+                    }
+                  ],
+                  "transitions": [
+                    {
+                      "type": "transition",
+                      "src": 68,
+                      "tSrc": 0.41506561744518666,
+                      "dst": 69,
+                      "tDst": 2.5810527246756534,
+                      "event": "d (in alarm1 off)",
+                      "tText": 0.13903264511181124
+                    },
+                    {
+                      "type": "transition",
+                      "src": 69,
+                      "tSrc": 2.21070073743602,
+                      "dst": 68,
+                      "tDst": 0.7729312944408374,
+                      "event": "d (in alarm1 on)",
+                      "tText": 0.8531750763271719
+                    },
+                    {
+                      "type": "transition",
+                      "src": 67,
+                      "tSrc": 0.40559385694662,
+                      "dst": 68,
+                      "tDst": 2.620547931040894,
+                      "tText": 0.5
+                    }
+                  ]
+                },
+                {
+                  "type": "statechart",
+                  "x": 0,
+                  "y": 1239.3213736313585,
+                  "width": 1914.0607261657715,
+                  "height": 77.7471923828125,
+                  "name": "alarm2-status",
+                  "states": [
+                    {
+                      "type": "start",
+                      "id": 70,
+                      "x": 116.0829849243164,
+                      "y": 25.190188212312023
+                    },
+                    {
+                      "type": "state",
+                      "id": 71,
+                      "x": 174.32205486297607,
+                      "y": 9.7471923828125,
+                      "width": 100,
+                      "height": 60,
+                      "name": "disabled",
+                      "statecharts": []
+                    },
+                    {
+                      "type": "state",
+                      "id": 72,
+                      "x": 514.1089811325073,
+                      "y": 8,
+                      "width": 100,
+                      "height": 60,
+                      "name": "enabled",
+                      "statecharts": []
+                    }
+                  ],
+                  "transitions": [
+                    {
+                      "type": "transition",
+                      "src": 71,
+                      "tSrc": 0.41506561744518666,
+                      "dst": 72,
+                      "tDst": 2.5810527246756534,
+                      "event": "d (in alarm2 off)",
+                      "tText": 0.13903264511181124
+                    },
+                    {
+                      "type": "transition",
+                      "src": 72,
+                      "tSrc": 2.21070073743602,
+                      "dst": 71,
+                      "tDst": 0.7729312944408374,
+                      "event": "d (in alarm2 on)",
+                      "tText": 0.8531750763271719
+                    },
+                    {
+                      "type": "transition",
+                      "src": 70,
+                      "tSrc": 0.328546999338041,
+                      "dst": 71,
+                      "tDst": 2.606860315861871,
+                      "tText": 0.5
+                    }
+                  ]
+                },
+                {
+                  "type": "statechart",
+                  "x": 0,
+                  "y": 1317.068566014171,
+                  "width": 1914.0607261657715,
+                  "height": 144.3729476301353,
+                  "name": "chime-status",
+                  "states": [
+                    {
+                      "type": "start",
+                      "id": 73,
+                      "x": 115.46121978759766,
+                      "y": 25.991790771484375
+                    },
+                    {
+                      "type": "state",
+                      "id": 74,
+                      "x": 170.90954875946045,
+                      "y": 17.481353759765625,
+                      "width": 100,
+                      "height": 60,
+                      "name": "disabled",
+                      "statecharts": []
+                    },
+                    {
+                      "type": "state",
+                      "id": 75,
+                      "x": 507.3463773727417,
+                      "y": 10.696868896484375,
+                      "width": 410.71484375,
+                      "height": 125.67607873365091,
+                      "name": "enabled",
+                      "statecharts": [
+                        {
+                          "type": "statechart",
+                          "x": 0,
+                          "y": 20,
+                          "width": 410.71484375,
+                          "height": 105.67607873365091,
+                          "states": [
+                            {
+                              "type": "state",
+                              "id": 76,
+                              "x": 38.46875,
+                              "y": 36.19951623365091,
+                              "width": 100,
+                              "height": 60,
+                              "name": "quiet",
+                              "statecharts": []
+                            },
+                            {
+                              "type": "state",
+                              "id": 77,
+                              "x": 302.71484375,
+                              "y": 37.67607873365091,
+                              "width": 100,
+                              "height": 60,
+                              "name": "beep",
+                              "statecharts": []
+                            }
+                          ],
+                          "transitions": [
+                            {
+                              "type": "transition",
+                              "src": 76,
+                              "tSrc": 0.4823009501422783,
+                              "dst": 77,
+                              "tDst": 2.5391146349776834,
+                              "event": "T is whole hour",
+                              "tText": 0.11470953341559177
+                            },
+                            {
+                              "type": "transition",
+                              "src": 77,
+                              "tSrc": 2.167755983760004,
+                              "dst": 76,
+                              "tDst": 0.844467659721515,
+                              "event": "2 sec in beep",
+                              "tText": 0.871885627907774
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "transitions": [
+                    {
+                      "type": "transition",
+                      "src": 74,
+                      "tSrc": 0.41506561744518666,
+                      "dst": 76,
+                      "tDst": 2.9101902022891037,
+                      "event": "d (in chime off)",
+                      "tText": 0.13903264511181124
+                    },
+                    {
+                      "type": "transition",
+                      "src": 75,
+                      "tSrc": 2.4036103029769396,
+                      "dst": 74,
+                      "tDst": 0.8256306726580649,
+                      "event": "d (in chime on)",
+                      "tText": 0.8531750763271719
+                    },
+                    {
+                      "type": "transition",
+                      "src": 73,
+                      "tSrc": 0.22393516105902478,
+                      "dst": 74,
+                      "tDst": 2.770582188420802,
+                      "tText": 0.5
+                    }
+                  ]
+                },
+                {
+                  "type": "statechart",
+                  "x": 0,
+                  "y": 1461.4415136443063,
+                  "width": 1914.0607261657715,
+                  "height": 79.20083618164062,
+                  "name": "light",
+                  "states": [
+                    {
+                      "type": "start",
+                      "id": 78,
+                      "x": 105.65482330322266,
+                      "y": 34.855682373046875
+                    },
+                    {
+                      "type": "state",
+                      "id": 79,
+                      "x": 167.75451946258545,
+                      "y": 11.200836181640625,
+                      "width": 100,
+                      "height": 60,
+                      "name": "off",
+                      "statecharts": []
+                    },
+                    {
+                      "type": "state",
+                      "id": 80,
+                      "x": 428.0546293258667,
+                      "y": 9.639007568359375,
+                      "width": 100,
+                      "height": 60,
+                      "name": "on",
+                      "statecharts": []
+                    }
+                  ],
+                  "transitions": [
+                    {
+                      "type": "transition",
+                      "src": 80,
+                      "tSrc": 2.21070073743602,
+                      "dst": 79,
+                      "tDst": 0.7729312944408374,
+                      "event": "b^",
+                      "tText": 0.8531750763271719
+                    },
+                    {
+                      "type": "transition",
+                      "src": 79,
+                      "tSrc": 0.41506561744518666,
+                      "dst": 80,
+                      "tDst": 2.5810527246756534,
+                      "event": "b",
+                      "tText": 0.13903264511181124
+                    },
+                    {
+                      "type": "transition",
+                      "src": 78,
+                      "tSrc": 0.30056976135719093,
+                      "dst": 79,
+                      "tDst": 2.459593909541965,
+                      "tText": 0.5
+                    }
+                  ]
+                },
+                {
+                  "type": "statechart",
+                  "x": 0,
+                  "y": 1540.642349825947,
+                  "width": 1914.0607261657715,
+                  "height": 80.27804183959961,
+                  "name": "power",
+                  "states": [
+                    {
+                      "type": "start",
+                      "id": 81,
+                      "x": 108.9499282836914,
+                      "y": 29.4632568359375
+                    },
+                    {
+                      "type": "state",
+                      "id": 82,
+                      "x": 171.1980619430542,
+                      "y": 12.2371826171875,
+                      "width": 100,
+                      "height": 60,
+                      "name": "OK",
+                      "statecharts": []
+                    },
+                    {
+                      "type": "state",
+                      "id": 83,
+                      "x": 431.49817180633545,
+                      "y": 10.67535400390625,
+                      "width": 100,
+                      "height": 60,
+                      "name": "blink",
+                      "statecharts": []
+                    }
+                  ],
+                  "transitions": [
+                    {
+                      "type": "transition",
+                      "src": 83,
+                      "tSrc": 2.21070073743602,
+                      "dst": 82,
+                      "tDst": 0.7729312944408374,
+                      "event": "b^",
+                      "tText": 0.8531750763271719
+                    },
+                    {
+                      "type": "transition",
+                      "src": 82,
+                      "tSrc": 0.41506561744518666,
+                      "dst": 83,
+                      "tDst": 2.5810527246756534,
+                      "event": "b",
+                      "tText": 0.13903264511181124
+                    },
+                    {
+                      "type": "transition",
+                      "src": 81,
+                      "tSrc": 0.5384505488930017,
+                      "dst": 82,
+                      "tDst": 2.605924834520952,
+                      "tText": 0.5
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "start",
+              "id": 84,
+              "x": 16.49664306640625,
+              "y": 1107.9232654571533
+            },
+            {
+              "type": "state",
+              "id": 85,
+              "x": 22.403864860534668,
+              "y": 1160.1040031481616,
+              "width": 100,
+              "height": 60,
+              "name": "dead",
+              "statecharts": []
+            }
+          ],
+          "transitions": [
+            {
+              "type": "transition",
+              "src": 84,
+              "tSrc": 1.3914438616637532,
+              "dst": 85,
+              "tDst": 3.0518058603906657,
+              "tText": 0.5
+            },
+            {
+              "type": "transition",
+              "src": 83,
+              "tSrc": 2.804628031510501,
+              "dst": 85,
+              "tDst": 1.7628771755929897,
+              "event": "weak battery",
+              "tText": 0.9196484223053926
+            },
+            {
+              "type": "transition",
+              "src": 2,
+              "tSrc": 2.202240025135379,
+              "dst": 85,
+              "tDst": 1.4515856276094272,
+              "event": "battery removed",
+              "tText": 0.8935197860020068
+            },
+            {
+              "type": "transition",
+              "src": 85,
+              "tSrc": 3.6271789243118153,
+              "dst": 2,
+              "tDst": 2.3721421859148384,
+              "event": "battery inserted",
+              "tText": 0.29707500041570134
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "transitions": []
+}

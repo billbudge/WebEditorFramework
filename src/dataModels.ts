@@ -128,16 +128,15 @@ class DataList implements List {
   }
   forEach(visitor: (element: any) => void) : void {
     const array = this.array;
-    if (!array)
-      return;
-    array.forEach(visitor);
+    if (array)
+      array.forEach(visitor);
   };
   forEachReverse(visitor: (element: any) => void) : void {
     const array = this.array;
-    if (!array)
-      return;
-    for (let i = array.length - 1; i >= 0; --i) {
-      visitor(array[i]);
+    if (array) {
+      for (let i = array.length - 1; i >= 0; --i) {
+        visitor(array[i]);
+      }
     }
   }
 

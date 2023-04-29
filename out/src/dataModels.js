@@ -67,17 +67,16 @@ class DataList {
     }
     forEach(visitor) {
         const array = this.array;
-        if (!array)
-            return;
-        array.forEach(visitor);
+        if (array)
+            array.forEach(visitor);
     }
     ;
     forEachReverse(visitor) {
         const array = this.array;
-        if (!array)
-            return;
-        for (let i = array.length - 1; i >= 0; --i) {
-            visitor(array[i]);
+        if (array) {
+            for (let i = array.length - 1; i >= 0; --i) {
+                visitor(array[i]);
+            }
         }
     }
     constructor(owner, prop) {
@@ -244,6 +243,11 @@ function deserializeItem1(raw, map, context) {
             if (id !== undefined)
                 map.set(id, item);
         }
+        else if (prop instanceof ReferenceProp) {
+            // Copy the old id, to be remapped in the second pass.
+            const id = raw[prop.name];
+            prop.setId(item, id);
+        }
         else if (prop instanceof ChildArrayProp) {
             const rawList = raw[prop.name], list = prop.get(item);
             if (rawList) {
@@ -271,8 +275,8 @@ function deserializeItem2(item, map, context) {
     return item;
 }
 export function Deserialize(raw, context) {
-    const map = new Map();
-    return deserializeItem2(raw, map, context);
+    const map = new Map(), root = deserializeItem1(raw, map, context);
+    return deserializeItem2(root, map, context);
 }
 ;
 export function getLineage(item) {

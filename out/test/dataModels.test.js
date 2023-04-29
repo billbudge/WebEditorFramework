@@ -92,7 +92,8 @@ describe('DataContext', () => {
         expect(context.valueChange.prop).toBe(item.template.x);
         expect(context.valueChange.oldValue).toBeUndefined();
     });
-    test('ArrayProp', () => {
+    // TODO IdProp.
+    test('ChildArrayProp', () => {
         const context = new TestDataContext(), item = new TestDataContextObject(context);
         expect(item.array.length).toBe(0);
         const child1 = new TestDataContextObject(context);
@@ -111,19 +112,26 @@ describe('DataContext', () => {
         expect(item.array.at(1)).toBe(child1);
         expect(item.array.indexOf(child1)).toBe(1);
         expect(item.array.indexOf(child2)).toBe(0);
+        const forward = new Array();
+        item.array.forEach((child) => forward.push(child));
+        expect(forward).toEqual([child2, child1]);
+        const reverse = new Array();
+        item.array.forEachReverse((child) => reverse.push(child));
+        expect(reverse).toEqual([child1, child2]);
         item.array.remove(child2);
         expect(context.elementRemove.owner).toBe(item);
         expect(context.elementRemove.prop).toBe(item.template.array);
         expect(context.elementRemove.index).toBe(0);
         expect(context.elementRemove.oldValue).toBe(child2);
+        expect(() => item.array.removeAt(1)).toThrow(RangeError);
     });
     test('ReferenceProp', () => {
         const context = new TestDataContext(), item = new TestDataContextObject(context), child1 = new TestDataContextObject(context);
         expect(item.reference).toBeUndefined();
         item.reference = child1;
         expect(item.reference).toBe(child1);
-        // expect(context.resolvedReference.owner).toBe(item);
-        // expect(context.resolvedReference.id).toBe(child1.id);
+        expect(context.resolvedReference.owner).toBe(item);
+        expect(context.resolvedReference.id).toBe(child1.id);
     });
     test('cloning', () => {
         const context = new TestDataContext(), item = new TestDataContextObject(context), child1 = new TestDataContextObject(context), child2 = new TestDataContextObject(context), child3 = new TestDataContextObject(context);
@@ -169,11 +177,13 @@ describe('Serialization, deserialization', () => {
         const context = new TestDataContext(), item = new TestDataContextObject(context), child1 = new TestDataContextObject(context), child2 = new TestDataContextObject(context), child3 = new TestDataContextObject(context);
         item.array.append(child3);
         child3.array.append(child1);
+        child1.x = 1;
         child1.reference = item;
         child3.array.append(child2);
+        child2.x = 2;
         child2.reference = child1;
+        child3.x = 3;
         const blob = Data.Serialize(item);
-        console.log(JSON.stringify(blob, null, 2));
         const copy = Data.Deserialize(blob, context);
         expect(copy instanceof TestDataContextObject).toBe(true);
         const itemCopy = copy;
@@ -181,9 +191,12 @@ describe('Serialization, deserialization', () => {
         expect(itemCopy.array.at(0) instanceof TestDataContextObject).toBe(true);
         const child3Copy = itemCopy.array.at(0);
         expect(child3Copy.array.length).toBe(2);
+        expect(child3Copy.x).toBe(3);
         const child1Copy = child3Copy.array.at(0), child2Copy = child3Copy.array.at(1);
-        // expect(child1Copy.reference).toBe(itemCopy);
-        // expect(child2Copy.reference).toBe(child1Copy);  // TODO fix.
+        expect(child1Copy.reference).toBe(itemCopy);
+        expect(child1Copy.x).toBe(1);
+        expect(child2Copy.x).toBe(2);
+        expect(child2Copy.reference).toBe(child1Copy); // TODO fix.
     });
 });
 //------------------------------------------------------------------------------
@@ -201,6 +214,9 @@ describe('Hierarchy', () => {
         expect(Data.getLowestCommonAncestor(child3, child1)).toBe(child3);
         expect(Data.getLowestCommonAncestor(child1, child2)).toBe(child3);
         expect(Data.getLowestCommonAncestor(child3, child1, item)).toBe(item);
+        // Ill defined tree.
+        const child4 = new TestDataContextObject(context);
+        expect(Data.getLowestCommonAncestor(child3, child4)).toBeUndefined();
     });
 });
 //------------------------------------------------------------------------------

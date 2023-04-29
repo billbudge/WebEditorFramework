@@ -1,0 +1,212 @@
+{
+  "type": "statechart",
+  "x": 0,
+  "y": 0,
+  "width": 676.047721862793,
+  "height": 791.4942979812622,
+  "states": [
+    {
+      "type": "state",
+      "id": 1,
+      "x": 319.87145233154297,
+      "y": 124.8046875,
+      "width": 150.421875,
+      "height": 60,
+      "name": "Idle",
+      "entry": "count = 0",
+      "statecharts": []
+    },
+    {
+      "type": "start",
+      "id": 2,
+      "x": 290.03124046325684,
+      "y": 85.03124618530273
+    },
+    {
+      "type": "state",
+      "id": 3,
+      "x": 500.82311248779297,
+      "y": 249.38919067382812,
+      "width": 167.224609375,
+      "height": 60,
+      "name": "Verification",
+      "entry": "Ask for PIN",
+      "statecharts": []
+    },
+    {
+      "type": "state",
+      "id": 4,
+      "x": 358.29119873046875,
+      "y": 379.5596694946289,
+      "width": 133.619140625,
+      "height": 60,
+      "name": "Search PIN",
+      "entry": "count++",
+      "statecharts": []
+    },
+    {
+      "type": "state",
+      "id": 5,
+      "x": 327.0021209716797,
+      "y": 486.10794830322266,
+      "width": 323.98363876342773,
+      "height": 181.54576688237796,
+      "name": "Transaction",
+      "entry": "Select Transaction",
+      "exit": "End Transaction",
+      "statecharts": [
+        {
+          "type": "statechart",
+          "x": 0,
+          "y": 20,
+          "width": 323.98363876342773,
+          "height": 161.54576688237796,
+          "states": [
+            {
+              "type": "start",
+             "id": 6,
+             "x": 8,
+              "y": 24.39559555053711
+            },
+            {
+              "type": "state",
+              "id": 7,
+              "x": 43.01838684082031,
+              "y": 43.007720947265625,
+              "width": 100,
+              "height": 60,
+              "name": "Prompt",
+              "statecharts": []
+            },
+            {
+              "type": "state",
+              "id": 8,
+              "x": 215.98363876342773,
+              "y": 45.749290466308594,
+              "width": 100,
+              "height": 60,
+              "name": "Verify",
+              "statecharts": []
+            }
+          ],
+          "transitions": [
+            {
+              "type": "transition",
+              "src": 7,
+              "tSrc": 3.875568440175133,
+              "dst": 8,
+              "tDst": 3.131008854204675,
+              "tText": 0.5
+            },
+            {
+              "type": "transition",
+              "src": 8,
+              "tSrc": 1.8721079817293709,
+              "dst": 7,
+              "tDst": 1.065402488526407,
+              "event": "Choose Transaction",
+              "guard": "isWithdrawal && newBalance < 0",
+              "action": "deny",
+              "tText": 0.09197592656615705
+            },
+            {
+              "type": "transition",
+              "src": 6,
+              "tSrc": 0.5731273141323199,
+              "dst": 7,
+              "tDst": 2.9375471016872394,
+              "tText": 0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "state",
+      "id": 9,
+      "x": 403.1101531982422,
+      "y": 715.6569414138794,
+      "width": 203.36639404296875,
+      "height": 67.83735656738281,
+      "name": "Process Transaction",
+      "statecharts": []
+    }
+  ],
+  "transitions": [
+    {
+      "type": "transition",
+      "src": 2,
+      "tSrc": 1.1081919924478187,
+      "dst": 1,
+      "tDst": 3.018348152417231,
+      "tText": 0.5
+    },
+    {
+      "type": "transition",
+      "src": 1,
+      "tSrc": 0.8060987119426765,
+      "dst": 3,
+      "tDst": 3.205061592098234,
+      "event": "Insert Card",
+      "tText": 0.5
+    },
+    {
+      "type": "transition",
+      "src": 4,
+      "tSrc": 0.6537617936225301,
+      "dst": 3,
+      "tDst": 1.51544961947187,
+      "event": "Invalid PIN",
+      "guard": "count < 3",
+      "tText": 0.5
+    },
+    {
+      "type": "transition",
+      "src": 3,
+      "tSrc": 2.288104073093831,
+      "dst": 4,
+      "tDst": 3.4828463731305543,
+      "event": "PIN Entered",
+      "tText": 0.5908550970496914
+    },
+    {
+      "type": "transition",
+      "src": 4,
+      "tSrc": 2.336986127425887,
+      "dst": 1,
+      "tDst": 2.345337958252232,
+      "event": "Invalid PIN",
+      "guard": "count == 3",
+      "tText": 0.5508066268624181
+    },
+    {
+      "type": "transition",
+      "src": 4,
+      "tSrc": 1.4966141219504854,
+      "dst": 5,
+      "tDst": 3.285943109254656,
+      "event": "Valid PIN",
+      "tText": 0.2613768576015561
+    },
+    {
+      "type": "transition",
+      "src": 5,
+      "tSrc": 2.0321811107774623,
+      "dst": 1,
+      "tDst": 2.587611197659897,
+      "event": "Card Removed",
+      "tText": 0.4523483878097065
+    },
+    {
+      "type": "transition",
+      "src": 5,
+      "tSrc": 1.4849442958291426,
+      "dst": 9,
+      "tDst": 3.438211800920308,
+      "event": "Choose Transaction",
+      "guard": "newBalance >= 0",
+      "action": "approve",
+      "tText": 0.5
+    }
+  ]
+}

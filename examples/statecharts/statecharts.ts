@@ -1665,7 +1665,7 @@ class Renderer {
 //------------------------------------------------------------------------------
 
 // Serialization to raw objects, deserialization from raw objects. Import of old
-// format.
+// format.  TODO use dataModels serialization.
 
 function assignProps(src: any, dst: DataContextObject) {
   dst.template.properties.forEach(function (prop) {
