@@ -412,19 +412,6 @@ class ChangeOp {
         this.change = change;
     }
 }
-class SelectionOp {
-    undo() {
-        this.selectionSet.set(this.startingSelection);
-    }
-    redo() {
-        this.selectionSet.set(this.endingSelection);
-    }
-    constructor(selectionSet, startingSelection) {
-        this.selectionSet = selectionSet;
-        this.startingSelection = startingSelection;
-        this.endingSelection = selectionSet.contents();
-    }
-}
 export class CompoundOp {
     add(op) {
         this.ops.push(op);
@@ -504,8 +491,6 @@ export class TransactionManager extends EventBase {
         return snapshot;
     }
     recordChange(change) {
-        if (!this.transaction)
-            return;
         // Combine value changes, combine nop insert/remove changes.
         const ops = this.transaction.ops;
         for (let i = 0; i < ops.length; ++i) {
@@ -566,14 +551,27 @@ export class TransactionManager extends EventBase {
         }
     }
 }
+class SelectionOp {
+    undo() {
+        this.selectionSet.set(this.startingSelection);
+    }
+    redo() {
+        this.selectionSet.set(this.endingSelection);
+    }
+    constructor(selectionSet, startingSelection) {
+        this.selectionSet = selectionSet;
+        this.startingSelection = startingSelection;
+        this.endingSelection = selectionSet.contents();
+    }
+}
 export class HistoryManager {
     getRedo() {
         const length = this.undone.length;
-        return length > 0 ? this.undone[length - 1] : null;
+        return length > 0 ? this.undone[length - 1] : undefined;
     }
     getUndo() {
         const length = this.done.length;
-        return length > 0 ? this.done[length - 1] : null;
+        return length > 0 ? this.done[length - 1] : undefined;
     }
     redo() {
         const transaction = this.getRedo();

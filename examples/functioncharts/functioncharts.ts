@@ -323,12 +323,13 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
   // Derived properties.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
-  type: Type = globalTypeParser_.add(this.typeString);
+  type: Type = nullFunction;
   inWires: (Wire | undefined)[];  // one input per pin.
   outWires: Wire[][];             // array of outputs per pin, outputs have fan out.
 
   constructor(template: PseudoelementTemplate, id: number, context: FunctionchartContext) {
     this.template = template;
+    this.type = globalTypeParser_.add(this.typeString);
     this.id = id;
     this.context = context;
   }
@@ -500,7 +501,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   visitNonWires(item: AllTypes, visitor: NonWireVisitor) : void {
     const self = this;
-    if (item instanceof Element) {
+    if (item instanceof Element || item instanceof Pseudoelement) {
       visitor(item);
     } else if (item instanceof Functionchart) {
       visitor(item);
@@ -584,7 +585,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     };
   }
 
-  getSubgraphInfo(items: Element[]) : GraphInfo {
+  getSubgraphInfo(items: ElementTypes[]) : GraphInfo {
     const self = this,
           elements = new Set<ElementTypes>(),
           functioncharts = new Set<Functionchart>(),
@@ -595,7 +596,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // First collect elements and Functioncharts.
     items.forEach(item => {
       this.visitAll(item, item => {
-        if (item instanceof Element)
+        if (item instanceof Element || item instanceof Pseudoelement)
           elements.add(item);
         else if (item instanceof Functionchart)
           functioncharts.add(item);
@@ -624,7 +625,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           }
         }
       }
-      if (item instanceof Element) {
+      if (item instanceof Element || item instanceof Pseudoelement) {
         self.forInWires(item, addWire);
         self.forOutWires(item, addWire);
       }
@@ -713,10 +714,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.selection.contents();
   }
 
-  selectedElements() : Array<Element> {
-    const result = new Array<Element>();
+  selectedElements() : ElementTypes[] {
+    const result = new Array<ElementTypes>();
     this.selection.forEach(item => {
-      if (item instanceof Element)
+      if (item instanceof Element || item instanceof Pseudoelement)
         result.push(item);
     });
     return result;
@@ -760,7 +761,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
     if (item instanceof Wire) {
       parent.wires.append(item);
-    } else if (item instanceof Element) {
+    } else if (item instanceof Element || item instanceof Pseudoelement) {
       parent.elements.append(item);
     }
     return item;
@@ -769,7 +770,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   addItems(items: AllTypes[], parent: Functionchart) {
     // Add elements first, then transitions, so the context can track transitions.
     for (let item of items) {
-      if (item instanceof Element)
+      if (item instanceof Element || item instanceof Pseudoelement)
         this.addItem(item, parent);
     }
     for (let item of items) {
@@ -791,7 +792,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           copies = copyItems(selected, this, map);
 
     selected.forEach(item => {
-      if (item instanceof Element) {
+      if (item instanceof Element || item instanceof Pseudoelement) {
         const copy = map.get(item.id);
         if (copy) {
           const translation = this.getToParent(item, Functionchart);
@@ -807,7 +808,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.transactionManager.beginTransaction('paste');
     items.forEach(item => {
       // Offset paste so copies don't overlap with the originals.
-      if (item instanceof Element || item instanceof Functionchart) {
+      if (item instanceof Element || item instanceof Pseudoelement || item instanceof Functionchart) {
         item.x += 16;
         item.y += 16;
       }
@@ -908,9 +909,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.updateItem(element);
 
     if (element.inWires === undefined)
-      element.inWires = new Array<Wire>();
+      element.inWires = new Array<Wire>(element.type.inputs.length);
     if (element.outWires === undefined)
-      element.outWires = new Array<Wire[]>();
+      element.outWires = new Array<Wire[]>(element.type.outputs.length);
   }
 
   private removeElement_(element: ElementTypes) {
@@ -1269,6 +1270,13 @@ class Renderer {
     }
   }
 
+  layoutElement(element: ElementTypes) {
+    const type = element.type;
+    if (type.width === 0 || type.height === 0) {
+      this.layoutType(type);
+    }
+  }
+
   layoutWire(wire: Wire) {
     let src = wire.src,
         dst = wire.dst,
@@ -1276,10 +1284,10 @@ class Renderer {
         p2 = wire.pDst;
     // Since we intercept change events and not transactions, wires may be in
     // an inconsistent state, so check before creating the path.
-    if (src && wire.srcPin !== undefined) {
+    if (src && wire.srcPin >= 0) {
       p1 = this.pinToPoint(src, wire.srcPin, false);
     }
-    if (dst && wire.dstPin !== undefined) {
+    if (dst && wire.dstPin >= 0) {
       p2 = this.pinToPoint(dst, wire.dstPin, true);
     }
     if (p1 && p2) {
@@ -1399,6 +1407,7 @@ class Renderer {
 
     switch (mode) {
       case RenderMode.Normal:
+      case RenderMode.Print:
         ctx.fillStyle = /*element.state === 'palette' ? theme.altBgColor :*/ theme.bgColor;
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
@@ -1428,9 +1437,9 @@ class Renderer {
         right = x + w,
         pin: Pin;
 
-    if (input !== undefined) {
+    if (input >= 0) {
       pin = type.inputs[input];
-    } else if (output !== undefined) {
+    } else if (output >= 0) {
       pin = type.outputs[output];
       x = right - pin.width;
     }
@@ -1439,6 +1448,7 @@ class Renderer {
 
     switch (mode) {
       case RenderMode.Normal:
+      case RenderMode.Print:
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 1;
         break;
@@ -1553,6 +1563,7 @@ class Renderer {
     bezierEdgePath(wire.bezier, ctx, 0);
     switch (mode) {
       case RenderMode.Normal:
+      case RenderMode.Print:
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 1;
         break;
@@ -1577,7 +1588,7 @@ class Renderer {
   }
 
   draw(item: AllTypes, mode: RenderMode) {
-    if (item instanceof Element) {
+    if (item instanceof Element || item instanceof Pseudoelement) {
       this.drawElement(item, mode);
     } else if (item instanceof Wire) {
       this.drawWire(item, mode);
@@ -1598,8 +1609,9 @@ class Renderer {
   }
 
   layout(item: AllTypes) {
-    // TODO element layout?
-    if (item instanceof Wire) {
+    if (item instanceof Element || item instanceof Pseudoelement) {
+      this.layoutElement(item);
+    } else if (item instanceof Wire) {
       this.layoutWire(item);
     }
   }
@@ -1699,7 +1711,7 @@ class WireDrag {
 
 type DragTypes = NonWireDrag | WireDrag;
 
-export class FunctionchartEditor /*implements CanvasLayer*/ {
+export class FunctionchartEditor implements CanvasLayer {
   private theme: FunctionchartTheme;
   private canvasController: CanvasController;
   private paletteController: CanvasController;
@@ -1748,11 +1760,13 @@ export class FunctionchartEditor /*implements CanvasLayer*/ {
 
     // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
     const context = new FunctionchartContext(),
-          Functionchart = context.newFunctionchart(),
+          functionchart = context.newFunctionchart(),
           input = context.newPseudoelement('input'),
           output = context.newPseudoelement('output'),
           literal = context.newPseudoelement('literal'),
           newElement = context.newElement();
+
+    context.setRoot(functionchart);
 
     input.x = input.y = 8;
     output.x = 40; output.y = 8;
@@ -1760,12 +1774,12 @@ export class FunctionchartEditor /*implements CanvasLayer*/ {
     newElement.x = 8; newElement.y = 32;
     // newElement.width = 100; newElement.height = 60;
 
-    Functionchart.elements.append(input);
-    Functionchart.elements.append(output);
-    Functionchart.elements.append(literal);
-    Functionchart.elements.append(newElement);
-    context.setRoot(Functionchart);
-    this.palette = Functionchart;
+    functionchart.elements.append(input);
+    functionchart.elements.append(output);
+    functionchart.elements.append(literal);
+    functionchart.elements.append(newElement);
+    context.setRoot(functionchart);
+    this.palette = functionchart;
 
     // Default Functionchart.
     this.context = new FunctionchartContext();
@@ -1903,7 +1917,7 @@ export class FunctionchartEditor /*implements CanvasLayer*/ {
       renderer.begin(canvasController.getCtx());
       this.context.reverseVisitAll(this.palette, item => renderer.layout(item));
       // Draw the palette items.
-      this.context.visitAll(this.palette, item => renderer.draw(item, RenderMode.Normal));
+      this.context.visitAll(this.palette, item => renderer.draw(item, RenderMode.Print));
       renderer.end();
     }
   }
@@ -2238,7 +2252,8 @@ export class FunctionchartEditor /*implements CanvasLayer*/ {
     let dragItem = pointerHitInfo.item;
     let drag: DragTypes | undefined, newWire: Wire | undefined;
     // First check for a drag that creates a new transition.
-    if ((pointerHitInfo instanceof ElementHitResult)) {
+    if ((pointerHitInfo instanceof ElementHitResult &&
+        (pointerHitInfo.input >= 0 || pointerHitInfo.output >= 0))) {
       const element = (dragItem as Element),
             cp0 = this.getCanvasPosition(canvasController, p0);
       if (pointerHitInfo.input >= 0) {
@@ -2442,7 +2457,128 @@ export class FunctionchartEditor /*implements CanvasLayer*/ {
 
     this.canvasController.draw();
   }
+  onKeyDown(e: KeyboardEvent) {
+    const self = this,
+          context = this.context,
+          functionchart = this.functionchart,
+          selection = context.selection,
+          transactionManager = context.transactionManager,
+          keyCode = e.keyCode,  // TODO fix
+          cmdKey = e.ctrlKey || e.metaKey,
+          shiftKey = e.shiftKey;
 
+    if (keyCode === 8) { // 'delete'
+      transactionManager.beginTransaction('delete');
+      context.reduceSelection();
+      context.deleteItems(selection.contents());
+      transactionManager.endTransaction();
+      return true;
+    }
+    if (cmdKey) {
+      switch (keyCode) {
+        case 65: { // 'a'
+          functionchart.elements.forEach(function (v) {  // TODO select functioncharts too
+            context.selection.add(v);
+          });
+          self.canvasController.draw();
+          return true;
+        }
+        case 90: { // 'z'
+          if (context.getUndo()) {
+            context.undo();
+            self.canvasController.draw();
+          }
+          return true;
+        }
+        case 89: { // 'y'
+          if (context.getRedo()) {
+            context.redo();
+            self.canvasController.draw();
+          }
+          return true;
+        }
+        case 88: { // 'x'
+          this.scrap = context.cut()
+          self.canvasController.draw();
+          return true;
+        }
+        case 67: { // 'c'
+          this.scrap = context.copy();
+          return true;
+        }
+        case 86: { // 'v'
+          if (this.scrap.length > 0) {
+            context.paste(this.scrap);
+            this.updateBounds_();
+            return true;
+          }
+          return false;
+        }
+        case 69: { // 'e'
+          context.selectConnectedElements(true);
+          self.canvasController.draw();
+          return true;
+        }
+        case 72: // 'h'
+          // editingModel.doTogglePalette();
+          // return true;
+          return false;
+        case 78: { // ctrl 'n'   // Can't intercept cmd n.
+          const context = new FunctionchartContext();
+          self.initializeContext(context);
+          self.setContext(context);
+          self.renderer.begin(self.canvasController.getCtx());
+          self.updateBounds_();
+          self.canvasController.draw();
+          return true;
+        }
+        case 79: { // 'o'
+        //   function parse(text: string) {
+        //     const raw = JSON.parse(text),
+        //           context = new FunctionchartContext();
+        //     const statechart = readRaw(raw, context);
+        //     self.initializeContext(context);
+        //     self.setContext(context);
+        //     self.renderer.begin(self.canvasController.getCtx());
+        //     self.updateBounds_();
+        //     self.canvasController.draw();
+        // }
+        //   this.fileController.openFile().then(result => parse(result));
+        //   return true;
+        }
+        case 83: { // 's'
+          let text = JSON.stringify(Serialize(functionchart), undefined, 2);
+          this.fileController.saveUnnamedFile(text, 'functionchart.txt').then();
+          // console.log(text);
+          return true;
+        }
+        case 80: { // 'p'
+          // this.print();
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  onKeyUp(e: KeyboardEvent): boolean {
+    return false;
+  }
+  onBeginHover(canvasController: CanvasController) {
+    const context = this.context,
+          p = canvasController.getCurrentPointerPosition(),
+          hitList = this.hitTestCanvas(p),
+          hoverHitInfo = this.hoverHitInfo = this.getFirstHit(hitList, hasProperties);
+    if (!hoverHitInfo)
+      return false;
+
+    const cp = canvasController.viewToCanvas(p);
+    this.hoverPoint = cp;
+    this.hoverHitInfo = hoverHitInfo;
+    return true;
+  }
+  onEndHover(canvasController: CanvasController) {
+    this.hoverHitInfo = undefined;
+  }
 
 }
 /*

@@ -2,6 +2,7 @@
 'use strict';
 import { describe, expect, test } from '@jest/globals';
 import * as Data from '../src/dataModels.js';
+import * as Collections from '../src/collections.js';
 //------------------------------------------------------------------------------
 class TestDataContext extends Data.EventBase {
     constructor() {
@@ -132,20 +133,6 @@ describe('DataContext', () => {
         expect(item.reference).toBe(child1);
         expect(context.resolvedReference.owner).toBe(item);
         expect(context.resolvedReference.id).toBe(child1.id);
-    });
-    test('cloning', () => {
-        const context = new TestDataContext(), item = new TestDataContextObject(context), child1 = new TestDataContextObject(context), child2 = new TestDataContextObject(context), child3 = new TestDataContextObject(context);
-        item.array.append(child1);
-        item.array.append(child2);
-        child2.array.append(child3);
-        child1.reference = child2;
-        child2.reference = child3;
-        child3.reference = item; // to parent, outside cloned graph.
-        const clone1 = Data.copyItems([child1, child2], context), child1Clone = clone1[0], child2Clone = clone1[1], child3Clone = child2Clone.array.at(0);
-        expect(clone1.length).toBe(2); // 2 top level items.
-        expect(child1Clone.reference).toBe(child2Clone);
-        expect(child2Clone.reference).toBe(child3Clone);
-        expect(child3Clone.reference).toBe(item); // |item| was not cloned.
     });
 });
 //------------------------------------------------------------------------------
@@ -330,6 +317,49 @@ describe('TransactionManager', () => {
         expect(transaction.ops.length).toBe(1);
         item.array.append(child);
         expect(transaction.ops.length).toBe(0);
+    });
+});
+describe('HistoryManager', () => {
+    test('undo, redo, selection undo/redo', () => {
+        const context = new TestDataContext(), item = new TestDataContextObject(context), child1 = new TestDataContextObject(context), child2 = new TestDataContextObject(context), transactionManager = new Data.TransactionManager(), selectionSet = new Collections.SelectionSet(), historyManager = new Data.HistoryManager(transactionManager, selectionSet);
+        context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+        expect(historyManager.getUndo()).toBeUndefined();
+        expect(historyManager.getRedo()).toBeUndefined();
+        selectionSet.add(item);
+        const transaction = transactionManager.beginTransaction('test');
+        item.array.append(child1);
+        item.array.append(child2);
+        selectionSet.set([child1, child2]);
+        transactionManager.endTransaction();
+        expect(transaction.ops.length).toBe(3); // Two appends and a SelectionOp.
+        expect(selectionSet.length()).toBe(2);
+        expect(selectionSet.has(child1)).toBe(true);
+        expect(selectionSet.has(child2)).toBe(true);
+        expect(selectionSet.lastSelected()).toBe(child2);
+        expect(historyManager.getUndo()).toBeDefined();
+        expect(historyManager.getRedo()).toBeUndefined();
+        historyManager.undo();
+        expect(historyManager.getUndo()).toBeUndefined();
+        expect(historyManager.getRedo()).toBeDefined();
+        expect(selectionSet.length()).toBe(1);
+        expect(selectionSet.has(item)).toBe(true);
+        historyManager.redo();
+        expect(historyManager.getUndo()).toBeDefined();
+        expect(historyManager.getRedo()).toBeUndefined();
+        expect(selectionSet.length()).toBe(2);
+        expect(selectionSet.has(child1)).toBe(true);
+        expect(selectionSet.has(child2)).toBe(true);
+        expect(selectionSet.lastSelected()).toBe(child2);
+    });
+    test('no SelectionOp when selection is unchanged', () => {
+        const context = new TestDataContext(), item = new TestDataContextObject(context), transactionManager = new Data.TransactionManager(), selectionSet = new Collections.SelectionSet(), historyManager = new Data.HistoryManager(transactionManager, selectionSet);
+        context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+        selectionSet.add(item);
+        const transaction = transactionManager.beginTransaction('test');
+        item.x = 1;
+        transactionManager.endTransaction();
+        expect(selectionSet.length()).toBe(1);
+        expect(selectionSet.lastSelected()).toBe(item);
     });
 });
 //# sourceMappingURL=dataModels.test.js.map

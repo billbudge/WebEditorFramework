@@ -1895,10 +1895,12 @@ export class StatechartEditor {
             drag = new TransitionDrag(newTransition, 'newTransition', 'Add new transition');
         }
         else if (pointerHitInfo instanceof TransitionHitResult) {
-            if (pointerHitInfo.inner.t === 0)
+            if (pointerHitInfo.inner.t === 0) {
                 drag = new TransitionDrag(dragItem, 'connectTransitionSrc', 'Edit transition');
-            else if (pointerHitInfo.inner.t === 1)
+            }
+            else if (pointerHitInfo.inner.t === 1) {
                 drag = new TransitionDrag(dragItem, 'connectTransitionDst', 'Edit transition');
+            }
             else {
                 drag = new TransitionDrag(dragItem, 'moveTransitionPoint', 'Drag transition attachment point');
             }
