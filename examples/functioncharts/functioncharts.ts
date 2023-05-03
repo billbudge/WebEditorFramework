@@ -284,17 +284,17 @@ export class Element implements DataContextObject, ReferencedObject {
     this.template.type.set(this, value);
     this.type = globalTypeParser_.add(value);
     this.inWires = new Array<Wire | undefined>(this.type.inputs.length);
-    this.outWires = new Array<Wire[]>(this.type.outputs.length);
+    this.outWires = new Array<Array<Wire | undefined>>(this.type.outputs.length);
     for (let i = 0; i < this.outWires.length; i++)
-      this.outWires[i] = [];
+      this.outWires[i] = new Array<Wire | undefined>();
   }
 
   // Derived properties.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
   type: Type = nullFunction;
-  inWires: (Wire | undefined)[];  // one input per pin.
-  outWires: Wire[][];             // array of outputs per pin, outputs have fan out.
+  inWires: Array<Wire | undefined>;           // one input per pin.
+  outWires: Array<Array<Wire | undefined>>;   // array of outputs per pin, outputs have fan out.
 
   constructor(context: FunctionchartContext, id: number) {
     this.context = context;
@@ -314,8 +314,8 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
   set y(value: number) { this.template.y.set(this, value); }
   get typeString() : string {
     switch (this.template.typeName) {
-      case 'input': return '[*,]';
-      case 'output': return '[,*]';
+      case 'input': return '[,*]';
+      case 'output': return '[*,]';
       case 'literal': return '[,v]';
     }
   }
@@ -324,14 +324,18 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
   type: Type = nullFunction;
-  inWires: (Wire | undefined)[];  // one input per pin.
-  outWires: Wire[][];             // array of outputs per pin, outputs have fan out.
+  inWires: Array<Wire | undefined>;           // one input per pin.
+  outWires: Array<Array<Wire | undefined>>;   // array of outputs per pin, outputs have fan out.
 
   constructor(template: PseudoelementTemplate, id: number, context: FunctionchartContext) {
     this.template = template;
     this.type = globalTypeParser_.add(this.typeString);
     this.id = id;
     this.context = context;
+    this.inWires = new Array<Wire | undefined>(this.type.inputs.length);
+    this.outWires = new Array<Array<Wire | undefined>>(this.type.outputs.length);
+    for (let i = 0; i < this.outWires.length; i++)
+      this.outWires[i] = new Array<Wire | undefined>();
   }
 }
 
@@ -341,21 +345,23 @@ export class Wire implements DataContextObject {
 
   get src() { return this.template.src.get(this) as ElementTypes | undefined; }
   set src(value: ElementTypes | undefined) { this.template.src.set(this, value); }
-  get srcPin() { return this.template.srcPin.get(this) || -1; }
+  get srcPin() { return this.template.srcPin.get(this); }
   set srcPin(value: number) { this.template.srcPin.set(this, value); }
   get dst() { return this.template.dst.get(this) as ElementTypes | undefined; }
   set dst(value: ElementTypes | undefined) { this.template.dst.set(this, value); }
-  get dstPin() { return this.template.dstPin.get(this) || -1; }
+  get dstPin() { return this.template.dstPin.get(this); }
   set dstPin(value: number) { this.template.dstPin.set(this, value); }
 
   // Derived properties.
   parent: Functionchart | undefined;
   pSrc: PointWithNormal | undefined;
   pDst: PointWithNormal | undefined;
-  bezier: BezierCurve;
+  bezier: BezierCurve = defaultBezierCurve;
 
   constructor(context: FunctionchartContext) {
     this.context = context;
+    this.srcPin = -1;
+    this.dstPin = -1;
   }
 }
 
