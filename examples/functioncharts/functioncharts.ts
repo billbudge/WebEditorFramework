@@ -204,9 +204,9 @@ const elementTemplate = (function() {
         x = new ScalarProp('x'),
         y = new ScalarProp('y'),
         name = new ScalarProp('name'),
-        type = new ScalarProp('type'),
-        properties = [id, x, y, name, type];
-  return { typeName, id, x, y, name, type, properties };
+        typeString = new ScalarProp('typeString'),
+        properties = [id, x, y, name, typeString];
+  return { typeName, id, x, y, name, typeString, properties };
 })();
 
 export type PseudoelementSubtype = 'input' | 'output' | 'literal';
@@ -277,24 +277,15 @@ export class Element implements DataContextObject, ReferencedObject {
   set y(value: number) { this.template.y.set(this, value); }
   get name() { return this.template.name.get(this); }
   set name(value: string | undefined) { this.template.name.set(this, value); }
-  get typeString() { return this.template.type.get(this); }
-  set typeString(value: string) {
-    if (this.type !== nullFunction)
-      throw new Error('Cannot change type of element');  // TODO ?
-    this.template.type.set(this, value);
-    this.type = globalTypeParser_.add(value);
-    this.inWires = new Array<Wire | undefined>(this.type.inputs.length);
-    this.outWires = new Array<Array<Wire | undefined>>(this.type.outputs.length);
-    for (let i = 0; i < this.outWires.length; i++)
-      this.outWires[i] = new Array<Wire | undefined>();
-  }
+  get typeString() { return this.template.typeString.get(this); }
+  set typeString(value: string) { this.template.typeString.set(this, value); }
 
   // Derived properties.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
   type: Type = nullFunction;
   inWires: Array<Wire | undefined>;           // one input per pin.
-  outWires: Array<Array<Wire | undefined>>;   // array of outputs per pin, outputs have fan out.
+  outWires: Array<Array<Wire>>;   // array of outputs per pin, outputs have fan out.
 
   constructor(context: FunctionchartContext, id: number) {
     this.context = context;
@@ -325,7 +316,7 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
   globalPosition = defaultPoint;
   type: Type = nullFunction;
   inWires: Array<Wire | undefined>;           // one input per pin.
-  outWires: Array<Array<Wire | undefined>>;   // array of outputs per pin, outputs have fan out.
+  outWires: Array<Array<Wire>>;   // array of outputs per pin, outputs have fan out.
 
   constructor(template: PseudoelementTemplate, id: number, context: FunctionchartContext) {
     this.template = template;
@@ -333,9 +324,9 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
     this.id = id;
     this.context = context;
     this.inWires = new Array<Wire | undefined>(this.type.inputs.length);
-    this.outWires = new Array<Array<Wire | undefined>>(this.type.outputs.length);
+    this.outWires = new Array<Array<Wire>>(this.type.outputs.length);
     for (let i = 0; i < this.outWires.length; i++)
-      this.outWires[i] = new Array<Wire | undefined>();
+      this.outWires[i] = new Array<Wire>();
   }
 }
 
@@ -946,14 +937,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.updateItem(wire);
 
     const src = wire.src,
-          dst = wire.dst;
-    if (src) {
-      const outputs = src.outWires[wire.srcPin];
+          srcPin = wire.srcPin,
+          dst = wire.dst,
+          dstPin = wire.dstPin;
+    if (src && srcPin >= 0) {
+      const outputs = src.outWires[srcPin];
       if (!outputs.includes(wire))
         outputs.push(wire);
     }
-    if (dst) {
-      dst.inWires[wire.srcPin] = wire;
+    if (dst && dstPin >= 0) {
+      dst.inWires[dstPin] = wire;
     }
   }
 
@@ -1007,27 +1000,37 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       const parent = owner.parent;
       if (parent) {
         if (prop === wireTemplate.src) {
-          const oldSrc = oldValue as Element;
-          if (oldSrc)
-            FunctionchartContext.removeWireHelper(oldSrc.outWires[owner.srcPin], owner);
+          const oldSrc = oldValue as Element,
+                srcPin = owner.srcPin;
+          if (oldSrc && srcPin >= 0)  // TODO systematize the valid wire check.
+            FunctionchartContext.removeWireHelper(oldSrc.outWires[srcPin], owner);
         } else if (prop === wireTemplate.dst) {
-          const oldDst = oldValue as Element;
-          if (oldDst)
-            oldDst.inWires[owner.dstPin] = undefined;
+          const oldDst = oldValue as Element,
+                dstPin = owner.dstPin;
+          if (oldDst && dstPin >= 0)
+            oldDst.inWires[dstPin] = undefined;
         } else if (prop === wireTemplate.srcPin) {
           const src = owner.src,
                 oldPin = oldValue as number;
-          if (src) {
+          if (src && oldPin >= 0) {
             const oldOutputs = src.outWires[oldPin];
             FunctionchartContext.removeWireHelper(oldOutputs, owner);
           }
         } else if (prop === wireTemplate.dstPin) {
           const dst = owner.dst,
                 oldPin = oldValue as number;
-          if (dst)
+          if (dst && oldPin >= 0)
             dst.inWires[oldPin] = undefined;
         }
         this.insertWire_(owner, parent);
+      }
+    } else if (owner instanceof Element || owner instanceof Pseudoelement) {
+      if (prop === elementTemplate.typeString) {
+        owner.type = globalTypeParser_.add(owner.typeString);
+        owner.inWires = new Array<Wire | undefined>(owner.type.inputs.length);
+        owner.outWires = new Array<Array<Wire>>(owner.type.outputs.length);
+        for (let i = 0; i < owner.outWires.length; i++)
+          owner.outWires[i] = new Array<Wire>();
       }
     }
     this.onValueChanged(owner, prop, oldValue);
@@ -1778,6 +1781,7 @@ export class FunctionchartEditor implements CanvasLayer {
     output.x = 40; output.y = 8;
     literal.x = 72; literal.y = 8;
     newElement.x = 8; newElement.y = 32;
+    newElement.typeString = '[vv,v]';
     // newElement.width = 100; newElement.height = 60;
 
     functionchart.elements.append(input);
@@ -2390,25 +2394,24 @@ export class FunctionchartEditor implements CanvasLayer {
         case 'connectWireSrc': {
           const dst = wire.dst,
                 dstPin = wire.dstPin,
-                hitInfo = this.getFirstHit(hitList, isElementInputPin) as ElementHitResult,
+                hitInfo = this.getFirstHit(hitList, isElementOutputPin) as ElementHitResult,
                 src = hitInfo ? hitInfo.item as ElementTypes : undefined;
-          if (src && dst) {
+          if (src && dst && src !== dst) {
             wire.src = src;
-            wire.srcPin = hitInfo.input;
+            wire.srcPin = hitInfo.output;
           } else {
             wire.src = undefined;  // This notifies observers to update the layout.
-            wire.srcPin = -1;
             wire.pSrc = { x: cp.x, y: cp.y, nx: 0, ny: 0 };
           }
           break;
         }
         case 'connectWireDst': {
           const src = wire.src,
-                hitInfo = this.getFirstHit(hitList, isElementOutputPin) as ElementHitResult,
+                hitInfo = this.getFirstHit(hitList, isElementInputPin) as ElementHitResult,
                 dst = hitInfo ? hitInfo.item as ElementTypes : undefined;
-          if (src && dst) {
+          if (src && dst && src !== dst) {
             wire.dst = dst;
-            wire.dstPin = hitInfo.output;
+            wire.dstPin = hitInfo.input;
           } else {
             wire.dst = undefined;  // This notifies observers to update the layout.
             wire.pDst = { x: cp.x, y: cp.y, nx: 0, ny: 0 };
