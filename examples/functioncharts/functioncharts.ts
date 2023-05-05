@@ -423,7 +423,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.addHandler('changed',
         this.transactionManager.onChanged.bind(this.transactionManager));
     this.transactionManager.addHandler('transactionEnding', () => {
-      // self.makeConsistent();
+      self.makeConsistent();
     });
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
     this.functionchart = new Functionchart(this);
@@ -829,7 +829,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const self = this,
           Functionchart = this.functionchart,
           graphInfo = this.getGraphInfo();
-    // Eliminate dangling transitions.
+    // Eliminate dangling wires.
     graphInfo.wires.forEach(wire => {
       const src = wire.src,
             dst = wire.dst;
@@ -838,7 +838,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         self.deleteItem(wire);
         return;
       }
-      // Make sure transitions belong to lowest common functionchart.
+      // Make sure transitions wires to lowest common functionchart.
       const srcParent = src.parent!,
             dstParent = dst.parent!,
             lca: Functionchart = getLowestCommonAncestor<AllTypes>(srcParent, dstParent) as Functionchart;
