@@ -770,12 +770,12 @@ export class HistoryManager {
     }
   }
 
-  onTransactionBegan_(op: CompoundOp) {
+  private onTransactionBegan(op: CompoundOp) {
     const selectionSet = this.selectionSet;
     this.startingSelection = selectionSet.contents();
   }
 
-  onTransactionEnding_(op: CompoundOp) {
+  private onTransactionEnding(op: CompoundOp) {
     const selectionSet = this.selectionSet;
     const startingSelection = this.startingSelection || [];
     let endingSelection = selectionSet.contents();
@@ -791,14 +791,14 @@ export class HistoryManager {
     this.startingSelection = [];
   }
 
-  onTransactionEnded_(op: CompoundOp) {
+  private onTransactionEnded(op: CompoundOp) {
     this.startingSelection = [];
     if (this.undone.length)
       this.undone = [];
     this.done.push(op);
   }
 
-  onTransactionCancelled_(op: CompoundOp) {
+  private onTransactionCancelled(op: CompoundOp) {
     this.selectionSet.set(this.startingSelection);
     this.startingSelection = [];
   }
@@ -806,9 +806,9 @@ export class HistoryManager {
   constructor(transactionManager: TransactionManager, selectionSet: SelectionSet<DataContextObject>) {
     this.transactionManager = transactionManager;
     this.selectionSet = selectionSet;
-    transactionManager.addHandler('transactionBegan', this.onTransactionBegan_.bind(this));
-    transactionManager.addHandler('transactionEnding', this.onTransactionEnding_.bind(this));
-    transactionManager.addHandler('transactionEnded', this.onTransactionEnded_.bind(this));
-    transactionManager.addHandler('transactionCancelled', this.onTransactionCancelled_.bind(this));
+    transactionManager.addHandler('transactionBegan', this.onTransactionBegan.bind(this));
+    transactionManager.addHandler('transactionEnding', this.onTransactionEnding.bind(this));
+    transactionManager.addHandler('transactionEnded', this.onTransactionEnded.bind(this));
+    transactionManager.addHandler('transactionCancelled', this.onTransactionCancelled.bind(this));
   }
 }
