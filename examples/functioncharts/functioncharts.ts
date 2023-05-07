@@ -198,39 +198,37 @@ const globalTypeParser_ = new TypeParser(),
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
 
-const elementTemplate = (function() {
-  const typeName: string = 'element',
-        id = new IdProp('id'),
-        x = new ScalarProp('x'),
-        y = new ScalarProp('y'),
-        name = new ScalarProp('name'),
-        typeString = new ScalarProp('typeString'),
-        properties = [id, x, y, name, typeString];
-  return { typeName, id, x, y, name, typeString, properties };
-})();
+class ElementBase {
+  readonly id = new IdProp('id');
+  readonly x = new ScalarProp('x');
+  readonly y = new ScalarProp('y');
+}
+
+class ElementTemplate extends ElementBase {
+  readonly typeName = 'element';
+  readonly name = new ScalarProp('name');
+  readonly typeString = new ScalarProp('typeString');
+  readonly properties = [this.id, this.x, this.y, this.name, this.typeString];
+}
 
 export type PseudoelementSubtype = 'input' | 'output' | 'literal';
-type PseudoelementTemplate = {
-  readonly typeName: PseudoelementSubtype,
-  readonly id: IdProp,
-  readonly x: ScalarProp,
-  readonly y: ScalarProp,
-  readonly properties: PropertyTypes[],
+
+class PseudoelementTemplate extends ElementBase {
+  readonly typeName: PseudoelementSubtype;
+  readonly id = new IdProp('id');
+  readonly x = new ScalarProp('x');
+  readonly y = new ScalarProp('y');
+  readonly properties = [this.id, this.x, this.y];
+  constructor(typeName: PseudoelementSubtype) {
+    super();
+    this.typeName = typeName;
+  }
 }
-const pseudoelementTemplate = (function() {
-  const id = new IdProp('id'),
-        x = new ScalarProp('x'),
-        y = new ScalarProp('y'),
-        properties = [id, x, y],
-        input: PseudoelementSubtype = 'input',
-        output: PseudoelementSubtype = 'output',
-        literal: PseudoelementSubtype = 'literal';
-  return {
-    input: { typeName: input, id, x, y, properties },
-    output: { typeName: output, id, x, y, properties },
-    literal: { typeName: literal, id, x, y, properties },
-  };
-})();
+
+const elementTemplate = new ElementTemplate(),
+      inputPseudoelementTemplate = new PseudoelementTemplate('input'),
+      outputPseudoelementTemplate = new PseudoelementTemplate('output'),
+      literalPseudoelementTemplate = new PseudoelementTemplate('literal');
 
 const wireTemplate = (function() {
   const typeName: string = 'wire',
@@ -450,9 +448,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const nextId = ++this.highestId;
     let template: PseudoelementTemplate;
     switch (typeName) {
-      case 'input': template = pseudoelementTemplate.input; break;
-      case 'output': template = pseudoelementTemplate.output; break;
-      case 'literal': template = pseudoelementTemplate.literal; break;
+      case 'input': template = inputPseudoelementTemplate; break;
+      case 'output': template = outputPseudoelementTemplate; break;
+      case 'literal': template = literalPseudoelementTemplate; break;
       default: throw new Error('Unknown pseudoelement type: ' + typeName);
     }
     const result: Pseudoelement = new Pseudoelement(template, nextId, this);
