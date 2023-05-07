@@ -6,19 +6,35 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems
 //------------------------------------------------------------------------------
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
-const stateTemplate = (function () {
-    const typeName = 'state', id = new IdProp('id'), x = new ScalarProp('x'), y = new ScalarProp('y'), width = new ScalarProp('width'), height = new ScalarProp('height'), name = new ScalarProp('name'), entry = new ScalarProp('entry'), exit = new ScalarProp('exit'), statecharts = new ChildArrayProp('statecharts'), properties = [id, x, y, width, height, name, entry, exit, statecharts];
-    return { typeName, id, x, y, width, height, name, entry, exit, statecharts, properties };
-})();
-const pseudostateTemplate = (function () {
-    const id = new IdProp('id'), x = new ScalarProp('x'), y = new ScalarProp('y'), properties = [id, x, y], start = 'start', stop = 'stop', history = 'history', deepHistory = 'history*';
-    return {
-        start: { typeName: start, id, x, y, properties },
-        stop: { typeName: stop, id, x, y, properties },
-        history: { typeName: history, id, x, y, properties },
-        deepHistory: { typeName: deepHistory, id, x, y, properties },
-    };
-})();
+class StateBaseTemplate {
+    constructor() {
+        this.id = new IdProp('id');
+        this.x = new ScalarProp('x');
+        this.y = new ScalarProp('y');
+    }
+}
+class StateTemplate extends StateBaseTemplate {
+    constructor() {
+        super(...arguments);
+        this.typeName = 'state';
+        this.width = new ScalarProp('width');
+        this.height = new ScalarProp('height');
+        this.name = new ScalarProp('name');
+        this.entry = new ScalarProp('entry');
+        this.exit = new ScalarProp('exit');
+        this.statecharts = new ChildArrayProp('statecharts');
+        this.properties = [this.id, this.x, this.y, this.width, this.height,
+            this.name, this.entry, this.exit, this.statecharts];
+    }
+}
+class PseudostateTemplate extends StateBaseTemplate {
+    constructor(typeName) {
+        super();
+        this.properties = [this.id, this.x, this.y];
+        this.typeName = typeName;
+    }
+}
+const stateTemplate = new StateTemplate(), startPseudostateTemplate = new PseudostateTemplate('start'), stopPseudostateTemplate = new PseudostateTemplate('stop'), historyPseudostateTemplate = new PseudostateTemplate('history'), deepHistoryPseudostateTemplate = new PseudostateTemplate('history*');
 const transitionTemplate = (function () {
     const typeName = 'transition', src = new ReferenceProp('src'), tSrc = new ScalarProp('tSrc'), dst = new ReferenceProp('dst'), tDst = new ScalarProp('tDst'), event = new ScalarProp('event'), guard = new ScalarProp('guard'), action = new ScalarProp('action'), tText = new ScalarProp('tText'), properties = [src, tSrc, dst, tDst, event, guard, action, tText];
     return { typeName, src, tSrc, dst, tDst, event, guard, action, tText, properties };
@@ -154,16 +170,16 @@ export class StatechartContext extends EventBase {
         let template;
         switch (typeName) {
             case 'start':
-                template = pseudostateTemplate.start;
+                template = startPseudostateTemplate;
                 break;
             case 'stop':
-                template = pseudostateTemplate.stop;
+                template = stopPseudostateTemplate;
                 break;
             case 'history':
-                template = pseudostateTemplate.history;
+                template = historyPseudostateTemplate;
                 break;
             case 'history*':
-                template = pseudostateTemplate.deepHistory;
+                template = deepHistoryPseudostateTemplate;
                 break;
             default: throw new Error('Unknown pseudostate type: ' + typeName);
         }

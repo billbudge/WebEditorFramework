@@ -24,47 +24,40 @@ import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
-
-const stateTemplate = (function() {
-  const typeName: string = 'state',
-        id = new IdProp('id'),
-        x = new ScalarProp('x'),
-        y = new ScalarProp('y'),
-        width = new ScalarProp('width'),
-        height = new ScalarProp('height'),
-        name = new ScalarProp('name'),
-        entry = new ScalarProp('entry'),
-        exit = new ScalarProp('exit'),
-        statecharts = new ChildArrayProp('statecharts'),
-        properties = [id, x, y, width, height, name, entry, exit, statecharts];
-  return { typeName, id, x, y, width, height, name, entry, exit, statecharts, properties };
-})();
-
-// TODO use this or remove it.
-export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
-type PseudostateTemplate = {
-  readonly typeName: string,
-  readonly id: IdProp,
-  readonly x: ScalarProp,
-  readonly y: ScalarProp,
-  readonly properties: PropertyTypes[],
+class StateBaseTemplate {
+  readonly id = new IdProp('id');
+  readonly x = new ScalarProp('x');
+  readonly y = new ScalarProp('y');
 }
-const pseudostateTemplate = (function() {
-  const id = new IdProp('id'),
-        x = new ScalarProp('x'),
-        y = new ScalarProp('y'),
-        properties = [id, x, y],
-        start: PseudostateSubtype = 'start',
-        stop: PseudostateSubtype = 'stop',
-        history: PseudostateSubtype = 'history',
-        deepHistory: PseudostateSubtype = 'history*';
-  return {
-    start: { typeName: start, id, x, y, properties },
-    stop: { typeName: stop, id, x, y, properties },
-    history: { typeName: history, id, x, y, properties },
-    deepHistory: { typeName: deepHistory, id, x, y, properties },
-  };
-})();
+
+class StateTemplate extends StateBaseTemplate {
+  readonly typeName = 'state';
+  readonly width = new ScalarProp('width');
+  readonly height = new ScalarProp('height');
+  readonly name = new ScalarProp('name');
+  readonly entry = new ScalarProp('entry');
+  readonly exit = new ScalarProp('exit');
+  readonly statecharts = new ChildArrayProp('statecharts');
+  readonly properties = [this.id, this.x, this.y, this.width, this.height,
+                         this.name, this.entry, this.exit, this.statecharts];
+}
+
+export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
+
+class PseudostateTemplate extends StateBaseTemplate {
+  readonly typeName: string;
+  readonly properties = [this.id, this.x, this.y];
+  constructor(typeName: PseudostateSubtype) {
+    super();
+    this.typeName = typeName;
+  }
+}
+
+const stateTemplate = new StateTemplate(),
+      startPseudostateTemplate = new PseudostateTemplate('start'),
+      stopPseudostateTemplate = new PseudostateTemplate('stop'),
+      historyPseudostateTemplate = new PseudostateTemplate('history'),
+      deepHistoryPseudostateTemplate = new PseudostateTemplate('history*');
 
 const transitionTemplate = (function() {
   const typeName: string = 'transition',
@@ -304,10 +297,10 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     const nextId = ++this.highestId;
     let template: PseudostateTemplate;
     switch (typeName) {
-      case 'start': template = pseudostateTemplate.start; break;
-      case 'stop': template = pseudostateTemplate.stop; break;
-      case 'history': template = pseudostateTemplate.history; break;
-      case 'history*': template = pseudostateTemplate.deepHistory; break;
+      case 'start': template = startPseudostateTemplate; break;
+      case 'stop': template = stopPseudostateTemplate; break;
+      case 'history': template = historyPseudostateTemplate; break;
+      case 'history*': template = deepHistoryPseudostateTemplate; break;
       default: throw new Error('Unknown pseudostate type: ' + typeName);
     }
     const result = new Pseudostate(template, nextId, this);

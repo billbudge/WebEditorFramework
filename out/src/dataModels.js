@@ -587,11 +587,11 @@ export class HistoryManager {
             this.undone.push(this.done.pop());
         }
     }
-    onTransactionBegan_(op) {
+    onTransactionBegan(op) {
         const selectionSet = this.selectionSet;
         this.startingSelection = selectionSet.contents();
     }
-    onTransactionEnding_(op) {
+    onTransactionEnding(op) {
         const selectionSet = this.selectionSet;
         const startingSelection = this.startingSelection || [];
         let endingSelection = selectionSet.contents();
@@ -605,13 +605,13 @@ export class HistoryManager {
         op.add(selectionOp);
         this.startingSelection = [];
     }
-    onTransactionEnded_(op) {
+    onTransactionEnded(op) {
         this.startingSelection = [];
         if (this.undone.length)
             this.undone = [];
         this.done.push(op);
     }
-    onTransactionCancelled_(op) {
+    onTransactionCancelled(op) {
         this.selectionSet.set(this.startingSelection);
         this.startingSelection = [];
     }
@@ -620,10 +620,10 @@ export class HistoryManager {
         this.undone = [];
         this.transactionManager = transactionManager;
         this.selectionSet = selectionSet;
-        transactionManager.addHandler('transactionBegan', this.onTransactionBegan_.bind(this));
-        transactionManager.addHandler('transactionEnding', this.onTransactionEnding_.bind(this));
-        transactionManager.addHandler('transactionEnded', this.onTransactionEnded_.bind(this));
-        transactionManager.addHandler('transactionCancelled', this.onTransactionCancelled_.bind(this));
+        transactionManager.addHandler('transactionBegan', this.onTransactionBegan.bind(this));
+        transactionManager.addHandler('transactionEnding', this.onTransactionEnding.bind(this));
+        transactionManager.addHandler('transactionEnded', this.onTransactionEnded.bind(this));
+        transactionManager.addHandler('transactionCancelled', this.onTransactionCancelled.bind(this));
     }
 }
 //# sourceMappingURL=dataModels.js.map
