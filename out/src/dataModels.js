@@ -13,46 +13,31 @@ export class ScalarProp {
         this.internalName = '_' + name;
     }
 }
-// Internal, non-type safe implementation of List<T>.
+// Internal implementation of List<T>.
 class DataList {
-    get array() {
-        return this.owner[this.prop.internalName];
-    }
-    set array(value) {
-        this.owner[this.prop.internalName] = value;
-    }
     get length() {
-        const array = this.array;
-        return array ? array.length : 0;
+        return this.array.length;
     }
     at(index) {
         const array = this.array;
-        if (!array || array.length <= index)
+        if (array.length <= index)
             throw new RangeError('Index out of range: ' + index);
         return array[index];
     }
     insert(element, index) {
-        let array = this.array;
-        if (!array) {
-            // Set the internal value to an empty array, which is equivalent to
-            // undefined, so don't notify any observers.
-            this.array = array = [];
-        }
-        array.splice(index, 0, element);
+        this.array.splice(index, 0, element);
         this.owner.context.elementInserted(this.owner, this.prop, index);
     }
     append(element) {
         this.insert(element, this.length);
     }
     indexOf(element) {
-        const array = this.array;
-        return array ? array.indexOf(element) : -1;
+        return this.array.indexOf(element);
     }
     removeAt(index) {
-        const array = this.array;
-        if (!array || array.length <= index)
+        if (this.array.length <= index)
             throw new RangeError('Index out of range: ' + index);
-        const oldValue = array.splice(index, 1);
+        const oldValue = this.array.splice(index, 1);
         this.owner.context.elementRemoved(this.owner, this.prop, index, oldValue[0]);
         return oldValue[0];
     }
@@ -63,23 +48,20 @@ class DataList {
         return index;
     }
     asArray() {
-        return this.array || [];
+        return this.array;
     }
     forEach(visitor) {
-        const array = this.array;
-        if (array)
-            array.forEach(visitor);
+        this.array.forEach(visitor);
     }
     ;
     forEachReverse(visitor) {
         const array = this.array;
-        if (array) {
-            for (let i = array.length - 1; i >= 0; --i) {
-                visitor(array[i]);
-            }
+        for (let i = array.length - 1; i >= 0; --i) {
+            visitor(array[i]);
         }
     }
     constructor(owner, prop) {
+        this.array = new Array();
         this.owner = owner;
         this.prop = prop;
     }
@@ -87,7 +69,7 @@ class DataList {
 export class ChildArrayProp {
     get(owner) {
         let list = owner[this.cacheKey];
-        if (!list) {
+        if (list === undefined) {
             list = new DataList(owner, this);
             owner[this.cacheKey] = list;
         }

@@ -21,7 +21,7 @@ function stringifyType(type) {
 }
 function addElement(functionchart) {
     const element = functionchart.context.newElement();
-    functionchart.elements.append(element);
+    functionchart.nonWires.append(element);
     return element;
 }
 function addWire(functionchart, elem1, elem2) {
@@ -31,7 +31,7 @@ function addWire(functionchart, elem1, elem2) {
 }
 function addFunctionchart(parent) {
     const functionchart = parent.context.newFunctionchart();
-    functionchart.functioncharts.append(functionchart);
+    functionchart.nonWires.append(functionchart);
     return functionchart;
 }
 // function setEquals(set1: Set<any>, set2: Array<any>) {

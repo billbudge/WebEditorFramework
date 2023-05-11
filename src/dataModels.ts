@@ -70,50 +70,35 @@ export interface List<T = any> {
   forEachReverse(visitor: (element: T) => void) : void;
 }
 
-// Internal, non-type safe implementation of List<T>.
+// Internal implementation of List<T>.
 class DataList implements List {
   private owner: DataContextObject;
   private prop: ChildArrayProp;
-
-  private get array() : any[] | undefined {
-    return (this.owner as any)[this.prop.internalName];
-  }
-  private set array(value: any[] | undefined) {
-    (this.owner as any)[this.prop.internalName] = value;
-  }
+  private array = new Array<any>();
 
   get length() : number {
-    const array = this.array;
-    return array ? array.length : 0;
+    return this.array.length;
   }
   at(index: number) : any {
     const array = this.array;
-    if (!array || array.length <= index)
+    if (array.length <= index)
       throw new RangeError('Index out of range: ' + index);
     return array[index];
   }
   insert(element: any, index: number) {
-    let array = this.array;
-    if (!array) {
-      // Set the internal value to an empty array, which is equivalent to
-      // undefined, so don't notify any observers.
-      this.array = array = [];
-    }
-    array.splice(index, 0, element);
+    this.array.splice(index, 0, element);
     this.owner.context.elementInserted(this.owner, this.prop, index);
   }
   append(element: any) {
     this.insert(element, this.length);
   }
   indexOf(element: any) : number {
-    const array = this.array;
-    return array ? array.indexOf(element) : -1;
+    return this.array.indexOf(element);
   }
   removeAt(index: number) : any {
-    const array = this.array;
-    if (!array || array.length <= index)
+    if (this.array.length <= index)
       throw new RangeError('Index out of range: ' + index);
-    const oldValue = array.splice(index, 1);
+    const oldValue = this.array.splice(index, 1);
     this.owner.context.elementRemoved(this.owner, this.prop, index, oldValue[0]);
     return oldValue[0];
   }
@@ -124,19 +109,15 @@ class DataList implements List {
     return index;
   }
   asArray(): DataContextObject[] {
-    return this.array || [];
+    return this.array;
   }
   forEach(visitor: (element: any) => void) : void {
-    const array = this.array;
-    if (array)
-      array.forEach(visitor);
+    this.array.forEach(visitor);
   };
   forEachReverse(visitor: (element: any) => void) : void {
     const array = this.array;
-    if (array) {
-      for (let i = array.length - 1; i >= 0; --i) {
-        visitor(array[i]);
-      }
+    for (let i = array.length - 1; i >= 0; --i) {
+      visitor(array[i]);
     }
   }
 
@@ -153,7 +134,7 @@ export class ChildArrayProp<T extends DataContextObject = DataContextObject> {
 
   get(owner: DataContextObject) : List<T> {
     let list = (owner as any)[this.cacheKey];
-    if (!list) {
+    if (list === undefined) {
       list = new DataList(owner, this);
       (owner as any)[this.cacheKey] = list;
     }
