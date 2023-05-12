@@ -499,8 +499,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   updateItem(item: AllTypes) {
-    if (!(item instanceof Wire))
-      this.setGlobalPosition(item);
+    const self = this;
+    if (!(item instanceof Wire)) {
+      this.visitNonWires(item, item => self.setGlobalPosition(item));
+    }
   }
 
   getGrandParent(item: AllTypes) : AllTypes | undefined {
@@ -711,6 +713,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
+  selectedNonWires() : NonWireTypes[] {
+    const result = new Array<NonWireTypes>();
+    this.selection.forEach(item => {
+      if (!(item instanceof Wire))
+        result.push(item);
+    });
+    return result;
+  }
+
   reduceSelection() {
     const selection = this.selection;
     const roots = reduceToRoots(selection.contents(), selection);
@@ -771,7 +782,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const Functionchart = this.functionchart,
           selection = this.selection;
 
-    selection.set(this.selectedElements());
+    selection.set(this.selectedNonWires());
     this.selectInteriorWires();
     this.reduceSelection();
 
@@ -2040,9 +2051,10 @@ export class FunctionchartEditor implements CanvasLayer {
     function layout(item: AllTypes, visitor: FunctionchartVisitor) {
       context.reverseVisitAll(item, visitor);
     }
+    // Layout elements. Functioncharts are updated at the end of the transaction.
     changedItems.forEach(item => {
       layout(item, item => {
-        if (!(item instanceof Wire))
+        if (item instanceof Element || item instanceof Pseudoelement)
           renderer.layout(item);
       });
     });
