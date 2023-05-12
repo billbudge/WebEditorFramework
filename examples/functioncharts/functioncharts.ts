@@ -383,6 +383,8 @@ export type FunctionchartVisitor = (item: AllTypes) => void;
 export type NonWireVisitor = (nonwire: NonWireTypes) => void;
 export type WireVisitor = (wire: Wire) => void;
 
+export type PinPositionFunction = (element: ElementTypes, pin: number) => PointWithNormal;
+
 export interface GraphInfo {
   elements: Set<ElementTypes>;
   functioncharts: Set<Functionchart>;
@@ -450,7 +452,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.referentMap.set(nextId, result);
     return result;
   }
-  newWire(src: Element | undefined, srcPin: number, dst: Element | undefined, dstPin: number) : Wire {
+  newWire(src: ElementTypes | undefined, srcPin: number,
+          dst: ElementTypes | undefined, dstPin: number) : Wire {
     const result = new Wire(this);
     result.src = src;
     result.srcPin = srcPin;
@@ -658,10 +661,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
+  // TODO make transaction manager private?
   beginTransaction(name: string) {
     this.transactionManager.beginTransaction(name);
   }
-  endTransaction(name: string) {
+  endTransaction() {
     this.transactionManager.endTransaction();
   }
   cancelTransaction(name: string) {
@@ -827,7 +831,49 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
-  makeConsistent () {
+  connectInput(element: ElementTypes, pin: number, pinToPoint: PinPositionFunction) {
+    const elementParent = element.parent!,
+          p = pinToPoint(element, pin),
+          junction = this.newPseudoelement('input');
+    junction.x = p.x - 32;
+    junction.y = p.y;
+    this.addItem(junction, elementParent);
+    const wire = this.newWire(junction, 0, element, pin);
+    this.addItem(wire, elementParent);
+    return { junction, wire };
+  }
+
+  connectOutput(element: ElementTypes, pin: number, pinToPoint: PinPositionFunction) {
+    const elementParent = element.parent!,
+          p = pinToPoint(element, pin),
+          junction = this.newPseudoelement('output');
+    junction.x = p.x + 32;
+    junction.y = p.y;
+    this.addItem(junction, elementParent);
+    const wire = this.newWire(element, pin, junction, 0);
+    this.addItem(wire, elementParent);
+    return { junction, wire };
+  }
+
+  completeElements(
+      elements: ElementTypes[], inputToPoint: PinPositionFunction, outputToPoint: PinPositionFunction) {
+    const self = this;
+    // Add junctions for disconnected pins on elements.
+    elements.forEach(element => {
+      const inputs = element.inWires,
+            outputs = element.outWires;
+      for (let pin = 0; pin < inputs.length; pin++) {
+        if (inputs[pin] === undefined)
+          self.connectInput(element, pin, inputToPoint);
+      }
+      for (let pin = 0; pin < outputs.length; pin++) {
+        if (outputs[pin].length === 0)
+          self.connectOutput(element, pin, outputToPoint);
+      }
+    });
+  }
+
+  makeConsistent() {
     const self = this,
           Functionchart = this.functionchart,
           graphInfo = this.getGraphInfo();
@@ -908,7 +954,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.updateItem(element);
 
     if (element.inWires === undefined)
-      element.inWires = new Array<Wire>(element.type.inputs.length);
+      element.inWires = new Array<Wire | undefined>(element.type.inputs.length);
     if (element.outWires === undefined)
       element.outWires = new Array<Wire[]>(element.type.outputs.length);
   }
@@ -2595,6 +2641,21 @@ export class FunctionchartEditor implements CanvasLayer {
           // editingModel.doTogglePalette();
           // return true;
           return false;
+        case 74: { // 'j'
+          const renderer = this.renderer;
+          renderer.begin(this.canvasController.getCtx());
+          function inputToPoint(element: Element, pin: number) {
+            return renderer.pinToPoint(element, pin, true);
+          };
+          function outputToPoint(element: Element, pin: number) {
+            return renderer.pinToPoint(element, pin, false);
+          };
+          context.beginTransaction('complete elements');
+          context.completeElements(context.selectedElements(), inputToPoint, outputToPoint);
+          renderer.end();
+          context.endTransaction();
+          return true;
+        }
         case 78: { // ctrl 'n'   // Can't intercept cmd n.
           const context = new FunctionchartContext();
           self.initializeContext(context);
@@ -2681,49 +2742,6 @@ const editingModel = (function() {
 
 
 
-    connectInput: function(element, pin, p) {
-      const renderer = this.model.renderer,
-            parent = this.getParent(element);  // same parent as element
-
-      p = p || renderer.pinToPoint(element, pin, true);
-      const junction = this.newElement(inputElementType, p.x - 32, p.y, 'input');
-      this.addItem(junction, parent);
-      const wire = this.newWire(junction.id, 0, element.id, pin);
-      this.addItem(wire, parent);
-      return { junction: junction, wire: wire };
-    },
-
-    connectOutput: function(element, pin, p) {
-      const renderer = this.model.renderer,
-            parent = this.getParent(element);
-
-      p = p || renderer.pinToPoint(element, pin, false);
-      const junction = this.newElement(outputElementType, p.x + 32, p.y, 'output');
-      this.addItem(junction, parent);  // same parent as element
-      const wire = this.newWire(element.id, pin, junction.id, 0);
-      this.addItem(wire, parent);  // same parent as element
-      return { junction: junction, wire: wire };
-    },
-
-    completeGroup: function(elements) {
-      const self = this,
-            model = this.model,
-            functionChartModel = model.functionChartModel;
-
-      // Add junctions for disconnected pins on elements.
-      elements.forEach(function(element) {
-        const inputs = functionChartModel.getInputs(element),
-              outputs = functionChartModel.getOutputs(element);
-        inputs.forEach(function(wire, pin) {
-          if (!wire)
-            self.connectInput(element, pin);
-        });
-        outputs.forEach(function(wires, pin) {
-          if (wires.length === 0)
-            self.connectOutput(element, pin);
-        });
-      });
-    },
 
     getPinTypeWithName: function(pin) {
       let type = pin.type;
