@@ -3102,42 +3102,6 @@ const editingModel = (function() {
       return '*';
     },
 
-    doCopy: function() {
-      const selectionModel = this.model.selectionModel;
-      selectionModel.contents().forEach(function(item) {
-        if (!isElementOrGroup(item))
-          selectionModel.remove(item);
-      });
-      this.selectInteriorWires();
-      this.reduceSelection();
-      this.model.copyPasteModel.doCopy(this.copyItems.bind(this));
-    },
-
-    doCut: function() {
-      this.doCopy();
-      this.doDelete();
-    },
-
-    doPaste: function(dx, dy) {
-      const copyPasteModel = this.model.copyPasteModel;
-      copyPasteModel.getScrap().forEach(function(item) {
-        // Offset pastes so the user can see them.
-        if (isElementOrGroup(item)) {
-          item.x += dx;
-          item.y += dy;
-        }
-      });
-      copyPasteModel.doPaste(this.copyItems.bind(this),
-                             this.addItems.bind(this));
-    },
-
-    doComplete: function() {
-      let model = this.model;
-      this.reduceSelection();
-      model.transactionModel.beginTransaction('complete');
-      this.completeGroup(model.selectionModel.contents());
-      model.transactionModel.endTransaction();
-    },
 
     doExport: function() {
       let transactionModel = this.model.transactionModel;
@@ -3193,13 +3157,6 @@ const editingModel = (function() {
       model.transactionModel.endTransaction();
     },
 
-    doSelectConnectedElements: function(upstream) {
-      let selectionModel = this.model.selectionModel,
-          selection = selectionModel.contents(),
-          functionChartModel = this.model.functionChartModel,
-          newSelection = functionChartModel.getConnectedElements(selection, upstream, true);
-      selectionModel.set(newSelection);
-    },
 
     makeConsistent: function () {
       const self = this, model = this.model,
@@ -3435,171 +3392,6 @@ const editingModel = (function() {
       this.junctions = junctions;
       this.primitives = primitives;
       this.palette = junctions.concat(primitives);
-    }
-    initializeModel(model) {
-      const self = this;
-
-      functionChartModel.extend(model);
-      editingModel.extend(model);
-      dataModels.translatableModel.extend(model);
-
-      this.renderer.extend(model);
-
-      model.dataModel.initialize();
-    }
-    setModel(model) {
-      const functionChart = model.root,
-            renderer = this.renderer;
-
-      this.model = model;
-      this.diagram = model.root;
-      this.functionChart = functionChart;
-
-      renderer.setModel(model);
-
-      // Layout any items in the functionChart.
-      renderer.begin(this.canvasController.getCtx());
-      reverseVisitItem(functionChart, item => renderer.layout(item));
-      renderer.end();
-    }
-    initialize(canvasController) {
-      if (canvasController === this.canvasController) {
-      } else {
-        assert(canvasController === this.paletteController);
-        const renderer = this.renderer;
-        renderer.begin(canvasController.getCtx());
-
-        // Position every junction and literal.
-        let x = 16, y = 16, h = 0;
-        const spacing = 8;
-        this.junctions.forEach(function (junction) {
-          junction.x = x;
-          junction.y = y;
-          let r = renderer.getItemRect(junction);
-          x += r.w + spacing;
-          h = Math.max(h, r.h);
-        });
-        y += h + spacing;
-
-        // Position every primitive.
-        x = 16, h = 0;
-        this.primitives.forEach(function (primitive) {
-          primitive.x = x;
-          primitive.y = y;
-          let r = renderer.getItemRect(primitive);
-          x += r.w + spacing;
-          h = Math.max(h, r.h);
-          if (x > 208) {
-            x = 16, y += h + spacing, h = 0;
-          }
-        });
-        // Layout the palette items.
-        renderer.begin(this.paletteController.getCtx());
-        reverseVisitItems(this.palette, item => renderer.layout(item));
-        // Draw the palette items.
-        visitItems(this.palette, item => renderer.draw(item));
-        renderer.end();
-      }
-    }
-    draw(canvasController) {
-      const model = this.model,
-            diagram = this.diagram,
-            renderer = this.renderer;
-
-      if (canvasController === this.canvasController) {
-        const ctx = this.canvasController.getCtx(),
-              diagram = this.diagram;
-        renderer.begin(ctx);
-        canvasController.applyTransform();
-        model.functionChartModel.updateLayout();
-        // // Draw registration frame for generating screen shots.
-        // ctx.strokeStyle = renderer.theme.dimColor;
-        // ctx.lineWidth = 0.5;
-        // ctx.strokeRect(300, 10, 700, 300);
-        visitItems(diagram.items,
-          function (item) {
-            renderer.draw(item, normalMode);
-          }, isElementOrGroup);
-        visitItems(diagram.items,
-          function (wire) {
-            renderer.draw(wire, normalMode);
-          }, isWire);
-
-        model.selectionModel.forEach(function (item) {
-          renderer.draw(item, highlightMode);
-        });
-
-        if (this.hotTrackInfo) {
-          let hitInfo = this.hotTrackInfo, item = hitInfo.item, input = hitInfo.input, output = hitInfo.output;
-          if (input !== undefined || output !== undefined) {
-            renderer.drawElementPin(item, input, output, hotTrackMode);
-          } else {
-            renderer.draw(item, hotTrackMode);
-          }
-        }
-        let hoverHitInfo = this.hoverHitInfo;
-        if (hoverHitInfo) {
-          renderer.drawHoverInfo(hoverHitInfo.item, hoverHitInfo.p);
-        }
-        renderer.end();
-      } else if (canvasController === this.paletteController) {
-        // Palette drawing occurs during drag and drop. If the palette has the drag,
-        // draw the canvas underneath so the new object will appear on the canvas.
-        this.canvasController.draw();
-        const ctx = this.paletteController.getCtx();
-        renderer.begin(ctx);
-        canvasController.applyTransform();
-        visitItems(this.palette, function (item) {
-          renderer.draw(item, printMode);
-        });
-        // Draw the new object in the palette. Translate object to palette coordinates.
-        const offset = canvasController.offsetToOtherCanvas(this.canvasController);
-        ctx.translate(offset.x, offset.y);
-        model.selectionModel.forEach(function (item) {
-          renderer.draw(item, normalMode);
-          renderer.draw(item, highlightMode);
-        });
-        renderer.end();
-      }
-    }
-    print() {
-      let diagram = this.diagram,
-          canvasController = this.canvasController,
-          model = this.model,
-          renderer = this.renderer;
-
-      // Calculate document bounds.
-      const elements = new Array();
-      visitItems(diagram.items, function (item) {
-        elements.push(item);
-      }, isElementOrGroup);
-
-      const bounds = renderer.getItemRect(elements);
-      // Adjust all edges 1 pixel out.
-      const ctx = new C2S(bounds.width * 2 + 4, bounds.height * 2 + 4);
-      ctx.scale(1.5, 1.5);
-      ctx.translate(-bounds.x + 2, -bounds.y + 2);
-
-      renderer.begin(ctx);
-      canvasController.applyTransform();
-
-      visitItems(diagram.items,
-        function (item) {
-          renderer.draw(item, printMode);
-        }, isSelectedElementOrGroup);
-      visitItems(diagram.items,
-        function (wire) {
-          renderer.draw(wire, printMode);
-        }, isSelectedWire);
-
-      renderer.end();
-
-      // Write out the SVG file.
-      const serializedSVG = ctx.getSerializedSvg();
-      const blob = new Blob([serializedSVG], {
-        type: 'text/plain'
-      });
-      saveAs(blob, 'functionChart.svg', true);
     }
     getCanvasPosition(canvasController, p) {
       // When dragging from the palette, convert the position from pointer events
@@ -3941,21 +3733,6 @@ const editingModel = (function() {
       this.mouseHitInfo = null;
 
       this.canvasController.draw();
-    }
-    onBeginHover(canvasController) {
-      // TODO hover over palette items?
-      const p = canvasController.getCurrentPointerPosition(),
-            hitList = this.hitTestCanvas(p),
-            hoverHitInfo = this.getFirstHit(hitList, isDraggable);
-      if (!hoverHitInfo)
-        return false;
-      hoverHitInfo.p = p;
-      this.hoverHitInfo = hoverHitInfo;
-      return true;
-    }
-    onEndHover(canvasController) {
-      if (this.hoverHitInfo)
-        this.hoverHitInfo = null;
     }
     onKeyDown(e) {
         const diagram = this.diagram,
