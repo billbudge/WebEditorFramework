@@ -2258,7 +2258,7 @@ export class FunctionchartEditor implements CanvasLayer {
     const blob = new Blob([serializedSVG], {
       type: 'text/plain'
     });
-    (window as any).saveAs(blob, 'statechart.svg', true);
+    (window as any).saveAs(blob, 'functionchart.svg', true);
   }
   getCanvasPosition(canvasController: CanvasController, p: Point) {
     // When dragging from the palette, convert the position from pointer events
@@ -2407,7 +2407,7 @@ export class FunctionchartEditor implements CanvasLayer {
       if (!(pointerHitInfo instanceof WireHitResult)) {
         if (this.clickInPalette) {
           this.clickInPalette = false;  // TODO fix
-          drag = new NonWireDrag([pointerHitInfo.item], 'copyPalette', 'Create new state or pseudostate');
+          drag = new NonWireDrag([pointerHitInfo.item], 'copyPalette', 'Create new element or functionchart');
         } else if (this.moveCopy) {
           this.moveCopy = false;  // TODO fix
           drag = new NonWireDrag(context.selectedElements(), 'moveCopySelection', 'Move copy of selection');
@@ -2677,18 +2677,19 @@ export class FunctionchartEditor implements CanvasLayer {
           return true;
         }
         case 79: { // 'o'
-        //   function parse(text: string) {
-        //     const raw = JSON.parse(text),
-        //           context = new FunctionchartContext();
-        //     const statechart = readRaw(raw, context);
-        //     self.initializeContext(context);
-        //     self.setContext(context);
-        //     self.renderer.begin(self.canvasController.getCtx());
-        //     self.updateBounds_();
-        //     self.canvasController.draw();
-        // }
-        //   this.fileController.openFile().then(result => parse(result));
-        //   return true;
+          function parse(text: string) {
+            const raw = JSON.parse(text),
+                  context = new FunctionchartContext();
+            const functionchart = Deserialize(raw, context) as Functionchart;
+            context.setRoot(functionchart);
+            self.initializeContext(context);
+            self.setContext(context);
+            self.renderer.begin(self.canvasController.getCtx());
+            self.updateBounds_();
+            self.canvasController.draw();
+          }
+          this.fileController.openFile().then(result => parse(result));
+          return true;
         }
         case 83: { // 's'
           let text = JSON.stringify(Serialize(functionchart), undefined, 2);
@@ -2697,7 +2698,7 @@ export class FunctionchartEditor implements CanvasLayer {
           return true;
         }
         case 80: { // 'p'
-          // this.print();
+          this.print();
           return true;
         }
       }
