@@ -1230,19 +1230,31 @@ class Renderer {
     this.ctx.restore();
   }
 
-  getItemRect(item: NonWireTypes) : Rect {
-    const global = item.globalPosition;
-    const x = global.x,
-          y = global.y;
-    if (item instanceof Element || item instanceof Pseudoelement) {
-      const type = item.type;
-      return { x: x, y: y, width: type.width, height: type.height };
+  getItemRect(item: AllTypes) : Rect {
+    let x, y, width, height;
+    if (item instanceof Wire) {
+      const extents = getExtents(item.bezier);
+      x = extents.xmin;
+      y = extents.ymin;
+      width = extents.xmax - x;
+      height = extents.ymax - y;
     } else {
-      return { x: x, y: y, width: item.width, height: item.height };
+      const global = item.globalPosition;
+      x = global.x,
+      y = global.y;
+      if (item instanceof Element || item instanceof Pseudoelement) {
+        const type = item.type;
+        width = type.width;
+        height = type.height;
+      } else {
+        width = item.width;
+        height = item.height;
+      }
     }
+    return { x, y, width, height };
   }
 
-  getBounds(items: NonWireTypes[]) : Rect {
+  getBounds(items: AllTypes[]) : Rect {
     let xMin = Number.POSITIVE_INFINITY, yMin = Number.POSITIVE_INFINITY,
         xMax = -Number.POSITIVE_INFINITY, yMax = -Number.POSITIVE_INFINITY;
     for (let item of items) {
@@ -2212,42 +2224,42 @@ export class FunctionchartEditor implements CanvasLayer {
       renderer.end();
     }
   }
-  // print() {
-  //   const renderer = this.renderer,
-  //         context = this.context,
-  //         statechart = this.statechart,
-  //         canvasController = this.canvasController;
+  print() {
+    const renderer = this.renderer,
+          context = this.context,
+          functionchart = this.functionchart,
+          canvasController = this.canvasController;
 
-  //   // Calculate document bounds.
-  //   const items: AllTypes[] = new Array();
-  //   context.visitAll(statechart, function (item) {
-  //     items.push(item);
-  //   });
+    // Calculate document bounds.
+    const items: AllTypes[] = new Array();
+    context.visitAll(functionchart, function (item) {
+      items.push(item);
+    });
 
-  //   const bounds = renderer.getBounds(items);
-  //   // Adjust all edges 1 pixel out.
-  //   const ctx = new (window as any).C2S(bounds.width + 2, bounds.height + 2);
-  //   ctx.translate(-bounds.x + 1, -bounds.y + 1);
+    const bounds = renderer.getBounds(items);
+    // Adjust all edges 1 pixel out.
+    const ctx = new (window as any).C2S(bounds.width + 2, bounds.height + 2);
+    ctx.translate(-bounds.x + 1, -bounds.y + 1);
 
-  //   renderer.begin(ctx);
-  //   canvasController.applyTransform();
+    renderer.begin(ctx);
+    canvasController.applyTransform();
 
-  //   context.visitAllItems(statechart.states, state => {
-  //     renderer.draw(state, RenderMode.Print);
-  //   });
-  //   context.visitAllItems(statechart.transitions, transition => {
-  //     renderer.draw(transition, RenderMode.Print);
-  //   });
+    context.visitAllItems(functionchart.nonWires, state => {
+      renderer.draw(state, RenderMode.Print);
+    });
+    context.visitAllItems(functionchart.wires, transition => {
+      renderer.draw(transition, RenderMode.Print);
+    });
 
-  //   renderer.end();
+    renderer.end();
 
-  //   // Write out the SVG file.
-  //   const serializedSVG = ctx.getSerializedSvg();
-  //   const blob = new Blob([serializedSVG], {
-  //     type: 'text/plain'
-  //   });
-  //   (window as any).saveAs(blob, 'statechart.svg', true);
-  // }
+    // Write out the SVG file.
+    const serializedSVG = ctx.getSerializedSvg();
+    const blob = new Blob([serializedSVG], {
+      type: 'text/plain'
+    });
+    (window as any).saveAs(blob, 'statechart.svg', true);
+  }
   getCanvasPosition(canvasController: CanvasController, p: Point) {
     // When dragging from the palette, convert the position from pointer events
     // into the canvas space to render the drag and drop.
