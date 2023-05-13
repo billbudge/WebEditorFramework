@@ -1351,7 +1351,7 @@ class Renderer {
       p2 = this.pinToPoint(dst, wire.dstPin, true);
     }
     if (p1 && p2) {
-      wire.bezier = getEdgeBezier(p1, p2, 64);
+      wire.bezier = getEdgeBezier(p1, p2, 24);
     }
   }
 
@@ -2160,13 +2160,12 @@ export class FunctionchartEditor implements CanvasLayer {
       this.updateLayout_();
       canvasController.applyTransform();
 
-      context.visitAll(functionchart, item => {
-        if (!(item instanceof Wire))
-          renderer.draw(item, RenderMode.Normal);
+      // Don't draw the root functionchart.
+      context.visitAllItems(functionchart.nonWires, item => {
+        renderer.draw(item, RenderMode.Normal);
       });
-      context.visitAll(functionchart, item => {
-        if (item instanceof Wire)
-          renderer.draw(item, RenderMode.Normal);
+      context.visitAllItems(functionchart.wires, item => {
+        renderer.draw(item, RenderMode.Normal);
       });
 
       context.selection.forEach(function (item) {
@@ -2200,10 +2199,10 @@ export class FunctionchartEditor implements CanvasLayer {
       const ctx = this.paletteController.getCtx();
       renderer.begin(ctx);
       canvasController.applyTransform();
-      context.visitAll(this.palette, item => {
+      context.visitAllItems(this.palette.nonWires, item => {
         renderer.draw(item, RenderMode.Print);
       });
-      // Draw the new object in the palette. Translate object to palette coordinates.
+      // Draw any selected object in the palette. Translate object to palette coordinates.
       const offset = canvasController.offsetToOtherCanvas(this.canvasController);
       ctx.translate(offset.x, offset.y);
       context.selection.forEach(item => {
