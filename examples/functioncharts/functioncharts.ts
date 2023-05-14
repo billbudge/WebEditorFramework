@@ -1953,6 +1953,30 @@ export class FunctionchartEditor implements CanvasLayer {
        }
       }
     }
+    this.propertyInfo.set('input', [
+      {
+        label: 'name',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+      }
+    ]);
+    this.propertyInfo.set('output', [
+      {
+        label: 'name',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+      }
+    ]);
+    this.propertyInfo.set('literal', [
+      {
+        label: 'name',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+      }
+    ]);
     this.propertyInfo.set('element', [
       {
         label: 'name',
