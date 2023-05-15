@@ -147,6 +147,20 @@ export class TypeParser {
     return type;
   }
 
+  getLabel(type: string) {
+    const label = type.lastIndexOf('(');
+    if (label > 0)
+      return type.substring(label + 1, type.length - 1);
+    return '';
+  }
+
+  setLabel(type: string, label: string) {
+    const i = type.lastIndexOf('(');
+    if (i > 0)
+      return type.substring(0, i) + '(' + label + ')';
+    return type + '(' + label + ')';
+  }
+
   // Removes all labels from signature.
   getUnlabeledTypeString(type: string) : string {
     let result = '', label = 0;
@@ -215,7 +229,8 @@ export type PseudoelementSubtype = 'input' | 'output' | 'literal';
 
 class PseudoelementTemplate extends NonWireTemplate {
   readonly typeName: PseudoelementSubtype;
-  readonly properties = [this.id, this.x, this.y];
+  readonly typeString = new ScalarProp('typeString');
+  readonly properties = [this.id, this.x, this.y, this.typeString];
   constructor(typeName: PseudoelementSubtype) {
     super();
     this.typeName = typeName;
@@ -292,13 +307,8 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
   set x(value: number) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
   set y(value: number) { this.template.y.set(this, value); }
-  get typeString() : string {
-    switch (this.template.typeName) {
-      case 'input': return '[,*]';
-      case 'output': return '[*,]';
-      case 'literal': return '[,v]';
-    }
-  }
+  get typeString() : string { return this.template.typeString.get(this); }
+  set typeString(value: string) { this.template.typeString.set(this, value); }
 
   // Derived properties.
   parent: Functionchart | undefined;
@@ -309,9 +319,22 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
 
   constructor(template: PseudoelementTemplate, id: number, context: FunctionchartContext) {
     this.template = template;
-    this.type = globalTypeParser_.add(this.typeString);
-    this.id = id;
     this.context = context;
+    this.id = id;
+
+    switch (this.template.typeName) {
+      case 'input':
+        this.typeString = '[,*]';
+        break;
+      case 'output':
+        this.typeString = '[*,]';
+        break;
+      case 'literal':
+        this.typeString = '[,v]';
+        break;
+    }
+    this.type = globalTypeParser_.add(this.typeString);
+
     this.inWires = new Array<Wire | undefined>(this.type.inputs.length);
     this.outWires = new Array<Array<Wire>>(this.type.outputs.length);
     for (let i = 0; i < this.outWires.length; i++)
@@ -579,7 +602,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     };
   }
 
-  getSubgraphInfo(items: ElementTypes[]) : GraphInfo {
+  getSubgraphInfo(items: NonWireTypes[]) : GraphInfo {
     const self = this,
           elements = new Set<ElementTypes>(),
           functioncharts = new Set<Functionchart>(),
@@ -587,7 +610,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           interiorWires = new Set<Wire>(),
           inWires = new Set<Wire>(),
           outWires = new Set<Wire>();
-    // First collect elements and Functioncharts.
+    // First collect Elements and Functioncharts.
     items.forEach(item => {
       this.visitAll(item, item => {
         if (item instanceof Element || item instanceof Pseudoelement)
@@ -948,6 +971,100 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.deleteItem(element);
   }
 
+  // getFunctionchartType(functionChart: Functionchart) {
+  //   const self = this,
+  //         nonWires = functionChart.nonWires.asArray(),
+  //         graphInfo = this.getSubgraphInfo(nonWires),
+  //         inputs = new Array<Pseudoelement>(),
+  //         outputs = new Array<Pseudoelement>();
+
+  //   // Add pins for inputs, outputs, and disconnected pins on elements.
+  //   nonWires.forEach(function(item, index) {
+  //     if (item instanceof Pseudoelement) {
+  //       if (item.template.typeName === 'input') {
+  //         inputs.push(item);
+  //       } else if(item.template.typeName === 'output') {
+  //         outputs.push(item);
+  //       }
+  //     }
+  //   });
+
+  //   // Sort pins so we encounter them in increasing y-order. This lets us arrange
+  //   // the pins of the group type in an intuitive way.
+  //   function comparePins(pin1: Pseudoelement, pin2: Pseudoelement) {
+  //     return pin1.y - pin2.y;
+  //   }
+
+  //   inputs.sort(comparePins);
+  //   outputs.sort(comparePins);
+
+  //   function getTypestringWithName(junction: Pseudoelement) : string {
+  //     let typeString = junction.typeString;
+  //     if (junction.name)
+  //       typeString += '(' + pin.name + ')';
+  //     return typeString;
+  //   }
+
+  //   let typeString = '[';
+  //   inputs.forEach(input => {
+  //     typeString += input.typeString;
+  //   });
+  //   typeString += ',';
+  //   outputs.forEach(output => {
+  //     typeString += output.typeString;
+  //   });
+  //   typeString += ']';
+
+  //   contextInputs.sort(comparePins);
+
+  //   let contextTypeString = '[';
+  //   contextInputs.forEach(function(input, i) {
+  //     contextTypeString += input.type;
+  //     input.item.index = i;
+  //   });
+  //   contextTypeString += ',]';  // no outputs
+
+  //   const info = {
+  //     type: typeString,
+  //     contextType: contextTypeString,
+  //   }
+
+  //   // Compute group pass throughs.
+  //   const passThroughs = new Set();
+  //   graphInfo.interiorWires.forEach(function(wire) {
+  //     let src = self.getWireSrc(wire),
+  //         srcPin = getType(src).outputs[wire.srcPin];
+  //     // Trace wires, starting at input junctions.
+  //     if (!isInput(src) || srcPin.type !== '*')
+  //       return;
+  //     let srcPinIndex = src.index,
+  //         activeWires = [wire];
+  //     while (activeWires.length) {
+  //       wire = activeWires.pop();
+  //       let dst = self.getWireDst(wire),
+  //           dstPin = getType(dst).inputs[wire.dstPin];
+  //       if (isOutput(dst) && dstPin.type === '*') {
+  //         passThroughs.add([srcPinIndex, dst.index]);
+  //       } else if (dst.passThroughs) {
+  //         dst.passThroughs.forEach(function(passThrough) {
+  //           if (passThrough[0] === wire.dstPin) {
+  //             let outgoingWires = functionChartModel.getOutputs(dst)[passThrough[1]];
+  //             outgoingWires.forEach(wire => activeWires.push(wire));
+  //           }
+  //         });
+  //       }
+  //     }
+  //   });
+
+  //   if (passThroughs.size) {
+  //     // console.log(passThroughs);
+  //     info.passThroughs = Array.from(passThroughs);
+  //   }
+  //   // console.log(info.type, info.contextType);
+  //   return info;
+  // }
+
+
   private insertElement_(element: ElementTypes, parent: Functionchart) {
     this.elements.add(element);
     element.parent = parent;
@@ -1073,7 +1190,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         this.insertWire_(owner, parent);
       }
     } else if (owner instanceof Element || owner instanceof Pseudoelement) {
-      if (prop === elementTemplate.typeString && owner.typeString) {
+      if (prop.name === 'typeString' && owner.typeString) {  // TODO use the same property in templates.
         owner.type = globalTypeParser_.add(owner.typeString);
         owner.inWires = new Array<Wire | undefined>(owner.type.inputs.length);
         owner.outWires = new Array<Array<Wire>>(owner.type.outputs.length);
@@ -1344,9 +1461,8 @@ class Renderer {
 
   layoutElement(element: ElementTypes) {
     const type = element.type;
-    if (type.width === 0 || type.height === 0) {
+    if (!type.width || !type.height)
       this.layoutType(type);
-    }
   }
 
   layoutWire(wire: Wire) {
@@ -1919,19 +2035,11 @@ export class FunctionchartEditor implements CanvasLayer {
     // Register property grid layouts.
     function getAttr(info: PropertyInfo) : string | undefined {
       switch (info.label) {
-        case 'name':
-          return 'name';
-        case 'entry':
-          return 'entry';
-        case 'exit':
-          return 'exit';
-        case 'event':
-          return 'event';
-        case 'guard':
-          return 'guard';
-        case 'action':
-          return 'action';
+        case 'label':
+        case 'value':
+          return 'typeString';
       }
+      return info.label;
     }
     function getter(info: PropertyInfo, item: AllTypes) {
       const attr = getAttr(info);
@@ -1953,28 +2061,62 @@ export class FunctionchartEditor implements CanvasLayer {
        }
       }
     }
+    function pseudoelementLabelGetter(info: PropertyInfo, item: AllTypes) {
+      const typeString = getter(info, item);
+      switch (item.template.typeName) {
+        case 'input':       // [,v(label)]
+        case 'output':      // [v(label),]
+        case 'literal': {   // [,v(label)]
+          const first = typeString.lastIndexOf('('),
+                last = typeString.lastIndexOf(')');
+          if (first >= 0 && last >= 0)
+            return typeString.substring(first + 1, last);
+        }
+      }
+      return '';
+    }
+    function pseudoelementLabelSetter(info: PropertyInfo, item: AllTypes, value: any) {
+      const typeString = getter(info, item);
+      let newValue;
+      if (value === undefined) {
+        newValue = globalTypeParser_.getUnlabeledTypeString(typeString);
+      } else {
+        switch (item.template.typeName) {
+          case 'input':       // [,v(label)]
+            newValue = '[,*(' + value + ')]';
+            break;
+          case 'output':      // [v(label),]
+            newValue = '[*(' + value + '),]';
+            break;
+          case 'literal':  // [,v(label)]
+            newValue = '[,*(' + value + ')]';
+            break;
+        }
+      }
+      setter(info, item, newValue);
+    }
     this.propertyInfo.set('input', [
       {
-        label: 'name',
+        label: 'label',
         type: 'text',
-        getter: getter,
-        setter: setter,
+        getter: pseudoelementLabelGetter,
+        setter: pseudoelementLabelSetter,
       }
     ]);
     this.propertyInfo.set('output', [
       {
-        label: 'name',
+        label: 'label',
         type: 'text',
-        getter: getter,
-        setter: setter,
+        getter: pseudoelementLabelGetter,
+        setter: pseudoelementLabelSetter,
       }
     ]);
     this.propertyInfo.set('literal', [
       {
-        label: 'name',
+        label: 'value',
         type: 'text',
-        getter: getter,
-        setter: setter,
+        getter: pseudoelementLabelGetter,
+        setter: pseudoelementLabelSetter,
       }
     ]);
     this.propertyInfo.set('element', [
