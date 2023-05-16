@@ -212,16 +212,30 @@ const globalTypeParser_ = new TypeParser(),
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
 
+const idProp = new IdProp('id'),
+      xProp = new ScalarProp('x'),
+      yProp = new ScalarProp('y'),
+      nameProp = new ScalarProp('name'),
+      typeStringProp = new ScalarProp('typeString'),
+      widthProp = new ScalarProp('width'),
+      heightProp = new ScalarProp('height'),
+      srcProp = new ReferenceProp('src'),
+      srcPinProp = new ScalarProp('srcPin'),
+      dstProp = new ReferenceProp('dst'),
+      dstPinProp = new ScalarProp('dstPin'),
+      nonWiresProp = new ChildArrayProp('nonWires'),
+      wiresProp = new ChildArrayProp('wires');
+
 class NonWireTemplate {
-  readonly id = new IdProp('id');
-  readonly x = new ScalarProp('x');
-  readonly y = new ScalarProp('y');
+  readonly id = idProp;
+  readonly x = xProp;
+  readonly y = yProp;
 }
 
 class ElementTemplate extends NonWireTemplate {
   readonly typeName = 'element';
-  readonly name = new ScalarProp('name');
-  readonly typeString = new ScalarProp('typeString');
+  readonly name = nameProp;
+  readonly typeString = typeStringProp;
   readonly properties = [this.id, this.x, this.y, this.name, this.typeString];
 }
 
@@ -229,7 +243,7 @@ export type PseudoelementSubtype = 'input' | 'output' | 'literal';
 
 class PseudoelementTemplate extends NonWireTemplate {
   readonly typeName: PseudoelementSubtype;
-  readonly typeString = new ScalarProp('typeString');
+  readonly typeString = typeStringProp;
   readonly properties = [this.id, this.x, this.y, this.typeString];
   constructor(typeName: PseudoelementSubtype) {
     super();
@@ -239,20 +253,20 @@ class PseudoelementTemplate extends NonWireTemplate {
 
 class WireTemplate {
   readonly typeName = 'wire';
-  readonly src = new ReferenceProp('src');
-  readonly srcPin = new ScalarProp('srcPin');
-  readonly dst = new ReferenceProp('dst');
-  readonly dstPin = new ScalarProp('dstPin');
+  readonly src = srcProp;
+  readonly srcPin = srcPinProp;
+  readonly dst = dstProp;
+  readonly dstPin = dstPinProp;
   readonly properties = [this.src, this.srcPin, this.dst, this.dstPin];
 }
 
 class FunctionchartTemplate extends NonWireTemplate {
   readonly typeName = 'functionchart';
-  readonly width = new ScalarProp('width');
-  readonly height = new ScalarProp('height');
-  readonly name = new ScalarProp('name');
-  readonly nonWires = new ChildArrayProp('nonWires');
-  readonly wires = new ChildArrayProp('wires');
+  readonly width = widthProp;
+  readonly height = heightProp;
+  readonly name = nameProp;
+  readonly nonWires = nonWiresProp;
+  readonly wires = wiresProp;
   readonly properties = [this.id, this.x, this.y, this.width, this.height, this.name,
                          this.nonWires, this.wires];
 }
@@ -971,98 +985,100 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.deleteItem(element);
   }
 
-  // getFunctionchartType(functionChart: Functionchart) {
-  //   const self = this,
-  //         nonWires = functionChart.nonWires.asArray(),
-  //         graphInfo = this.getSubgraphInfo(nonWires),
-  //         inputs = new Array<Pseudoelement>(),
-  //         outputs = new Array<Pseudoelement>();
+  getFunctionchartTypeString(functionChart: Functionchart) {
+    const self = this,
+          nonWires = functionChart.nonWires.asArray(),
+          // graphInfo = this.getSubgraphInfo(nonWires),
+          inputs = new Array<Pseudoelement>(),
+          outputs = new Array<Pseudoelement>();
 
-  //   // Add pins for inputs, outputs, and disconnected pins on elements.
-  //   nonWires.forEach(function(item, index) {
-  //     if (item instanceof Pseudoelement) {
-  //       if (item.template.typeName === 'input') {
-  //         inputs.push(item);
-  //       } else if(item.template.typeName === 'output') {
-  //         outputs.push(item);
-  //       }
-  //     }
-  //   });
+    // Add pins for inputs, outputs, and disconnected pins on elements.
+    nonWires.forEach(item => {
+      if (item instanceof Pseudoelement) {
+        if (item.template.typeName === 'input') {
+          inputs.push(item);
+        } else if(item.template.typeName === 'output') {
+          outputs.push(item);
+        }
+      }
+    });
 
-  //   // Sort pins so we encounter them in increasing y-order. This lets us arrange
-  //   // the pins of the group type in an intuitive way.
-  //   function comparePins(pin1: Pseudoelement, pin2: Pseudoelement) {
-  //     return pin1.y - pin2.y;
-  //   }
+    // Sort pins so we encounter them in increasing y-order. This lets us arrange
+    // the pins of the group type in an intuitive way.
+    function compareJunctions(p1: Pseudoelement, p2: Pseudoelement) {
+      return p1.y - p2.y;
+    }
 
-  //   inputs.sort(comparePins);
-  //   outputs.sort(comparePins);
+    inputs.sort(compareJunctions);
+    outputs.sort(compareJunctions);
 
-  //   function getTypestringWithName(junction: Pseudoelement) : string {
-  //     let typeString = junction.typeString;
-  //     if (junction.name)
-  //       typeString += '(' + pin.name + ')';
-  //     return typeString;
-  //   }
+    function getPinTypeString(pin: Pin) : string {
+      let typeString = pin.typeString;
+      if (pin.name)
+        typeString += '(' + pin.name + ')';
+      return typeString;
+    }
 
-  //   let typeString = '[';
-  //   inputs.forEach(input => {
-  //     typeString += input.typeString;
-  //   });
-  //   typeString += ',';
-  //   outputs.forEach(output => {
-  //     typeString += output.typeString;
-  //   });
-  //   typeString += ']';
+    let typeString = '[';
+    inputs.forEach(input => {
+      if (input.type)
+        typeString += getPinTypeString(input.type.outputs[0]);
+    });
+    typeString += ',';
+    outputs.forEach(output => {
+      if (output.type)
+        typeString += getPinTypeString(output.type.inputs[0]);
+    });
+    typeString += ']';
 
-  //   contextInputs.sort(comparePins);
+    // contextInputs.sort(comparePins);
 
-  //   let contextTypeString = '[';
-  //   contextInputs.forEach(function(input, i) {
-  //     contextTypeString += input.type;
-  //     input.item.index = i;
-  //   });
-  //   contextTypeString += ',]';  // no outputs
+    // let contextTypeString = '[';
+    // contextInputs.forEach(function(input, i) {
+    //   contextTypeString += input.type;
+    //   input.item.index = i;
+    // });
+    // contextTypeString += ',]';  // no outputs
 
-  //   const info = {
-  //     type: typeString,
-  //     contextType: contextTypeString,
-  //   }
+    // const info = {
+    //   type: typeString,
+    //   contextType: contextTypeString,
+    // }
 
-  //   // Compute group pass throughs.
-  //   const passThroughs = new Set();
-  //   graphInfo.interiorWires.forEach(function(wire) {
-  //     let src = self.getWireSrc(wire),
-  //         srcPin = getType(src).outputs[wire.srcPin];
-  //     // Trace wires, starting at input junctions.
-  //     if (!isInput(src) || srcPin.type !== '*')
-  //       return;
-  //     let srcPinIndex = src.index,
-  //         activeWires = [wire];
-  //     while (activeWires.length) {
-  //       wire = activeWires.pop();
-  //       let dst = self.getWireDst(wire),
-  //           dstPin = getType(dst).inputs[wire.dstPin];
-  //       if (isOutput(dst) && dstPin.type === '*') {
-  //         passThroughs.add([srcPinIndex, dst.index]);
-  //       } else if (dst.passThroughs) {
-  //         dst.passThroughs.forEach(function(passThrough) {
-  //           if (passThrough[0] === wire.dstPin) {
-  //             let outgoingWires = functionChartModel.getOutputs(dst)[passThrough[1]];
-  //             outgoingWires.forEach(wire => activeWires.push(wire));
-  //           }
-  //         });
-  //       }
-  //     }
-  //   });
+    // // Compute group pass throughs.
+    // const passThroughs = new Set();
+    // graphInfo.interiorWires.forEach(function(wire) {
+    //   let src = self.getWireSrc(wire),
+    //       srcPin = getType(src).outputs[wire.srcPin];
+    //   // Trace wires, starting at input junctions.
+    //   if (!isInput(src) || srcPin.type !== '*')
+    //     return;
+    //   let srcPinIndex = src.index,
+    //       activeWires = [wire];
+    //   while (activeWires.length) {
+    //     wire = activeWires.pop();
+    //     let dst = self.getWireDst(wire),
+    //         dstPin = getType(dst).inputs[wire.dstPin];
+    //     if (isOutput(dst) && dstPin.type === '*') {
+    //       passThroughs.add([srcPinIndex, dst.index]);
+    //     } else if (dst.passThroughs) {
+    //       dst.passThroughs.forEach(function(passThrough) {
+    //         if (passThrough[0] === wire.dstPin) {
+    //           let outgoingWires = functionChartModel.getOutputs(dst)[passThrough[1]];
+    //           outgoingWires.forEach(wire => activeWires.push(wire));
+    //         }
+    //       });
+    //     }
+    //   }
+    // });
 
-  //   if (passThroughs.size) {
-  //     // console.log(passThroughs);
-  //     info.passThroughs = Array.from(passThroughs);
-  //   }
-  //   // console.log(info.type, info.contextType);
-  //   return info;
-  // }
+    // if (passThroughs.size) {
+    //   // console.log(passThroughs);
+    //   info.passThroughs = Array.from(passThroughs);
+    // }
+    console.log(typeString);
+    return typeString;
+  }
 
 
   private insertElement_(element: ElementTypes, parent: Functionchart) {
@@ -1190,7 +1206,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         this.insertWire_(owner, parent);
       }
     } else if (owner instanceof Element || owner instanceof Pseudoelement) {
-      if (prop.name === 'typeString' && owner.typeString) {  // TODO use the same property in templates.
+      if (prop === typeStringProp && owner.typeString) {
         owner.type = globalTypeParser_.add(owner.typeString);
         owner.inWires = new Array<Wire | undefined>(owner.type.inputs.length);
         owner.outWires = new Array<Array<Wire>>(owner.type.outputs.length);
@@ -1489,28 +1505,31 @@ class Renderer {
           spacing = this.theme.spacing;
     function layout(functionChart: Functionchart) {
       const nonWires = functionChart.nonWires;
+      let width, height;
       if (nonWires.length === 0) {
-        functionchart.width = self.theme.minFunctionchartWidth;
-        functionchart.height = self.theme.minFunctionchartHeight;
+        width = self.theme.minFunctionchartWidth;
+        height = self.theme.minFunctionchartHeight;
       } else {
         const extents = self.getBounds(nonWires.asArray()),
               global = functionChart.globalPosition,
               groupX = global.x,
               groupY = global.y,
               margin = 2 * spacing;
-        let width = extents.x + extents.width - groupX + margin,
-            height = extents.y + extents.height - groupY + margin;
+        width = extents.x + extents.width - groupX + margin;
+        height = extents.y + extents.height - groupY + margin;
         // width += type.width;  // TODO Functionchart type and export
         // height = Math.max(height, type.height + margin);
-        functionChart.width = width;
-        functionChart.height = height;
       }
+      functionchart.width = Math.max(width, functionchart.width);
+      functionchart.height = Math.max(height, functionchart.height);
     }
     // Visit in reverse order to correctly include sub-functionchart bounds.
     functionchart.context.reverseVisitAll(functionchart, item => {
       if (item instanceof Functionchart)
         layout(item);
     });
+
+    functionchart.context.getFunctionchartTypeString(functionchart);
   }
 
   drawType(type: Type, x: number, y: number, fillOutputs: boolean) {
@@ -2089,7 +2108,7 @@ export class FunctionchartEditor implements CanvasLayer {
             newValue = '[*(' + value + '),]';
             break;
           case 'literal':  // [,v(label)]
-            newValue = '[,*(' + value + ')]';
+            newValue = '[,v(' + value + ')]';
             break;
         }
       }
@@ -2578,7 +2597,7 @@ export class FunctionchartEditor implements CanvasLayer {
           this.moveCopy = false;  // TODO fix
           drag = new NonWireDrag(context.selectedElements(), 'moveCopySelection', 'Move copy of selection');
         } else {
-          if (pointerHitInfo.item instanceof FunctionchartHitResult && pointerHitInfo.inner.border) {
+          if (pointerHitInfo instanceof FunctionchartHitResult && pointerHitInfo.inner.border) {
             drag = new NonWireDrag([pointerHitInfo.item], 'resizeFunctionchart', 'Resize functionchart');
           } else {
             drag = new NonWireDrag(context.selectedElements(), 'moveSelection', 'Move selection');
