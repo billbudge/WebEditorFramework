@@ -527,10 +527,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       item.wires.forEach(t => self.visitAll(t, visitor));
     }
   }
-  visitAllItems(items: List<AllTypes>, visitor: FunctionchartVisitor) : void {
-    const self = this;
-    items.forEach(item => self.visitAll(item, visitor));
-  }
   reverseVisitAll(item: AllTypes, visitor: FunctionchartVisitor) : void {
     const self = this;
     if (item instanceof Functionchart) {
@@ -539,19 +535,35 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
     visitor(item);
   }
-  reverseVisitAllItems(items: List<AllTypes>, visitor: FunctionchartVisitor) : void {
+  visitNonWires(item: NonWireTypes, visitor: NonWireVisitor) : void {
     const self = this;
-    items.forEachReverse(item => self.reverseVisitAll(item, visitor));
-  }
-
-  visitNonWires(item: AllTypes, visitor: NonWireVisitor) : void {
-    const self = this;
-    if (!(item instanceof Wire)) {
-      visitor(item);
-      if (item instanceof Functionchart) {
-        item.nonWires.forEach(item => self.visitNonWires(item, visitor));
-      }
+    visitor(item);
+    if (item instanceof Functionchart) {
+      item.nonWires.forEach(item => self.visitNonWires(item, visitor));
     }
+  }
+  reverseVisitNonWires(item: NonWireTypes, visitor: NonWireVisitor) : void {
+    const self = this;
+    if (item instanceof Functionchart) {
+      item.nonWires.forEachReverse(item => self.reverseVisitNonWires(item, visitor));
+    }
+    visitor(item);
+  }
+  visitWires(functionchart: Functionchart, visitor: WireVisitor) : void {
+    const self = this;
+    functionchart.wires.forEach(t => visitor(t));
+    functionchart.nonWires.forEach(t => {
+      if (t instanceof Functionchart)
+        self.visitWires(t, visitor)
+    });
+  }
+  reverseVisitWires(functionchart: Functionchart, visitor: WireVisitor) : void {
+    const self = this;
+    functionchart.nonWires.forEachReverse(t => {
+      if (t instanceof Functionchart)
+        self.reverseVisitWires(t, visitor)
+    });
+    functionchart.wires.forEach(t => visitor(t));
   }
 
   updateItem(item: AllTypes) {
@@ -642,14 +654,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           outWires = new Set<Wire>();
     // First collect Elements and Functioncharts.
     items.forEach(item => {
-      this.visitAll(item, item => {
+      this.visitNonWires(item, item => {
         if (item instanceof Element || item instanceof Pseudoelement)
           elements.add(item);
         else if (item instanceof Functionchart)
           functioncharts.add(item);
       });
-      });
-    // Now collect and classify transitions that connect to them.
+    });
+    // Now collect and classify wires that connect to them.
     items.forEach(item => {
       function addWire(wire: Wire) {
         // Stop if we've already processed this transtion (handle transitions from a element to itself.)
@@ -688,12 +700,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  getConnectedElements(elements: ElementTypes[], upstream: boolean, downstream: boolean) : Set<ElementTypes> {
+  getConnectedElements(
+      elements: ElementTypes[], upstream: boolean, downstream: boolean) : Set<ElementTypes> {
     const result = new Set<ElementTypes>();
     elements = elements.slice(0);  // Copy input array
     while (elements.length > 0) {
-      const element = elements.pop();
-      if (!element) continue;
+      const element = elements.pop()!;
 
       result.add(element);
       if (upstream) {
@@ -794,7 +806,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   selectConnectedElements(upstream: boolean) {
     const selectedElements = this.selectedElements(),
-          connectedElements = this.getConnectedElements(selectedElements, upstream, false);
+          connectedElements = this.getConnectedElements(selectedElements, upstream, true);
     this.selection.set(Array.from(connectedElements));
   }
 
@@ -2043,6 +2055,7 @@ export class FunctionchartEditor implements CanvasLayer {
           output = context.newPseudoelement('output'),
           literal = context.newPseudoelement('literal'),
           newBinop = context.newElement('binop'),
+          newUnop = context.newElement('unop'),
           newFunctionchart = context.newFunctionchart();
 
     context.setRoot(functionchart);
@@ -2051,9 +2064,10 @@ export class FunctionchartEditor implements CanvasLayer {
     output.x = 40; output.y = 8;
     literal.x = 72; literal.y = 8;
     newBinop.x = 8; newBinop.y = 32;
-    newBinop.typeString = '[vv,v]';
-    newBinop.name = '+';
-    newFunctionchart.x = 48; newFunctionchart.y = 32;
+    newBinop.typeString = '[vv,v(+)]';  // binary addition
+    newUnop.x = 72; newUnop.y = 32;
+    newUnop.typeString = '[v,v(-)]';    // unary negation
+    newFunctionchart.x = 8; newFunctionchart.y = 70;
     newFunctionchart.width = this.theme.minFunctionchartWidth;
     newFunctionchart.height = this.theme.minFunctionchartHeight;
 
@@ -2061,6 +2075,7 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nonWires.append(output);
     functionchart.nonWires.append(literal);
     functionchart.nonWires.append(newBinop);
+    functionchart.nonWires.append(newUnop);
     functionchart.nonWires.append(newFunctionchart);
     context.setRoot(functionchart);
     this.palette = functionchart;
@@ -2099,12 +2114,14 @@ export class FunctionchartEditor implements CanvasLayer {
        }
       }
     }
-    function pseudoelementLabelGetter(info: PropertyInfo, item: AllTypes) {
+    function elementLabelGetter(info: PropertyInfo, item: AllTypes) {
       const typeString = getter(info, item);
       switch (item.template.typeName) {
-        case 'input':       // [,v(label)]
-        case 'output':      // [v(label),]
-        case 'literal': {   // [,v(label)]
+        case 'input':       // [,*(label)]
+        case 'output':      // [*(label),]
+        case 'literal':     // [,v(label)]
+        case 'binop':       // [vv,v(op)]
+        case 'unop': {      // [v,v(op)]
           const first = typeString.lastIndexOf('('),
                 last = typeString.lastIndexOf(')');
           if (first >= 0 && last >= 0)
@@ -2113,7 +2130,7 @@ export class FunctionchartEditor implements CanvasLayer {
       }
       return '';
     }
-    function pseudoelementLabelSetter(info: PropertyInfo, item: AllTypes, value: any) {
+    function elementLabelSetter(info: PropertyInfo, item: AllTypes, value: any) {
       const typeString = getter(info, item);
       let newValue;
       if (value === undefined) {
@@ -2126,8 +2143,14 @@ export class FunctionchartEditor implements CanvasLayer {
           case 'output':      // [v(label),]
             newValue = '[*(' + value + '),]';
             break;
-          case 'literal':  // [,v(label)]
+          case 'literal':     // [,v(label)]
             newValue = '[,v(' + value + ')]';
+            break;
+          case 'binop':       // [vv,v(label)]
+            newValue = '[vv,v(' + value + ')]';
+            break;
+          case 'unop':       // [v,v(label)]
+            newValue = '[v,v(' + value + ')]';
             break;
         }
       }
@@ -2137,58 +2160,55 @@ export class FunctionchartEditor implements CanvasLayer {
       {
         label: 'label',
         type: 'text',
-        getter: pseudoelementLabelGetter,
-        setter: pseudoelementLabelSetter,
+        getter: elementLabelGetter,
+        setter: elementLabelSetter,
       }
     ]);
     this.propertyInfo.set('output', [
       {
         label: 'label',
         type: 'text',
-        getter: pseudoelementLabelGetter,
-        setter: pseudoelementLabelSetter,
+        getter: elementLabelGetter,
+        setter: elementLabelSetter,
       }
     ]);
     this.propertyInfo.set('literal', [
       {
         label: 'value',
         type: 'text',
-        getter: pseudoelementLabelGetter,
-        setter: pseudoelementLabelSetter,
+        getter: elementLabelGetter,
+        setter: elementLabelSetter,
       }
     ]);
-    const unaryOps = ['!', '~', '-'];
     const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
       '|', '&', '||', '&&'];
     this.propertyInfo.set('binop', [
       {
-        label: 'name',
+        label: 'label',
         type: 'enum',
         values: binaryOps.join(','),
-        getter: getter,
-        setter: setter,
+        getter: elementLabelGetter,
+        setter: elementLabelSetter,
       },
     ]);
-    this.propertyInfo.set('wire', [
+    const unaryOps = ['!', '~', '-'];
+    this.propertyInfo.set('unop', [
       {
-        label: 'event',
-        type: 'text',
-        getter: getter,
-        setter: setter,
-      },
-      {
-        label: 'guard',
-        type: 'text',
-        getter: getter,
-        setter: setter,
-      },
-      {
-        label: 'action',
-        type: 'text',
-        getter: getter,
-        setter: setter,
+        label: 'label',
+        type: 'enum',
+        values: unaryOps.join(','),
+        getter: elementLabelGetter,
+        setter: elementLabelSetter,
       },
     ]);
+    // this.propertyInfo.set('wire', [
+    //   {
+    //     label: 'tbd',
+    //     type: 'text',
+    //     getter: getter,
+    //     setter: setter,
+    //   },
+    // ]);
     this.propertyInfo.set('functionchart', [
       {
         label: 'name',
@@ -2243,7 +2263,7 @@ export class FunctionchartEditor implements CanvasLayer {
       renderer.begin(canvasController.getCtx());
       this.context.reverseVisitAll(this.palette, item => renderer.layout(item));
       // Draw the palette items.
-      this.context.visitAll(this.palette, item => renderer.draw(item, RenderMode.Print));
+      this.palette.nonWires.forEach(item => renderer.draw(item, RenderMode.Print));
       renderer.end();
     }
   }
@@ -2280,7 +2300,7 @@ export class FunctionchartEditor implements CanvasLayer {
         const attr = prop.name;
         // For changes to x, y, width, or height, layout affected transitions.
         if (attr == 'x' || attr == 'y' || attr == 'width' || attr == 'height') {
-          // Visit item and sub-items to layout all affected transitions.
+          // Visit item and sub-items to layout all affected wires.
           context.visitAll(item, addItems);
         } else if (item instanceof Wire) {
           addItems(item);
@@ -2369,13 +2389,14 @@ export class FunctionchartEditor implements CanvasLayer {
       canvasController.applyTransform();
 
       // Don't draw the root functionchart.
-      context.visitAllItems(functionchart.nonWires, item => {
-        renderer.draw(item, RenderMode.Normal);
+      functionchart.nonWires.forEach(item => {
+        context.visitNonWires(item, item => { renderer.draw(item, RenderMode.Normal); });
       });
-      context.visitAllItems(functionchart.wires, item => {
-        renderer.draw(item, RenderMode.Normal);
+      // Draw wires after elements.
+      context.visitWires(functionchart, wire => {
+        renderer.drawWire(wire, RenderMode.Normal);
       });
-
+      // Highlight selection.
       context.selection.forEach(function (item) {
         renderer.draw(item, RenderMode.Highlight);
       });
@@ -2407,9 +2428,7 @@ export class FunctionchartEditor implements CanvasLayer {
       const ctx = this.paletteController.getCtx();
       renderer.begin(ctx);
       canvasController.applyTransform();
-      context.visitAllItems(this.palette.nonWires, item => {
-        renderer.draw(item, RenderMode.Print);
-      });
+      this.palette.nonWires.forEach(item => { renderer.draw(item, RenderMode.Print); });
       // Draw any selected object in the palette. Translate object to palette coordinates.
       const offset = canvasController.offsetToOtherCanvas(this.canvasController);
       ctx.translate(offset.x, offset.y);
@@ -2440,11 +2459,13 @@ export class FunctionchartEditor implements CanvasLayer {
     renderer.begin(ctx);
     canvasController.applyTransform();
 
-    context.visitAllItems(functionchart.nonWires, state => {
-      renderer.draw(state, RenderMode.Print);
+    // Don't draw the root functionchart.
+    functionchart.nonWires.forEach(item => {
+      context.visitNonWires(item, item => { renderer.draw(item, RenderMode.Print); });
     });
-    context.visitAllItems(functionchart.wires, transition => {
-      renderer.draw(transition, RenderMode.Print);
+    // Draw wires after elements.
+    context.visitWires(functionchart, wire => {
+      renderer.drawWire(wire, RenderMode.Print);
     });
 
     renderer.end();
@@ -2501,7 +2522,7 @@ export class FunctionchartEditor implements CanvasLayer {
         hitList.push(info);
     }
     renderer.begin(ctx);
-    context.reverseVisitAllItems(this.palette.nonWires, item => {
+    this.palette.nonWires.forEachReverse(item => {
       pushInfo(renderer.hitTest(item, p, tol, RenderMode.Normal));
     });
     renderer.end();
