@@ -232,11 +232,16 @@ class NonWireTemplate {
   readonly y = yProp;
 }
 
+export type ElementType = 'binop' | 'unop' | 'element';
 class ElementTemplate extends NonWireTemplate {
-  readonly typeName = 'element';
+  readonly typeName: ElementType;
   readonly name = nameProp;
   readonly typeString = typeStringProp;
   readonly properties = [this.id, this.x, this.y, this.name, this.typeString];
+  constructor(typeName: ElementType) {
+    super();
+    this.typeName = typeName;
+  }
 }
 
 export type PseudoelementSubtype = 'input' | 'output' | 'literal';
@@ -271,7 +276,9 @@ class FunctionchartTemplate extends NonWireTemplate {
                          this.nonWires, this.wires];
 }
 
-const elementTemplate = new ElementTemplate(),
+const binopTemplate = new ElementTemplate('binop'),
+      unopTemplate = new ElementTemplate('unop'),
+      elementTemplate = new ElementTemplate('element'),
       inputPseudoelementTemplate = new PseudoelementTemplate('input'),
       outputPseudoelementTemplate = new PseudoelementTemplate('output'),
       literalPseudoelementTemplate = new PseudoelementTemplate('literal'),
@@ -284,7 +291,7 @@ const defaultPoint = { x: 0, y: 0 },
           defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal];
 
 export class Element implements DataContextObject, ReferencedObject {
-  readonly template = elementTemplate;
+  readonly template: ElementTemplate;
   readonly context: FunctionchartContext;
 
   readonly id: number;
@@ -305,8 +312,9 @@ export class Element implements DataContextObject, ReferencedObject {
   inWires: Array<Wire | undefined>;           // one input per pin.
   outWires: Array<Array<Wire>>;   // array of outputs per pin, outputs have fan out.
 
-  constructor(context: FunctionchartContext, id: number) {
+  constructor(context: FunctionchartContext, template: ElementTemplate, id: number) {
     this.context = context;
+    this.template = template;
     this.id = id;
   }
 }
@@ -331,9 +339,9 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
   inWires: Array<Wire | undefined>;           // one input per pin.
   outWires: Array<Array<Wire>>;   // array of outputs per pin, outputs have fan out.
 
-  constructor(template: PseudoelementTemplate, id: number, context: FunctionchartContext) {
-    this.template = template;
+  constructor(context: FunctionchartContext, template: PseudoelementTemplate, id: number) {
     this.context = context;
+    this.template = template;
     this.id = id;
 
     switch (this.template.typeName) {
@@ -470,9 +478,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.functionchart = root;
   }
 
-  newElement() : Element {
-    const nextId = ++this.highestId,
-          result: Element = new Element(this, nextId);
+  newElement(typeName: ElementType) : Element {
+    const nextId = ++this.highestId;
+    let template: ElementTemplate;
+    switch (typeName) {
+      case 'binop': template = binopTemplate; break;
+      case 'unop': template = unopTemplate; break;
+      case 'element': template = elementTemplate; break;
+      default: throw new Error('Unknown element type: ' + typeName);
+    }
+
+    const result: Element = new Element(this, template, nextId);
     this.referentMap.set(nextId, result);
     return result;
   }
@@ -485,7 +501,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'literal': template = literalPseudoelementTemplate; break;
       default: throw new Error('Unknown pseudoelement type: ' + typeName);
     }
-    const result: Pseudoelement = new Pseudoelement(template, nextId, this);
+    const result: Pseudoelement = new Pseudoelement(this, template, nextId);
     this.referentMap.set(nextId, result);
     return result;
   }
@@ -1235,7 +1251,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
   construct(typeName: string) : AllTypes {
     switch (typeName) {
-      case 'element': return this.newElement();
+      case 'binop': return this.newElement('binop');
+      case 'unop': return this.newElement('unop');
+      case 'element': return this.newElement('element');
       case 'input': return this.newPseudoelement('input');
       case 'output': return this.newPseudoelement('output');
       case 'literal': return this.newPseudoelement('literal');
@@ -2024,7 +2042,7 @@ export class FunctionchartEditor implements CanvasLayer {
           input = context.newPseudoelement('input'),
           output = context.newPseudoelement('output'),
           literal = context.newPseudoelement('literal'),
-          newElement = context.newElement(),
+          newBinop = context.newElement('binop'),
           newFunctionchart = context.newFunctionchart();
 
     context.setRoot(functionchart);
@@ -2032,8 +2050,9 @@ export class FunctionchartEditor implements CanvasLayer {
     input.x = input.y = 8;
     output.x = 40; output.y = 8;
     literal.x = 72; literal.y = 8;
-    newElement.x = 8; newElement.y = 32;
-    newElement.typeString = '[vv,v]';
+    newBinop.x = 8; newBinop.y = 32;
+    newBinop.typeString = '[vv,v]';
+    newBinop.name = '+';
     newFunctionchart.x = 48; newFunctionchart.y = 32;
     newFunctionchart.width = this.theme.minFunctionchartWidth;
     newFunctionchart.height = this.theme.minFunctionchartHeight;
@@ -2041,7 +2060,7 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nonWires.append(input);
     functionchart.nonWires.append(output);
     functionchart.nonWires.append(literal);
-    functionchart.nonWires.append(newElement);
+    functionchart.nonWires.append(newBinop);
     functionchart.nonWires.append(newFunctionchart);
     context.setRoot(functionchart);
     this.palette = functionchart;
@@ -2138,22 +2157,14 @@ export class FunctionchartEditor implements CanvasLayer {
         setter: pseudoelementLabelSetter,
       }
     ]);
-    this.propertyInfo.set('element', [
+    const unaryOps = ['!', '~', '-'];
+    const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
+      '|', '&', '||', '&&'];
+    this.propertyInfo.set('binop', [
       {
         label: 'name',
-        type: 'text',
-        getter: getter,
-        setter: setter,
-      },
-      {
-        label: 'entry',
-        type: 'text',
-        getter: getter,
-        setter: setter,
-      },
-      {
-        label: 'exit',
-        type: 'text',
+        type: 'enum',
+        values: binaryOps.join(','),
         getter: getter,
         setter: setter,
       },

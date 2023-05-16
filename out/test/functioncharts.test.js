@@ -20,7 +20,7 @@ function stringifyType(type) {
     return s;
 }
 function addElement(functionchart) {
-    const element = functionchart.context.newElement();
+    const element = functionchart.context.newElement('element');
     functionchart.nonWires.append(element);
     return element;
 }
