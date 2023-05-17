@@ -2297,9 +2297,8 @@ export class FunctionchartEditor implements CanvasLayer {
 
     switch (change.type) {
       case 'valueChanged': {
-        const attr = prop.name;
         // For changes to x, y, width, or height, layout affected transitions.
-        if (attr == 'x' || attr == 'y' || attr == 'width' || attr == 'height') {
+        if (prop === xProp || prop === yProp || prop === widthProp || prop === heightProp) {
           // Visit item and sub-items to layout all affected wires.
           context.visitAll(item, addItems);
         } else if (item instanceof Wire) {
