@@ -46,6 +46,10 @@ export class Type {
   y = 0;
   width = 0;
   height = 0;
+
+  get needsLayout() {
+    return this.width === 0;
+  }
   constructor(typeString: string, inputs: Pin[], outputs: Pin[], name?: string) {
     this.typeString = typeString;
     this.inputs = inputs;
@@ -413,6 +417,7 @@ export class Functionchart implements DataContextObject {
   // Derived properties.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
+  type: Type = nullFunction;
 
   constructor(context: FunctionchartContext, id: number) {
     this.context = context;
@@ -568,8 +573,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   updateItem(item: AllTypes) {
     const self = this;
-    if (!(item instanceof Wire)) {
-      this.visitNonWires(item, item => self.setGlobalPosition(item));
+    if (item instanceof Wire)
+      return;
+    this.visitNonWires(item, item => self.setGlobalPosition(item));
+    if (item instanceof Functionchart && item.parent !== undefined) {
+      const typeString = this.getFunctionchartTypeString(item);
+      item.type = globalTypeParser_.add(typeString);
     }
   }
 
@@ -1104,7 +1113,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     //   // console.log(passThroughs);
     //   info.passThroughs = Array.from(passThroughs);
     // }
-    console.log(typeString);
     return typeString;
   }
 
@@ -1430,6 +1438,14 @@ class Renderer {
     return { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
   }
 
+    // Gets the bounding rect for the functionchart instancing element.
+  getFunctionchartInstanceBounds(type: Type, right: number, bottom: number) {
+    const theme = this.theme, spacing = theme.spacing,
+          width = type.width, height = type.height,
+          x = right - width - spacing, y = bottom - height - spacing;
+    return { x: x, y: y, w: width, h: height };
+  }
+
   pinToPoint(element: ElementTypes, index: number, isInput: boolean) : PointWithNormal {
     const rect: Rect = this.getItemRect(element),
           w = rect.width, h = rect.height,
@@ -1507,7 +1523,7 @@ class Renderer {
 
   layoutElement(element: ElementTypes) {
     const type = element.type;
-    if (!type.width || !type.height)
+    if (type.needsLayout)
       this.layoutType(type);
   }
 
@@ -1544,11 +1560,14 @@ class Renderer {
               global = functionChart.globalPosition,
               groupX = global.x,
               groupY = global.y,
-              margin = 2 * spacing;
+              margin = 2 * spacing,
+              type = functionChart.type;
         width = extents.x + extents.width - groupX + margin;
         height = extents.y + extents.height - groupY + margin;
-        // width += type.width;  // TODO Functionchart type and export
-        // height = Math.max(height, type.height + margin);
+        if (type.needsLayout)
+          self.layoutType(type);
+        width += type.width;
+        height = Math.max(height, type.height + margin);
       }
       functionchart.width = Math.max(width, functionchart.width);
       functionchart.height = Math.max(height, functionchart.height);
@@ -1558,8 +1577,6 @@ class Renderer {
       if (item instanceof Functionchart)
         layout(item);
     });
-
-    functionchart.context.getFunctionchartTypeString(functionchart);
   }
 
   drawType(type: Type, x: number, y: number, fillOutputs: boolean) {
@@ -1728,7 +1745,17 @@ class Renderer {
         ctx.moveTo(x, lineBase);
         ctx.lineTo(x + w, lineBase);
         ctx.stroke();
-              break;
+        const type = functionchart.type,
+              instanceRect = this.getFunctionchartInstanceBounds(type, x + w, y + h);
+        ctx.beginPath();
+        ctx.rect(instanceRect.x, instanceRect.y, instanceRect.w, instanceRect.h);
+        ctx.fillStyle = theme.altBgColor;
+        ctx.fill();
+        ctx.strokeStyle = theme.strokeColor;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        this.drawType(type, instanceRect.x, instanceRect.y, false);
+        break;
       case RenderMode.Highlight:
       case RenderMode.HotTrack:
         roundRectPath(x, y, w, h, r, ctx);
@@ -2497,15 +2524,15 @@ export class FunctionchartEditor implements CanvasLayer {
     renderer.begin(ctx);
     this.updateLayout_();
     // TODO hit test selection first, in highlight, first.
-    // Skip the root functionchart, as hits there should go to the underlying canvas controller.
     // Hit test transitions first.
-    context.reverseVisitAll(functionchart, (item: AllTypes) => {
-      if (item instanceof Wire)
-        pushInfo(renderer.hitTestWire(item, cp, tol, RenderMode.Normal));
+    context.reverseVisitWires(functionchart, (wire: Wire) => {
+      pushInfo(renderer.hitTestWire(wire, cp, tol, RenderMode.Normal));
     });
-    context.reverseVisitAll(functionchart, (item: AllTypes) => {
-      if (!(item instanceof Wire))
+    // Skip the root functionchart, as hits there should go to the underlying canvas controller.
+    functionchart.nonWires.forEachReverse(item => {
+      context.reverseVisitNonWires(item, (item: NonWireTypes) => {
         pushInfo(renderer.hitTest(item, cp, tol, RenderMode.Normal));
+      });
     });
     renderer.end();
     return hitList;

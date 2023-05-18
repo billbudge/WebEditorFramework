@@ -318,6 +318,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
+  // TODO rework visit functions to match functioncharts.
   visitAll(item: AllTypes, visitor: StatechartVisitor) : void {
     const self = this;
     visitor(item);
