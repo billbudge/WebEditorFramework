@@ -274,7 +274,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     });
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
     this.statechart = new Statechart(this);
-    this.insertItem_(this.statechart, undefined);
+    this.insertItem(this.statechart, undefined);
   }
 
   root() : Statechart {
@@ -282,8 +282,8 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
   setRoot(root: Statechart) : void {
     if (this.statechart)
-      this.removeItem_(this.statechart);
-    this.insertItem_(root, undefined);
+      this.removeItem(this.statechart);
+    this.insertItem(root, undefined);
     this.statechart = root;
   }
 
@@ -839,7 +839,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     return valid;
   }
 
-  private insertState_(state: StateTypes, parent: Statechart) {
+  private insertState(state: StateTypes, parent: Statechart) {
     this.states.add(state);
 
     if (state.inTransitions === undefined)
@@ -849,33 +849,33 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
 
     if (state instanceof State && state.statecharts) {
       const self = this;
-      state.statecharts.forEach(statechart => self.insertStatechart_(statechart, state));
+      state.statecharts.forEach(statechart => self.insertStatechart(statechart, state));
     }
   }
 
-  private removeState_(state: StateTypes) {
+  private removeState(state: StateTypes) {
     this.states.delete(state);
     if (state instanceof State && state.statecharts) {
       const self = this;
-      state.statecharts.forEach(statechart => self.removeStatechart_(statechart));
+      state.statecharts.forEach(statechart => self.removeStatechart(statechart));
     }
   }
 
-  private insertStatechart_(statechart: Statechart, parent: State | undefined) {
+  private insertStatechart(statechart: Statechart, parent: State | undefined) {
     this.statecharts.add(statechart);
 
     const self = this;
-    statechart.states.forEach(state => self.insertState_(state, statechart));
-    statechart.transitions.forEach(transition => self.insertTransition_(transition, statechart));
+    statechart.states.forEach(state => self.insertState(state, statechart));
+    statechart.transitions.forEach(transition => self.insertTransition(transition, statechart));
   }
 
-  private removeStatechart_(stateChart: Statechart) {
+  private removeStatechart(stateChart: Statechart) {
     this.statecharts.delete(stateChart);
     const self = this;
-    stateChart.states.forEach(state => self.removeState_(state));
+    stateChart.states.forEach(state => self.removeState(state));
   }
 
-  private insertTransition_(transition: Transition, parent: Statechart) {
+  private insertTransition(transition: Transition, parent: Statechart) {
     this.transitions.add(transition);
 
     const src = transition.src,
@@ -899,7 +899,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  private removeTransition_(transition: Transition) {
+  private removeTransition(transition: Transition) {
     this.transitions.delete(transition);
     const src = transition.src,
           dst = transition.dst;
@@ -913,30 +913,30 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  private insertItem_(item: AllTypes, parent: ParentTypes) {
+  private insertItem(item: AllTypes, parent: ParentTypes) {
     item.parent = parent;
     this.updateItem(item);
 
     if (item instanceof Transition) {
       if (parent && parent instanceof Statechart)
-        this.insertTransition_(item, parent);
+        this.insertTransition(item, parent);
     } else if (item instanceof Statechart) {
       if (!parent || parent instanceof State)
-        this.insertStatechart_(item, parent);
+        this.insertStatechart(item, parent);
     } else {
       if (parent && parent instanceof Statechart) {
-        this.insertState_(item, parent);
+        this.insertState(item, parent);
       }
     }
   }
 
-  private removeItem_(item: AllTypes) {
+  private removeItem(item: AllTypes) {
     if (item instanceof Transition)
-      this.removeTransition_(item);
+      this.removeTransition(item);
     else if (item instanceof Statechart)
-      this.removeStatechart_(item);
+      this.removeStatechart(item);
     else
-      this.removeState_(item);
+      this.removeState(item);
   }
 
   // DataContext interface implementation.
@@ -954,7 +954,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
           if (oldDst)
             StatechartContext.removeTransitionHelper(oldDst.inTransitions, owner);
         }
-        this.insertTransition_(owner, parent);
+        this.insertTransition(owner, parent);
       }
     }
     this.onValueChanged(owner, prop, oldValue);
@@ -962,11 +962,11 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
   elementInserted(owner: State | Statechart, prop: ArrayPropertyTypes, index: number) : void {
     const value: AllTypes = prop.get(owner).at(index) as AllTypes;
-    this.insertItem_(value, owner);
+    this.insertItem(value, owner);
     this.onElementInserted(owner, prop, index);
   }
   elementRemoved(owner: State | Statechart, prop: ArrayPropertyTypes, index: number, oldValue: AllTypes) : void {
-    this.removeItem_(oldValue);
+    this.removeItem(oldValue);
     this.onElementRemoved(owner, prop, index, oldValue);
   }
   resolveReference(owner: AllTypes, prop: ReferenceProp) : StateTypes | undefined {
