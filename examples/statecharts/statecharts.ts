@@ -855,6 +855,10 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
 
   private removeState_(state: StateTypes) {
     this.states.delete(state);
+    if (state instanceof State && state.statecharts) {
+      const self = this;
+      state.statecharts.forEach(statechart => self.removeStatechart_(statechart));
+    }
   }
 
   private insertStatechart_(statechart: Statechart, parent: State | undefined) {
