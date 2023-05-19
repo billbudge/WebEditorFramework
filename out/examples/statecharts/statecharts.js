@@ -209,10 +209,6 @@ export class StatechartContext extends EventBase {
             item.transitions.forEach(t => self.visitAll(t, visitor));
         }
     }
-    visitAllItems(items, visitor) {
-        const self = this;
-        items.forEach(item => self.visitAll(item, visitor));
-    }
     reverseVisitAll(item, visitor) {
         const self = this;
         if (item instanceof State) {
@@ -223,10 +219,6 @@ export class StatechartContext extends EventBase {
             item.transitions.forEachReverse(t => self.reverseVisitAll(t, visitor));
         }
         visitor(item);
-    }
-    reverseVisitAllItems(items, visitor) {
-        const self = this;
-        items.forEachReverse(item => self.reverseVisitAll(item, visitor));
     }
     visitNonTransitions(item, visitor) {
         const self = this;
@@ -240,6 +232,40 @@ export class StatechartContext extends EventBase {
         else if (item instanceof Statechart) {
             visitor(item);
             item.states.forEach(item => self.visitNonTransitions(item, visitor));
+        }
+    }
+    reverseVisitNonTransitions(item, visitor) {
+        const self = this;
+        if (item instanceof State) {
+            item.statecharts.forEachReverse(item => self.reverseVisitNonTransitions(item, visitor));
+            visitor(item);
+        }
+        else if (item instanceof Pseudostate) {
+            visitor(item);
+        }
+        else if (item instanceof Statechart) {
+            item.states.forEachReverse(item => self.reverseVisitNonTransitions(item, visitor));
+            visitor(item);
+        }
+    }
+    visitTransitions(item, visitor) {
+        const self = this;
+        if (item instanceof State) {
+            item.statecharts.forEach(item => self.visitTransitions(item, visitor));
+        }
+        else if (item instanceof Statechart) {
+            item.transitions.forEach(item => visitor(item));
+            item.states.forEach(item => self.visitTransitions(item, visitor));
+        }
+    }
+    reverseVisitTransitions(item, visitor) {
+        const self = this;
+        if (item instanceof State) {
+            item.statecharts.forEachReverse(item => self.reverseVisitTransitions(item, visitor));
+        }
+        else if (item instanceof Statechart) {
+            item.states.forEachReverse(item => self.reverseVisitTransitions(item, visitor));
+            item.transitions.forEachReverse(item => visitor(item));
         }
     }
     updateItem(item) {
@@ -1722,13 +1748,11 @@ export class StatechartEditor {
             renderer.begin(ctx);
             this.updateLayout_();
             canvasController.applyTransform();
-            context.visitAll(statechart, item => {
-                if (!(item instanceof Transition))
-                    renderer.draw(item, RenderMode.Normal);
+            statechart.states.forEach(function (state) {
+                context.visitNonTransitions(state, item => { renderer.draw(item, RenderMode.Normal); });
             });
-            context.visitAll(statechart, item => {
-                if (item instanceof Transition)
-                    renderer.draw(item, RenderMode.Normal);
+            context.visitTransitions(statechart, transition => {
+                renderer.drawTransition(transition, RenderMode.Normal);
             });
             context.selection.forEach(function (item) {
                 renderer.draw(item, RenderMode.Highlight);
@@ -1783,11 +1807,11 @@ export class StatechartEditor {
         ctx.translate(-bounds.x + 1, -bounds.y + 1);
         renderer.begin(ctx);
         canvasController.applyTransform();
-        context.visitAllItems(statechart.states, state => {
-            renderer.draw(state, RenderMode.Print);
+        statechart.states.forEach(state => {
+            context.visitNonTransitions(state, item => { renderer.draw(state, RenderMode.Print); });
         });
-        context.visitAllItems(statechart.transitions, transition => {
-            renderer.draw(transition, RenderMode.Print);
+        context.visitTransitions(statechart, transition => {
+            renderer.drawTransition(transition, RenderMode.Print);
         });
         renderer.end();
         // Write out the SVG file.
@@ -1813,13 +1837,13 @@ export class StatechartEditor {
         // TODO hit test selection first, in highlight, first.
         // Skip the root statechart, as hits there should go to the underlying canvas controller.
         // Hit test transitions first.
-        context.reverseVisitAll(statechart, (item) => {
-            if (item instanceof Transition)
-                pushInfo(renderer.hitTestTransition(item, cp, tol, RenderMode.Normal));
+        context.reverseVisitTransitions(statechart, (transition) => {
+            pushInfo(renderer.hitTestTransition(transition, cp, tol, RenderMode.Normal));
         });
-        context.reverseVisitAll(statechart, (item) => {
-            if (!(item instanceof Transition))
+        statechart.states.forEachReverse(state => {
+            context.reverseVisitNonTransitions(state, item => {
                 pushInfo(renderer.hitTest(item, cp, tol, RenderMode.Normal));
+            });
         });
         renderer.end();
         return hitList;
@@ -1831,7 +1855,7 @@ export class StatechartEditor {
                 hitList.push(info);
         }
         renderer.begin(ctx);
-        context.reverseVisitAllItems(this.palette.states, state => {
+        this.palette.states.forEach(state => {
             pushInfo(renderer.hitTest(state, p, tol, RenderMode.Normal));
         });
         renderer.end();
