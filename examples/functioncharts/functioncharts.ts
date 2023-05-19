@@ -112,7 +112,7 @@ export class TypeParser {
       let type = parseFunction(),
           typeString = s.substring(i, j);
       // Add the pin type, without label.
-      addType(typeString, type!);  // TODO fix
+      type = addType(typeString, type);
       return new Pin(typeString, parseName(), type);
     }
     function parseFunction() : Type {
@@ -128,19 +128,19 @@ export class TypeParser {
           outputs.push(parsePin());
         }
         j++;
-        const typeString = s.substring(i, j),
-              type = new Type(typeString, inputs, outputs);
-        addType(typeString, type);
+        const typeString = s.substring(i, j);
+        let type = new Type(typeString, inputs, outputs);
+        type = addType(typeString, type);
         return type;
       }
       throw new Error('Invalid type string: ' + s);
     }
 
-    const type = parseFunction();
+    let type = parseFunction();
     if (type) {
       // Add the type with label.
       type.name = parseName();
-      addType(s, type);
+      type = addType(s, type);
     }
     return type;
   }
@@ -782,7 +782,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.selection.contents();
   }
 
-  selectedElements() : ElementTypes[] {
+  selectedElements() : Element[] {
+    const result = new Array<Element>();
+    this.selection.forEach(item => {
+      if (item instanceof Element)
+        result.push(item);
+    });
+    return result;
+  }
+
+  selectedElementTypes() : ElementTypes[] {
     const result = new Array<ElementTypes>();
     this.selection.forEach(item => {
       if (item instanceof Element || item instanceof Pseudoelement)
@@ -809,12 +818,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   selectInteriorWires() {
     const self = this,
-          graphInfo = this.getSubgraphInfo(this.selectedElements());
+          graphInfo = this.getSubgraphInfo(this.selectedElementTypes());
     graphInfo.interiorWires.forEach(wire => self.selection.add(wire));
   }
 
   selectConnectedElements(upstream: boolean) {
-    const selectedElements = this.selectedElements(),
+    const selectedElements = this.selectedElementTypes(),
           connectedElements = this.getConnectedElements(selectedElements, upstream, true);
     this.selection.set(Array.from(connectedElements));
   }
@@ -1020,6 +1029,47 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
 
     this.deleteItem(element);
+  }
+
+  exportElement(element: Element) {
+    const result = this.newElement('element');
+    result.typeString = '[,' + element.typeString + ']';
+    return result;
+  }
+
+  exportElements(elements: Element[]) {
+    const self = this,
+          selection = this.selection;
+
+    // Open each non-input/output element.
+    elements.forEach(element => {
+      selection.delete(element);
+      const newElement = self.exportElement(element);
+      self.replaceElement(element, newElement);
+      selection.add(newElement);
+    });
+  }
+
+  openElement(element: Element) {
+    const typeString = element.typeString,
+          j = globalTypeParser_.splitTypeString(typeString);
+    const result = this.newElement('element');
+    result.typeString =
+      typeString.substring(0, j - 1) + typeString + typeString.substring(j);
+    return result;
+  }
+
+  openElements(elements: Element[]) {
+    const self = this,
+          selection = this.selection;
+
+    // Open each non-input/output element.
+    elements.forEach(element => {
+      selection.delete(element);
+      const newElement = self.openElement(element);
+      self.replaceElement(element, newElement);
+      selection.add(newElement);
+    });
   }
 
   getFunctionchartTypeString(functionChart: Functionchart) {
@@ -1369,9 +1419,11 @@ class WireHitResult {
 class FunctionchartHitResult {
   item: Functionchart;
   inner: RectHitResult;
-  constructor(item: Functionchart, inner: RectHitResult) {
+  instancer: boolean;
+  constructor(item: Functionchart, inner: RectHitResult, instancer: boolean) {
     this.item = item;
     this.inner = inner;
+    this.instancer = instancer;
   }
 }
 
@@ -1766,58 +1818,6 @@ class Renderer {
     }
   }
 
-
-  // // Gets the bounding rect for the group instancing element.
-  // getGroupInstanceBounds(type, groupRight, groupBottom) {
-  //   const theme = this.theme, spacing = theme.spacing,
-  //         width = type.width, height = type.height,
-  //         x = groupRight - width - spacing, y = groupBottom - height - spacing;
-  //   return { x: x, y: y, w: width, h: height };
-  // }
-
-  // drawGroup(group, mode) {
-  //   if (!group[_hasLayout])
-  //     this.layoutGroup(group);
-  //   const ctx = this.ctx,
-  //         theme = this.theme,
-  //         rect = this.getItemRect(group),
-  //         x = rect.x, y = rect.y, w = rect.w , h = rect.h,
-  //         right = x + w, bottom = y + h;
-  //   diagrams.roundRectPath(x, y, w, h, theme.spacing, ctx);
-  //   switch (mode) {
-  //     case normalMode:
-  //       ctx.fillStyle = theme.bgColor;
-  //       ctx.fill();
-  //       ctx.strokeStyle = theme.strokeColor;
-  //       ctx.lineWidth = 0.5;
-  //       ctx.setLineDash([6,3]);
-  //       ctx.stroke();
-  //       ctx.setLineDash([]);
-
-  //       const type = getType(group),
-  //             instanceRect = this.getGroupInstanceBounds(type, right, bottom);
-  //       ctx.beginPath();
-  //       ctx.rect(instanceRect.x, instanceRect.y, instanceRect.w, instanceRect.h);
-  //       ctx.fillStyle = theme.altBgColor;
-  //       ctx.fill();
-  //       ctx.strokeStyle = theme.strokeColor;
-  //       ctx.lineWidth = 0.5;
-  //       ctx.stroke();
-  //       this.drawType(type, instanceRect.x, instanceRect.y, 0);
-  //       break;
-  //     case highlightMode:
-  //       ctx.strokeStyle = theme.highlightColor;
-  //       ctx.lineWidth = 2;
-  //       ctx.stroke();
-  //       break;
-  //     case hotTrackMode:
-  //       ctx.strokeStyle = theme.hotTrackColor;
-  //       ctx.lineWidth = 2;
-  //       ctx.stroke();
-  //       break;
-  //   }
-  // }
-
   hitTestElement(element: ElementTypes, p: Point, tol: number, mode: RenderMode) :
                  ElementHitResult | undefined {
     const rect = this.getItemRect(element),
@@ -1848,28 +1848,12 @@ class Renderer {
         x = rect.x, y = rect.y, w = rect.width, h = rect.height,
         inner = hitTestRect(x, y, w, h, p, tol);
   if (inner) {
-    return new FunctionchartHitResult(functionchart, inner);
+    const instanceRect = this.getFunctionchartInstanceBounds(functionchart.type, x + w, y + h),
+          instancer = hitTestRect(
+              instanceRect.x, instanceRect.y, instanceRect.w, instanceRect.h, p, tol) !== undefined;
+    return new FunctionchartHitResult(functionchart, inner, instancer);
   }
 }
-
-  // hitTestGroup(group, p, tol, mode) {
-  //   const rect = this.getItemRect(group),
-  //         x = rect.x, y = rect.y, w = rect.w , h = rect.h,
-  //         hitInfo = diagrams.hitTestRect(x, y, w, h, p, tol);
-  //   if (hitInfo) {
-  //     assert(group[_hasLayout]);
-  //     const type = getType(group),
-  //           instanceRect = this.getGroupInstanceBounds(type, x + w, y + h);
-  //     if (diagrams.hitTestRect(instanceRect.x, instanceRect.y,
-  //                              instanceRect.w, instanceRect.h, p, tol)) {
-  //       hitInfo.newGroupInstanceInfo = {
-  //         x: instanceRect.x,
-  //         y: instanceRect.y,
-  //       };
-  //     }
-  //   }
-  //   return hitInfo;
-  // }
 
   drawWire(wire: Wire, mode: RenderMode) {
     const theme = this.theme,
@@ -2653,12 +2637,12 @@ export class FunctionchartEditor implements CanvasLayer {
           drag = new NonWireDrag([pointerHitInfo.item], 'copyPalette', 'Create new element or functionchart');
         } else if (this.moveCopy) {
           this.moveCopy = false;  // TODO fix
-          drag = new NonWireDrag(context.selectedElements(), 'moveCopySelection', 'Move copy of selection');
+          drag = new NonWireDrag(context.selectedElementTypes(), 'moveCopySelection', 'Move copy of selection');
         } else {
           if (pointerHitInfo instanceof FunctionchartHitResult && pointerHitInfo.inner.border) {
             drag = new NonWireDrag([pointerHitInfo.item], 'resizeFunctionchart', 'Resize functionchart');
           } else {
-            drag = new NonWireDrag(context.selectedElements(), 'moveSelection', 'Move selection');
+            drag = new NonWireDrag(context.selectedElementTypes(), 'moveSelection', 'Move selection');
           }
         }
       }
@@ -2910,6 +2894,17 @@ export class FunctionchartEditor implements CanvasLayer {
           context.endTransaction();
           return true;
         }
+        case 75: { // 'k'
+          context.beginTransaction('export elements');
+          context.exportElements(context.selectedElements());
+          context.endTransaction();
+          return true;
+        }
+        case 76: // 'l'
+          context.beginTransaction('open elements');
+          context.openElements(context.selectedElements());
+          context.endTransaction();
+          return true;
         case 78: { // ctrl 'n'   // Can't intercept cmd n.
           const context = new FunctionchartContext();
           self.initializeContext(context);
@@ -3033,78 +3028,6 @@ const editingModel = (function() {
       return result;
     },
 
-    changeType: function (item, newType) {
-      const type = getType(item);
-      let result;
-      if (isJunction(item)) {
-        if (isInput(item)) {
-          let label = type.outputs[0].name;
-          label = label ? '(' + label + ')' : '';
-          result = '[,' + newType + label + ']';
-        } else if (isOutput(item)) {
-          let label = type.inputs[0].name;
-          label = label ? '(' + label + ')' : '';
-          result = '[' + newType + label + ',]';
-        }
-      }
-      return result;
-    },
-
-    exportElement: function(element) {
-      const model = this.model,
-            dataModel = model.dataModel,
-            observableModel = model.observableModel,
-            type = element.type,
-            newType = '[,' + type + ']';
-
-      const result = this.newElement(newType, element.x, element.y, 'element');
-      return result;
-    },
-
-    exportElements: function(elements) {
-      const self = this,
-            selectionModel = this.model.selectionModel;
-
-      // Open each non-input/output element.
-      elements.forEach(function(element) {
-        selectionModel.remove(element);
-        if (isInput(element) || isOutput(element) ||
-            isLiteral(element) || isGroup(element) || isWire(element))
-          return;
-        const newElement = self.exportElement(element);
-        self.replaceElement(element, newElement);
-        selectionModel.add(newElement);
-      });
-    },
-
-    openElement: function(element) {
-      const model = this.model,
-            dataModel = model.dataModel,
-            observableModel = model.observableModel,
-            type = getType(element),
-            trimmedType = globalTypeParser_.trimType(element.type),
-            innerType = globalTypeParser_.getUnlabeledType(trimmedType),
-            newType = globalTypeParser_.addInputToType(trimmedType, innerType);
-
-      const result = this.newElement(newType, element.x, element.y, 'abstract');
-      return result;
-    },
-
-    openElements: function(elements) {
-      const self = this,
-            selectionModel = this.model.selectionModel;
-
-      // Open each non-input/output element.
-      elements.forEach(function(element) {
-        selectionModel.remove(element);
-        if (isInput(element) || isOutput(element) ||
-            isLiteral(element) || isGroup(element) || isWire(element))
-          return;
-        const newElement = self.openElement(element);
-        self.replaceElement(element, newElement);
-        selectionModel.add(newElement);
-      });
-    },
 
     isInstanceOfGroup: function(element, group) {
       assert(isElement(element));
