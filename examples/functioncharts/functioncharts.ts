@@ -470,7 +470,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
     this.functionchart = new Functionchart(this, this.highestId++);
-    this.insertItem_(this.functionchart, undefined);
+    this.insertItem(this.functionchart, undefined);
   }
 
   root() : Functionchart {
@@ -478,8 +478,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
   setRoot(root: Functionchart) : void {
     if (this.functionchart)
-      this.removeItem_(this.functionchart);
-    this.insertItem_(root, undefined);
+      this.removeItem(this.functionchart);
+    this.insertItem(root, undefined);
     this.functionchart = root;
   }
 
@@ -1167,7 +1167,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
 
-  private insertElement_(element: ElementTypes, parent: Functionchart) {
+  private insertElement(element: ElementTypes, parent: Functionchart) {
     this.elements.add(element);
     element.parent = parent;
     this.updateItem(element);
@@ -1178,27 +1178,27 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       element.outWires = new Array<Wire[]>(element.type.outputs.length);
   }
 
-  private removeElement_(element: ElementTypes) {
+  private removeElement(element: ElementTypes) {
     this.elements.delete(element);
   }
 
-  private insertFunctionchart_(functionchart: Functionchart, parent: Functionchart | undefined) {
+  private insertFunctionchart(functionchart: Functionchart, parent: Functionchart | undefined) {
     this.functioncharts.add(functionchart);
     functionchart.parent = parent;
     this.updateItem(functionchart);
 
     const self = this;
-    functionchart.nonWires.forEach(element => self.insertItem_(element, functionchart));
-    functionchart.wires.forEach(wire => self.insertWire_(wire, functionchart));
+    functionchart.nonWires.forEach(element => self.insertItem(element, functionchart));
+    functionchart.wires.forEach(wire => self.insertWire(wire, functionchart));
   }
 
-  private removeFunctionchart_(functionchart: Functionchart) {
+  private removeFunctionchart(functionchart: Functionchart) {
     this.functioncharts.delete(functionchart);
     const self = this;
-    functionchart.nonWires.forEach(element => self.removeItem_(element));
+    functionchart.nonWires.forEach(element => self.removeItem(element));
   }
 
-  private insertWire_(wire: Wire, parent: Functionchart) {
+  private insertWire(wire: Wire, parent: Functionchart) {
     this.wires.add(wire);
     wire.parent = parent;
     this.updateItem(wire);
@@ -1224,7 +1224,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  private removeWire_(wire: Wire) {
+  private removeWire(wire: Wire) {
     this.wires.delete(wire);
     const src = wire.src,
           dst = wire.dst;
@@ -1238,26 +1238,26 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  private insertItem_(item: AllTypes, parent: Functionchart | undefined) {
+  private insertItem(item: AllTypes, parent: Functionchart | undefined) {
     if (item instanceof Wire) {
       if (parent)
-        this.insertWire_(item, parent);
+        this.insertWire(item, parent);
     } else if (item instanceof Functionchart) {
-      this.insertFunctionchart_(item, parent);
+      this.insertFunctionchart(item, parent);
     } else {
       if (parent) {
-        this.insertElement_(item, parent);
+        this.insertElement(item, parent);
       }
     }
   }
 
-  private removeItem_(item: AllTypes) {
+  private removeItem(item: AllTypes) {
     if (item instanceof Wire)
-      this.removeWire_(item);
+      this.removeWire(item);
     else if (item instanceof Functionchart)
-      this.removeFunctionchart_(item);
+      this.removeFunctionchart(item);
     else
-      this.removeElement_(item);
+      this.removeElement(item);
   }
 
   // DataContext interface implementation.
@@ -1289,7 +1289,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           if (dst && oldPin >= 0)
             dst.inWires[oldPin] = undefined;
         }
-        this.insertWire_(owner, parent);
+        this.insertWire(owner, parent);
       }
     } else if (owner instanceof Element || owner instanceof Pseudoelement) {
       if (prop === typeStringProp && owner.typeString) {
@@ -1305,11 +1305,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
   elementInserted(owner: Functionchart, prop: ArrayPropertyTypes, index: number) : void {
     const value: AllTypes = prop.get(owner).at(index) as AllTypes;
-    this.insertItem_(value, owner);
+    this.insertItem(value, owner);
     this.onElementInserted(owner, prop, index);
   }
   elementRemoved(owner: Functionchart, prop: ArrayPropertyTypes, index: number, oldValue: AllTypes) : void {
-    this.removeItem_(oldValue);
+    this.removeItem(oldValue);
     this.onElementRemoved(owner, prop, index, oldValue);
   }
   resolveReference(owner: AllTypes, prop: ReferenceProp) : ElementTypes | undefined {
@@ -2238,15 +2238,15 @@ export class FunctionchartEditor implements CanvasLayer {
 
     // On attribute changes and item insertions, dynamically layout affected items.
     // This allows us to layout transitions as their src or dst elements are dragged.
-    context.addHandler('changed', change => self.onChanged_(change));
+    context.addHandler('changed', change => self.onChanged(change));
 
     // On ending transactions and undo/redo, layout the changed top level functioncharts.
-    function updateBounds() {
-      self.updateBounds_();
+    function update() {
+      self.updateBounds();
     }
-    context.transactionManager.addHandler('transactionEnding', updateBounds);
-    context.transactionManager.addHandler('didUndo', updateBounds);
-    context.transactionManager.addHandler('didRedo', updateBounds);
+    context.transactionManager.addHandler('transactionEnding', update);
+    context.transactionManager.addHandler('didUndo', update);
+    context.transactionManager.addHandler('didRedo', update);
   }
   setContext(context: FunctionchartContext) {
     const functionchart = context.root(),
@@ -2278,7 +2278,7 @@ export class FunctionchartEditor implements CanvasLayer {
       renderer.end();
     }
   }
-  onChanged_(change: Change) {
+  private onChanged(change: Change) {
     const functionchart = this.functionchart,
           context = this.context, changedItems = this.changedItems,
           changedTopLevelStates = this.changedTopLevelFunctioncharts,
@@ -2324,7 +2324,7 @@ export class FunctionchartEditor implements CanvasLayer {
       }
     }
   }
-  updateLayout_() {
+  private updateLayout() {
     const renderer = this.renderer,
           context = this.context,
           changedItems = this.changedItems;
@@ -2350,7 +2350,7 @@ export class FunctionchartEditor implements CanvasLayer {
     });
     changedItems.clear();
   }
-  updateBounds_() {
+  private updateBounds() {
     const ctx = this.canvasController.getCtx(),
           renderer = this.renderer,
           context = this.context,
@@ -2358,7 +2358,7 @@ export class FunctionchartEditor implements CanvasLayer {
           changedTopLevelStates = this.changedTopLevelFunctioncharts;
     renderer.begin(ctx);
     // Update any changed items first.
-    this.updateLayout_();
+    this.updateLayout();
     // Then update the bounds of super states, bottom up.
     changedTopLevelStates.forEach(
       state => context.reverseVisitAll(state, item => {
@@ -2395,7 +2395,7 @@ export class FunctionchartEditor implements CanvasLayer {
 
       // Now draw the functionchart.
       renderer.begin(ctx);
-      this.updateLayout_();
+      this.updateLayout();
       canvasController.applyTransform();
 
       // Don't draw the root functionchart.
@@ -2506,7 +2506,7 @@ export class FunctionchartEditor implements CanvasLayer {
         hitList.push(info);
     }
     renderer.begin(ctx);
-    this.updateLayout_();
+    this.updateLayout();
     // TODO hit test selection first, in highlight, first.
     // Hit test transitions first.
     context.reverseVisitWires(functionchart, (wire: Wire) => {
@@ -2865,7 +2865,7 @@ export class FunctionchartEditor implements CanvasLayer {
         case 86: { // 'v'
           if (this.scrap.length > 0) {
             context.paste(this.scrap);
-            this.updateBounds_();
+            this.updateBounds();
             return true;
           }
           return false;
@@ -2910,7 +2910,7 @@ export class FunctionchartEditor implements CanvasLayer {
           self.initializeContext(context);
           self.setContext(context);
           self.renderer.begin(self.canvasController.getCtx());
-          self.updateBounds_();
+          self.updateBounds();
           self.canvasController.draw();
           return true;
         }
@@ -2923,7 +2923,7 @@ export class FunctionchartEditor implements CanvasLayer {
             self.initializeContext(context);
             self.setContext(context);
             self.renderer.begin(self.canvasController.getCtx());
-            self.updateBounds_();
+            self.updateBounds();
             self.canvasController.draw();
           }
           this.fileController.openFile().then(result => parse(result));

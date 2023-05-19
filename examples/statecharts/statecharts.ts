@@ -1984,15 +1984,15 @@ export class StatechartEditor implements CanvasLayer {
 
     // On attribute changes and item insertions, dynamically layout affected items.
     // This allows us to layout transitions as their src or dst states are dragged.
-    context.addHandler('changed', change => self.onChanged_(change));
+    context.addHandler('changed', change => self.onChanged(change));
 
     // On ending transactions and undo/redo, layout the changed top level states.
-    function updateBounds() {
-      self.updateBounds_();
+    function update() {
+      self.updateBounds();
     }
-    context.transactionManager.addHandler('transactionEnding', updateBounds);
-    context.transactionManager.addHandler('didUndo', updateBounds);
-    context.transactionManager.addHandler('didRedo', updateBounds);
+    context.transactionManager.addHandler('transactionEnding', update);
+    context.transactionManager.addHandler('didUndo', update);
+    context.transactionManager.addHandler('didRedo', update);
   }
   setContext(context: StatechartContext) {
     const statechart = context.root(),
@@ -2024,7 +2024,7 @@ export class StatechartEditor implements CanvasLayer {
       renderer.end();
     }
   }
-  onChanged_(change: Change) {
+  private onChanged(change: Change) {
     const statechart = this.statechart,
           context = this.context, changedItems = this.changedItems,
           changedTopLevelStates = this.changedTopLevelStates,
@@ -2071,7 +2071,7 @@ export class StatechartEditor implements CanvasLayer {
       }
     }
   }
-  updateLayout_() {
+  private updateLayout() {
     const renderer = this.renderer,
           context = this.context,
           changedItems = this.changedItems;
@@ -2096,7 +2096,7 @@ export class StatechartEditor implements CanvasLayer {
     });
     changedItems.clear();
   }
-  updateBounds_() {
+  private updateBounds() {
     const ctx = this.canvasController.getCtx(),
           renderer = this.renderer,
           context = this.context,
@@ -2104,7 +2104,7 @@ export class StatechartEditor implements CanvasLayer {
           changedTopLevelStates = this.changedTopLevelStates;
     renderer.begin(ctx);
     // Update any changed items first.
-    this.updateLayout_();
+    this.updateLayout();
     // Then update the bounds of super states, bottom up.
     changedTopLevelStates.forEach(
       state => context.reverseVisitAll(state, item => {
@@ -2141,7 +2141,7 @@ export class StatechartEditor implements CanvasLayer {
 
       // Now draw the statechart.
       renderer.begin(ctx);
-      this.updateLayout_();
+      this.updateLayout();
       canvasController.applyTransform();
 
       statechart.states.forEach(function (state) {
@@ -2250,7 +2250,7 @@ export class StatechartEditor implements CanvasLayer {
         hitList.push(info);
     }
     renderer.begin(ctx);
-    this.updateLayout_();
+    this.updateLayout();
     // TODO hit test selection first, in highlight, first.
     // Skip the root statechart, as hits there should go to the underlying canvas controller.
     // Hit test transitions first.
@@ -2621,7 +2621,7 @@ export class StatechartEditor implements CanvasLayer {
         case 86: { // 'v'
           if (this.scrap.length > 0) {
             context.paste(this.scrap);
-            this.updateBounds_();
+            this.updateBounds();
             return true;
           }
           return false;
@@ -2640,7 +2640,7 @@ export class StatechartEditor implements CanvasLayer {
           self.initializeContext(context);
           self.setContext(context);
           self.renderer.begin(self.canvasController.getCtx());
-          self.updateBounds_();
+          self.updateBounds();
           self.canvasController.draw();
           return true;
         }
@@ -2652,7 +2652,7 @@ export class StatechartEditor implements CanvasLayer {
             self.initializeContext(context);
             self.setContext(context);
             self.renderer.begin(self.canvasController.getCtx());
-            self.updateBounds_();
+            self.updateBounds();
             self.canvasController.draw();
         }
           this.fileController.openFile().then(result => parse(result));
