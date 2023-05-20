@@ -140,8 +140,6 @@ export class Pseudostate implements DataContextObject, ReferencedObject {
 
   readonly id: number;
 
-  get subtype() : string { return this.template.typeName };
-
   get x() { return this.template.x.get(this) || 0; }
   set x(value: number) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
@@ -549,10 +547,10 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   // without violating statechart constraints.
   canAddState(state: StateTypes, statechart: Statechart) : boolean {
     // The only constraint is that there can't be two start states in a statechart.
-    if (!(state instanceof Pseudostate) || state.subtype !== 'start')
+    if (!(state instanceof Pseudostate) || state.template.typeName !== 'start')
       return true;
     for (let child of statechart.states.asArray()) {
-      if (child !== state && child instanceof Pseudostate && child.subtype === 'start')
+      if (child !== state && child instanceof Pseudostate && child.template.typeName === 'start')
         return false;
     }
     return true;
@@ -563,12 +561,13 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     // No transition to self for pseudostates.
     if (src === dst) return src instanceof State;
     // No transitions to a start pseudostate.
-    if (dst instanceof Pseudostate && dst.subtype === 'start') return false;
+    if (dst instanceof Pseudostate && dst.template.typeName === 'start') return false;
     // No transitions from a stop pseudostate.
-    if (src instanceof Pseudostate && src.subtype === 'stop') return false;
+    if (src instanceof Pseudostate && src.template.typeName === 'stop') return false;
     // No transitions out of parent state for start or history pseudostates.
     if (src instanceof Pseudostate && (
-        src.subtype === 'start' || src.subtype === 'history' || src.subtype === 'history*')) {
+        src.template.typeName === 'start' || src.template.typeName === 'history' ||
+        src.template.typeName === 'history*')) {
       const srcParent = src.parent,
             dstParent = dst.parent;
       return srcParent === dstParent;
@@ -1488,7 +1487,7 @@ class Renderer {
       case RenderMode.Normal:
       case RenderMode.Print:
         ctx.lineWidth = 0.25;
-        switch (pseudostate.subtype) {
+        switch (pseudostate.template.typeName) {
           case 'start':
             ctx.fillStyle = theme.strokeColor;
             ctx.fill();
@@ -1536,7 +1535,7 @@ class Renderer {
         ctx.stroke();
         break;
     }
-    if (mode !== RenderMode.Print && pseudostate.subtype !== 'stop') {
+    if (mode !== RenderMode.Print && pseudostate.template.typeName !== 'stop') {
       this.drawArrow(x + 2 * r + theme.arrowSize, y + r);
     }
   }
@@ -1549,7 +1548,7 @@ class Renderer {
           inner = hitTestDisk(x + r, y + r, r, p, tol);
     if (inner) {
       const result = new PseudostateHitResult(state, inner);
-      if (mode !== RenderMode.Print && state.subtype !== 'stop' &&
+      if (mode !== RenderMode.Print && state.template.typeName !== 'stop' &&
           this.hitTestArrow(x + 2 * r + theme.arrowSize, y + r, p, tol)) {
         result.arrow = true;
       }

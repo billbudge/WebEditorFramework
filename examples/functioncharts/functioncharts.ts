@@ -485,15 +485,26 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   newElement(typeName: ElementType) : Element {
     const nextId = ++this.highestId;
-    let template: ElementTemplate;
+    let template: ElementTemplate,
+        typeString: string;
     switch (typeName) {
-      case 'binop': template = binopTemplate; break;
-      case 'unop': template = unopTemplate; break;
-      case 'element': template = elementTemplate; break;
+      case 'binop':
+        template = binopTemplate;
+        typeString = '[vv,v]'
+        break;
+      case 'unop':
+        template = unopTemplate;
+        typeString = '[v,v]'
+        break;
+      case 'element':
+        template = elementTemplate;
+        typeString = '[,]'
+        break;
       default: throw new Error('Unknown element type: ' + typeName);
     }
 
     const result: Element = new Element(this, template, nextId);
+    result.typeString = typeString;
     this.referentMap.set(nextId, result);
     return result;
   }
@@ -956,6 +967,64 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
+  isValidWire(wire: Wire) {
+    const src = wire.src,
+          dst = wire.dst;
+    if (!src || !dst)
+      return false;
+    if (src === dst)
+      return false;
+    // TODO Cycle detection.
+    return true;
+  }
+
+  topologicalSort(graphInfo: GraphInfo) {
+    const visiting = new Set<ElementTypes>(),
+          visited = new Set<ElementTypes>(),
+          sorted = new Array<ElementTypes>();
+
+    let cycle = false;
+    function visit(element: ElementTypes) {
+      if (visited.has(element))
+        return;
+      if (visiting.has(element)) {
+        cycle = true;
+        return;
+      }
+      visiting.add(element);
+      element.outWires.forEach(wires => {
+        wires.forEach(wire => {
+          visit(wire.dst!);
+        });
+      });
+      if (cycle)
+        return;
+      visiting.delete(element);
+      visited.add(element);
+      sorted.push(element);
+    }
+    graphInfo.elements.forEach(element => {
+      if (!visited.has(element) && !visiting.has(element))
+        visit(element);
+    });
+    return sorted;
+  }
+  isValidFunctionchart(functionchart: Functionchart) {
+    const self = this,
+          invalidWires = new Array<Wire>(),
+          graphInfo = this.getSubgraphInfo(functionchart.nonWires.asArray());
+    // Check wires.
+    graphInfo.wires.forEach(wire => {
+      if (!self.isValidWire(wire))
+        invalidWires.push(wire);
+    });
+    if (invalidWires.length > 0)
+      return false;
+    // Check for cycles using topological sort.
+    const sorted = this.topologicalSort(graphInfo);
+    return sorted.length === this.elements.size;
+  }
+
   makeConsistent() {
     const self = this,
           Functionchart = this.functionchart,
@@ -969,7 +1038,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         self.deleteItem(wire);
         return;
       }
-      // Make sure transitions wires to lowest common functionchart.
+      // Make sure wires between elements are in lowest common parent functionchart.
       const srcParent = src.parent!,
             dstParent = dst.parent!,
             lca: Functionchart = getLowestCommonAncestor<AllTypes>(srcParent, dstParent) as Functionchart;
@@ -2791,14 +2860,14 @@ export class FunctionchartEditor implements CanvasLayer {
       if (hitInfo && (hitInfo instanceof FunctionchartHitResult)) {
         parent = hitInfo.item;
       }
-      // Reparent items.
+      // Reparent items
       selection.contents().forEach(item => {
         // if (!(item instanceof Functionchart))
           context.addItem(item, parent);
       });
     }
 
-    // if (context.isValidStatechart(functionchart)) {
+    // if (context.isValidFunctionchart(functionchart)) {
       transactionManager.endTransaction();
     // } else {
     //   transactionManager.cancelTransaction();
