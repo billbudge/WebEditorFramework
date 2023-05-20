@@ -74,8 +74,6 @@ export class State {
     }
 }
 export class Pseudostate {
-    get subtype() { return this.template.typeName; }
-    ;
     get x() { return this.template.x.get(this) || 0; }
     set x(value) { this.template.x.set(this, value); }
     get y() { return this.template.y.get(this) || 0; }
@@ -149,15 +147,15 @@ export class StatechartContext extends EventBase {
         });
         this.historyManager = new HistoryManager(this.transactionManager, this.selection);
         this.statechart = new Statechart(this);
-        this.insertItem_(this.statechart, undefined);
+        this.insertItem(this.statechart, undefined);
     }
     root() {
         return this.statechart;
     }
     setRoot(root) {
         if (this.statechart)
-            this.removeItem_(this.statechart);
-        this.insertItem_(root, undefined);
+            this.removeItem(this.statechart);
+        this.insertItem(root, undefined);
         this.statechart = root;
     }
     newState() {
@@ -415,10 +413,10 @@ export class StatechartContext extends EventBase {
     // without violating statechart constraints.
     canAddState(state, statechart) {
         // The only constraint is that there can't be two start states in a statechart.
-        if (!(state instanceof Pseudostate) || state.subtype !== 'start')
+        if (!(state instanceof Pseudostate) || state.template.typeName !== 'start')
             return true;
         for (let child of statechart.states.asArray()) {
-            if (child !== state && child instanceof Pseudostate && child.subtype === 'start')
+            if (child !== state && child instanceof Pseudostate && child.template.typeName === 'start')
                 return false;
         }
         return true;
@@ -430,13 +428,14 @@ export class StatechartContext extends EventBase {
         if (src === dst)
             return src instanceof State;
         // No transitions to a start pseudostate.
-        if (dst instanceof Pseudostate && dst.subtype === 'start')
+        if (dst instanceof Pseudostate && dst.template.typeName === 'start')
             return false;
         // No transitions from a stop pseudostate.
-        if (src instanceof Pseudostate && src.subtype === 'stop')
+        if (src instanceof Pseudostate && src.template.typeName === 'stop')
             return false;
         // No transitions out of parent state for start or history pseudostates.
-        if (src instanceof Pseudostate && (src.subtype === 'start' || src.subtype === 'history' || src.subtype === 'history*')) {
+        if (src instanceof Pseudostate && (src.template.typeName === 'start' || src.template.typeName === 'history' ||
+            src.template.typeName === 'history*')) {
             const srcParent = src.parent, dstParent = dst.parent;
             return srcParent === dstParent;
         }
@@ -674,7 +673,7 @@ export class StatechartContext extends EventBase {
         });
         return valid;
     }
-    insertState_(state, parent) {
+    insertState(state, parent) {
         this.states.add(state);
         if (state.inTransitions === undefined)
             state.inTransitions = new Array();
@@ -682,28 +681,28 @@ export class StatechartContext extends EventBase {
             state.outTransitions = new Array();
         if (state instanceof State && state.statecharts) {
             const self = this;
-            state.statecharts.forEach(statechart => self.insertStatechart_(statechart, state));
+            state.statecharts.forEach(statechart => self.insertStatechart(statechart, state));
         }
     }
-    removeState_(state) {
+    removeState(state) {
         this.states.delete(state);
         if (state instanceof State && state.statecharts) {
             const self = this;
-            state.statecharts.forEach(statechart => self.removeStatechart_(statechart));
+            state.statecharts.forEach(statechart => self.removeStatechart(statechart));
         }
     }
-    insertStatechart_(statechart, parent) {
+    insertStatechart(statechart, parent) {
         this.statecharts.add(statechart);
         const self = this;
-        statechart.states.forEach(state => self.insertState_(state, statechart));
-        statechart.transitions.forEach(transition => self.insertTransition_(transition, statechart));
+        statechart.states.forEach(state => self.insertState(state, statechart));
+        statechart.transitions.forEach(transition => self.insertTransition(transition, statechart));
     }
-    removeStatechart_(stateChart) {
+    removeStatechart(stateChart) {
         this.statecharts.delete(stateChart);
         const self = this;
-        stateChart.states.forEach(state => self.removeState_(state));
+        stateChart.states.forEach(state => self.removeState(state));
     }
-    insertTransition_(transition, parent) {
+    insertTransition(transition, parent) {
         this.transitions.add(transition);
         const src = transition.src, dst = transition.dst;
         if (src) {
@@ -723,7 +722,7 @@ export class StatechartContext extends EventBase {
             array.splice(index, 1);
         }
     }
-    removeTransition_(transition) {
+    removeTransition(transition) {
         this.transitions.delete(transition);
         const src = transition.src, dst = transition.dst;
         if (src) {
@@ -735,30 +734,30 @@ export class StatechartContext extends EventBase {
             StatechartContext.removeTransitionHelper(inputs, transition);
         }
     }
-    insertItem_(item, parent) {
+    insertItem(item, parent) {
         item.parent = parent;
         this.updateItem(item);
         if (item instanceof Transition) {
             if (parent && parent instanceof Statechart)
-                this.insertTransition_(item, parent);
+                this.insertTransition(item, parent);
         }
         else if (item instanceof Statechart) {
             if (!parent || parent instanceof State)
-                this.insertStatechart_(item, parent);
+                this.insertStatechart(item, parent);
         }
         else {
             if (parent && parent instanceof Statechart) {
-                this.insertState_(item, parent);
+                this.insertState(item, parent);
             }
         }
     }
-    removeItem_(item) {
+    removeItem(item) {
         if (item instanceof Transition)
-            this.removeTransition_(item);
+            this.removeTransition(item);
         else if (item instanceof Statechart)
-            this.removeStatechart_(item);
+            this.removeStatechart(item);
         else
-            this.removeState_(item);
+            this.removeState(item);
     }
     // DataContext interface implementation.
     valueChanged(owner, prop, oldValue) {
@@ -776,7 +775,7 @@ export class StatechartContext extends EventBase {
                     if (oldDst)
                         StatechartContext.removeTransitionHelper(oldDst.inTransitions, owner);
                 }
-                this.insertTransition_(owner, parent);
+                this.insertTransition(owner, parent);
             }
         }
         this.onValueChanged(owner, prop, oldValue);
@@ -784,11 +783,11 @@ export class StatechartContext extends EventBase {
     }
     elementInserted(owner, prop, index) {
         const value = prop.get(owner).at(index);
-        this.insertItem_(value, owner);
+        this.insertItem(value, owner);
         this.onElementInserted(owner, prop, index);
     }
     elementRemoved(owner, prop, index, oldValue) {
-        this.removeItem_(oldValue);
+        this.removeItem(oldValue);
         this.onElementRemoved(owner, prop, index, oldValue);
     }
     resolveReference(owner, prop) {
@@ -1203,7 +1202,7 @@ class Renderer {
             case RenderMode.Normal:
             case RenderMode.Print:
                 ctx.lineWidth = 0.25;
-                switch (pseudostate.subtype) {
+                switch (pseudostate.template.typeName) {
                     case 'start':
                         ctx.fillStyle = theme.strokeColor;
                         ctx.fill();
@@ -1251,7 +1250,7 @@ class Renderer {
                 ctx.stroke();
                 break;
         }
-        if (mode !== RenderMode.Print && pseudostate.subtype !== 'stop') {
+        if (mode !== RenderMode.Print && pseudostate.template.typeName !== 'stop') {
             this.drawArrow(x + 2 * r + theme.arrowSize, y + r);
         }
     }
@@ -1259,7 +1258,7 @@ class Renderer {
         const theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y, inner = hitTestDisk(x + r, y + r, r, p, tol);
         if (inner) {
             const result = new PseudostateHitResult(state, inner);
-            if (mode !== RenderMode.Print && state.subtype !== 'stop' &&
+            if (mode !== RenderMode.Print && state.template.typeName !== 'stop' &&
                 this.hitTestArrow(x + 2 * r + theme.arrowSize, y + r, p, tol)) {
                 result.arrow = true;
             }
@@ -1617,14 +1616,14 @@ export class StatechartEditor {
         const self = this;
         // On attribute changes and item insertions, dynamically layout affected items.
         // This allows us to layout transitions as their src or dst states are dragged.
-        context.addHandler('changed', change => self.onChanged_(change));
+        context.addHandler('changed', change => self.onChanged(change));
         // On ending transactions and undo/redo, layout the changed top level states.
-        function updateBounds() {
-            self.updateBounds_();
+        function update() {
+            self.updateBounds();
         }
-        context.transactionManager.addHandler('transactionEnding', updateBounds);
-        context.transactionManager.addHandler('didUndo', updateBounds);
-        context.transactionManager.addHandler('didRedo', updateBounds);
+        context.transactionManager.addHandler('transactionEnding', update);
+        context.transactionManager.addHandler('didUndo', update);
+        context.transactionManager.addHandler('didRedo', update);
     }
     setContext(context) {
         const statechart = context.root(), renderer = this.renderer;
@@ -1652,7 +1651,7 @@ export class StatechartEditor {
             renderer.end();
         }
     }
-    onChanged_(change) {
+    onChanged(change) {
         const statechart = this.statechart, context = this.context, changedItems = this.changedItems, changedTopLevelStates = this.changedTopLevelStates, item = change.item, prop = change.prop;
         // Track all top level states which contain changes. On ending a transaction,
         // update the layout of states and statecharts.
@@ -1692,7 +1691,7 @@ export class StatechartEditor {
             }
         }
     }
-    updateLayout_() {
+    updateLayout() {
         const renderer = this.renderer, context = this.context, changedItems = this.changedItems;
         // This function is called during the draw, hitTest, and updateBounds_ methods,
         // so the renderer is started.
@@ -1715,11 +1714,11 @@ export class StatechartEditor {
         });
         changedItems.clear();
     }
-    updateBounds_() {
+    updateBounds() {
         const ctx = this.canvasController.getCtx(), renderer = this.renderer, context = this.context, statechart = this.statechart, changedTopLevelStates = this.changedTopLevelStates;
         renderer.begin(ctx);
         // Update any changed items first.
-        this.updateLayout_();
+        this.updateLayout();
         // Then update the bounds of super states, bottom up.
         changedTopLevelStates.forEach(state => context.reverseVisitAll(state, item => {
             if (!(item instanceof Transition))
@@ -1750,7 +1749,7 @@ export class StatechartEditor {
             ctx.setLineDash([]);
             // Now draw the statechart.
             renderer.begin(ctx);
-            this.updateLayout_();
+            this.updateLayout();
             canvasController.applyTransform();
             statechart.states.forEach(function (state) {
                 context.visitNonTransitions(state, item => { renderer.draw(item, RenderMode.Normal); });
@@ -1837,7 +1836,7 @@ export class StatechartEditor {
                 hitList.push(info);
         }
         renderer.begin(ctx);
-        this.updateLayout_();
+        this.updateLayout();
         // TODO hit test selection first, in highlight, first.
         // Skip the root statechart, as hits there should go to the underlying canvas controller.
         // Hit test transitions first.
@@ -2172,7 +2171,7 @@ export class StatechartEditor {
                 case 86: { // 'v'
                     if (this.scrap.length > 0) {
                         context.paste(this.scrap);
-                        this.updateBounds_();
+                        this.updateBounds();
                         return true;
                     }
                     return false;
@@ -2191,7 +2190,7 @@ export class StatechartEditor {
                     self.initializeContext(context);
                     self.setContext(context);
                     self.renderer.begin(self.canvasController.getCtx());
-                    self.updateBounds_();
+                    self.updateBounds();
                     self.canvasController.draw();
                     return true;
                 }
@@ -2202,7 +2201,7 @@ export class StatechartEditor {
                         self.initializeContext(context);
                         self.setContext(context);
                         self.renderer.begin(self.canvasController.getCtx());
-                        self.updateBounds_();
+                        self.updateBounds();
                         self.canvasController.draw();
                     }
                     this.fileController.openFile().then(result => parse(result));

@@ -17,6 +17,7 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          ArrayPropertyTypes } from '../../src/dataModels.js'
 
 import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
+import { types } from '@babel/core'
 
 //------------------------------------------------------------------------------
 
@@ -237,6 +238,7 @@ class NonWireTemplate {
 }
 
 export type ElementType = 'binop' | 'unop' | 'element';
+
 class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
   readonly name = nameProp;
@@ -248,13 +250,13 @@ class ElementTemplate extends NonWireTemplate {
   }
 }
 
-export type PseudoelementSubtype = 'input' | 'output' | 'literal';
+export type PseudoelementType = 'input' | 'output' | 'literal';
 
 class PseudoelementTemplate extends NonWireTemplate {
-  readonly typeName: PseudoelementSubtype;
+  readonly typeName: PseudoelementType;
   readonly typeString = typeStringProp;
   readonly properties = [this.id, this.x, this.y, this.typeString];
-  constructor(typeName: PseudoelementSubtype) {
+  constructor(typeName: PseudoelementType) {
     super();
     this.typeName = typeName;
   }
@@ -425,9 +427,9 @@ export class Functionchart implements DataContextObject {
   }
 }
 
-type ElementTypes = Element | Pseudoelement;
-type NonWireTypes = ElementTypes | Functionchart;
-type AllTypes = NonWireTypes | Wire;
+export type ElementTypes = Element | Pseudoelement;
+export type NonWireTypes = ElementTypes | Functionchart;
+export type AllTypes = NonWireTypes | Wire;
 
 export type FunctionchartVisitor = (item: AllTypes) => void;
 export type NonWireVisitor = (nonwire: NonWireTypes) => void;
@@ -508,7 +510,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.referentMap.set(nextId, result);
     return result;
   }
-  newPseudoelement(typeName: PseudoelementSubtype) : Pseudoelement {
+  newPseudoelement(typeName: PseudoelementType) : Pseudoelement {
     const nextId = ++this.highestId;
     let template: PseudoelementTemplate;
     switch (typeName) {
@@ -1139,6 +1141,29 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       self.replaceElement(element, newElement);
       selection.add(newElement);
     });
+  }
+
+  getInputTypeString(input: Pseudoelement) {
+    let typeString = input.type.outputs[0].typeString;
+    if (typeString === '*') {  // Still generic type?
+      const outWires = input.outWires[0];
+      if (outWires.length > 0) {
+        const wire = outWires[0];  // Take the first output wire.
+        typeString = wire.dst!.type.inputs[wire.dstPin].typeString;
+      }
+    }
+    return typeString;
+  }
+
+  getOutputTypeString(output: Pseudoelement) {
+    let typeString = output.type.inputs[0].typeString;
+    if (typeString === '*') {  // Still generic type?
+      const wire = output.inWires[0];
+      if (wire !== undefined) {
+        typeString = wire.src!.type.outputs[wire.srcPin].typeString;
+      }
+    }
+    return typeString;
   }
 
   getFunctionchartTypeString(functionChart: Functionchart) {
@@ -2867,11 +2892,11 @@ export class FunctionchartEditor implements CanvasLayer {
       });
     }
 
-    // if (context.isValidFunctionchart(functionchart)) {
+    if (context.isValidFunctionchart(functionchart)) {
       transactionManager.endTransaction();
-    // } else {
-    //   transactionManager.cancelTransaction();
-    // }
+    } else {
+      transactionManager.cancelTransaction();
+    }
 
     this.setPropertyGrid();
 

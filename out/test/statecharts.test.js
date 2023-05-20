@@ -45,7 +45,7 @@ describe('StatechartContext', () => {
         const context = new SC.StatechartContext(), pseudostate = context.newPseudostate('start');
         expect(pseudostate instanceof SC.Pseudostate).toBe(true);
         expect(pseudostate.id).toBe(1);
-        expect(pseudostate.subtype).toBe('start');
+        expect(pseudostate.template.typeName).toBe('start');
         expect(pseudostate.x).toBe(0);
         pseudostate.x = 10;
         expect(pseudostate.x).toBe(10);
