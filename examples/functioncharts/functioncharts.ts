@@ -362,11 +362,6 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
         break;
     }
     this.type = globalTypeParser_.add(this.typeString);
-
-    this.inWires = new Array<Wire | undefined>(this.type.inputs.length);
-    this.outWires = new Array<Array<Wire>>(this.type.outputs.length);
-    for (let i = 0; i < this.outWires.length; i++)
-      this.outWires[i] = new Array<Wire>();
   }
 }
 
@@ -582,17 +577,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         self.reverseVisitWires(t, visitor)
     });
     functionchart.wires.forEach(t => visitor(t));
-  }
-
-  updateItem(item: AllTypes) {
-    const self = this;
-    if (item instanceof Wire)
-      return;
-    this.visitNonWires(item, item => self.setGlobalPosition(item));
-    if (item instanceof Functionchart && item.parent !== undefined) {
-      const typeString = this.getFunctionchartTypeString(item);
-      item.type = globalTypeParser_.add(typeString);
-    }
   }
 
   getGrandParent(item: AllTypes) : AllTypes | undefined {
@@ -1029,7 +1013,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   makeConsistent() {
     const self = this,
-          Functionchart = this.functionchart,
+          functionchart = this.functionchart,
           graphInfo = this.getGraphInfo();
     // Eliminate dangling wires.
     graphInfo.wires.forEach(wire => {
@@ -1047,6 +1031,23 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (wire.parent !== lca) {
         self.deleteItem(wire);
         self.addItem(wire, lca);
+      }
+    });
+    // Update pseudoelement and functionchart types.
+    this.reverseVisitNonWires(this.functionchart, item => {
+      // Update types of inputs and outputs.
+      if (item instanceof Pseudoelement) {
+        // TODO preserve label.
+        if (item.template.typeName === 'input') {
+          const typeString = self.getInputTypeString(item);
+          item.typeString = '[,' + typeString + ']';
+        } else if(item.template.typeName === 'output') {
+          const typeString = self.getOutputTypeString(item);
+          item.typeString = '[' + typeString + ',]';
+        }
+      } else if (item instanceof Functionchart) {
+        const typeString = self.getFunctionchartTypeString(item);
+        item.type = globalTypeParser_.add(typeString);
       }
     });
     // // Delete any empty functioncharts (except for the root functionchart).
@@ -1144,26 +1145,22 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   getInputTypeString(input: Pseudoelement) {
-    let typeString = input.type.outputs[0].typeString;
-    if (typeString === '*') {  // Still generic type?
-      const outWires = input.outWires[0];
-      if (outWires.length > 0) {
-        const wire = outWires[0];  // Take the first output wire.
-        typeString = wire.dst!.type.inputs[wire.dstPin].typeString;
-      }
+    let result = '*';
+    const outWires = input.outWires[0];
+    if (outWires.length > 0) {
+      const wire = outWires[0];  // Take the first output wire.
+      result = wire.dst!.type.inputs[wire.dstPin].typeString;
     }
-    return typeString;
+    return result;
   }
 
   getOutputTypeString(output: Pseudoelement) {
-    let typeString = output.type.inputs[0].typeString;
-    if (typeString === '*') {  // Still generic type?
-      const wire = output.inWires[0];
-      if (wire !== undefined) {
-        typeString = wire.src!.type.outputs[wire.srcPin].typeString;
-      }
+    let result = '*';
+    const wire = output.inWires[0];
+    if (wire !== undefined) {
+      result = wire.src!.type.outputs[wire.srcPin].typeString;
     }
-    return typeString;
+    return result;
   }
 
   getFunctionchartTypeString(functionChart: Functionchart) {
@@ -1258,6 +1255,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     //   info.passThroughs = Array.from(passThroughs);
     // }
     return typeString;
+  }
+
+  private updateItem(item: AllTypes) {
+    const self = this;
+    if (item instanceof Wire)
+      return;
+    this.visitNonWires(item, item => self.setGlobalPosition(item));
   }
 
 
@@ -1388,10 +1392,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     } else if (owner instanceof Element || owner instanceof Pseudoelement) {
       if (prop === typeStringProp && owner.typeString) {
         owner.type = globalTypeParser_.add(owner.typeString);
-        owner.inWires = new Array<Wire | undefined>(owner.type.inputs.length);
-        owner.outWires = new Array<Array<Wire>>(owner.type.outputs.length);
-        for (let i = 0; i < owner.outWires.length; i++)
-          owner.outWires[i] = new Array<Wire>();
+        const inputs = owner.type.inputs.length,
+              inWires = owner.inWires || new Array<Wire | undefined>(inputs),
+              outputs = owner.type.outputs.length,
+              outWires = owner.outWires || new Array<Array<Wire>>(outputs);
+        inWires.length = inputs;
+        outWires.length = outputs;
+        owner.inWires = inWires;
+        owner.outWires = outWires;
+        for (let i = 0; i < outputs; i++)
+          if (owner.outWires[i] === undefined)
+            owner.outWires[i] = new Array<Wire>();
       }
     }
     this.onValueChanged(owner, prop, oldValue);
