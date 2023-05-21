@@ -276,10 +276,11 @@ class FunctionchartTemplate extends NonWireTemplate {
   readonly width = widthProp;
   readonly height = heightProp;
   readonly name = nameProp;
+  readonly typeString = typeStringProp;
   readonly nonWires = nonWiresProp;
   readonly wires = wiresProp;
   readonly properties = [this.id, this.x, this.y, this.width, this.height, this.name,
-                         this.nonWires, this.wires];
+                         this.typeString, this.nonWires, this.wires];
 }
 
 const binopTemplate = new ElementTemplate('binop'),
@@ -361,7 +362,6 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
         this.typeString = '[,v]';
         break;
     }
-    this.type = globalTypeParser_.add(this.typeString);
   }
 }
 
@@ -407,6 +407,8 @@ export class Functionchart implements DataContextObject {
   set height(value: number) { this.template.height.set(this, value); }
   get name() { return this.template.name.get(this) || ''; }
   set name(value: string | undefined) { this.template.name.set(this, value); }
+  get typeString() : string { return this.template.typeString.get(this); }
+  set typeString(value: string) { this.template.typeString.set(this, value); }
 
   get nonWires() { return this.template.nonWires.get(this) as List<NonWireTypes>; }
   get wires() { return this.template.wires.get(this) as List<Wire>; }
@@ -1008,7 +1010,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       return false;
     // Check for cycles using topological sort.
     const sorted = this.topologicalSort(graphInfo);
-    return sorted.length === this.elements.size;
+    return sorted.length === graphInfo.elements.size;
   }
 
   makeConsistent() {
@@ -1047,7 +1049,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         }
       } else if (item instanceof Functionchart) {
         const typeString = self.getFunctionchartTypeString(item);
-        item.type = globalTypeParser_.add(typeString);
+        item.typeString = typeString;
       }
     });
     // // Delete any empty functioncharts (except for the root functionchart).
@@ -1389,20 +1391,23 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         }
         this.insertWire(owner, parent);
       }
-    } else if (owner instanceof Element || owner instanceof Pseudoelement) {
+    } else {
       if (prop === typeStringProp && owner.typeString) {
         owner.type = globalTypeParser_.add(owner.typeString);
-        const inputs = owner.type.inputs.length,
-              inWires = owner.inWires || new Array<Wire | undefined>(inputs),
-              outputs = owner.type.outputs.length,
-              outWires = owner.outWires || new Array<Array<Wire>>(outputs);
-        inWires.length = inputs;
-        outWires.length = outputs;
-        owner.inWires = inWires;
-        owner.outWires = outWires;
-        for (let i = 0; i < outputs; i++)
-          if (owner.outWires[i] === undefined)
-            owner.outWires[i] = new Array<Wire>();
+        if (owner instanceof Element || owner instanceof Pseudoelement) {
+          const inputs = owner.type.inputs.length,
+          inWires = owner.inWires || new Array<Wire | undefined>(inputs),
+          outputs = owner.type.outputs.length,
+          outWires = owner.outWires || new Array<Array<Wire>>(outputs);
+          inWires.length = inputs;
+          outWires.length = outputs;
+          owner.inWires = inWires;
+          owner.outWires = outWires;
+          for (let i = 0; i < outputs; i++) {
+            if (owner.outWires[i] === undefined)
+              owner.outWires[i] = new Array<Wire>();
+          }
+        }
       }
     }
     this.onValueChanged(owner, prop, oldValue);
