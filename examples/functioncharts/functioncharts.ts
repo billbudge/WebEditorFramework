@@ -481,18 +481,21 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
     });
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
-    this.functionchart = new Functionchart(this, this.highestId++);
-    this.insertItem(this.functionchart, undefined);
+    const root = new Functionchart(this, this.highestId++);
+    this.functionchart = root;
+    this.insertFunctionchart(root, undefined);
   }
 
   root() : Functionchart {
     return this.functionchart;
   }
   setRoot(root: Functionchart) : void {
-    if (this.functionchart)
+    if (this.functionchart) {
+      // This removes all elements, functioncharts, and wires.
       this.removeItem(this.functionchart);
-    this.insertItem(root, undefined);
+    }
     this.functionchart = root;
+    this.insertFunctionchart(root, undefined);
   }
 
   newElement(typeName: ElementType) : Element {
@@ -1299,6 +1302,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.elements.delete(element);
   }
 
+  // Allow parent to be undefined for the root functionchart.
   private insertFunctionchart(functionchart: Functionchart, parent: Functionchart | undefined) {
     this.functioncharts.add(functionchart);
     functionchart.parent = parent;
@@ -1356,14 +1360,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  private insertItem(item: AllTypes, parent: Functionchart | undefined) {
+  private insertItem(item: AllTypes, parent: Functionchart) {
     if (item instanceof Wire) {
-      if (parent)
+      if (parent && this.functioncharts.has(parent)) {
         this.insertWire(item, parent);
+      }
     } else if (item instanceof Functionchart) {
-      this.insertFunctionchart(item, parent);
+      if (parent && this.functioncharts.has(parent)) {
+        this.insertFunctionchart(item, parent);
+      }
     } else {
-      if (parent) {
+      if (parent && this.functioncharts.has(parent)) {
         this.insertElement(item, parent);
       }
     }
@@ -1380,50 +1387,51 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // DataContext interface implementation.
   valueChanged(owner: AllTypes, prop: ScalarPropertyTypes, oldValue: any) : void {
-    if (!owner.parent)
-      return;
     if (owner instanceof Wire) {
-      // Remove and reinsert changed wires.
-      if (prop === wireTemplate.src) {
-        const oldSrc = oldValue as Element,
-              srcPin = owner.srcPin;
-        if (oldSrc && srcPin >= 0)  // TODO systematize the valid wire check.
-          FunctionchartContext.removeWireHelper(oldSrc.outWires[srcPin], owner);
-      } else if (prop === wireTemplate.dst) {
-        const oldDst = oldValue as Element,
-              dstPin = owner.dstPin;
-        if (oldDst && dstPin >= 0)
-          oldDst.inWires[dstPin] = undefined;
-      } else if (prop === wireTemplate.srcPin) {
-        const src = owner.src,
-              oldPin = oldValue as number;
-        if (src && oldPin >= 0) {
-          const oldOutputs = src.outWires[oldPin];
-          FunctionchartContext.removeWireHelper(oldOutputs, owner);
+      if (this.wires.has(owner)) {
+        // Remove and reinsert changed wires.
+        if (prop === wireTemplate.src) {
+          const oldSrc = oldValue as Element,
+                srcPin = owner.srcPin;
+          if (oldSrc && srcPin >= 0)  // TODO systematize the valid wire check.
+            FunctionchartContext.removeWireHelper(oldSrc.outWires[srcPin], owner);
+        } else if (prop === wireTemplate.dst) {
+          const oldDst = oldValue as Element,
+                dstPin = owner.dstPin;
+          if (oldDst && dstPin >= 0)
+            oldDst.inWires[dstPin] = undefined;
+        } else if (prop === wireTemplate.srcPin) {
+          const src = owner.src,
+                oldPin = oldValue as number;
+          if (src && oldPin >= 0) {
+            const oldOutputs = src.outWires[oldPin];
+            FunctionchartContext.removeWireHelper(oldOutputs, owner);
+          }
+        } else if (prop === wireTemplate.dstPin) {
+          const dst = owner.dst,
+                oldPin = oldValue as number;
+          if (dst && oldPin >= 0)
+            dst.inWires[oldPin] = undefined;
         }
-      } else if (prop === wireTemplate.dstPin) {
-        const dst = owner.dst,
-              oldPin = oldValue as number;
-        if (dst && oldPin >= 0)
-          dst.inWires[oldPin] = undefined;
+        this.insertWire(owner, owner.parent!);
       }
-      this.insertWire(owner, owner.parent);
-    } else {
-      // Non-wires.
-      if (prop === typeStringProp && owner.typeString) {
-        owner.type = globalTypeParser_.add(owner.typeString);
-        if (owner instanceof Element || owner instanceof Pseudoelement) {
-          const inputs = owner.type.inputs.length,
-                outputs = owner.type.outputs.length,
-                inWires = owner.inWires || new Array<Wire | undefined>(inputs),
-                outWires = owner.outWires || new Array<Array<Wire>>(outputs);
-          inWires.length = inputs;
-          outWires.length = outputs;
-          owner.inWires = inWires;
-          owner.outWires = outWires;
-          for (let i = 0; i < outputs; i++) {
-            if (owner.outWires[i] === undefined)
-              owner.outWires[i] = new Array<Wire>();
+    } else if (owner instanceof Element || owner instanceof Pseudoelement) {
+      if (this.elements.has(owner)) {
+        if (prop === typeStringProp && owner.typeString) {
+          owner.type = globalTypeParser_.add(owner.typeString);
+          if (owner instanceof Element || owner instanceof Pseudoelement) {
+            const inputs = owner.type.inputs.length,
+                  outputs = owner.type.outputs.length,
+                  inWires = owner.inWires || new Array<Wire | undefined>(inputs),
+                  outWires = owner.outWires || new Array<Array<Wire>>(outputs);
+            inWires.length = inputs;
+            outWires.length = outputs;
+            owner.inWires = inWires;
+            owner.outWires = outWires;
+            for (let i = 0; i < outputs; i++) {
+              if (owner.outWires[i] === undefined)
+                owner.outWires[i] = new Array<Wire>();
+            }
           }
         }
       }
