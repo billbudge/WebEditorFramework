@@ -17,7 +17,8 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          ArrayPropertyTypes } from '../../src/dataModels.js'
 
 import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
-import { types } from '@babel/core'
+
+// TODO fix problem when cloning elements, of inWires and outWires being wrong.
 
 //------------------------------------------------------------------------------
 
@@ -310,7 +311,10 @@ export class Element implements DataContextObject, ReferencedObject {
   get name() { return this.template.name.get(this); }
   set name(value: string | undefined) { this.template.name.set(this, value); }
   get typeString() { return this.template.typeString.get(this); }
-  set typeString(value: string) { this.template.typeString.set(this, value); }
+  set typeString(value: string) {
+    this.template.typeString.set(this, value);
+    this.type = globalTypeParser_.add(value);
+  }
 
   // Derived properties.
   parent: Functionchart | undefined;
@@ -337,7 +341,10 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
   get y() { return this.template.y.get(this) || 0; }
   set y(value: number) { this.template.y.set(this, value); }
   get typeString() : string { return this.template.typeString.get(this); }
-  set typeString(value: string) { this.template.typeString.set(this, value); }
+  set typeString(value: string) {
+    this.template.typeString.set(this, value);
+    this.type = globalTypeParser_.add(value);
+  }
 
   // Derived properties.
   parent: Functionchart | undefined;
@@ -408,7 +415,10 @@ export class Functionchart implements DataContextObject {
   get name() { return this.template.name.get(this) || ''; }
   set name(value: string | undefined) { this.template.name.set(this, value); }
   get typeString() : string { return this.template.typeString.get(this); }
-  set typeString(value: string) { this.template.typeString.set(this, value); }
+  set typeString(value: string) {
+    this.template.typeString.set(this, value);
+    this.type = globalTypeParser_.add(value);
+  }
 
   get nonWires() { return this.template.nonWires.get(this) as List<NonWireTypes>; }
   get wires() { return this.template.wires.get(this) as List<Wire>; }
@@ -466,6 +476,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         this.transactionManager.onChanged.bind(this.transactionManager));
     this.transactionManager.addHandler('transactionEnding', () => {
       self.makeConsistent();
+      if (!self.isValidFunctionchart(self.functionchart)) {
+        self.transactionManager.cancelTransaction();
+      }
     });
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
     this.functionchart = new Functionchart(this, this.highestId++);
@@ -1266,16 +1279,20 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.visitNonWires(item, item => self.setGlobalPosition(item));
   }
 
-
   private insertElement(element: ElementTypes, parent: Functionchart) {
     this.elements.add(element);
     element.parent = parent;
     this.updateItem(element);
 
-    if (element.inWires === undefined)
+    if (element.inWires === undefined) {
       element.inWires = new Array<Wire | undefined>(element.type.inputs.length);
-    if (element.outWires === undefined)
-      element.outWires = new Array<Wire[]>(element.type.outputs.length);
+    }
+    if (element.outWires === undefined) {
+      const length = element.type.outputs.length;
+      element.outWires = new Array<Wire[]>(length);
+      for (let i = 0; i < length; i++)
+        element.outWires[i] = new Array<Wire>();
+    }
   }
 
   private removeElement(element: ElementTypes) {
@@ -1288,13 +1305,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.updateItem(functionchart);
 
     const self = this;
-    functionchart.nonWires.forEach(element => self.insertItem(element, functionchart));
+    functionchart.nonWires.forEach(item => self.insertItem(item, functionchart));
     functionchart.wires.forEach(wire => self.insertWire(wire, functionchart));
   }
 
   private removeFunctionchart(functionchart: Functionchart) {
     this.functioncharts.delete(functionchart);
     const self = this;
+    functionchart.wires.forEach(wire => self.removeWire(wire));
     functionchart.nonWires.forEach(element => self.removeItem(element));
   }
 
@@ -1362,43 +1380,43 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // DataContext interface implementation.
   valueChanged(owner: AllTypes, prop: ScalarPropertyTypes, oldValue: any) : void {
+    if (!owner.parent)
+      return;
     if (owner instanceof Wire) {
       // Remove and reinsert changed wires.
-      const parent = owner.parent;
-      if (parent) {
-        if (prop === wireTemplate.src) {
-          const oldSrc = oldValue as Element,
-                srcPin = owner.srcPin;
-          if (oldSrc && srcPin >= 0)  // TODO systematize the valid wire check.
-            FunctionchartContext.removeWireHelper(oldSrc.outWires[srcPin], owner);
-        } else if (prop === wireTemplate.dst) {
-          const oldDst = oldValue as Element,
-                dstPin = owner.dstPin;
-          if (oldDst && dstPin >= 0)
-            oldDst.inWires[dstPin] = undefined;
-        } else if (prop === wireTemplate.srcPin) {
-          const src = owner.src,
-                oldPin = oldValue as number;
-          if (src && oldPin >= 0) {
-            const oldOutputs = src.outWires[oldPin];
-            FunctionchartContext.removeWireHelper(oldOutputs, owner);
-          }
-        } else if (prop === wireTemplate.dstPin) {
-          const dst = owner.dst,
-                oldPin = oldValue as number;
-          if (dst && oldPin >= 0)
-            dst.inWires[oldPin] = undefined;
+      if (prop === wireTemplate.src) {
+        const oldSrc = oldValue as Element,
+              srcPin = owner.srcPin;
+        if (oldSrc && srcPin >= 0)  // TODO systematize the valid wire check.
+          FunctionchartContext.removeWireHelper(oldSrc.outWires[srcPin], owner);
+      } else if (prop === wireTemplate.dst) {
+        const oldDst = oldValue as Element,
+              dstPin = owner.dstPin;
+        if (oldDst && dstPin >= 0)
+          oldDst.inWires[dstPin] = undefined;
+      } else if (prop === wireTemplate.srcPin) {
+        const src = owner.src,
+              oldPin = oldValue as number;
+        if (src && oldPin >= 0) {
+          const oldOutputs = src.outWires[oldPin];
+          FunctionchartContext.removeWireHelper(oldOutputs, owner);
         }
-        this.insertWire(owner, parent);
+      } else if (prop === wireTemplate.dstPin) {
+        const dst = owner.dst,
+              oldPin = oldValue as number;
+        if (dst && oldPin >= 0)
+          dst.inWires[oldPin] = undefined;
       }
+      this.insertWire(owner, owner.parent);
     } else {
+      // Non-wires.
       if (prop === typeStringProp && owner.typeString) {
         owner.type = globalTypeParser_.add(owner.typeString);
         if (owner instanceof Element || owner instanceof Pseudoelement) {
           const inputs = owner.type.inputs.length,
-          inWires = owner.inWires || new Array<Wire | undefined>(inputs),
-          outputs = owner.type.outputs.length,
-          outWires = owner.outWires || new Array<Array<Wire>>(outputs);
+                outputs = owner.type.outputs.length,
+                inWires = owner.inWires || new Array<Wire | undefined>(inputs),
+                outWires = owner.outWires || new Array<Array<Wire>>(outputs);
           inWires.length = inputs;
           outWires.length = outputs;
           owner.inWires = inWires;
@@ -2908,11 +2926,7 @@ export class FunctionchartEditor implements CanvasLayer {
       });
     }
 
-    if (context.isValidFunctionchart(functionchart)) {
-      transactionManager.endTransaction();
-    } else {
-      transactionManager.cancelTransaction();
-    }
+    transactionManager.endTransaction();
 
     this.setPropertyGrid();
 

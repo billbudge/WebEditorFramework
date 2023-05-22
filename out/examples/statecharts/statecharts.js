@@ -144,6 +144,9 @@ export class StatechartContext extends EventBase {
         this.addHandler('changed', this.transactionManager.onChanged.bind(this.transactionManager));
         this.transactionManager.addHandler('transactionEnding', () => {
             self.makeConsistent();
+            if (!self.isValidStatechart(self.statechart)) {
+                self.transactionManager.cancelTransaction();
+            }
         });
         this.historyManager = new HistoryManager(this.transactionManager, this.selection);
         this.statechart = new Statechart(this);
@@ -2113,12 +2116,7 @@ export class StatechartEditor {
                     context.addItem(item, parent);
             });
         }
-        if (context.isValidStatechart(statechart)) {
-            transactionManager.endTransaction();
-        }
-        else {
-            transactionManager.cancelTransaction();
-        }
+        transactionManager.endTransaction();
         this.setPropertyGrid();
         this.dragInfo = undefined;
         this.pointerHitInfo = undefined;

@@ -269,6 +269,9 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
         this.transactionManager.onChanged.bind(this.transactionManager));
     this.transactionManager.addHandler('transactionEnding', () => {
       self.makeConsistent();
+      if (!self.isValidStatechart(self.statechart)) {
+        self.transactionManager.cancelTransaction();
+      }
     });
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
     this.statechart = new Statechart(this);
@@ -2552,11 +2555,7 @@ export class StatechartEditor implements CanvasLayer {
       });
     }
 
-    if (context.isValidStatechart(statechart)) {
-      transactionManager.endTransaction();
-    } else {
-      transactionManager.cancelTransaction();
-    }
+    transactionManager.endTransaction();
 
     this.setPropertyGrid();
 

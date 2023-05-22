@@ -246,9 +246,9 @@ function remapItem(copy: DataContextObject, map: Map<number, ReferencedObject>) 
     } else if (prop instanceof ReferenceProp) {
       const reference: ReferencedObject | undefined = prop.get(copy);
       if (reference) {
-        const original = map.get(reference.id);
-        if (original) {
-          prop.set(copy, original);
+        const refCopy = map.get(reference.id);
+        if (refCopy) {
+          prop.set(copy, refCopy);
         }
       }
     }
