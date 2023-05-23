@@ -150,7 +150,7 @@ export class StatechartContext extends EventBase {
         });
         this.historyManager = new HistoryManager(this.transactionManager, this.selection);
         this.statechart = new Statechart(this);
-        this.insertItem(this.statechart, undefined);
+        this.insertStatechart(this.statechart, undefined);
     }
     root() {
         return this.statechart;
@@ -158,7 +158,7 @@ export class StatechartContext extends EventBase {
     setRoot(root) {
         if (this.statechart)
             this.removeItem(this.statechart);
-        this.insertItem(root, undefined);
+        this.insertStatechart(root, undefined);
         this.statechart = root;
     }
     newState() {
@@ -745,6 +745,7 @@ export class StatechartContext extends EventBase {
         }
     }
     insertItem(item, parent) {
+        this.updateItem(item);
         if (item instanceof Transition) {
             if (parent instanceof Statechart && this.statecharts.has(parent))
                 this.insertTransition(item, parent);
