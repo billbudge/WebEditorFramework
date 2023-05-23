@@ -842,6 +842,8 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
 
   private insertState(state: StateTypes, parent: Statechart) {
+    state.parent = parent;
+    this.updateItem(state);
     this.states.add(state);
 
     if (state.inTransitions === undefined)
@@ -863,7 +865,10 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
+  // Allow parent to be undefined for the root statechart.
   private insertStatechart(statechart: Statechart, parent: State | undefined) {
+    statechart.parent = parent;
+    this.updateItem(statechart);
     this.statecharts.add(statechart);
 
     const self = this;
@@ -878,6 +883,8 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
 
   private insertTransition(transition: Transition, parent: Statechart) {
+    transition.parent = parent;
+    this.updateItem(transition);
     this.transitions.add(transition);
 
     const src = transition.src,
@@ -916,18 +923,16 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   }
 
   private insertItem(item: AllTypes, parent: ParentTypes) {
-    item.parent = parent;
-    this.updateItem(item);
-
     if (item instanceof Transition) {
-      if (parent && parent instanceof Statechart)
+      if (parent instanceof Statechart && this.statecharts.has(parent))
         this.insertTransition(item, parent);
     } else if (item instanceof Statechart) {
-      if (!parent || parent instanceof State)
+      if (parent instanceof State && this.states.has(parent))
         this.insertStatechart(item, parent);
     } else {
-      if (parent && parent instanceof Statechart) {
-        this.insertState(item, parent);
+      if (parent instanceof Statechart) {
+        if (this.statecharts.has(parent))
+          this.insertState(item, parent);
       }
     }
   }
@@ -944,9 +949,8 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   // DataContext interface implementation.
   valueChanged(owner: AllTypes, prop: ScalarPropertyTypes, oldValue: any) : void {
     if (owner instanceof Transition) {
-      // Remove and reinsert changed transitions.
-      const parent = owner.parent;
-      if (parent) {
+      if (this.transitions.has(owner)) {
+        // Remove and reinsert changed transitions.
         if (prop === transitionTemplate.src) {
           const oldSrc = oldValue as StateTypes;
           if (oldSrc)
@@ -956,7 +960,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
           if (oldDst)
             StatechartContext.removeTransitionHelper(oldDst.inTransitions, owner);
         }
-        this.insertTransition(owner, parent);
+        this.insertTransition(owner, owner.parent!);
       }
     }
     this.onValueChanged(owner, prop, oldValue);
