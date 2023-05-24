@@ -79,6 +79,21 @@ describe('FunctionchartContext', () => {
         element.x = 10;
         expect(element.x).toBe(10);
     });
+    test('element typeString', () => {
+        const context = new FC.FunctionchartContext(), element = context.newElement('element');
+        expect(element.typeString).toBe('[,]');
+        expect(element.type.inputs.length).toBe(0);
+        expect(element.type.outputs.length).toBe(0);
+        expect(element.inWires.length).toBe(0);
+        expect(element.outWires.length).toBe(0);
+        element.typeString = '[v,v]';
+        expect(element.typeString).toBe('[v,v]');
+        expect(element.type.inputs.length).toBe(1);
+        expect(element.type.outputs.length).toBe(1);
+        expect(element.inWires.length).toBe(1);
+        expect(element.outWires.length).toBe(1);
+        expect(element.outWires[0].length).toBe(0); // Empty wire array.
+    });
     test('pseudoelement interface', () => {
         const context = new FC.FunctionchartContext(), pseudostate = context.newPseudoelement('input');
         expect(pseudostate instanceof FC.Pseudoelement).toBe(true);
@@ -87,6 +102,22 @@ describe('FunctionchartContext', () => {
         expect(pseudostate.x).toBe(0);
         pseudostate.x = 10;
         expect(pseudostate.x).toBe(10);
+    });
+    test('pseudoelement typeString', () => {
+        const context = new FC.FunctionchartContext(), pseudoelement = context.newPseudoelement('input');
+        expect(pseudoelement.typeString).toBe('[,*]');
+        expect(pseudoelement.type.inputs.length).toBe(0);
+        expect(pseudoelement.type.outputs.length).toBe(1);
+        expect(pseudoelement.inWires.length).toBe(0);
+        expect(pseudoelement.outWires.length).toBe(1);
+        expect(pseudoelement.outWires[0].length).toBe(0); // Empty wire array.
+        pseudoelement.typeString = '[,v(foo)]';
+        expect(pseudoelement.typeString).toBe('[,v(foo)]');
+        expect(pseudoelement.type.inputs.length).toBe(0);
+        expect(pseudoelement.type.outputs.length).toBe(1);
+        expect(pseudoelement.inWires.length).toBe(0);
+        expect(pseudoelement.outWires.length).toBe(1);
+        expect(pseudoelement.outWires[0].length).toBe(0); // Empty wire array.
     });
     test('wire interface', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root(), elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop'), wire = addWire(functionchart, elem1, 0, elem2, 0);

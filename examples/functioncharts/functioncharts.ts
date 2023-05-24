@@ -16,9 +16,7 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          reduceToRoots, List, TransactionManager, HistoryManager, ScalarPropertyTypes,
          ArrayPropertyTypes } from '../../src/dataModels.js'
 
-import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
-
-// TODO fix problem when cloning elements, of inWires and outWires being wrong.
+// import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
 //------------------------------------------------------------------------------
 
@@ -298,6 +296,32 @@ const defaultPoint = { x: 0, y: 0 },
       defaultBezierCurve: BezierCurve = [
           defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal];
 
+function changeType(item: NonWireTypes, newTypeString: string) {
+  // Update derivative properties only if changed.
+  if (item.typeString !== newTypeString) {
+    const oldType = item.type,
+          type = globalTypeParser_.add(newTypeString);
+    item.type = type;
+
+    if (item instanceof Element || item instanceof Pseudoelement) {
+      const inputs = type.inputs.length,
+            outputs = type.outputs.length,
+            inWires = item.inWires || new Array<Wire | undefined>(inputs),
+            outWires = item.outWires || new Array<Array<Wire>>(outputs);
+      inWires.length = inputs;
+      item.inWires = inWires;
+      outWires.length = outputs;
+      item.outWires = outWires;
+      for (let i = oldType.outputs.length; i < outputs; i++) {
+        if (item.outWires[i] === undefined)
+          item.outWires[i] = new Array<Wire>();
+      }
+    }
+  }
+  // Set property even if unchanged.
+  item.template.typeString.set(item, newTypeString);
+}
+
 export class Element implements DataContextObject, ReferencedObject {
   readonly template: ElementTemplate;
   readonly context: FunctionchartContext;
@@ -311,17 +335,14 @@ export class Element implements DataContextObject, ReferencedObject {
   get name() { return this.template.name.get(this); }
   set name(value: string | undefined) { this.template.name.set(this, value); }
   get typeString() { return this.template.typeString.get(this); }
-  set typeString(value: string) {
-    this.template.typeString.set(this, value);
-    this.type = globalTypeParser_.add(value);
-  }
+  set typeString(value: string) { changeType(this, value); }
 
   // Derived properties.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
   type: Type = nullFunction;
-  inWires: Array<Wire | undefined>;           // one input per pin.
-  outWires: Array<Array<Wire>>;   // array of outputs per pin, outputs have fan out.
+  inWires = new Array<Wire | undefined>(0);   // one input per pin.
+  outWires = new Array<Array<Wire>>(0);       // array of outputs per pin, outputs have fan out.
 
   constructor(context: FunctionchartContext, template: ElementTemplate, id: number) {
     this.context = context;
@@ -341,17 +362,14 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
   get y() { return this.template.y.get(this) || 0; }
   set y(value: number) { this.template.y.set(this, value); }
   get typeString() : string { return this.template.typeString.get(this); }
-  set typeString(value: string) {
-    this.template.typeString.set(this, value);
-    this.type = globalTypeParser_.add(value);
-  }
+  set typeString(value: string) { changeType(this, value); }
 
   // Derived properties.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
   type: Type = nullFunction;
-  inWires: Array<Wire | undefined>;           // one input per pin.
-  outWires: Array<Array<Wire>>;   // array of outputs per pin, outputs have fan out.
+  inWires = new Array<Wire | undefined>(0);   // one input per pin.
+  outWires = new Array<Array<Wire>>(0);       // array of outputs per pin, outputs have fan out.
 
   constructor(context: FunctionchartContext, template: PseudoelementTemplate, id: number) {
     this.context = context;
@@ -415,10 +433,7 @@ export class Functionchart implements DataContextObject {
   get name() { return this.template.name.get(this) || ''; }
   set name(value: string | undefined) { this.template.name.set(this, value); }
   get typeString() : string { return this.template.typeString.get(this); }
-  set typeString(value: string) {
-    this.template.typeString.set(this, value);
-    this.type = globalTypeParser_.add(value);
-  }
+  set typeString(value: string) { changeType(this, value); }
 
   get nonWires() { return this.template.nonWires.get(this) as List<NonWireTypes>; }
   get wires() { return this.template.wires.get(this) as List<Wire>; }
@@ -1055,13 +1070,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.reverseVisitNonWires(this.functionchart, item => {
       // Update types of inputs and outputs.
       if (item instanceof Pseudoelement) {
-        // TODO preserve label.
-        if (item.template.typeName === 'input') {
-          const typeString = self.getInputTypeString(item);
-          item.typeString = '[,' + typeString + ']';
+        const label = globalTypeParser_.getLabel(item.typeString);
+        if (item.template.typeName === 'input' || item.template.typeName === 'literal') {
+          const typeString = self.getInputTypeString(item),
+                newTypeString = globalTypeParser_.setLabel('[,' + typeString + ']', label);
+          if (typeString !== newTypeString)
+            item.typeString = newTypeString;
         } else if(item.template.typeName === 'output') {
           const typeString = self.getOutputTypeString(item);
-          item.typeString = '[' + typeString + ',]';
+          item.typeString = globalTypeParser_.setLabel('[' + typeString + ',]', label);
         }
       } else if (item instanceof Functionchart) {
         const typeString = self.getFunctionchartTypeString(item);
@@ -1286,16 +1303,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.elements.add(element);
     element.parent = parent;
     this.updateItem(element);
-
-    if (element.inWires === undefined) {
-      element.inWires = new Array<Wire | undefined>(element.type.inputs.length);
-    }
-    if (element.outWires === undefined) {
-      const length = element.type.outputs.length;
-      element.outWires = new Array<Wire[]>(length);
-      for (let i = 0; i < length; i++)
-        element.outWires[i] = new Array<Wire>();
-    }
   }
 
   private removeElement(element: ElementTypes) {
@@ -1414,26 +1421,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
             dst.inWires[oldPin] = undefined;
         }
         this.insertWire(owner, owner.parent!);
-      }
-    } else if (owner instanceof Element || owner instanceof Pseudoelement) {
-      if (this.elements.has(owner)) {
-        if (prop === typeStringProp && owner.typeString) {
-          owner.type = globalTypeParser_.add(owner.typeString);
-          if (owner instanceof Element || owner instanceof Pseudoelement) {
-            const inputs = owner.type.inputs.length,
-                  outputs = owner.type.outputs.length,
-                  inWires = owner.inWires || new Array<Wire | undefined>(inputs),
-                  outWires = owner.outWires || new Array<Array<Wire>>(outputs);
-            inWires.length = inputs;
-            outWires.length = outputs;
-            owner.inWires = inWires;
-            owner.outWires = outWires;
-            for (let i = 0; i < outputs; i++) {
-              if (owner.outWires[i] === undefined)
-                owner.outWires[i] = new Array<Wire>();
-            }
-          }
-        }
       }
     }
     this.onValueChanged(owner, prop, oldValue);
@@ -2148,6 +2135,10 @@ class WireDrag {
 
 type DragTypes = NonWireDrag | WireDrag;
 
+interface ItemInfo extends PropertyInfo {
+  prop: PropertyTypes;
+}
+
 export class FunctionchartEditor implements CanvasLayer {
   private theme: FunctionchartTheme;
   private canvasController: CanvasController;
@@ -2171,7 +2162,7 @@ export class FunctionchartEditor implements CanvasLayer {
   private hotTrackInfo: HitResultTypes | undefined;
   private hoverHitInfo: HitResultTypes | undefined;
   private hoverPoint: Point;
-  private propertyInfo = new Map<string, PropertyInfo[]>();
+  private propertyInfo = new Map<string, ItemInfo[]>();
 
   constructor(theme: Theme,
               canvasController: CanvasController,
@@ -2233,51 +2224,26 @@ export class FunctionchartEditor implements CanvasLayer {
     this.functionchart = this.context.root();
 
     // Register property grid layouts.
-    function getAttr(info: PropertyInfo) : string | undefined {
-      switch (info.label) {
-        case 'label':
-        case 'value':
-          return 'typeString';
-      }
-      return info.label;
+    function getter(info: ItemInfo, item: AllTypes) {
+      return item ? info.prop.get(item) : '';
     }
-    function getter(info: PropertyInfo, item: AllTypes) {
-      const attr = getAttr(info);
-      if (item && attr)
-        return (item as any)[attr];
-      return '';
-    }
-    function setter(info: PropertyInfo, item: AllTypes, value: any) {
-      const canvasController = self.canvasController;
-      if (item) {
-        const attr = getAttr(info);
-        if (attr) {
-          const description = 'change ' + attr,
-                transactionManager = self.context.transactionManager;
-          transactionManager.beginTransaction(description);
-          (item as any)[attr] = value;
-          transactionManager.endTransaction();
-          canvasController.draw();
-       }
+    function setter(info: ItemInfo, item: AllTypes, value: any) {
+      if (item && (info.prop instanceof ScalarProp || info.prop instanceof ReferenceProp)) {
+        const description = 'change ' + info.label,
+              transactionManager = self.context.transactionManager;
+        transactionManager.beginTransaction(description);
+        info.prop.set(item, value);
+        transactionManager.endTransaction();
+        self.canvasController.draw();
       }
     }
-    function elementLabelGetter(info: PropertyInfo, item: AllTypes) {
+    function elementLabelGetter(info: ItemInfo, item: AllTypes) {
       const typeString = getter(info, item);
-      switch (item.template.typeName) {
-        case 'input':       // [,*(label)]
-        case 'output':      // [*(label),]
-        case 'literal':     // [,v(label)]
-        case 'binop':       // [vv,v(op)]
-        case 'unop': {      // [v,v(op)]
-          const first = typeString.lastIndexOf('('),
-                last = typeString.lastIndexOf(')');
-          if (first >= 0 && last >= 0)
-            return typeString.substring(first + 1, last);
-        }
-      }
+      if (typeString)
+        return globalTypeParser_.getLabel(typeString);
       return '';
     }
-    function elementLabelSetter(info: PropertyInfo, item: AllTypes, value: any) {
+    function elementLabelSetter(info: ItemInfo, item: AllTypes, value: any) {
       const typeString = getter(info, item);
       let newValue;
       if (value === undefined) {
@@ -2309,6 +2275,7 @@ export class FunctionchartEditor implements CanvasLayer {
         type: 'text',
         getter: elementLabelGetter,
         setter: elementLabelSetter,
+        prop: typeStringProp,
       }
     ]);
     this.propertyInfo.set('output', [
@@ -2317,6 +2284,7 @@ export class FunctionchartEditor implements CanvasLayer {
         type: 'text',
         getter: elementLabelGetter,
         setter: elementLabelSetter,
+        prop: typeStringProp,
       }
     ]);
     this.propertyInfo.set('literal', [
@@ -2325,6 +2293,7 @@ export class FunctionchartEditor implements CanvasLayer {
         type: 'text',
         getter: elementLabelGetter,
         setter: elementLabelSetter,
+        prop: typeStringProp,
       }
     ]);
     const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
@@ -2336,6 +2305,7 @@ export class FunctionchartEditor implements CanvasLayer {
         values: binaryOps.join(','),
         getter: elementLabelGetter,
         setter: elementLabelSetter,
+        prop: typeStringProp,
       },
     ]);
     const unaryOps = ['!', '~', '-'];
@@ -2346,22 +2316,16 @@ export class FunctionchartEditor implements CanvasLayer {
         values: unaryOps.join(','),
         getter: elementLabelGetter,
         setter: elementLabelSetter,
+        prop: typeStringProp,
       },
     ]);
-    // this.propertyInfo.set('wire', [
-    //   {
-    //     label: 'tbd',
-    //     type: 'text',
-    //     getter: getter,
-    //     setter: setter,
-    //   },
-    // ]);
     this.propertyInfo.set('functionchart', [
       {
         label: 'name',
         type: 'text',
         getter: getter,
         setter: setter,
+        prop: typeStringProp,
       },
     ]);
 
