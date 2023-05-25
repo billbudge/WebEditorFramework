@@ -296,32 +296,6 @@ const defaultPoint = { x: 0, y: 0 },
       defaultBezierCurve: BezierCurve = [
           defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal];
 
-function changeType(item: NonWireTypes, newTypeString: string) {
-  // Update derivative properties only if changed.
-  if (item.typeString !== newTypeString) {
-    const oldType = item.type,
-          type = globalTypeParser_.add(newTypeString);
-    item.type = type;
-
-    if (item instanceof Element || item instanceof Pseudoelement) {
-      const inputs = type.inputs.length,
-            outputs = type.outputs.length,
-            inWires = item.inWires || new Array<Wire | undefined>(inputs),
-            outWires = item.outWires || new Array<Array<Wire>>(outputs);
-      inWires.length = inputs;
-      item.inWires = inWires;
-      outWires.length = outputs;
-      item.outWires = outWires;
-      for (let i = oldType.outputs.length; i < outputs; i++) {
-        if (item.outWires[i] === undefined)
-          item.outWires[i] = new Array<Wire>();
-      }
-    }
-  }
-  // Set property even if unchanged.
-  item.template.typeString.set(item, newTypeString);
-}
-
 export class Element implements DataContextObject, ReferencedObject {
   readonly template: ElementTemplate;
   readonly context: FunctionchartContext;
@@ -335,7 +309,7 @@ export class Element implements DataContextObject, ReferencedObject {
   get name() { return this.template.name.get(this); }
   set name(value: string | undefined) { this.template.name.set(this, value); }
   get typeString() { return this.template.typeString.get(this); }
-  set typeString(value: string) { changeType(this, value); }
+  set typeString(value: string) { this.template.typeString.set(this, value); }
 
   // Derived properties.
   parent: Functionchart | undefined;
@@ -362,7 +336,7 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
   get y() { return this.template.y.get(this) || 0; }
   set y(value: number) { this.template.y.set(this, value); }
   get typeString() : string { return this.template.typeString.get(this); }
-  set typeString(value: string) { changeType(this, value); }
+  set typeString(value: string) { this.template.typeString.set(this, value); }
 
   // Derived properties.
   parent: Functionchart | undefined;
@@ -433,7 +407,7 @@ export class Functionchart implements DataContextObject {
   get name() { return this.template.name.get(this) || ''; }
   set name(value: string | undefined) { this.template.name.set(this, value); }
   get typeString() : string { return this.template.typeString.get(this); }
-  set typeString(value: string) { changeType(this, value); }
+  set typeString(value: string) { this.template.typeString.set(this, value); }
 
   get nonWires() { return this.template.nonWires.get(this) as List<NonWireTypes>; }
   get wires() { return this.template.wires.get(this) as List<Wire>; }
@@ -1296,6 +1270,27 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const self = this;
     if (item instanceof Wire)
       return;
+
+    // Update 'type' property.
+    const typeString = item.typeString;
+    if (typeString && typeString !== item.type.typeString) {
+      const oldType = item.type,
+            newType = globalTypeParser_.add(item.typeString);
+      item.type = newType;
+      if (item instanceof Element || item instanceof Pseudoelement) {
+        const inputs = newType.inputs.length,
+              outputs = newType.outputs.length,
+              inWires = item.inWires,
+              outWires = item.outWires;
+        inWires.length = inputs;
+        outWires.length = outputs;
+        for (let i = oldType.outputs.length; i < outputs; i++) {
+          if (outWires[i] === undefined)
+            outWires[i] = new Array<Wire>();
+        }
+      }
+    }
+
     this.visitNonWires(item, item => self.setGlobalPosition(item));
   }
 
@@ -2408,8 +2403,9 @@ export class FunctionchartEditor implements CanvasLayer {
 
     switch (change.type) {
       case 'valueChanged': {
-        // For changes to x, y, width, or height, layout affected transitions.
-        if (prop === xProp || prop === yProp || prop === widthProp || prop === heightProp) {
+        // For changes to x, y, width, height, or typeString, layout affected transitions.
+        if (prop === xProp || prop === yProp || prop === widthProp || prop === heightProp ||
+            prop === typeStringProp) {
           // Visit item and sub-items to layout all affected wires.
           context.visitAll(item, addItems);
         } else if (item instanceof Wire) {
