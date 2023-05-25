@@ -2911,7 +2911,7 @@ export class FunctionchartEditor implements CanvasLayer {
           functionchart = this.functionchart,
           selection = context.selection,
           transactionManager = context.transactionManager,
-          keyCode = e.keyCode,  // TODO fix
+          keyCode = e.keyCode,  // TODO fix me.
           cmdKey = e.ctrlKey || e.metaKey,
           shiftKey = e.shiftKey;
 
