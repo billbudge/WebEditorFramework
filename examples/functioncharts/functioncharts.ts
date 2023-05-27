@@ -2260,6 +2260,9 @@ export class FunctionchartEditor implements CanvasLayer {
           case 'unop':       // [v,v(label)]
             newValue = '[v,v(' + value + ')]';
             break;
+          case 'functionchart':       // [v(label),]
+            newValue = globalTypeParser_.setLabel(typeString, value);
+            break
         }
       }
       setter(info, item, newValue);
@@ -2318,8 +2321,8 @@ export class FunctionchartEditor implements CanvasLayer {
       {
         label: 'name',
         type: 'text',
-        getter: getter,
-        setter: setter,
+        getter: elementLabelGetter,
+        setter: elementLabelSetter,
         prop: typeStringProp,
       },
     ]);
