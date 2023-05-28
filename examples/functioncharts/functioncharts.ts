@@ -30,7 +30,7 @@ export class Pin {
   width = 0;
   height = 0;
   baseline = 0;
-  constructor(typeString: string, name?: string, type?: Type) {
+  constructor(typeString: string, name?: string, type?: Type) {  // TODO type for 'v' and '*'.
     this.typeString = typeString;
     this.name = name;
     this.type = type;
@@ -67,26 +67,27 @@ export class TypeParser {
   has(s: string) {
     return this.map_.has(s);
   }
+
+  private addType(s: string, type: Type) {
+    let result = this.map_.get(s);
+    if (!result) {
+      this.map_.set(s, type);
+      result = type;
+    }
+    return result;
+  }
+
   add(s: string) : Type {
-    const atomized = this.map_.get(s);
-    if (atomized)
-      return atomized;
+    let type = this.map_.get(s);
+    if (type)
+      return type;
 
     const self = this;
 
-    function addType(s: string, type: Type) {
-      let result = self.map_.get(s);
-      if (!result) {
-        self.map_.set(s, type);
-        result = type;
-      }
-      return result;
-    }
-
     let j = 0;
     // Close over j to avoid extra return values.
-    function parseName() : string {
-      let name = '';
+    function parseName() : string | undefined {
+      let name;
       if (s[j] === '(') {
         let i = j + 1;
         j = s.indexOf(')', i);
@@ -112,7 +113,7 @@ export class TypeParser {
       let type = parseFunction(),
           typeString = s.substring(i, j);
       // Add the pin type, without label.
-      type = addType(typeString, type);
+      type = self.addType(typeString, type);
       return new Pin(typeString, parseName(), type);
     }
     function parseFunction() : Type {
@@ -130,76 +131,84 @@ export class TypeParser {
         j++;
         const typeString = s.substring(i, j);
         let type = new Type(typeString, inputs, outputs);
-        type = addType(typeString, type);
+        type = self.addType(typeString, type);
         return type;
       }
       throw new Error('Invalid type string: ' + s);
     }
 
-    let type = parseFunction();
+    type = parseFunction();
     if (type) {
-      // Add the type with label.
-      type.name = parseName();
-      type = addType(s, type);
+      const name = parseName();
+      if (name) {
+        // The top level function type includes the label, so duplicate
+        // type and pins.
+        const inputs = type.inputs.map(pin => new Pin(pin.typeString, pin.name, pin.type)),
+              outputs = type.outputs.map(pin => new Pin(pin.typeString, pin.name, pin.type));
+        type = new Type(s, inputs, outputs, name);
+      }
+      type = this.addType(s, type);
     }
     return type;
   }
-  // Removes any trailing label. Type may be ill-formed, e.g. '[v(f)'
-  trimTypeString(type: string) : string {
-    if (type[type.length - 1] === ')')
-      type = type.substring(0, type.lastIndexOf('('));
-    return type;
-  }
 
-  getLabel(type: string) {
-    const label = type.lastIndexOf('(');
-    if (label > 0)
-      return type.substring(label + 1, type.length - 1);
+  getLabel(typeString: string) : string {
+    if (typeString[typeString.length - 1] === ')') {
+      const i = typeString.lastIndexOf('(');
+      if (i > 0) {
+        return typeString.substring(i + 1, typeString.length - 1);
+      }
+    }
     return '';
   }
-
-  setLabel(type: string, label: string) {
-    const i = type.lastIndexOf('(');
-    if (i > 0)
-      return type.substring(0, i) + '(' + label + ')';
-    return type + '(' + label + ')';
+  addLabel(typeString: string, label: string | undefined) : string {
+    if (label === undefined || label === '')
+      return typeString;
+    const i = typeString.lastIndexOf(']');
+    return typeString.substring(0, i + 1) + '(' + label + ')';
   }
 
-  // Removes all labels from signature.
-  getUnlabeledTypeString(type: string) : string {
+  // Removes any trailing label.
+  trimTypeString(typeString: string) : string {
+    if (typeString[typeString.length - 1] === ')')
+      typeString = typeString.substring(0, typeString.lastIndexOf('('));
+    return typeString;
+  }
+  // Removes all labels from type string.
+  getUnlabeledTypeString(typeString: string) : string {
     let result = '', label = 0;
     while (true) {
-      label = type.indexOf('(');
+      label = typeString.indexOf('(');
       if (label <= 0)
         break;
-      result += type.substring(0, label);
-      label = type.indexOf(')', label);
+      result += typeString.substring(0, label);
+      label = typeString.indexOf(')', label);
       if (label <= 0)
         break;
-      type = type.substring(label + 1, type.length);
+      typeString = typeString.substring(label + 1, typeString.length);
     }
-    return result + type;
+    return result + typeString;
   }
 
-  splitTypeString(type: string) : number {
+  splitTypeString(typeString: string) : number {
     let j = 0, level = 0;
     while (true) {
-      if (type[j] === '[')
+      if (typeString[j] === '[')
         level++;
-      else if (type[j] === ']')
+      else if (typeString[j] === ']')
         level--;
-      else if (type[j] === ',')
+      else if (typeString[j] === ',')
         if (level === 1) return j;
       j++;
     }
   }
-  hasOutput(type: string) {
-    return !type.endsWith(',]');
+  hasOutput(typeString: string) {
+    return !typeString.endsWith(',]');
   }
 
-  addInputToTypeString(type: string, inputType: string) : string {
-    let i = this.splitTypeString(type);
-    return type.substring(0, i) + inputType + type.substring(i);
+  addInputToTypeString(typeString: string, inputType: string) : string {
+    let i = this.splitTypeString(typeString);
+    return typeString.substring(0, i) + inputType + typeString.substring(i);
   }
 
   addOutputToTypeString(type: string, outputType: string) : string {
@@ -306,8 +315,6 @@ export class Element implements DataContextObject, ReferencedObject {
   set x(value: number) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
   set y(value: number) { this.template.y.set(this, value); }
-  get name() { return this.template.name.get(this); }
-  set name(value: string | undefined) { this.template.name.set(this, value); }
   get typeString() { return this.template.typeString.get(this); }
   set typeString(value: string) { this.template.typeString.set(this, value); }
 
@@ -404,8 +411,6 @@ export class Functionchart implements DataContextObject {
   set width(value: number) { this.template.width.set(this, value); }
   get height() { return this.template.height.get(this) || 0; }
   set height(value: number) { this.template.height.set(this, value); }
-  get name() { return this.template.name.get(this) || ''; }
-  set name(value: string | undefined) { this.template.name.set(this, value); }
   get typeString() : string { return this.template.typeString.get(this); }
   set typeString(value: string) { this.template.typeString.set(this, value); }
 
@@ -1047,12 +1052,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         const label = globalTypeParser_.getLabel(item.typeString);
         if (item.template.typeName === 'input' || item.template.typeName === 'literal') {
           const typeString = self.getInputTypeString(item),
-                newTypeString = globalTypeParser_.setLabel('[,' + typeString + ']', label);
+                newTypeString = globalTypeParser_.addLabel('[,' + typeString + ']', label);
           if (typeString !== newTypeString)
             item.typeString = newTypeString;
         } else if(item.template.typeName === 'output') {
           const typeString = self.getOutputTypeString(item);
-          item.typeString = globalTypeParser_.setLabel('[' + typeString + ',]', label);
+          item.typeString = globalTypeParser_.addLabel('[' + typeString + ',]', label);
         }
       } else if (item instanceof Functionchart) {
         const typeString = self.getFunctionchartTypeString(item);
@@ -1177,7 +1182,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           nonWires = functionChart.nonWires.asArray(),
           // graphInfo = this.getSubgraphInfo(nonWires),
           inputs = new Array<Pseudoelement>(),
-          outputs = new Array<Pseudoelement>();
+          outputs = new Array<Pseudoelement>(),
+          typeString = functionChart.typeString,
+          label = typeString ? globalTypeParser_.getLabel(typeString) : undefined;
 
     // Add pins for inputs, outputs, and disconnected pins on elements.
     nonWires.forEach(item => {
@@ -1206,17 +1213,18 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       return typeString;
     }
 
-    let typeString = '[';
+    let result = '[';
     inputs.forEach(input => {
       if (input.type)
-        typeString += getPinTypeString(input.type.outputs[0]);
+        result += getPinTypeString(input.type.outputs[0]);
     });
-    typeString += ',';
+    result += ',';
     outputs.forEach(output => {
       if (output.type)
-        typeString += getPinTypeString(output.type.inputs[0]);
+        result += getPinTypeString(output.type.inputs[0]);
     });
-    typeString += ']';
+    result += ']';
+    result = globalTypeParser_.addLabel(result, label);  // preserve label
 
     // contextInputs.sort(comparePins);
 
@@ -1263,7 +1271,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     //   // console.log(passThroughs);
     //   info.passThroughs = Array.from(passThroughs);
     // }
-    return typeString;
+    return result;
   }
 
   private updateItem(item: AllTypes) {
@@ -2197,10 +2205,10 @@ export class FunctionchartEditor implements CanvasLayer {
     output.x = 40; output.y = 8;
     literal.x = 72; literal.y = 8;
     newBinop.x = 8; newBinop.y = 32;
-    newBinop.typeString = '[vv,v(+)]';  // binary addition
+    newBinop.typeString = '[vv,v](+)';  // binary addition
     newUnop.x = 72; newUnop.y = 32;
-    newUnop.typeString = '[v,v(-)]';    // unary negation
-    newFunctionchart.x = 8; newFunctionchart.y = 70;
+    newUnop.typeString = '[v,v](-)';    // unary negation
+    newFunctionchart.x = 8; newFunctionchart.y = 80;
     newFunctionchart.width = this.theme.minFunctionchartWidth;
     newFunctionchart.height = this.theme.minFunctionchartHeight;
 
@@ -2254,14 +2262,14 @@ export class FunctionchartEditor implements CanvasLayer {
           case 'literal':     // [,v(label)]
             newValue = '[,v(' + value + ')]';
             break;
-          case 'binop':       // [vv,v(label)]
-            newValue = '[vv,v(' + value + ')]';
+          case 'binop':       // [vv,v](label)
+            newValue = globalTypeParser_.addLabel(typeString, value);
             break;
-          case 'unop':       // [v,v(label)]
-            newValue = '[v,v(' + value + ')]';
+          case 'unop':       // [v,v](label)
+            newValue = globalTypeParser_.addLabel(typeString, value);
             break;
-          case 'functionchart':       // [v(label),]
-            newValue = globalTypeParser_.setLabel(typeString, value);
+          case 'functionchart':       // [...](label)
+            newValue = globalTypeParser_.addLabel(typeString, value);
             break
         }
       }

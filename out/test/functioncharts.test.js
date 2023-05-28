@@ -49,31 +49,49 @@ function addFunctionchart(parent) {
 describe('Typeparser', () => {
     test('add', () => {
         const parser = new FC.TypeParser();
+        const typeStrings = [
+            '[vv,v](+)',
+            '[v(a)v(b),v(c)]',
+            '[,[,v][v,v]](@)',
+            '[[v,vv(q)](a)v(b),v(c)](foo)',
+        ];
+        typeStrings.forEach(typeString => expect(stringifyType(parser.add(typeString))).toBe(typeString));
+        typeStrings.forEach(typeString => expect(parser.has(typeString)).toBe(true));
+        expect(parser.add('[v,v]').name).toBeUndefined();
+        expect(parser.add('[vv,v](+)').name).toBe('+');
+        const type1 = parser.add('[v(a)v(b),v(c)]');
+        expect(type1.name).toBeUndefined();
+        expect(type1.inputs[0].name).toBe('a');
+        expect(type1.inputs[1].name).toBe('b');
+        expect(type1.outputs[0].name).toBe('c');
+        const type2 = parser.add('[,[,v][v,v]](@)');
+        expect(type2.name).toBe('@');
+        expect(type2.inputs.length).toBe(0);
+        expect(type2.outputs.length).toBe(2);
+        expect(type2.outputs[0].typeString).toBe('[,v]');
+        expect(type2.outputs[1].typeString).toBe('[v,v]');
+        // Make sure subtypes are present.
+        const subTypeStrings = ['[v,v]', '[,v]', '[v,vv(q)]'];
+        subTypeStrings.forEach(typeString => expect(parser.has(typeString)).toBe(true));
+    });
+    test('getLabel/setLabel', () => {
+        const parser = new FC.TypeParser();
         const types = [
             '[vv,v](+)',
             '[v(a)v(b),v(c)]',
             '[,[,v][v,v]](@)',
             '[[v,vv(q)](a)v(b),v(c)](foo)',
         ];
-        types.forEach(type => expect(stringifyType(parser.add(type))).toBe(type));
-        types.forEach(type => expect(parser.has(type)).toBe(true));
-        // Make sure subtypes are present.
-        expect(parser.has('[,v]')).toBe(true);
-        expect(parser.has('[v,v]')).toBe(true);
-        ;
-        expect(parser.has('[v,vv(q)]')).toBe(true);
-        ;
+        expect(parser.getLabel('[vv,v](+)')).toBe('+');
+        expect(parser.getLabel('[v(a)v(b),v(c)]')).toBe('');
+        expect(parser.addLabel('[vv,v](+)', '-')).toBe('[vv,v](-)');
+        expect(parser.addLabel('[v(a)v(b),v(c)]', 'foo')).toBe('[v(a)v(b),v(c)](foo)');
     });
 });
 describe('FunctionchartContext', () => {
     test('element interface', () => {
         const context = new FC.FunctionchartContext(), element = context.newElement('binop');
         expect(element instanceof FC.Element).toBe(true);
-        expect(element.name).toBeUndefined();
-        element.name = 'Test Element';
-        expect(element.name).toBe('Test Element');
-        element.name = undefined;
-        expect(element.name).toBeUndefined();
         expect(element.id).toBe(2);
         expect(element.x).toBe(0);
         element.x = 10;
@@ -133,9 +151,6 @@ describe('FunctionchartContext', () => {
     test('functionchart interface', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.newFunctionchart();
         expect(functionchart instanceof FC.Functionchart).toBe(true);
-        expect(functionchart.name).toBe('');
-        functionchart.name = 'Test Functionchart';
-        expect(functionchart.name).toBe('Test Functionchart');
         expect(functionchart.x).toBe(0);
         functionchart.x = 10;
         expect(functionchart.x).toBe(10);
