@@ -1617,11 +1617,12 @@ class Renderer {
   }
 
     // Gets the bounding rect for the functionchart instancing element.
-  getFunctionchartInstanceBounds(type: Type, right: number, bottom: number) {
+  getFunctionchartInstanceBounds(type: Type, bounds: Rect) : Rect {
     const theme = this.theme, spacing = theme.spacing,
           width = type.width, height = type.height,
-          x = right - width - spacing, y = bottom - height - spacing;
-    return { x: x, y: y, w: width, h: height };
+          x = bounds.x + bounds.width - width - spacing,
+          y = bounds.y + bounds.height - height - spacing;
+    return { x, y, width, height };
   }
 
   pinToPoint(element: ElementTypes, index: number, isInput: boolean) : PointWithNormal {
@@ -1924,9 +1925,9 @@ class Renderer {
         ctx.lineTo(x + w, lineBase);
         ctx.stroke();
         const type = functionchart.type,
-              instanceRect = this.getFunctionchartInstanceBounds(type, x + w, y + h);
+              instanceRect = this.getFunctionchartInstanceBounds(type, rect);
         ctx.beginPath();
-        ctx.rect(instanceRect.x, instanceRect.y, instanceRect.w, instanceRect.h);
+        ctx.rect(instanceRect.x, instanceRect.y, instanceRect.width, instanceRect.height);
         ctx.fillStyle = theme.altBgColor;
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
@@ -1974,9 +1975,9 @@ class Renderer {
         x = rect.x, y = rect.y, w = rect.width, h = rect.height,
         inner = hitTestRect(x, y, w, h, p, tol);
   if (inner) {
-    const instanceRect = this.getFunctionchartInstanceBounds(functionchart.type, x + w, y + h),
+    const instanceRect = this.getFunctionchartInstanceBounds(functionchart.type, rect),
           instancer = hitTestRect(
-              instanceRect.x, instanceRect.y, instanceRect.w, instanceRect.h, p, tol) !== undefined;
+              instanceRect.x, instanceRect.y, instanceRect.width, instanceRect.height, p, tol) !== undefined;
     return new FunctionchartHitResult(functionchart, inner, instancer);
   }
 }
@@ -2112,7 +2113,8 @@ function hasProperties(hitInfo: HitResultTypes) : boolean {
   return !(hitInfo instanceof Wire);
 }
 
-type NonWireDragType = 'copyPalette' | 'moveSelection' | 'moveCopySelection' | 'resizeFunctionchart';
+type NonWireDragType = 'copyPalette' | 'moveSelection' | 'moveCopySelection' |
+                       'resizeFunctionchart' | 'instantiateFunctionchart';
 class NonWireDrag {
   items: NonWireTypes[];
   type: NonWireDragType;
@@ -2746,8 +2748,14 @@ export class FunctionchartEditor implements CanvasLayer {
           this.moveCopy = false;  // TODO fix
           drag = new NonWireDrag(context.selectedElementTypes(), 'moveCopySelection', 'Move copy of selection');
         } else {
-          if (pointerHitInfo instanceof FunctionchartHitResult && pointerHitInfo.inner.border) {
-            drag = new NonWireDrag([pointerHitInfo.item], 'resizeFunctionchart', 'Resize functionchart');
+          if (pointerHitInfo instanceof FunctionchartHitResult) {
+            if (pointerHitInfo.inner.border) {
+              drag = new NonWireDrag([pointerHitInfo.item], 'resizeFunctionchart', 'Resize functionchart');
+            } else if (pointerHitInfo.instancer) {
+              drag = new NonWireDrag([pointerHitInfo.item], 'instantiateFunctionchart', 'Create new instance of functionchart');
+            } else {
+              drag = new NonWireDrag(context.selectedElementTypes(), 'moveSelection', 'Move selection');
+            }
           } else {
             drag = new NonWireDrag(context.selectedElementTypes(), 'moveSelection', 'Move selection');
           }
@@ -2774,6 +2782,17 @@ export class FunctionchartEditor implements CanvasLayer {
       } else if (drag.type == 'moveCopySelection') {
         const copies = context.copy() as NonWireTypes[];  // TODO fix
         drag.items = copies;
+      } else if  (drag.type === 'instantiateFunctionchart') {
+        const functionchart = drag.items[0] as Functionchart,
+              newInstance = context.newElement('element'),
+              renderer = this.renderer,
+              bounds = renderer.getItemRect(functionchart),
+              instancerBounds = this.renderer.getFunctionchartInstanceBounds(functionchart.type,
+                bounds);  // TODO simplify this
+        newInstance.typeString = functionchart.typeString;
+        newInstance.x = instancerBounds.x;
+        newInstance.y = instancerBounds.y;
+        drag.items = [newInstance];
       }
 
       context.transactionManager.beginTransaction(drag.description);
@@ -2781,7 +2800,8 @@ export class FunctionchartEditor implements CanvasLayer {
         context.addItem(newWire, this.functionchart);
         selection.set(newWire);
       } else {
-        if (drag.type == 'copyPalette' || drag.type == 'moveCopySelection') {
+        if (drag.type == 'copyPalette' || drag.type == 'moveCopySelection' ||
+            drag.type === 'instantiateFunctionchart') {
           context.addItems(drag.items, this.functionchart);
           selection.set(drag.items);
         }
@@ -2808,7 +2828,8 @@ export class FunctionchartEditor implements CanvasLayer {
       switch (drag.type) {
         case 'copyPalette':
         case 'moveCopySelection':
-        case 'moveSelection': {
+        case 'moveSelection':
+        case 'instantiateFunctionchart': {
           hitInfo = this.getFirstHit(hitList, isDropTarget) as ElementHitResult | FunctionchartHitResult;
           context.selection.forEach(item => {
             if (item instanceof Wire)
@@ -2890,7 +2911,7 @@ export class FunctionchartEditor implements CanvasLayer {
       drag.wire.pSrc = drag.wire.pDst = undefined;
     } else if (drag instanceof NonWireDrag &&
               (drag.type == 'copyPalette' || drag.type === 'moveSelection' ||
-               drag.type === 'moveCopySelection')) {
+               drag.type === 'moveCopySelection' || drag.type === 'instantiateFunctionchart')) {
       // Find element or functionchart beneath mouse.
       const hitList = this.hitTestCanvas(cp),
             hitInfo = this.getFirstHit(hitList, isDropTarget);
