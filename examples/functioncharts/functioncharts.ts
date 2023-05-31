@@ -237,7 +237,8 @@ const idProp = new IdProp('id'),
       dstProp = new ReferenceProp('dst'),
       dstPinProp = new ScalarProp('dstPin'),
       nonWiresProp = new ChildArrayProp('nonWires'),
-      wiresProp = new ChildArrayProp('wires');
+      wiresProp = new ChildArrayProp('wires'),
+      functionchartProp = new ReferenceProp('functionchart');
 
 class NonWireTemplate {
   readonly id = idProp;
@@ -291,6 +292,12 @@ class FunctionchartTemplate extends NonWireTemplate {
                          this.typeString, this.nonWires, this.wires];
 }
 
+class FunctionInstanceTemplate extends NonWireTemplate {
+  readonly typeName = 'instance';
+  readonly functionchart = functionchartProp;
+  readonly properties = [this.id, this.x, this.y, this.functionchart];
+}
+
 const binopTemplate = new ElementTemplate('binop'),
       unopTemplate = new ElementTemplate('unop'),
       elementTemplate = new ElementTemplate('element'),
@@ -298,18 +305,32 @@ const binopTemplate = new ElementTemplate('binop'),
       outputPseudoelementTemplate = new PseudoelementTemplate('output'),
       literalPseudoelementTemplate = new PseudoelementTemplate('literal'),
       wireTemplate = new WireTemplate(),
-      functionchartTemplate = new FunctionchartTemplate();
+      functionchartTemplate = new FunctionchartTemplate(),
+      functionInstanceTemplate = new FunctionInstanceTemplate();
 
 const defaultPoint = { x: 0, y: 0 },
       defaultPointWithNormal: PointWithNormal = { x: 0, y: 0, nx: 0 , ny: 0 },
       defaultBezierCurve: BezierCurve = [
           defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal];
 
-export class Element implements DataContextObject, ReferencedObject {
+class ElementBase {
+  readonly id: number;
+
+  // Derived properties.
+  parent: Functionchart | undefined;
+  globalPosition = defaultPoint;
+  type: Type = nullFunction;
+  inWires = new Array<Wire | undefined>(0);   // one input per pin.
+  outWires = new Array<Array<Wire>>(0);       // array of outputs per pin, outputs have fan out.
+
+  constructor(id: number) {
+    this.id = id;
+  }
+}
+
+export class Element extends ElementBase implements DataContextObject, ReferencedObject {
   readonly template: ElementTemplate;
   readonly context: FunctionchartContext;
-
-  readonly id: number;
 
   get x() { return this.template.x.get(this) || 0; }
   set x(value: number) { this.template.x.set(this, value); }
@@ -318,25 +339,16 @@ export class Element implements DataContextObject, ReferencedObject {
   get typeString() { return this.template.typeString.get(this); }
   set typeString(value: string) { this.template.typeString.set(this, value); }
 
-  // Derived properties.
-  parent: Functionchart | undefined;
-  globalPosition = defaultPoint;
-  type: Type = nullFunction;
-  inWires = new Array<Wire | undefined>(0);   // one input per pin.
-  outWires = new Array<Array<Wire>>(0);       // array of outputs per pin, outputs have fan out.
-
   constructor(context: FunctionchartContext, template: ElementTemplate, id: number) {
+    super(id);
     this.context = context;
     this.template = template;
-    this.id = id;
   }
 }
 
-export class Pseudoelement implements DataContextObject, ReferencedObject {
+export class Pseudoelement extends ElementBase implements DataContextObject, ReferencedObject {
   readonly template: PseudoelementTemplate;
   readonly context: FunctionchartContext;
-
-  readonly id: number;
 
   get x() { return this.template.x.get(this) || 0; }
   set x(value: number) { this.template.x.set(this, value); }
@@ -345,17 +357,10 @@ export class Pseudoelement implements DataContextObject, ReferencedObject {
   get typeString() : string { return this.template.typeString.get(this); }
   set typeString(value: string) { this.template.typeString.set(this, value); }
 
-  // Derived properties.
-  parent: Functionchart | undefined;
-  globalPosition = defaultPoint;
-  type: Type = nullFunction;
-  inWires = new Array<Wire | undefined>(0);   // one input per pin.
-  outWires = new Array<Array<Wire>>(0);       // array of outputs per pin, outputs have fan out.
-
   constructor(context: FunctionchartContext, template: PseudoelementTemplate, id: number) {
+    super(id);
     this.context = context;
     this.template = template;
-    this.id = id;
 
     switch (this.template.typeName) {
       case 'input':
@@ -428,7 +433,24 @@ export class Functionchart implements DataContextObject {
   }
 }
 
-export type ElementTypes = Element | Pseudoelement;
+export class FunctionInstance extends ElementBase implements DataContextObject, ReferencedObject {
+  readonly template = functionInstanceTemplate;
+  readonly context: FunctionchartContext;
+
+  get x() { return this.template.x.get(this) || 0; }
+  set x(value: number) { this.template.x.set(this, value); }
+  get y() { return this.template.y.get(this) || 0; }
+  set y(value: number) { this.template.y.set(this, value); }
+  get functionchart() { return this.template.functionchart.get(this) as Functionchart | undefined; }
+  set functionchart(value: Functionchart | undefined) { this.template.functionchart.set(this, value); }
+
+  constructor(context: FunctionchartContext, id: number) {
+    super(id);
+    this.context = context;
+  }
+}
+
+export type ElementTypes = Element | Pseudoelement | FunctionInstance;
 export type NonWireTypes = ElementTypes | Functionchart;
 export type AllTypes = NonWireTypes | Wire;
 
@@ -542,6 +564,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   newFunctionchart() : Functionchart {
     const nextId = ++this.highestId;
     return new Functionchart(this, nextId);
+  }
+
+  newFunctionInstance() : FunctionInstance {
+    const nextId = ++this.highestId;
+    return new FunctionInstance(this, nextId);
   }
 
   visitAll(item: AllTypes, visitor: FunctionchartVisitor) : void {
@@ -672,11 +699,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           outWires = new Set<Wire>();
     // First collect Elements and Functioncharts.
     items.forEach(item => {
-      this.visitNonWires(item, item => {
-        if (item instanceof Element || item instanceof Pseudoelement)
-          elements.add(item);
-        else if (item instanceof Functionchart)
+      this.visitNonWires(item, (item: NonWireTypes) => {
+        if (item instanceof Functionchart)
           functioncharts.add(item);
+        else
+          elements.add(item);
       });
     });
     // Now collect and classify wires that connect to them.
@@ -702,7 +729,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           }
         }
       }
-      if (item instanceof Element || item instanceof Pseudoelement) {
+      if (item instanceof ElementBase) {
         self.forInWires(item, addWire);
         self.forOutWires(item, addWire);
       }
@@ -800,10 +827,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
-  selectedElementTypes() : ElementTypes[] {
+  selectedAllElements() : ElementTypes[] {
     const result = new Array<ElementTypes>();
     this.selection.forEach(item => {
-      if (item instanceof Element || item instanceof Pseudoelement)
+      if (item instanceof ElementBase)
         result.push(item);
     });
     return result;
@@ -827,12 +854,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   selectInteriorWires() {
     const self = this,
-          graphInfo = this.getSubgraphInfo(this.selectedElementTypes());
+          graphInfo = this.getSubgraphInfo(this.selectedAllElements());
     graphInfo.interiorWires.forEach(wire => self.selection.add(wire));
   }
 
   selectConnectedElements(upstream: boolean) {
-    const selectedElements = this.selectedElementTypes(),
+    const selectedElements = this.selectedAllElements(),
           connectedElements = this.getConnectedElements(selectedElements, upstream, true);
     this.selection.set(Array.from(connectedElements));
   }
@@ -1280,22 +1307,25 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       return;
 
     // Update 'type' property.
-    const typeString = item.typeString;
-    if (typeString && typeString !== item.type.typeString) {
-      const oldType = item.type,
-            newType = globalTypeParser_.add(item.typeString);
-      item.type = newType;
-      if (item instanceof Element || item instanceof Pseudoelement) {
-        const inputs = newType.inputs.length,
-              outputs = newType.outputs.length,
-              inWires = item.inWires,
-              outWires = item.outWires;
-        inWires.length = inputs;
-        outWires.length = outputs;
-        for (let i = oldType.outputs.length; i < outputs; i++) {
-          if (outWires[i] === undefined)
-            outWires[i] = new Array<Wire>();
-        }
+    if (!(item instanceof FunctionInstance)) {
+      const typeString = item.typeString;
+      if (typeString && typeString !== item.type.typeString) {
+        const newType = globalTypeParser_.add(item.typeString);
+        item.type = newType;
+      }
+    }
+    // Update 'inWires' and 'outWires' properties.
+    if (item instanceof ElementBase) {
+      const type = item.type,
+            inputs = type.inputs.length,
+            outputs = type.outputs.length,
+            inWires = item.inWires,
+            outWires = item.outWires;
+      inWires.length = inputs;
+      outWires.length = outputs;
+      for (let i = 0; i < outputs; i++) {
+        if (outWires[i] === undefined)
+          outWires[i] = new Array<Wire>();
       }
     }
 
@@ -1455,6 +1485,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'literal': return this.newPseudoelement('literal');
       case 'wire': return this.newWire(undefined, -1, undefined, -1);
       case 'functionchart': return this.newFunctionchart();
+      case 'functioninstance': return this.newFunctionInstance();
     }
     throw new Error('Unknown type');
   }
@@ -1591,13 +1622,14 @@ class Renderer {
       const global = item.globalPosition;
       x = global.x,
       y = global.y;
-      if (item instanceof Element || item instanceof Pseudoelement) {
+      if (item instanceof Functionchart) {
+        width = item.width;
+        height = item.height;
+      } else {
+        // Element, Pseudoelement, FunctionInstance.
         const type = item.type;
         width = type.width;
         height = type.height;
-      } else {
-        width = item.width;
-        height = item.height;
       }
     }
     return { x, y, width, height };
@@ -2013,7 +2045,7 @@ class Renderer {
   }
 
   draw(item: AllTypes, mode: RenderMode) {
-    if (item instanceof Element || item instanceof Pseudoelement) {
+    if (item instanceof ElementBase) {
       this.drawElement(item, mode);
     } else if (item instanceof Wire) {
       this.drawWire(item, mode);
@@ -2024,7 +2056,7 @@ class Renderer {
 
   hitTest(item: AllTypes, p: Point, tol: number, mode: RenderMode) : HitResultTypes | undefined {
     let hitInfo: HitResultTypes | undefined;
-    if (item instanceof Element || item instanceof Pseudoelement) {
+    if (item instanceof ElementBase) {
       hitInfo = this.hitTestElement(item, p, tol, mode);
     } else if (item instanceof Wire) {
       hitInfo = this.hitTestWire(item, p, tol, mode);
@@ -2035,7 +2067,7 @@ class Renderer {
   }
 
   layout(item: AllTypes) {
-    if (item instanceof Element || item instanceof Pseudoelement) {
+    if (item instanceof ElementBase) {
       this.layoutElement(item);
     } else if (item instanceof Wire) {
       this.layoutWire(item);
@@ -2406,7 +2438,7 @@ export class FunctionchartEditor implements CanvasLayer {
     }
 
     function addItems(item: AllTypes) {
-      if (item instanceof Element || item instanceof Pseudoelement) {  // TODO class hierarchy for Elements?
+      if (item instanceof ElementBase) {
         // Layout the state's incoming and outgoing transitions.
         context.forInWires(item, addItems);
         context.forOutWires(item, addItems);
@@ -2447,7 +2479,7 @@ export class FunctionchartEditor implements CanvasLayer {
     // Layout elements. Functioncharts are updated at the end of the transaction.
     changedItems.forEach(item => {
       layout(item, item => {
-        if (item instanceof Element || item instanceof Pseudoelement)
+        if (item instanceof ElementBase)
           renderer.layout(item);
       });
     });
@@ -2746,7 +2778,7 @@ export class FunctionchartEditor implements CanvasLayer {
           drag = new NonWireDrag([pointerHitInfo.item], 'copyPalette', 'Create new element or functionchart');
         } else if (this.moveCopy) {
           this.moveCopy = false;  // TODO fix
-          drag = new NonWireDrag(context.selectedElementTypes(), 'moveCopySelection', 'Move copy of selection');
+          drag = new NonWireDrag(context.selectedAllElements(), 'moveCopySelection', 'Move copy of selection');
         } else {
           if (pointerHitInfo instanceof FunctionchartHitResult) {
             if (pointerHitInfo.inner.border) {
@@ -2754,10 +2786,10 @@ export class FunctionchartEditor implements CanvasLayer {
             } else if (pointerHitInfo.instancer) {
               drag = new NonWireDrag([pointerHitInfo.item], 'instantiateFunctionchart', 'Create new instance of functionchart');
             } else {
-              drag = new NonWireDrag(context.selectedElementTypes(), 'moveSelection', 'Move selection');
+              drag = new NonWireDrag(context.selectedAllElements(), 'moveSelection', 'Move selection');
             }
           } else {
-            drag = new NonWireDrag(context.selectedElementTypes(), 'moveSelection', 'Move selection');
+            drag = new NonWireDrag(context.selectedAllElements(), 'moveSelection', 'Move selection');
           }
         }
       }
@@ -2921,7 +2953,6 @@ export class FunctionchartEditor implements CanvasLayer {
       }
       // Reparent items
       selection.contents().forEach(item => {
-        // if (!(item instanceof Functionchart))
           context.addItem(item, parent);
       });
     }
