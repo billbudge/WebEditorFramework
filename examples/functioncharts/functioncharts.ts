@@ -1099,7 +1099,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // });
   }
 
-  replaceElement(element: Element, newElement: Element) {
+  replaceElement(element: ElementTypes, newElement: ElementTypes) {
     const self = this,
           type = element.type,
           newType = newElement.type;
@@ -2121,7 +2121,7 @@ class Renderer {
 function isDropTarget(hitInfo: HitResultTypes) : boolean {
   const item = hitInfo.item,
         selection = item.context.selection;
-  return (hitInfo instanceof FunctionchartHitResult) &&
+  return (hitInfo instanceof FunctionchartHitResult || hitInfo instanceof ElementHitResult) &&
           !selection.has(item) && !ancestorInSet(item, selection);
 }
 
@@ -2948,13 +2948,17 @@ export class FunctionchartEditor implements CanvasLayer {
       const hitList = this.hitTestCanvas(cp),
             hitInfo = this.getFirstHit(hitList, isDropTarget);
       let parent: Functionchart = functionchart;
-      if (hitInfo && (hitInfo instanceof FunctionchartHitResult)) {
-        parent = hitInfo.item;
+      if (hitInfo) {
+        if (hitInfo.item instanceof Functionchart) {
+          parent = hitInfo.item;
+          // Reparent items
+          selection.contents().forEach(item => {
+            context.addItem(item, parent);
+          });
+        } else if (hitInfo instanceof ElementHitResult && drag.items[0] instanceof ElementBase) {
+          context.replaceElement(hitInfo.item, drag.items[0] as ElementTypes);
+        }
       }
-      // Reparent items
-      selection.contents().forEach(item => {
-          context.addItem(item, parent);
-      });
     }
 
     transactionManager.endTransaction();
