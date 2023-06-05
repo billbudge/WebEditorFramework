@@ -24,13 +24,19 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
 
 export class Pin {
   typeString: string;
+  type: Type;
   name?: string;
-  type?: Type;
   y = 0;
   width = 0;
   height = 0;
   baseline = 0;
-  constructor(typeString: string, name?: string, type?: Type) {  // TODO type for 'v' and '*'.
+  copy() : Pin {
+    let type = this.type;
+    if (type)
+      type = type.copy();
+    return new Pin(this.typeString, type, this.name);
+  }
+  constructor(typeString: string, type: Type, name?: string) {
     this.typeString = typeString;
     this.name = name;
     this.type = type;
@@ -50,6 +56,11 @@ export class Type {
   get needsLayout() {
     return this.width === 0;
   }
+  copy() : Type {
+    return new Type(this.typeString,
+                    this.inputs.map(pin => pin.copy()),
+                    this.outputs.map(pin => pin.copy()), this.name);
+  }
   constructor(typeString: string, inputs: Pin[], outputs: Pin[], name?: string) {
     this.typeString = typeString;
     this.inputs = inputs;
@@ -58,14 +69,46 @@ export class Type {
   }
 }
 
+export function stringifyType(type: Type) {
+  if (type.typeString == 'v' || type.typeString == '*')
+    return type.typeString;
+  let s = '[';
+  function stringifyName(item: Type | Pin) {
+    if (item.name)
+      s += '(' + item.name + ')';
+  }
+  function stringifyPin(pin: Pin) {
+    s += pin.type ? stringifyType(pin.type) : pin.typeString;
+    stringifyName(pin);
+  }
+  if (type.inputs)
+    type.inputs.forEach(input => stringifyPin(input));
+  s += ',';
+  if (type.outputs)
+    type.outputs.forEach(output => stringifyPin(output));
+  s += ']';
+  stringifyName(type);
+  return s;
+}
+
+// export type TypeVisitor = (type: Type, parent: Type | undefined) => void;
+
+// export function forEachType(type: Type, callback: TypeVisitor) {
+//   callback(type, undefined);
+//   if (type.inputs)
+//     type.inputs.forEach(input => forEachType(input.type, callback));
+//   if (type.outputs)
+//     type.outputs.forEach(output => forEachType(output.type, callback));
+// }
+
 export class TypeParser {
   private readonly map_ = new Map<string, Type>();
+  readonly valueType = new Type('v', [], []);
+  readonly starType = new Type('*', [], []);
 
-  get(s: string) : Type | undefined {
-    return this.map_.get(s);
-  }
-  has(s: string) {
-    return this.map_.has(s);
+  constructor() {
+    this.addType('v', this.valueType);
+    this.addType('*', this.starType);
   }
 
   private addType(s: string, type: Type) {
@@ -77,6 +120,12 @@ export class TypeParser {
     return result;
   }
 
+  get(s: string) : Type | undefined {
+    return this.map_.get(s);
+  }
+  has(s: string) {
+    return this.map_.has(s);
+  }
   add(s: string) : Type {
     let type = this.map_.get(s);
     if (type)
@@ -102,19 +151,19 @@ export class TypeParser {
       // value types
       if (s[j] === 'v') {
         j++;
-        return new Pin('v', parseName());
+        return new Pin('v', self.valueType, parseName());
       }
       // wildcard types
       if (s[j] === '*') {
         j++;
-        return new Pin('*', parseName());
+        return new Pin('*', self.starType, parseName());
       }
       // function types
       let type = parseFunction(),
           typeString = s.substring(i, j);
       // Add the pin type, without label.
       type = self.addType(typeString, type);
-      return new Pin(typeString, parseName(), type);
+      return new Pin(typeString, type, parseName());
     }
     function parseFunction() : Type {
       let i = j;
@@ -133,8 +182,13 @@ export class TypeParser {
         let type = new Type(typeString, inputs, outputs);
         type = self.addType(typeString, type);
         return type;
+      } else if (s[j] === 'v' || s[j] === '*') {
+        let type = new Type(s[j], [], []);
+        type = self.addType(type.typeString, type);
+        return type;
+      } else {
+        throw new Error('Invalid type string: ' + s);
       }
-      throw new Error('Invalid type string: ' + s);
     }
 
     type = parseFunction();
@@ -143,8 +197,8 @@ export class TypeParser {
       if (name) {
         // The top level function type includes the label, so duplicate
         // type and pins.
-        const inputs = type.inputs.map(pin => new Pin(pin.typeString, pin.name, pin.type)),
-              outputs = type.outputs.map(pin => new Pin(pin.typeString, pin.name, pin.type));
+        const inputs = type.inputs.map(pin => new Pin(pin.typeString, pin.type, pin.name)),
+              outputs = type.outputs.map(pin => new Pin(pin.typeString, pin.type, pin.name));
         type = new Type(s, inputs, outputs, name);
       }
       type = this.addType(s, type);
@@ -152,20 +206,27 @@ export class TypeParser {
     return type;
   }
 
-  getLabel(typeString: string) : string {
-    if (typeString[typeString.length - 1] === ')') {
-      const i = typeString.lastIndexOf('(');
-      if (i > 0) {
-        return typeString.substring(i + 1, typeString.length - 1);
-      }
-    }
-    return '';
-  }
   addLabel(typeString: string, label: string | undefined) : string {
     if (label === undefined || label === '')
       return typeString;
-    const i = typeString.lastIndexOf(']');
-    return typeString.substring(0, i + 1) + '(' + label + ')';
+    const type = this.add(typeString),
+          copy = type.copy();
+    copy.name = label;
+    return stringifyType(copy);
+  }
+  addInputLabel(typeString: string, label: string | undefined) : string {
+    const type = this.add(typeString),
+          copy = type.copy();
+    if (copy.inputs.length > 0)
+      copy.inputs[0].name = label;
+    return stringifyType(copy);
+  }
+  addOutputLabel(typeString: string, label: string | undefined) : string {
+    const type = this.add(typeString),
+          copy = type.copy();
+    if (copy.outputs.length > 0)
+      copy.outputs[0].name = label;
+    return stringifyType(copy);
   }
 
   // Removes any trailing label.
@@ -205,16 +266,6 @@ export class TypeParser {
   hasOutput(typeString: string) {
     return !typeString.endsWith(',]');
   }
-
-  addInputToTypeString(typeString: string, inputType: string) : string {
-    let i = this.splitTypeString(typeString);
-    return typeString.substring(0, i) + inputType + typeString.substring(i);
-  }
-
-  addOutputToTypeString(type: string, outputType: string) : string {
-    let i = type.lastIndexOf(']');
-    return type.substring(0, i) + outputType + type.substring(i);
-  }
 }
 
 const globalTypeParser_ = new TypeParser(),
@@ -246,7 +297,7 @@ class NonWireTemplate {
   readonly y = yProp;
 }
 
-export type ElementType = 'binop' | 'unop' | 'element';
+export type ElementType = 'binop' | 'unop' | 'cond' | 'element';
 
 class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
@@ -300,6 +351,7 @@ class FunctionInstanceTemplate extends NonWireTemplate {
 
 const binopTemplate = new ElementTemplate('binop'),
       unopTemplate = new ElementTemplate('unop'),
+      condTemplate = new ElementTemplate('cond'),
       elementTemplate = new ElementTemplate('element'),
       inputPseudoelementTemplate = new PseudoelementTemplate('input'),
       outputPseudoelementTemplate = new PseudoelementTemplate('output'),
@@ -521,15 +573,19 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     switch (typeName) {
       case 'binop':
         template = binopTemplate;
-        typeString = '[vv,v]'
+        typeString = '[vv,v]';
         break;
       case 'unop':
         template = unopTemplate;
-        typeString = '[v,v]'
+        typeString = '[v,v]';
+        break;
+      case 'cond':
+        template = condTemplate;
+        typeString = '[v**,*]';
         break;
       case 'element':
         template = elementTemplate;
-        typeString = '[,]'
+        typeString = '[,]';
         break;
       default: throw new Error('Unknown element type: ' + typeName);
     }
@@ -565,7 +621,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const nextId = ++this.highestId;
     return new Functionchart(this, nextId);
   }
-
   newFunctionInstance() : FunctionInstance {
     const nextId = ++this.highestId;
     return new FunctionInstance(this, nextId);
@@ -1051,15 +1106,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   makeConsistent() {
-    const self = this,
-          functionchart = this.functionchart,
-          graphInfo = this.getGraphInfo();
+    const self = this;
     // Eliminate dangling wires.
-    graphInfo.wires.forEach(wire => {
+    this.wires.forEach(wire => {
       const src = wire.src,
             dst = wire.dst;
-      if (!src || !graphInfo.elements.has(src) ||
-          !dst || !graphInfo.elements.has(dst)) {
+      if (!src || !this.elements.has(src) ||
+          !dst || !this.elements.has(dst)) {
         self.deleteItem(wire);
         return;
       }
@@ -1072,23 +1125,35 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         self.addItem(wire, lca);
       }
     });
-    // Update pseudoelement and functionchart types.
+    // Update pseudoelement, conditional, and functionchart types.
     this.reverseVisitNonWires(this.functionchart, item => {
       // Update types of inputs and outputs.
       if (item instanceof Pseudoelement) {
-        const label = globalTypeParser_.getLabel(item.typeString);
+        const label = item.type.name,
+              type = self.getFirstIOType(item);
         if (item.template.typeName === 'input' || item.template.typeName === 'literal') {
-          const typeString = self.getInputTypeString(item),
-                newTypeString = globalTypeParser_.addLabel('[,' + typeString + ']', label);
-          if (typeString !== newTypeString)
+          const newTypeString = globalTypeParser_.addOutputLabel(type.typeString, label);
+          if (type.typeString !== newTypeString)
             item.typeString = newTypeString;
         } else if(item.template.typeName === 'output') {
-          const typeString = self.getOutputTypeString(item);
-          item.typeString = globalTypeParser_.addLabel('[' + typeString + ',]', label);
+          const newTypeString = globalTypeParser_.addInputLabel(type.typeString, label);
+          if (type.typeString !== newTypeString)
+            item.typeString = newTypeString;
         }
+      } else if (item instanceof Element && item.template.typeName === 'cond') {
+        const type = self.getFirstIOType(item),
+              newTypeString = '[v' + type + type + ',' + type + ']';
+        item.typeString = newTypeString;
       } else if (item instanceof Functionchart) {
         const typeString = self.getFunctionchartTypeString(item);
         item.typeString = typeString;
+      }
+    });
+    this.visitNonWires(this.functionchart, item => {
+      if (item instanceof FunctionInstance) {
+        if (item.type !== item.functionchart!.type) {
+          self.updateType(item);
+        }
       }
     });
     // // Delete any empty functioncharts (except for the root functionchart).
@@ -1100,8 +1165,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   replaceElement(element: ElementTypes, newElement: ElementTypes) {
-    const self = this,
-          type = element.type,
+    const type = element.type,
           newType = newElement.type;
     // Add newElement right after element. Both should be present as we
     // rewire them.
@@ -1144,6 +1208,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.deleteItem(element);
   }
 
+  updateType(instance: FunctionInstance) {
+    const newInstance = this.newFunctionInstance();
+    newInstance.functionchart = instance.functionchart;
+    this.replaceElement(instance, newInstance);
+  }
+
   exportElement(element: Element) {
     const result = this.newElement('element');
     result.typeString = '[,' + element.typeString + ']';
@@ -1168,7 +1238,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           j = globalTypeParser_.splitTypeString(typeString);
     const result = this.newElement('element');
     result.typeString =
-      typeString.substring(0, j - 1) + typeString + typeString.substring(j);
+      typeString.substring(0, j) + typeString + typeString.substring(j);
     return result;
   }
 
@@ -1185,23 +1255,25 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  getInputTypeString(input: Pseudoelement) {
-    let result = '*';
-    const outWires = input.outWires[0];
-    if (outWires.length > 0) {
-      const wire = outWires[0];  // Take the first output wire.
-      result = wire.dst!.type.inputs[wire.dstPin].typeString;
+  getFirstIOType(element: ElementBase) {
+    const inWires = element.inWires;
+    for (let i = 0; i < inWires.length; i++) {
+      const wire = inWires[i];
+      if (wire && wire.src) {
+        return wire.src.type.outputs[wire.srcPin].type;
+      }
     }
-    return result;
-  }
-
-  getOutputTypeString(output: Pseudoelement) {
-    let result = '*';
-    const wire = output.inWires[0];
-    if (wire !== undefined) {
-      result = wire.src!.type.outputs[wire.srcPin].typeString;
+    const outWires = element.outWires;
+    for (let i = 0; i < outWires.length; i++) {
+      const array = outWires[i];
+      if (array.length > 0) {
+        const wire = array[0];
+        if (wire && wire.dst) {
+          return wire.dst.type.inputs[wire.dstPin].type;
+        }
+      }
     }
-    return result;
+    return globalTypeParser_.starType;
   }
 
   getFunctionchartTypeString(functionChart: Functionchart) {
@@ -1210,8 +1282,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           // graphInfo = this.getSubgraphInfo(nonWires),
           inputs = new Array<Pseudoelement>(),
           outputs = new Array<Pseudoelement>(),
-          typeString = functionChart.typeString,
-          label = typeString ? globalTypeParser_.getLabel(typeString) : undefined;
+          label = functionChart.type.name;
 
     // Add pins for inputs, outputs, and disconnected pins on elements.
     nonWires.forEach(item => {
@@ -1479,6 +1550,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     switch (typeName) {
       case 'binop': return this.newElement('binop');
       case 'unop': return this.newElement('unop');
+      case 'cond': return this.newElement('cond');
       case 'element': return this.newElement('element');
       case 'input': return this.newPseudoelement('input');
       case 'output': return this.newPseudoelement('output');
@@ -1538,6 +1610,10 @@ class FunctionchartTheme extends Theme {
     Object.assign(this, theme);
 
     this.radius = radius;
+
+    // Layout the base types.
+    globalTypeParser_.valueType.width = globalTypeParser_.starType.width = radius;
+    globalTypeParser_.valueType.height = globalTypeParser_.starType.height = radius;
   }
 }
 
@@ -1723,13 +1799,11 @@ class Renderer {
   }
 
   layoutPin(pin: Pin) {
-    const theme = this.theme;
-    if (pin.typeString === 'v' || pin.typeString === '*') {
-      pin.width = pin.height = 2 * theme.knobbyRadius;
-    } else if (pin.type) {
-      pin.width = pin.type.width;
-      pin.height = pin.type.height;
-    }
+    const type = pin.type;
+    if (type.needsLayout)
+      this.layoutType(type);
+    pin.width = type.width;
+    pin.height = type.height;
   }
 
   layoutElement(element: ElementTypes) {
@@ -2231,6 +2305,7 @@ export class FunctionchartEditor implements CanvasLayer {
           literal = context.newPseudoelement('literal'),
           newBinop = context.newElement('binop'),
           newUnop = context.newElement('unop'),
+          newCond = context.newElement('cond'),
           newFunctionchart = context.newFunctionchart();
 
     context.setRoot(functionchart);
@@ -2240,8 +2315,10 @@ export class FunctionchartEditor implements CanvasLayer {
     literal.x = 72; literal.y = 8;
     newBinop.x = 8; newBinop.y = 32;
     newBinop.typeString = '[vv,v](+)';  // binary addition
-    newUnop.x = 72; newUnop.y = 32;
+    newUnop.x = 48; newUnop.y = 32;
     newUnop.typeString = '[v,v](-)';    // unary negation
+    newCond.x = 86; newCond.y = 32;     // conditional
+
     newFunctionchart.x = 8; newFunctionchart.y = 80;
     newFunctionchart.width = this.theme.minFunctionchartWidth;
     newFunctionchart.height = this.theme.minFunctionchartHeight;
@@ -2251,6 +2328,7 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nonWires.append(literal);
     functionchart.nonWires.append(newBinop);
     functionchart.nonWires.append(newUnop);
+    functionchart.nonWires.append(newCond);
     functionchart.nonWires.append(newFunctionchart);
     context.setRoot(functionchart);
     this.palette = functionchart;
@@ -2274,10 +2352,19 @@ export class FunctionchartEditor implements CanvasLayer {
         self.canvasController.draw();
       }
     }
-    function elementLabelGetter(info: ItemInfo, item: AllTypes) {
-      const typeString = getter(info, item);
-      if (typeString)
-        return globalTypeParser_.getLabel(typeString);
+    function elementLabelGetter(info: ItemInfo, item: NonWireTypes) {
+      switch (item.template.typeName) {
+        case 'input':       // [,v(label)]
+          return item.type.outputs[0].name || '';
+        case 'output':      // [v(label),]
+          return item.type.inputs[0].name || '';
+        case 'literal':     // [,v(label)]
+          return item.type.outputs[0].name || '';
+        case 'binop':       // [vv,v](label)
+        case 'unop':        // [v,v](label)
+        case 'functionchart':       // [...](label)
+          return item.type.name || '';
+      }
       return '';
     }
     function elementLabelSetter(info: ItemInfo, item: AllTypes, value: any) {
@@ -2340,7 +2427,7 @@ export class FunctionchartEditor implements CanvasLayer {
       '|', '&', '||', '&&'];
     this.propertyInfo.set('binop', [
       {
-        label: 'label',
+        label: 'operator',
         type: 'enum',
         values: binaryOps.join(','),
         getter: elementLabelGetter,
@@ -2351,7 +2438,7 @@ export class FunctionchartEditor implements CanvasLayer {
     const unaryOps = ['!', '~', '-'];
     this.propertyInfo.set('unop', [
       {
-        label: 'label',
+        label: 'operator',
         type: 'enum',
         values: unaryOps.join(','),
         getter: elementLabelGetter,

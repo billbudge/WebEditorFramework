@@ -1,24 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
 import * as FC from '../examples/functioncharts/functioncharts.js';
-function stringifyType(type) {
-    let s = '[';
-    function stringifyName(item) {
-        if (item.name)
-            s += '(' + item.name + ')';
-    }
-    function stringifyPin(pin) {
-        s += pin.type ? stringifyType(pin.type) : pin.typeString;
-        stringifyName(pin);
-    }
-    if (type.inputs)
-        type.inputs.forEach(input => stringifyPin(input));
-    s += ',';
-    if (type.outputs)
-        type.outputs.forEach(output => stringifyPin(output));
-    s += ']';
-    stringifyName(type);
-    return s;
-}
 function addElement(functionchart, type) {
     const element = functionchart.context.newElement(type);
     functionchart.nonWires.append(element);
@@ -50,12 +31,14 @@ describe('Typeparser', () => {
     test('add', () => {
         const parser = new FC.TypeParser();
         const typeStrings = [
+            'v',
+            '*',
             '[vv,v](+)',
             '[v(a)v(b),v(c)]',
             '[,[,v][v,v]](@)',
             '[[v,vv(q)](a)v(b),v(c)](foo)',
         ];
-        typeStrings.forEach(typeString => expect(stringifyType(parser.add(typeString))).toBe(typeString));
+        typeStrings.forEach(typeString => expect(FC.stringifyType(parser.add(typeString))).toBe(typeString));
         typeStrings.forEach(typeString => expect(parser.has(typeString)).toBe(true));
         expect(parser.add('[v,v]').name).toBeUndefined();
         expect(parser.add('[vv,v](+)').name).toBe('+');
@@ -74,18 +57,23 @@ describe('Typeparser', () => {
         const subTypeStrings = ['[v,v]', '[,v]', '[v,vv(q)]'];
         subTypeStrings.forEach(typeString => expect(parser.has(typeString)).toBe(true));
     });
-    test('getLabel/setLabel', () => {
+    test('addLabel', () => {
         const parser = new FC.TypeParser();
-        const types = [
-            '[vv,v](+)',
-            '[v(a)v(b),v(c)]',
-            '[,[,v][v,v]](@)',
-            '[[v,vv(q)](a)v(b),v(c)](foo)',
-        ];
-        expect(parser.getLabel('[vv,v](+)')).toBe('+');
-        expect(parser.getLabel('[v(a)v(b),v(c)]')).toBe('');
+        expect(parser.addLabel('[vv,v]', '+')).toBe('[vv,v](+)');
         expect(parser.addLabel('[vv,v](+)', '-')).toBe('[vv,v](-)');
         expect(parser.addLabel('[v(a)v(b),v(c)]', 'foo')).toBe('[v(a)v(b),v(c)](foo)');
+    });
+    test('addInputLabel', () => {
+        const parser = new FC.TypeParser();
+        expect(parser.addInputLabel('[v,v]', 'a')).toBe('[v(a),v]');
+        expect(parser.addInputLabel('[v(a),v]', 'b')).toBe('[v(b),v]');
+        expect(parser.addInputLabel('[v(a),v]', undefined)).toBe('[v,v]');
+    });
+    test('addOutputLabel', () => {
+        const parser = new FC.TypeParser();
+        expect(parser.addOutputLabel('[v,v]', 'a')).toBe('[v,v(a)]');
+        expect(parser.addOutputLabel('[v,v(a)]', 'b')).toBe('[v,v(b)]');
+        expect(parser.addOutputLabel('[v,v(a)]', undefined)).toBe('[v,v]');
     });
 });
 describe('FunctionchartContext', () => {
@@ -177,27 +165,27 @@ describe('FunctionchartContext', () => {
         functionchart.wires.remove(cycleWire);
         expect(context.isValidFunctionchart(functionchart)).toBe(true);
     });
-    test('getInputTypeString', () => {
+    test('getFirstIOTypeString - inputs', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root(), // TODO use getter/setter for property.
         elem = addElement(functionchart, 'binop'), input = addPseudoelement(functionchart, 'input');
-        expect(context.getInputTypeString(input)).toBe('*');
+        expect(context.getFirstIOType(input).typeString).toBe('*');
         const wire = addWire(functionchart, input, 0, elem, 0);
-        expect(context.getInputTypeString(input)).toBe('v');
+        expect(context.getFirstIOType(input).typeString).toBe('v');
         const elem2 = addElement(functionchart, 'element');
         elem2.typeString = '[[vv,v],v]';
         wire.dst = elem2;
-        expect(context.getInputTypeString(input)).toBe('[vv,v]');
+        expect(context.getFirstIOType(input).typeString).toBe('[vv,v]');
     });
-    test('getOutputTypeString', () => {
+    test('getFirstIOTypeString - outputs', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root(), // TODO use getter/setter for property.
         elem = addElement(functionchart, 'binop'), output = addPseudoelement(functionchart, 'output');
-        expect(context.getOutputTypeString(output)).toBe('*');
+        expect(context.getFirstIOType(output).typeString).toBe('*');
         const wire = addWire(functionchart, elem, 0, output, 0);
-        expect(context.getOutputTypeString(output)).toBe('v');
+        expect(context.getFirstIOType(output).typeString).toBe('v');
         const elem2 = addElement(functionchart, 'element');
         elem2.typeString = '[v,[vv,v]]';
         wire.src = elem2;
-        expect(context.getOutputTypeString(output)).toBe('[vv,v]');
+        expect(context.getFirstIOType(output).typeString).toBe('[vv,v]');
     });
 });
 //# sourceMappingURL=functioncharts.test.js.map
