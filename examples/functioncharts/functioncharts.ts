@@ -524,7 +524,7 @@ export interface GraphInfo {
 export class FunctionchartContext extends EventBase<Change, ChangeEvents>
                                   implements DataContext {
   private highestId: number = 0;  // 0 stands for no id.
-  private readonly referentMap = new Map<number, ElementTypes>();
+  private readonly referentMap = new Map<number, ElementTypes | Functionchart>();
 
   private functionchart: Functionchart;  // The root functionchart.
   private elements = new Set<ElementTypes>;
@@ -619,11 +619,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
   newFunctionchart() : Functionchart {
     const nextId = ++this.highestId;
-    return new Functionchart(this, nextId);
+    const result = new Functionchart(this, nextId);
+    this.referentMap.set(nextId, result);
+    return result;
   }
   newFunctionInstance() : FunctionInstance {
     const nextId = ++this.highestId;
-    return new FunctionInstance(this, nextId);
+    const result = new FunctionInstance(this, nextId);
+    this.referentMap.set(nextId, result);
+    return result;
   }
 
   visitAll(item: AllTypes, visitor: FunctionchartVisitor) : void {
@@ -1125,34 +1129,38 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         self.addItem(wire, lca);
       }
     });
-    // Update pseudoelement, conditional, and functionchart types.
+    // Update pseudoelement, conditional, functionchart, and function instance types.
     this.reverseVisitNonWires(this.functionchart, item => {
       // Update types of inputs and outputs.
       if (item instanceof Pseudoelement) {
-        const label = item.type.name,
-              type = self.getFirstIOType(item);
+        const type = self.getFirstIOType(item);
         if (item.template.typeName === 'input' || item.template.typeName === 'literal') {
-          const newTypeString = globalTypeParser_.addOutputLabel(type.typeString, label);
-          if (type.typeString !== newTypeString)
+          const label = item.type.outputs[0].name || '',
+                newTypeString = '[,' + type.typeString + '(' + label + ')' + ']';  // TODO move to parser
+          if (item.typeString !== newTypeString)
             item.typeString = newTypeString;
         } else if(item.template.typeName === 'output') {
-          const newTypeString = globalTypeParser_.addInputLabel(type.typeString, label);
-          if (type.typeString !== newTypeString)
+          const label = item.type.inputs[0].name || '',
+                newTypeString = '[' + type.typeString + '(' + label + ')' + ',]';
+          if (item.typeString !== newTypeString)
             item.typeString = newTypeString;
         }
       } else if (item instanceof Element && item.template.typeName === 'cond') {
         const type = self.getFirstIOType(item),
-              newTypeString = '[v' + type + type + ',' + type + ']';
-        item.typeString = newTypeString;
+              typeString = type.typeString,
+              newTypeString = '[v' + typeString + typeString + ',' + typeString + ']';
+        if (item.typeString !== newTypeString)
+          item.typeString = newTypeString;
       } else if (item instanceof Functionchart) {
-        const typeString = self.getFunctionchartTypeString(item);
-        item.typeString = typeString;
+        const newTypeString = self.getFunctionchartTypeString(item);
+        if (item.typeString !== newTypeString)
+          item.typeString = newTypeString;
       }
     });
     this.visitNonWires(this.functionchart, item => {
       if (item instanceof FunctionInstance) {
         if (item.type !== item.functionchart!.type) {
-          self.updateType(item);
+          item.type = item.functionchart!.type;
         }
       }
     });
@@ -1539,7 +1547,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.removeItem(oldValue);
     this.onElementRemoved(owner, prop, index, oldValue);
   }
-  resolveReference(owner: AllTypes, prop: ReferenceProp) : ElementTypes | undefined {
+  resolveReference(owner: AllTypes, prop: ReferenceProp) : ElementTypes | Functionchart | undefined {
     // Look up element id.
     const id: number = prop.getId(owner);
     if  (!id)
@@ -2903,12 +2911,13 @@ export class FunctionchartEditor implements CanvasLayer {
         drag.items = copies;
       } else if  (drag.type === 'instantiateFunctionchart') {
         const functionchart = drag.items[0] as Functionchart,
-              newInstance = context.newElement('element'),
+              newInstance = context.newFunctionInstance(),
               renderer = this.renderer,
               bounds = renderer.getItemRect(functionchart),
               instancerBounds = this.renderer.getFunctionchartInstanceBounds(functionchart.type,
                 bounds);  // TODO simplify this
-        newInstance.typeString = functionchart.typeString;
+        newInstance.functionchart = functionchart;
+        newInstance.type = functionchart.type;  // TODO shouldn't have to manually set this.
         newInstance.x = instancerBounds.x;
         newInstance.y = instancerBounds.y;
         drag.items = [newInstance];
