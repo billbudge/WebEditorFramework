@@ -69,6 +69,9 @@ export class Type {
   }
 }
 
+const valueType = new Type('v', [], []),
+      starType = new Type('*', [], []);
+
 export function stringifyType(type: Type) {
   if (type.typeString == 'v' || type.typeString == '*')
     return type.typeString;
@@ -103,12 +106,10 @@ export function stringifyType(type: Type) {
 
 export class TypeParser {
   private readonly map_ = new Map<string, Type>();
-  readonly valueType = new Type('v', [], []);
-  readonly starType = new Type('*', [], []);
 
   constructor() {
-    this.addType('v', this.valueType);
-    this.addType('*', this.starType);
+    this.addType('v', valueType);
+    this.addType('*', starType);
   }
 
   private addType(s: string, type: Type) {
@@ -151,12 +152,12 @@ export class TypeParser {
       // value types
       if (s[j] === 'v') {
         j++;
-        return new Pin('v', self.valueType, parseName());
+        return new Pin('v', valueType, parseName());
       }
       // wildcard types
       if (s[j] === '*') {
         j++;
-        return new Pin('*', self.starType, parseName());
+        return new Pin('*', starType, parseName());
       }
       // function types
       let type = parseFunction(),
@@ -1058,7 +1059,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       return false;
     if (src === dst)
       return false;
-    // TODO Cycle detection.
     return true;
   }
 
@@ -1116,7 +1116,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       const src = wire.src,
             dst = wire.dst;
       if (!src || !this.elements.has(src) ||
-          !dst || !this.elements.has(dst)) {
+          !dst || !this.elements.has(dst) ||
+          src.type.outputs.length <= wire.srcPin ||
+          dst.type.inputs.length <= wire.dstPin) {
         self.deleteItem(wire);
         return;
       }
@@ -1129,24 +1131,28 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         self.addItem(wire, lca);
       }
     });
+    // TODO use topological sort to traverse graph and make types consistent.
     // Update pseudoelement, conditional, functionchart, and function instance types.
     this.reverseVisitNonWires(this.functionchart, item => {
       // Update types of inputs and outputs.
       if (item instanceof Pseudoelement) {
-        const type = self.getFirstIOType(item);
         if (item.template.typeName === 'input' || item.template.typeName === 'literal') {
-          const label = item.type.outputs[0].name || '',
+          const type = self.resolveOutputType(item, 0) || starType,
+                label = item.type.outputs[0].name || '',
                 newTypeString = '[,' + type.typeString + '(' + label + ')' + ']';  // TODO move to parser
           if (item.typeString !== newTypeString)
             item.typeString = newTypeString;
         } else if(item.template.typeName === 'output') {
-          const label = item.type.inputs[0].name || '',
+          const type = self.resolveInputType(item, 0) || starType,
+                label = item.type.inputs[0].name || '',
                 newTypeString = '[' + type.typeString + '(' + label + ')' + ',]';
           if (item.typeString !== newTypeString)
             item.typeString = newTypeString;
         }
       } else if (item instanceof Element && item.template.typeName === 'cond') {
-        const type = self.getFirstIOType(item),
+        const type = self.resolveOutputType(item, 0) ||
+                     self.resolveInputType(item, 1) ||
+                     self.resolveInputType(item, 2) || starType,
               typeString = type.typeString,
               newTypeString = '[v' + typeString + typeString + ',' + typeString + ']';
         if (item.typeString !== newTypeString)
@@ -1263,6 +1269,27 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
+  resolveInputType(element: ElementBase, pin: number) : Type | undefined {
+    const inWires = element.inWires,
+          wire = inWires[pin];
+    if (wire && wire.src) {
+      return wire.src.type.outputs[wire.srcPin].type;
+    }
+  }
+
+  resolveOutputType(element: ElementBase, pin: number) : Type | undefined {
+    const outWires = element.outWires,
+          array = outWires[pin],
+          pinType = element.type.outputs[pin].type;
+    for (let i = 0; i < array.length; i++) {
+      const wire = array[i];
+      if (wire && wire.dst) {
+        return wire.dst.type.inputs[wire.dstPin].type;
+        // TODO we need to check all wires and propagate the type downstream.
+      }
+    }
+  }
+
   getFirstIOType(element: ElementBase) {
     const inWires = element.inWires;
     for (let i = 0; i < inWires.length; i++) {
@@ -1281,7 +1308,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         }
       }
     }
-    return globalTypeParser_.starType;
+    return starType;
   }
 
   getFunctionchartTypeString(functionChart: Functionchart) {
@@ -1620,8 +1647,8 @@ class FunctionchartTheme extends Theme {
     this.radius = radius;
 
     // Layout the base types.
-    globalTypeParser_.valueType.width = globalTypeParser_.starType.width = radius;
-    globalTypeParser_.valueType.height = globalTypeParser_.starType.height = radius;
+    valueType.width = starType.width = radius;
+    valueType.height = starType.height = radius;
   }
 }
 
