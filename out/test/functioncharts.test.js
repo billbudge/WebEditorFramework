@@ -144,14 +144,28 @@ describe('FunctionchartContext', () => {
         expect(functionchart.x).toBe(10);
     });
     test('isValidWire', () => {
-        const context = new FC.FunctionchartContext(), wire = context.newWire(undefined, 0, undefined, 0), functionchart = context.newFunctionchart(), elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop');
-        expect(context.isValidWire(wire)).toBe(false);
+        const context = new FC.FunctionchartContext(), wire = context.newWire(undefined, 0, undefined, 0), functionchart = context.newFunctionchart(), elem1 = addElement(functionchart, 'element'), elem2 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
+        elem1.typeString = '[v,v]';
+        elem2.typeString = '[v[v,v],v[v,v]]';
+        expect(context.isValidWire(wire)).toBe(false); // src, dst undefined
         wire.src = elem1;
-        expect(context.isValidWire(wire)).toBe(false);
+        wire.srcPin = 0;
+        expect(context.isValidWire(wire)).toBe(false); // dst undefined
         wire.dst = elem1;
-        expect(context.isValidWire(wire)).toBe(false);
+        wire.dstPin = 0;
+        expect(context.isValidWire(wire)).toBe(false); // src, dst same
         wire.dst = elem2;
-        expect(context.isValidWire(wire)).toBe(true);
+        wire.dstPin = 0;
+        expect(context.isValidWire(wire)).toBe(true); // src, dst valid, types match
+        wire.dstPin = 1;
+        expect(context.isValidWire(wire)).toBe(false); // type mismatch
+        wire.src = input;
+        wire.srcPin = 0;
+        expect(context.isValidWire(wire)).toBe(true); // wildcard match
+        wire.src = elem2;
+        wire.dst = output;
+        wire.dstPin = 0;
+        expect(context.isValidWire(wire)).toBe(true); // wildcard match
     });
     test('isValidFunctionchart', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root(), // TODO use getter/setter for property.

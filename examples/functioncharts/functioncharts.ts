@@ -544,14 +544,22 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.transactionManager = new TransactionManager();
     this.addHandler('changed',
         this.transactionManager.onChanged.bind(this.transactionManager));
-    this.transactionManager.addHandler('transactionEnding', () => {
+
+    function update() {
       if (!self.sorted)
         self.sorted = self.topologicalSort();
       self.makeConsistent();
+    }
+    function updateAndValidate() {
+      update();
       if (!self.isValidFunctionchart()) {
         self.transactionManager.cancelTransaction();
       }
-    });
+    }
+    this.transactionManager.addHandler('transactionEnding', updateAndValidate);
+    this.transactionManager.addHandler('didUndo', update);
+    this.transactionManager.addHandler('didRedo', update);
+
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
     const root = new Functionchart(this, this.highestId++);
     this.functionchart = root;
