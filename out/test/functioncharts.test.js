@@ -156,14 +156,14 @@ describe('FunctionchartContext', () => {
     test('isValidFunctionchart', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root(), // TODO use getter/setter for property.
         elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop');
-        expect(context.isValidFunctionchart(functionchart)).toBe(true);
-        expect(context.isValidFunctionchart(functionchart)).toBe(true);
+        expect(context.isValidFunctionchart()).toBe(true);
+        expect(context.isValidFunctionchart()).toBe(true);
         const wire = addWire(functionchart, elem1, 0, elem2, 0);
-        expect(context.isValidFunctionchart(functionchart)).toBe(true);
+        expect(context.isValidFunctionchart()).toBe(true);
         const cycleWire = addWire(functionchart, elem2, 0, elem1, 0);
-        expect(context.isValidFunctionchart(functionchart)).toBe(false);
+        expect(context.isValidFunctionchart()).toBe(false);
         functionchart.wires.remove(cycleWire);
-        expect(context.isValidFunctionchart(functionchart)).toBe(true);
+        expect(context.isValidFunctionchart()).toBe(true);
     });
     test('getFirstIOTypeString - inputs', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root(), // TODO use getter/setter for property.

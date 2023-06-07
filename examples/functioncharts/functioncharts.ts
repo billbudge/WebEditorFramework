@@ -531,6 +531,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   private elements = new Set<ElementTypes>;
   private functioncharts = new Set<Functionchart>;
   private wires = new Set<Wire>;
+  private sorted? = new Array<ElementTypes>();  // Topologically sorted elements.
 
   readonly transactionManager: TransactionManager;
   readonly historyManager: HistoryManager;
@@ -544,8 +545,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.addHandler('changed',
         this.transactionManager.onChanged.bind(this.transactionManager));
     this.transactionManager.addHandler('transactionEnding', () => {
+      if (!self.sorted)
+        self.sorted = self.topologicalSort();
       self.makeConsistent();
-      if (!self.isValidFunctionchart(self.functionchart)) {
+      if (!self.isValidFunctionchart()) {
         self.transactionManager.cancelTransaction();
       }
     });
@@ -1059,10 +1062,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       return false;
     if (src === dst)
       return false;
+    const srcPin = wire.srcPin,
+          dstPin = wire.dstPin,
+          srcType = src.type.outputs[srcPin].type,
+          dstType = dst.type.inputs[dstPin].type;
+    // starType is wildcard type. // TODO notion of type covariance.
+    if (srcType !== starType && dstType !== starType && srcType !== dstType)
+      return false;
     return true;
   }
 
-  topologicalSort(graphInfo: GraphInfo) {
+  topologicalSort() : ElementTypes[] {
     const visiting = new Set<ElementTypes>(),
           visited = new Set<ElementTypes>(),
           sorted = new Array<ElementTypes>();
@@ -1087,30 +1097,34 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       visited.add(element);
       sorted.push(element);
     }
-    graphInfo.elements.forEach(element => {
+    this.elements.forEach(element => {
       if (!visited.has(element) && !visiting.has(element))
         visit(element);
     });
     return sorted;
   }
-  isValidFunctionchart(functionchart: Functionchart) {
+  isValidFunctionchart() {
     const self = this,
           invalidWires = new Array<Wire>(),
-          graphInfo = this.getSubgraphInfo(functionchart.nonWires.asArray());
+          graphInfo = this.getGraphInfo();
     // Check wires.
     graphInfo.wires.forEach(wire => {
       if (!self.isValidWire(wire))
         invalidWires.push(wire);
     });
-    if (invalidWires.length > 0)
+    if (invalidWires.length !== 0)
       return false;
-    // Check for cycles using topological sort.
-    const sorted = this.topologicalSort(graphInfo);
-    return sorted.length === graphInfo.elements.size;
+
+    if (!this.sorted)
+      this.sorted = this.topologicalSort();
+    return this.sorted.length === this.elements.size;
   }
 
   makeConsistent() {
     const self = this;
+    if (!this.sorted)
+      this.sorted = this.topologicalSort();
+
     // Eliminate dangling wires.
     this.wires.forEach(wire => {
       const src = wire.src,
@@ -1442,10 +1456,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.elements.add(element);
     element.parent = parent;
     this.updateItem(element);
+    this.sorted = undefined;
   }
 
   private removeElement(element: ElementTypes) {
     this.elements.delete(element);
+    this.sorted = undefined;
   }
 
   // Allow parent to be undefined for the root functionchart.
@@ -1470,6 +1486,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.wires.add(wire);
     wire.parent = parent;
     this.updateItem(wire);
+    this.sorted = undefined;
 
     const src = wire.src,
           srcPin = wire.srcPin,
@@ -1494,6 +1511,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   private removeWire(wire: Wire) {
     this.wires.delete(wire);
+    this.sorted = undefined;  // Removal might make an invalid graph valid.
     const src = wire.src,
           dst = wire.dst;
     if (src) {
