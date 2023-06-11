@@ -278,10 +278,10 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.insertStatechart(this.statechart, undefined);
   }
 
-  root() : Statechart {
+  get root() : Statechart {
     return this.statechart;
   }
-  setRoot(root: Statechart) : void {
+  set root(root: Statechart) {
     if (this.statechart)
       this.removeItem(this.statechart);
     this.insertStatechart(root, undefined);
@@ -1763,7 +1763,7 @@ function readRaw(raw: any, context: StatechartContext) : void {
     statechart = readStatechart(raw, context, map);
   }
   if (statechart) {
-    context.setRoot(statechart);
+    context.root = statechart;
   }
 }
 
@@ -1888,13 +1888,13 @@ export class StatechartEditor implements CanvasLayer {
     statechart.states.append(history);
     statechart.states.append(historyDeep);
     statechart.states.append(newState);
-    context.setRoot(statechart);
+    context.root = statechart;
     this.palette = statechart;
 
     // Default statechart.
     this.context = new StatechartContext();
     this.initializeContext(this.context);
-    this.statechart = this.context.root();
+    this.statechart = this.context.root;
 
     // Register property grid layouts.
     function getAttr(info: PropertyInfo) : string | undefined {
@@ -2002,7 +2002,7 @@ export class StatechartEditor implements CanvasLayer {
     context.transactionManager.addHandler('didRedo', update);
   }
   setContext(context: StatechartContext) {
-    const statechart = context.root(),
+    const statechart = context.root,
           renderer = this.renderer;
 
     this.context = context;

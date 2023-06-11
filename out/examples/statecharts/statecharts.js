@@ -152,10 +152,10 @@ export class StatechartContext extends EventBase {
         this.statechart = new Statechart(this);
         this.insertStatechart(this.statechart, undefined);
     }
-    root() {
+    get root() {
         return this.statechart;
     }
-    setRoot(root) {
+    set root(root) {
         if (this.statechart)
             this.removeItem(this.statechart);
         this.insertStatechart(root, undefined);
@@ -1453,7 +1453,7 @@ function readRaw(raw, context) {
         statechart = readStatechart(raw, context, map);
     }
     if (statechart) {
-        context.setRoot(statechart);
+        context.root = statechart;
     }
 }
 //------------------------------------------------------------------------------
@@ -1527,12 +1527,12 @@ export class StatechartEditor {
         statechart.states.append(history);
         statechart.states.append(historyDeep);
         statechart.states.append(newState);
-        context.setRoot(statechart);
+        context.root = statechart;
         this.palette = statechart;
         // Default statechart.
         this.context = new StatechartContext();
         this.initializeContext(this.context);
-        this.statechart = this.context.root();
+        this.statechart = this.context.root;
         // Register property grid layouts.
         function getAttr(info) {
             switch (info.label) {
@@ -1635,7 +1635,7 @@ export class StatechartEditor {
         context.transactionManager.addHandler('didRedo', update);
     }
     setContext(context) {
-        const statechart = context.root(), renderer = this.renderer;
+        const statechart = context.root, renderer = this.renderer;
         this.context = context;
         this.statechart = statechart;
         this.changedItems.clear();

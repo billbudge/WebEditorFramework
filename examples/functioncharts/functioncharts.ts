@@ -292,7 +292,7 @@ const idProp = new IdProp('id'),
       wiresProp = new ChildArrayProp('wires'),
       functionchartProp = new ReferenceProp('functionchart');
 
-class NonWireTemplate {
+abstract class NonWireTemplate {
   readonly id = idProp;
   readonly x = xProp;
   readonly y = yProp;
@@ -366,7 +366,7 @@ const defaultPoint = { x: 0, y: 0 },
       defaultBezierCurve: BezierCurve = [
           defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal];
 
-class ElementBase {
+abstract class ElementBase {
   readonly id: number;
 
   // Derived properties.
@@ -546,6 +546,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         this.transactionManager.onChanged.bind(this.transactionManager));
 
     function update() {
+      self.eliminateDanglingWires();  // TODO - this is a hack.
       if (!self.sorted)
         self.sorted = self.topologicalSort();
       self.makeConsistent();
@@ -566,10 +567,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.insertFunctionchart(root, undefined);
   }
 
-  root() : Functionchart {
+  get root() : Functionchart {
     return this.functionchart;
   }
-  setRoot(root: Functionchart) : void {
+  set root(root: Functionchart) {
     if (this.functionchart) {
       // This removes all elements, functioncharts, and wires.
       this.removeItem(this.functionchart);
@@ -1128,11 +1129,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.sorted.length === this.elements.size;
   }
 
-  makeConsistent() {
+  eliminateDanglingWires() {
     const self = this;
-    if (!this.sorted)
-      this.sorted = this.topologicalSort();
-
     // Eliminate dangling wires.
     this.wires.forEach(wire => {
       const src = wire.src,
@@ -1153,7 +1151,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         self.addItem(wire, lca);
       }
     });
+  }
+
+  makeConsistent() {
+    const self = this;
+
     // TODO use topological sort to traverse graph and make types consistent.
+    if (!this.sorted)
+      this.sorted = this.topologicalSort();
+
     // Update pseudoelement, conditional, functionchart, and function instance types.
     this.reverseVisitNonWires(this.functionchart, item => {
       // Update types of inputs and outputs.
@@ -1214,7 +1220,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     newElement.x = element.x;
     newElement.y = element.y;
 
-    // Update all incoming and outgoing wires if possible, otherwise they
+    // Update all incoming and outgoing wires if possible; otherwise they
     // will be deleted as dangling wires by makeConsistent.
     const srcChange = new Array<Wire>(), dstChange = new Array<Wire>();
     function canRewire(index: number, pins: Pin[], newPins: Pin[]) {
@@ -1291,6 +1297,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
+  group(items: AllTypes[]) {
+    const parent = this.newFunctionchart();
+    items.forEach(item => {
+      if (!(item instanceof Wire)) {
+        this.addItem(item, parent);
+      }
+    });
+    this.addItem(parent, this.functionchart);
+  }
+
   resolveInputType(element: ElementBase, pin: number) : Type | undefined {
     const inWires = element.inWires,
           wire = inWires[pin];
@@ -1310,27 +1326,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         // TODO we need to check all wires and propagate the type downstream.
       }
     }
-  }
-
-  getFirstIOType(element: ElementBase) {
-    const inWires = element.inWires;
-    for (let i = 0; i < inWires.length; i++) {
-      const wire = inWires[i];
-      if (wire && wire.src) {
-        return wire.src.type.outputs[wire.srcPin].type;
-      }
-    }
-    const outWires = element.outWires;
-    for (let i = 0; i < outWires.length; i++) {
-      const array = outWires[i];
-      if (array.length > 0) {
-        const wire = array[0];
-        if (wire && wire.dst) {
-          return wire.dst.type.inputs[wire.dstPin].type;
-        }
-      }
-    }
-    return starType;
   }
 
   getFunctionchartTypeString(functionChart: Functionchart) {
@@ -2369,7 +2364,7 @@ export class FunctionchartEditor implements CanvasLayer {
           newCond = context.newElement('cond'),
           newFunctionchart = context.newFunctionchart();
 
-    context.setRoot(functionchart);
+    context.root = functionchart;
 
     input.x = input.y = 8;
     output.x = 40; output.y = 8;
@@ -2391,13 +2386,13 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nonWires.append(newUnop);
     functionchart.nonWires.append(newCond);
     functionchart.nonWires.append(newFunctionchart);
-    context.setRoot(functionchart);
+    context.root = functionchart;
     this.palette = functionchart;
 
     // Default Functionchart.
     this.context = new FunctionchartContext();
     this.initializeContext(this.context);
-    this.functionchart = this.context.root();
+    this.functionchart = this.context.root;
 
     // Register property grid layouts.
     function getter(info: ItemInfo, item: AllTypes) {
@@ -2537,7 +2532,7 @@ export class FunctionchartEditor implements CanvasLayer {
     context.transactionManager.addHandler('didRedo', update);
   }
   setContext(context: FunctionchartContext) {
-    const functionchart = context.root(),
+    const functionchart = context.root,
           renderer = this.renderer;
 
     this.context = context;
@@ -3178,6 +3173,11 @@ export class FunctionchartEditor implements CanvasLayer {
           }
           return false;
         }
+        case 71 : { // 'g'
+          context.beginTransaction('group items');
+          context.group(context.selectionContents());
+          context.endTransaction();
+        }
         case 69: { // 'e'
           context.selectConnectedElements(true);
           self.canvasController.draw();
@@ -3227,7 +3227,7 @@ export class FunctionchartEditor implements CanvasLayer {
             const raw = JSON.parse(text),
                   context = new FunctionchartContext();
             const functionchart = Deserialize(raw, context) as Functionchart;
-            context.setRoot(functionchart);
+            context.root = functionchart;
             self.initializeContext(context);
             self.setContext(context);
             self.renderer.begin(self.canvasController.getCtx());

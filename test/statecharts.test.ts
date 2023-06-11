@@ -100,7 +100,7 @@ describe('StatechartContext', () => {
           childStatechart1 = context.newStatechart(),
           childState1 = context.newState();
 
-    context.setRoot(statechart);
+    context.root = statechart;
 
     expect(statechart.parent).toBeUndefined();
     expect(state1.parent).toBeUndefined();
@@ -122,7 +122,7 @@ describe('StatechartContext', () => {
           state2 = addState(statechart),
           transition1 = addTransition(statechart, state1, state2);
 
-    context.setRoot(statechart);
+    context.root = statechart;
 
     const graph1 = context.getGraphInfo();
 
@@ -151,7 +151,7 @@ describe('StatechartContext', () => {
           state2 = addState(statechart),
           transition1 = addTransition(statechart, state1, state2);
 
-    context.setRoot(statechart);
+    context.root = statechart;
 
     const subgraph1 = context.getSubgraphInfo([state1, state2]);
 
@@ -208,7 +208,7 @@ describe('StatechartContext', () => {
           transition3 = addTransition(statechart, input, state2),
           transition4 = addTransition(statechart, state2, output);
 
-    context.setRoot(statechart);
+    context.root = statechart;
 
     const inputFn = context.forInTransitions.bind(context),
           outputFn = context.forOutTransitions.bind(context);
@@ -229,7 +229,7 @@ describe('StatechartContext', () => {
           deepHistory = context.newPseudostate('history*'),
           stop = context.newPseudostate('stop');
 
-    context.setRoot(statechart);
+    context.root = statechart;
 
     expect(context.canAddState(state1, statechart)).toBe(true);
     expect(context.canAddState(state2, statechart)).toBe(true);
@@ -259,7 +259,7 @@ describe('StatechartContext', () => {
           shallowHistory = addPseudostate(statechart, 'history'),
           deepHistory = addPseudostate(statechart, 'history*');
 
-    context.setRoot(statechart);
+    context.root = statechart;
 
     // Test transitions within a statechart.
     expect(context.isValidTransition(state1, state1)).toBe(true);
@@ -290,7 +290,7 @@ describe('StatechartContext', () => {
           statechart = context.newStatechart(),
           state1 = context.newState();
 
-    context.setRoot(statechart);
+    context.root = statechart;
 
     expect(statechart.states.length).toBe(0);
     statechart.states.append(state1);
@@ -306,7 +306,7 @@ describe('StatechartContext', () => {
           start1 = context.newPseudostate('start'),
           start2 = context.newPseudostate('start');
 
-    context.setRoot(statechart);
+    context.root = statechart;
 
     // Primitive state has no statechart.
     expect(context.findChildStatechart(superState, state)).toBeUndefined();
@@ -331,7 +331,7 @@ describe('StatechartContext', () => {
           statechart1 = addStatechart(superState),
           state1 = addState(statechart1);
 
-    context.setRoot(statechart);
+    context.root = statechart;
 
     context.select(state1);
     expect(context.selectionContents()).toEqual([state1]);
