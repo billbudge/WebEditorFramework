@@ -17,6 +17,12 @@ export function getExtents(points) {
     }
     return { xmin: xmin, ymin: ymin, xmax: xmax, ymax: ymax };
 }
+export function expandRect(rect, dx, dy) {
+    rect.x -= dx;
+    rect.y -= dy;
+    rect.width += 2 * dx;
+    rect.height += 2 * dy;
+}
 export function pointToPointDist(p1, p2) {
     const dx = p2.x - p1.x, dy = p2.y - p1.y;
     return Math.sqrt(dx * dx + dy * dy);

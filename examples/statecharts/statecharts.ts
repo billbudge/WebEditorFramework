@@ -7,8 +7,8 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          hitTestBezier, measureNameValuePairs, CanvasController, CanvasLayer,
          PropertyGridController, PropertyInfo, FileController } from '../../src/diagrams.js'
 
-import { PointWithNormal, getExtents, projectPointToCircle, BezierCurve,
-         evaluateBezier, CurveHitResult } from '../../src/geometry.js'
+import { Point, Rect, PointWithNormal, getExtents, projectPointToCircle,
+         BezierCurve, evaluateBezier, CurveHitResult, expandRect } from '../../src/geometry.js'
 
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          ReferencedObject, DataContext, DataContextObject, EventBase, Change, ChangeEvents,
@@ -230,7 +230,8 @@ export class Statechart implements DataContextObject {
 
 export type StateTypes = State | Pseudostate;
 export type ParentTypes = Statechart | State | undefined;
-export type NonTransitionTypes = Statechart | StateTypes
+export type NonTransitionTypes = Statechart | StateTypes;
+export type NonStatechartTypes = StateTypes | Transition;
 export type AllTypes = StateTypes | Statechart | Transition;
 
 export type StatechartVisitor = (item: AllTypes) => void;
@@ -789,6 +790,19 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
+  group(items: Array<NonStatechartTypes>, grandparent: Statechart, bounds: Rect) {
+    const parent = this.newState();
+    parent.x = bounds.x;
+    parent.y = bounds.y;
+    // parent.width = bounds.width;
+    // parent.height = bounds.height;
+    this.addItem(parent, grandparent);
+
+    items.forEach(item => {
+      this.addItem(item, parent);
+    });
+  }
+
   makeConsistent () {
     const self = this,
           statechart = this.statechart,
@@ -1055,18 +1069,6 @@ class StatechartTheme extends Theme {
     this.HGlyph = [-h, -v, -h, v, -h, 0, h, 0, h, -v, h, v];
     this.StarGlyph = [-h, -v / 3, h, v / 3, -h, v / 3, h, -v / 3, 0, -v / 1.5, 0, v / 1.5];
   }
-}
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
 }
 
 class StateHitResult {
@@ -2629,15 +2631,19 @@ export class StatechartEditor implements CanvasLayer {
           }
           return false;
         }
-        // case 71 : { // 'g'
-        //   context.reduceSelection();
-        //   context.selection.set(context.selectedStates());
-        //   context.selectInteriorTransitions();
-        //   context.beginTransaction('group items into super state');
-        //   const bounds = this.renderer.getBounds(context.selectedStates());
-        //   context.group(context.selectionContents(), bounds);
-        //   context.endTransaction();
-        // }
+        case 71 : { // 'g'
+          context.reduceSelection();
+          context.selection.set(context.selectedStates());
+          context.selectInteriorTransitions();
+          context.beginTransaction('group items into super state');
+          const theme = this.theme,
+                bounds = this.renderer.getBounds(context.selectedStates()),
+                contents = context.selectionContents() as Array<NonStatechartTypes>,
+                parent = getLowestCommonAncestor<AllTypes>(...contents) as Statechart;
+          expandRect(bounds, theme.radius, theme.radius);
+          context.group(contents, parent, bounds);
+          context.endTransaction();
+        }
         case 69: { // 'e'
           context.selectConnectedStates(true);
           self.canvasController.draw();

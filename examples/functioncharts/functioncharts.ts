@@ -7,8 +7,8 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          CanvasController, CanvasLayer, PropertyGridController, PropertyInfo,
          FileController } from '../../src/diagrams.js'
 
-import { PointWithNormal, getExtents, projectPointToCircle, BezierCurve,
-         evaluateBezier, CurveHitResult } from '../../src/geometry.js'
+import { Point, Rect, PointWithNormal, getExtents, projectPointToCircle,
+         BezierCurve, evaluateBezier, CurveHitResult, expandRect } from '../../src/geometry.js'
 
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          ReferencedObject, DataContext, DataContextObject, EventBase, Change, ChangeEvents,
@@ -1297,17 +1297,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  group(items: AllTypes[], bounds: Rect) {
+  group(items: AllTypes[], grandparent: Functionchart, bounds: Rect) {
     const parent = this.newFunctionchart();
     parent.x = bounds.x;
     parent.y = bounds.y;
     // parent.width = bounds.width;
     // parent.height = bounds.height;
+    this.addItem(parent, grandparent);
 
     items.forEach(item => {
       this.addItem(item, parent);
     });
-    this.addItem(parent, this.functionchart);
   }
 
   resolveInputType(element: ElementBase, pin: number) : Type | undefined {
@@ -1674,18 +1674,6 @@ class FunctionchartTheme extends Theme {
     valueType.width = starType.width = radius;
     valueType.height = starType.height = radius;
   }
-}
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
 }
 
 class ElementHitResult {
@@ -3181,8 +3169,12 @@ export class FunctionchartEditor implements CanvasLayer {
           context.selectInteriorWires();
           context.reduceSelection();
           context.beginTransaction('group items into functionchart');
-          const bounds = this.renderer.getBounds(context.selectedNonWires());
-          context.group(context.selectionContents(), bounds);
+          const theme = this.theme,
+                bounds = this.renderer.getBounds(context.selectedNonWires()),
+                contents = context.selectionContents(),
+                parent = getLowestCommonAncestor<AllTypes>(...contents) as Functionchart;
+          expandRect(bounds, theme.radius, theme.radius);
+          context.group(context.selectionContents(), parent, bounds);
           context.endTransaction();
         }
         case 69: { // 'e'

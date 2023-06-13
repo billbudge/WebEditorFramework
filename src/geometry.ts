@@ -4,6 +4,15 @@ export interface Point {
   x: number;
   y: number;
 }
+
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+
 export interface Normal {
   nx: number;
   ny: number;
@@ -41,6 +50,13 @@ export function getExtents(
     ymax = Math.max(ymax, pi.y);
   }
   return { xmin: xmin, ymin: ymin, xmax: xmax, ymax: ymax };
+}
+
+export function expandRect(rect: Rect, dx: number, dy: number) {
+  rect.x -= dx;
+  rect.y -= dy;
+  rect.width += 2 * dx;
+  rect.height += 2 * dy;
 }
 
 export function pointToPointDist(p1: Point, p2: Point) : number {

@@ -1,6 +1,6 @@
 import { SelectionSet } from '../../src/collections.js';
 import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam, circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, diskPath, hitTestDisk, roundRectPath, bezierEdgePath, hitTestBezier, measureNameValuePairs, FileController } from '../../src/diagrams.js';
-import { getExtents, projectPointToCircle, evaluateBezier } from '../../src/geometry.js';
+import { getExtents, projectPointToCircle, evaluateBezier, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
 // TODO special context when objects are being constructed, before they are in a context.
 //------------------------------------------------------------------------------
@@ -471,10 +471,10 @@ export class StatechartContext extends EventBase {
     beginTransaction(name) {
         this.transactionManager.beginTransaction(name);
     }
-    endTransaction(name) {
+    endTransaction() {
         this.transactionManager.endTransaction();
     }
-    cancelTransaction(name) {
+    cancelTransaction() {
         this.transactionManager.cancelTransaction();
     }
     getUndo() {
@@ -629,6 +629,17 @@ export class StatechartContext extends EventBase {
         this.deleteItems(this.selection.contents());
         this.transactionManager.endTransaction();
         return result;
+    }
+    group(items, grandparent, bounds) {
+        const parent = this.newState();
+        parent.x = bounds.x;
+        parent.y = bounds.y;
+        // parent.width = bounds.width;
+        // parent.height = bounds.height;
+        this.addItem(parent, grandparent);
+        items.forEach(item => {
+            this.addItem(item, parent);
+        });
     }
     makeConsistent() {
         const self = this, statechart = this.statechart, graphInfo = this.getGraphInfo();
@@ -2179,6 +2190,16 @@ export class StatechartEditor {
                         return true;
                     }
                     return false;
+                }
+                case 71: { // 'g'
+                    context.reduceSelection();
+                    context.selection.set(context.selectedStates());
+                    context.selectInteriorTransitions();
+                    context.beginTransaction('group items into super state');
+                    const theme = this.theme, bounds = this.renderer.getBounds(context.selectedStates()), contents = context.selectionContents(), parent = getLowestCommonAncestor(...contents);
+                    expandRect(bounds, theme.radius, theme.radius);
+                    context.group(contents, parent, bounds);
+                    context.endTransaction();
                 }
                 case 69: { // 'e'
                     context.selectConnectedStates(true);
