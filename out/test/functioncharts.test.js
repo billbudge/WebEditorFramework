@@ -149,6 +149,25 @@ describe('FunctionchartContext', () => {
         functionchart.x = 10;
         expect(functionchart.x).toBe(10);
     });
+    test('iterators', () => {
+        function testIterator(fn, elem, items) {
+            const iterated = new Array();
+            fn(elem, t => iterated.push(t));
+            expect(items.length).toBe(iterated.length);
+            for (const item of items) {
+                expect(iterated).toContain(item);
+            }
+        }
+        const context = new FC.FunctionchartContext(), functionchart = context.newFunctionchart(), elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop'), wire1 = addWire(functionchart, elem1, 0, elem2, 0), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire2 = addWire(functionchart, input, 0, elem1, 1), wire3 = addWire(functionchart, input, 0, elem2, 1), wire4 = addWire(functionchart, elem2, 0, output1, 0), wire5 = addWire(functionchart, elem2, 0, output2, 0);
+        context.root = functionchart;
+        const inputFn = context.forInWires.bind(context), outputFn = context.forOutWires.bind(context);
+        testIterator(inputFn, input, []);
+        testIterator(outputFn, input, [wire2, wire3]);
+        testIterator(inputFn, elem1, [wire2]);
+        testIterator(outputFn, elem1, [wire1]);
+        testIterator(inputFn, elem2, [wire1, wire3]);
+        testIterator(outputFn, elem2, [wire4, wire5]);
+    });
     test('isValidWire', () => {
         const context = new FC.FunctionchartContext(), wire = context.newWire(undefined, 0, undefined, 0), functionchart = context.newFunctionchart(), elem1 = addElement(functionchart, 'element'), elem2 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
         elem1.typeString = '[v,v]';

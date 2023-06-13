@@ -606,10 +606,10 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   beginTransaction(name: string) {
     this.transactionManager.beginTransaction(name);
   }
-  endTransaction(name: string) {
+  endTransaction() {
     this.transactionManager.endTransaction();
   }
-  cancelTransaction(name: string) {
+  cancelTransaction() {
     this.transactionManager.cancelTransaction();
   }
   getUndo() {
@@ -2550,7 +2550,7 @@ export class StatechartEditor implements CanvasLayer {
       const hitList = this.hitTestCanvas(cp),
             hitInfo = this.getFirstHit(hitList, isDropTarget);
       let parent: State | Statechart = statechart;
-      if (hitInfo && (hitInfo instanceof StatechartHitResult || hitInfo instanceof StateHitResult)) {
+      if (hitInfo instanceof StatechartHitResult || hitInfo instanceof StateHitResult) {
         parent = hitInfo.item;
       }
       // Reparent items.
@@ -2629,6 +2629,15 @@ export class StatechartEditor implements CanvasLayer {
           }
           return false;
         }
+        // case 71 : { // 'g'
+        //   context.reduceSelection();
+        //   context.selection.set(context.selectedStates());
+        //   context.selectInteriorTransitions();
+        //   context.beginTransaction('group items into super state');
+        //   const bounds = this.renderer.getBounds(context.selectedStates());
+        //   context.group(context.selectionContents(), bounds);
+        //   context.endTransaction();
+        // }
         case 69: { // 'e'
           context.selectConnectedStates(true);
           self.canvasController.draw();

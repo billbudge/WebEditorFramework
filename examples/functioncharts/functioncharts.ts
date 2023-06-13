@@ -1297,12 +1297,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  group(items: AllTypes[]) {
+  group(items: AllTypes[], bounds: Rect) {
     const parent = this.newFunctionchart();
+    parent.x = bounds.x;
+    parent.y = bounds.y;
+    // parent.width = bounds.width;
+    // parent.height = bounds.height;
+
     items.forEach(item => {
-      if (!(item instanceof Wire)) {
-        this.addItem(item, parent);
-      }
+      this.addItem(item, parent);
     });
     this.addItem(parent, this.functionchart);
   }
@@ -1613,7 +1616,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'literal': return this.newPseudoelement('literal');
       case 'wire': return this.newWire(undefined, -1, undefined, -1);
       case 'functionchart': return this.newFunctionchart();
-      case 'functioninstance': return this.newFunctionInstance();
+      case 'instance': return this.newFunctionInstance();
     }
     throw new Error('Unknown type');
   }
@@ -3091,17 +3094,17 @@ export class FunctionchartEditor implements CanvasLayer {
       // Find element or functionchart beneath mouse.
       const hitList = this.hitTestCanvas(cp),
             hitInfo = this.getFirstHit(hitList, isDropTarget);
-      let parent: Functionchart = functionchart;
-      if (hitInfo) {
-        if (hitInfo.item instanceof Functionchart) {
+      if (hitInfo instanceof ElementHitResult && drag.items[0] instanceof ElementBase) {
+        context.replaceElement(hitInfo.item, drag.items[0] as ElementTypes);
+      } else {
+        let parent: Functionchart = functionchart;
+        if (hitInfo instanceof FunctionchartHitResult) {
           parent = hitInfo.item;
-          // Reparent items
-          selection.contents().forEach(item => {
-            context.addItem(item, parent);
-          });
-        } else if (hitInfo instanceof ElementHitResult && drag.items[0] instanceof ElementBase) {
-          context.replaceElement(hitInfo.item, drag.items[0] as ElementTypes);
         }
+        // Reparent items
+        selection.contents().forEach(item => {
+          context.addItem(item, parent);
+        });
       }
     }
 
@@ -3174,8 +3177,12 @@ export class FunctionchartEditor implements CanvasLayer {
           return false;
         }
         case 71 : { // 'g'
-          context.beginTransaction('group items');
-          context.group(context.selectionContents());
+          context.selection.set(context.selectedNonWires());
+          context.selectInteriorWires();
+          context.reduceSelection();
+          context.beginTransaction('group items into functionchart');
+          const bounds = this.renderer.getBounds(context.selectedNonWires());
+          context.group(context.selectionContents(), bounds);
           context.endTransaction();
         }
         case 69: { // 'e'

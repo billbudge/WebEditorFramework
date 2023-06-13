@@ -2113,7 +2113,7 @@ export class StatechartEditor {
             // Find state beneath mouse.
             const hitList = this.hitTestCanvas(cp), hitInfo = this.getFirstHit(hitList, isDropTarget);
             let parent = statechart;
-            if (hitInfo && (hitInfo instanceof StatechartHitResult || hitInfo instanceof StateHitResult)) {
+            if (hitInfo instanceof StatechartHitResult || hitInfo instanceof StateHitResult) {
                 parent = hitInfo.item;
             }
             // Reparent items.
