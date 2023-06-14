@@ -2,27 +2,27 @@ import { SelectionSet } from '../../src/collections.js';
 import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam, circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, diskPath, hitTestDisk, roundRectPath, bezierEdgePath, hitTestBezier, measureNameValuePairs, FileController } from '../../src/diagrams.js';
 import { getExtents, projectPointToCircle, evaluateBezier, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
-// TODO special context when objects are being constructed, before they are in a context.
 //------------------------------------------------------------------------------
+const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), entryProp = new ScalarProp('entry'), exitProp = new ScalarProp('exit'), srcProp = new ReferenceProp('src'), tSrcProp = new ScalarProp('tSrc'), dstProp = new ReferenceProp('dst'), tDstProp = new ScalarProp('tDst'), eventProp = new ScalarProp('event'), guardProp = new ScalarProp('guard'), actionProp = new ScalarProp('action'), tTextProp = new ScalarProp('tText'), statesProp = new ChildArrayProp('states'), transitionsProp = new ChildArrayProp('transitions'), statechartsProp = new ChildArrayProp('statecharts');
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
 class StateBaseTemplate {
     constructor() {
-        this.id = new IdProp('id');
-        this.x = new ScalarProp('x');
-        this.y = new ScalarProp('y');
+        this.id = idProp;
+        this.x = xProp;
+        this.y = yProp;
     }
 }
 class StateTemplate extends StateBaseTemplate {
     constructor() {
         super(...arguments);
         this.typeName = 'state';
-        this.width = new ScalarProp('width');
-        this.height = new ScalarProp('height');
-        this.name = new ScalarProp('name');
-        this.entry = new ScalarProp('entry');
-        this.exit = new ScalarProp('exit');
-        this.statecharts = new ChildArrayProp('statecharts');
+        this.width = widthProp;
+        this.height = heightProp;
+        this.name = nameProp;
+        this.entry = entryProp;
+        this.exit = exitProp;
+        this.statecharts = statechartsProp;
         this.properties = [this.id, this.x, this.y, this.width, this.height,
             this.name, this.entry, this.exit, this.statecharts];
     }
@@ -34,19 +34,48 @@ class PseudostateTemplate extends StateBaseTemplate {
         this.typeName = typeName;
     }
 }
-const stateTemplate = new StateTemplate(), startPseudostateTemplate = new PseudostateTemplate('start'), stopPseudostateTemplate = new PseudostateTemplate('stop'), historyPseudostateTemplate = new PseudostateTemplate('history'), deepHistoryPseudostateTemplate = new PseudostateTemplate('history*');
-const transitionTemplate = (function () {
-    const typeName = 'transition', src = new ReferenceProp('src'), tSrc = new ScalarProp('tSrc'), dst = new ReferenceProp('dst'), tDst = new ScalarProp('tDst'), event = new ScalarProp('event'), guard = new ScalarProp('guard'), action = new ScalarProp('action'), tText = new ScalarProp('tText'), properties = [src, tSrc, dst, tDst, event, guard, action, tText];
-    return { typeName, src, tSrc, dst, tDst, event, guard, action, tText, properties };
-})();
-const statechartTemplate = (function () {
-    const typeName = 'statechart', x = new ScalarProp('x'), y = new ScalarProp('y'), width = new ScalarProp('width'), height = new ScalarProp('height'), name = new ScalarProp('name'), states = new ChildArrayProp('states'), transitions = new ChildArrayProp('transitions'), properties = [x, y, width, height, name, states, transitions];
-    return { typeName, x, y, width, height, name, states, transitions, properties };
-})();
+class TransitionTemplate {
+    constructor() {
+        this.typeName = 'transition';
+        this.src = srcProp;
+        this.tSrc = tSrcProp;
+        this.dst = dstProp;
+        this.tDst = tDstProp;
+        this.event = eventProp;
+        this.guard = guardProp;
+        this.action = actionProp;
+        this.tText = tTextProp;
+        this.properties = [this.src, this.tSrc, this.dst, this.tDst, this.event,
+            this.guard, this.action, this.tText];
+    }
+}
+class StatechartTemplate {
+    constructor() {
+        this.typeName = 'statechart';
+        this.x = xProp;
+        this.y = yProp;
+        this.width = widthProp;
+        this.height = heightProp;
+        this.name = nameProp;
+        this.states = statesProp;
+        this.transitions = transitionsProp;
+        this.properties = [this.x, this.y, this.width, this.height, this.name,
+            this.states, this.transitions];
+    }
+}
+const stateTemplate = new StateTemplate(), startPseudostateTemplate = new PseudostateTemplate('start'), stopPseudostateTemplate = new PseudostateTemplate('stop'), historyPseudostateTemplate = new PseudostateTemplate('history'), deepHistoryPseudostateTemplate = new PseudostateTemplate('history*'), transitionTemplate = new TransitionTemplate(), statechartTemplate = new StatechartTemplate();
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
-export class State {
+class StateBase {
+    constructor(id) {
+        this.globalPosition = defaultPoint;
+        this.inTransitions = new Array();
+        this.outTransitions = new Array();
+        this.id = id;
+    }
+}
+export class State extends StateBase {
     get x() { return this.template.x.get(this) || 0; }
     set x(value) { this.template.x.set(this, value); }
     get y() { return this.template.y.get(this) || 0; }
@@ -63,25 +92,24 @@ export class State {
     set exit(value) { this.template.exit.set(this, value); }
     get statecharts() { return this.template.statecharts.get(this); }
     constructor(context, id) {
+        super(id);
         this.template = stateTemplate;
-        this.globalPosition = defaultPoint;
+        // Derived properties.
         this.entryText = '';
         this.entryY = 0;
         this.exitText = '';
         this.exitY = 0;
         this.context = context;
-        this.id = id;
     }
 }
-export class Pseudostate {
+export class Pseudostate extends StateBase {
     get x() { return this.template.x.get(this) || 0; }
     set x(value) { this.template.x.set(this, value); }
     get y() { return this.template.y.get(this) || 0; }
     set y(value) { this.template.y.set(this, value); }
     constructor(template, id, context) {
-        this.globalPosition = defaultPoint;
+        super(id);
         this.template = template;
-        this.id = id;
         this.context = context;
     }
 }
@@ -281,14 +309,10 @@ export class StatechartContext extends EventBase {
     }
     forInTransitions(state, visitor) {
         const inputs = state.inTransitions;
-        if (!inputs)
-            return;
         inputs.forEach((input, i) => visitor(input));
     }
     forOutTransitions(state, visitor) {
         const outputs = state.outTransitions;
-        if (!outputs)
-            return;
         outputs.forEach((output, i) => visitor(output));
     }
     // Gets the translation to move an item from its current parent to
@@ -336,7 +360,7 @@ export class StatechartContext extends EventBase {
         // First collect states and statecharts.
         items.forEach(item => {
             this.visitAll(item, item => {
-                if (item instanceof State || item instanceof Pseudostate)
+                if (item instanceof StateBase)
                     states.add(item);
                 else if (item instanceof Statechart)
                     statecharts.add(item);
@@ -364,7 +388,7 @@ export class StatechartContext extends EventBase {
                     }
                 }
             }
-            if (item instanceof State || item instanceof Pseudostate) {
+            if (item instanceof StateBase) {
                 self.forInTransitions(item, addTransition);
                 self.forOutTransitions(item, addTransition);
             }
@@ -513,7 +537,7 @@ export class StatechartContext extends EventBase {
     selectedStates() {
         const result = new Array();
         this.selection.forEach(item => {
-            if (item instanceof State || item instanceof Pseudostate)
+            if (item instanceof StateBase)
                 result.push(item);
         });
         return result;
@@ -562,7 +586,7 @@ export class StatechartContext extends EventBase {
             }
         }
         // At this point we can add item to parent.
-        if (item instanceof State || item instanceof Pseudostate) {
+        if (item instanceof StateBase) {
             const translation = this.getToParent(item, parent);
             item.x += translation.x;
             item.y += translation.y;
@@ -573,7 +597,7 @@ export class StatechartContext extends EventBase {
             if (item instanceof Transition) {
                 parent.transitions.append(item);
             }
-            else if (item instanceof State || item instanceof Pseudostate) {
+            else if (item instanceof StateBase) {
                 parent.states.append(item);
             }
         }
@@ -582,7 +606,7 @@ export class StatechartContext extends EventBase {
     addItems(items, parent) {
         // Add states first, then transitions, so the context can track transitions.
         for (let item of items) {
-            if (item instanceof State || item instanceof Pseudostate)
+            if (item instanceof StateBase)
                 this.addItem(item, parent);
         }
         for (let item of items) {
@@ -597,7 +621,7 @@ export class StatechartContext extends EventBase {
         this.reduceSelection();
         const selected = selection.contents(), map = new Map(), copies = copyItems(selected, this, map);
         selected.forEach(item => {
-            if (item instanceof State || item instanceof Pseudostate) {
+            if (item instanceof StateBase) {
                 const copy = map.get(item.id);
                 if (copy) {
                     const translation = this.getToParent(item, statechart);
@@ -612,7 +636,7 @@ export class StatechartContext extends EventBase {
         this.transactionManager.beginTransaction('paste');
         items.forEach(item => {
             // Offset paste so copies don't overlap with the originals.
-            if (item instanceof State || item instanceof Pseudostate) {
+            if (item instanceof StateBase) {
                 item.x += 16;
                 item.y += 16;
             }
@@ -691,10 +715,6 @@ export class StatechartContext extends EventBase {
         state.parent = parent;
         this.updateItem(state);
         this.states.add(state);
-        if (state.inTransitions === undefined)
-            state.inTransitions = new Array();
-        if (state.outTransitions === undefined)
-            state.outTransitions = new Array();
         if (state instanceof State && state.statecharts) {
             const self = this;
             state.statecharts.forEach(statechart => self.insertStatechart(statechart, state));
@@ -1684,7 +1704,7 @@ export class StatechartEditor {
             changedTopLevelStates.add(topLevel);
         }
         function addItems(item) {
-            if (item instanceof State || item instanceof Pseudostate) {
+            if (item instanceof StateBase) {
                 // Layout the state's incoming and outgoing transitions.
                 context.forInTransitions(item, addItems);
                 context.forOutTransitions(item, addItems);
@@ -1999,7 +2019,7 @@ export class StatechartEditor {
                 // Transform palette items into the canvas coordinate system.
                 const offset = this.paletteController.offsetToOtherCanvas(this.canvasController), copies = copyItems(drag.items, context);
                 copies.forEach(copy => {
-                    if (copy instanceof State || copy instanceof Pseudostate) {
+                    if (copy instanceof StateBase) {
                         copy.x -= offset.x;
                         copy.y -= offset.y;
                     }

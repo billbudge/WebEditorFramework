@@ -18,26 +18,44 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
 
 import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
-// TODO special context when objects are being constructed, before they are in a context.
-
 //------------------------------------------------------------------------------
+
+const idProp = new IdProp('id'),
+      xProp = new ScalarProp('x'),
+      yProp = new ScalarProp('y'),
+      nameProp = new ScalarProp('name'),
+      widthProp = new ScalarProp('width'),
+      heightProp = new ScalarProp('height'),
+      entryProp = new ScalarProp('entry'),
+      exitProp = new ScalarProp('exit'),
+      srcProp = new ReferenceProp('src'),
+      tSrcProp = new ScalarProp('tSrc'),
+      dstProp = new ReferenceProp('dst'),
+      tDstProp = new ScalarProp('tDst'),
+      eventProp = new ScalarProp('event'),
+      guardProp = new ScalarProp('guard'),
+      actionProp = new ScalarProp('action'),
+      tTextProp = new ScalarProp('tText'),
+      statesProp = new ChildArrayProp('states'),
+      transitionsProp = new ChildArrayProp('transitions'),
+      statechartsProp = new ChildArrayProp('statecharts');
 
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
 class StateBaseTemplate {
-  readonly id = new IdProp('id');
-  readonly x = new ScalarProp('x');
-  readonly y = new ScalarProp('y');
+  readonly id = idProp;
+  readonly x = xProp;
+  readonly y = yProp;
 }
 
 class StateTemplate extends StateBaseTemplate {
   readonly typeName = 'state';
-  readonly width = new ScalarProp('width');
-  readonly height = new ScalarProp('height');
-  readonly name = new ScalarProp('name');
-  readonly entry = new ScalarProp('entry');
-  readonly exit = new ScalarProp('exit');
-  readonly statecharts = new ChildArrayProp('statecharts');
+  readonly width = widthProp;
+  readonly height = heightProp;
+  readonly name = nameProp;
+  readonly entry = entryProp;
+  readonly exit = exitProp;
+  readonly statecharts = statechartsProp;
   readonly properties = [this.id, this.x, this.y, this.width, this.height,
                          this.name, this.entry, this.exit, this.statecharts];
 }
@@ -47,48 +65,47 @@ export type PseudostateSubtype = 'start' | 'stop' | 'history' | 'history*';
 class PseudostateTemplate extends StateBaseTemplate {
   readonly typeName: string;
   readonly properties = [this.id, this.x, this.y];
+
   constructor(typeName: PseudostateSubtype) {
     super();
     this.typeName = typeName;
   }
 }
 
+class TransitionTemplate {
+  readonly typeName = 'transition';
+  readonly src = srcProp;
+  readonly tSrc = tSrcProp;
+  readonly dst = dstProp;
+  readonly tDst = tDstProp;
+  readonly event = eventProp;
+  readonly guard = guardProp;
+  readonly action = actionProp;
+  readonly tText = tTextProp;
+  readonly properties = [this.src, this.tSrc, this.dst, this.tDst, this.event,
+                         this.guard, this.action, this.tText];
+}
+
+class StatechartTemplate {
+  readonly typeName = 'statechart';
+  readonly x = xProp;
+  readonly y = yProp;
+  readonly width = widthProp;
+  readonly height = heightProp;
+  readonly name = nameProp;
+  readonly states = statesProp;
+  readonly transitions = transitionsProp;
+  readonly properties = [this.x, this.y, this.width, this.height, this.name,
+                         this.states, this.transitions];
+}
+
 const stateTemplate = new StateTemplate(),
       startPseudostateTemplate = new PseudostateTemplate('start'),
       stopPseudostateTemplate = new PseudostateTemplate('stop'),
       historyPseudostateTemplate = new PseudostateTemplate('history'),
-      deepHistoryPseudostateTemplate = new PseudostateTemplate('history*');
-
-const transitionTemplate = (function() {
-  const typeName: string = 'transition',
-        src = new ReferenceProp('src'),
-        tSrc = new ScalarProp('tSrc'),
-        dst = new ReferenceProp('dst'),
-        tDst = new ScalarProp('tDst'),
-
-        event = new ScalarProp('event'),
-        guard = new ScalarProp('guard'),
-        action = new ScalarProp('action'),
-        tText = new ScalarProp('tText'),
-        properties = [src, tSrc, dst, tDst, event, guard, action, tText];
-
-  return { typeName, src, tSrc, dst, tDst, event, guard, action, tText, properties };
-})();
-
-const statechartTemplate = (function() {
-  const typeName: string = 'statechart',
-        x = new ScalarProp('x'),
-        y = new ScalarProp('y'),
-        width = new ScalarProp('width'),
-        height = new ScalarProp('height'),
-        name = new ScalarProp('name'),
-
-        states = new ChildArrayProp('states'),
-        transitions = new ChildArrayProp('transitions'),
-        properties = [x, y, width, height, name, states, transitions];
-
-  return { typeName, x, y, width, height, name, states, transitions, properties };
-})();
+      deepHistoryPseudostateTemplate = new PseudostateTemplate('history*'),
+      transitionTemplate = new TransitionTemplate(),
+      statechartTemplate = new StatechartTemplate();
 
 const defaultPoint = { x: 0, y: 0 },
       defaultPointWithNormal: PointWithNormal = { x: 0, y: 0, nx: 0 , ny: 0 },
