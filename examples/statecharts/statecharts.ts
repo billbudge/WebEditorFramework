@@ -95,6 +95,20 @@ const defaultPoint = { x: 0, y: 0 },
       defaultBezierCurve: BezierCurve = [
           defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal];
 
+abstract class StateBase {
+  readonly id: number;
+
+  // Derived properties.
+  parent: Statechart | undefined;
+  globalPosition = defaultPoint;
+  inTransitions = new Array<Transition>();
+  outTransitions = new Array<Transition>();
+
+  constructor(id: number) {
+    this.id = id;
+  }
+}
+
 export class State implements DataContextObject, ReferencedObject {
   readonly template = stateTemplate;
   readonly context: StatechartContext;
