@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Functionchart Editor</title>
+  <link rel="shortcut icon" href="./favicon.ico">
+</head>
+<body id="body" z-index="0">
+
+<canvas id="palette" style="position:fixed; z-index:1; box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);"></canvas>
+<canvas id="canvas" style="position:absolute; z-index:0; "></canvas>
+
+<script type="module" src="../../out/src/collections.js"></script>
+<script type="module" src="../../out/src/dataModels.js"></script>
+<script type="module" src="../../out/src/diagrams.js"></script>
+<script type="module" src="../../out/src/geometry.js"></script>
+<script type="module" src="../../out/examples/functioncharts/functioncharts.js"></script>
+<script type="module" src="../../out/examples/functioncharts/functionchart_example.js"></script>
+<script src="../../third_party/canvas2svg/canvas2svg.js"></script>
+<script src="../../third_party/FileSaver.min.js"></script>
+
+</body>
+</html>
