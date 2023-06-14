@@ -109,11 +109,9 @@ abstract class StateBase {
   }
 }
 
-export class State implements DataContextObject, ReferencedObject {
+export class State extends StateBase implements DataContextObject, ReferencedObject {
   readonly template = stateTemplate;
   readonly context: StatechartContext;
-
-  readonly id: number;
 
   get x() { return this.template.x.get(this) || 0; }
   set x(value: number) { this.template.x.set(this, value); }
@@ -133,41 +131,29 @@ export class State implements DataContextObject, ReferencedObject {
   get statecharts() { return this.template.statecharts.get(this) as List<Statechart>; }
 
   // Derived properties.
-  parent: Statechart | undefined;
-  globalPosition = defaultPoint;
-  inTransitions: Transition[];
-  outTransitions: Transition[];
   entryText = '';
   entryY = 0;
   exitText = '';
   exitY = 0;
 
   constructor(context: StatechartContext, id: number) {
+    super(id);
     this.context = context;
-    this.id = id;
   }
 }
 
-export class Pseudostate implements DataContextObject, ReferencedObject {
+export class Pseudostate extends StateBase implements DataContextObject, ReferencedObject {
   readonly template: PseudostateTemplate;
   readonly context: StatechartContext;
-
-  readonly id: number;
 
   get x() { return this.template.x.get(this) || 0; }
   set x(value: number) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
   set y(value: number) { this.template.y.set(this, value); }
 
-  // Derived properties.
-  parent: Statechart | undefined;
-  globalPosition = defaultPoint;
-  inTransitions: Transition[];
-  outTransitions: Transition[];
-
   constructor(template: PseudostateTemplate, id: number, context: StatechartContext) {
+    super(id);
     this.template = template;
-    this.id = id;
     this.context = context;
   }
 }
@@ -412,15 +398,11 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
 
   forInTransitions(state: StateTypes, visitor: TransitionVisitor) {
     const inputs = state.inTransitions;
-    if (!inputs)
-      return;
     inputs.forEach((input, i) => visitor(input));
   }
 
   forOutTransitions(state: StateTypes, visitor: TransitionVisitor) {
     const outputs = state.outTransitions;
-    if (!outputs)
-      return;
     outputs.forEach((output, i) => visitor(output));
   }
 
@@ -480,7 +462,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     // First collect states and statecharts.
     items.forEach(item => {
       this.visitAll(item, item => {
-        if (item instanceof State || item instanceof Pseudostate)
+        if (item instanceof StateBase)
           states.add(item);
         else if (item instanceof Statechart)
           statecharts.add(item);
@@ -509,7 +491,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
           }
         }
       }
-      if (item instanceof State || item instanceof Pseudostate) {
+      if (item instanceof StateBase) {
         self.forInTransitions(item, addTransition);
         self.forOutTransitions(item, addTransition);
       }
@@ -668,7 +650,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   selectedStates() : Array<StateTypes> {
     const result = new Array<StateTypes>();
     this.selection.forEach(item => {
-      if (item instanceof State || item instanceof Pseudostate)
+      if (item instanceof StateBase)
         result.push(item);
     });
     return result;
@@ -724,7 +706,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
       }
     }
     // At this point we can add item to parent.
-    if (item instanceof State || item instanceof Pseudostate) {
+    if (item instanceof StateBase) {
       const translation = this.getToParent(item, parent);
       item.x += translation.x;
       item.y += translation.y;
@@ -736,7 +718,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     if (parent instanceof Statechart) {
       if (item instanceof Transition) {
         parent.transitions.append(item);
-      } else if (item instanceof State || item instanceof Pseudostate) {
+      } else if (item instanceof StateBase) {
         parent.states.append(item);
       }
     }
@@ -746,7 +728,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   addItems(items: AllTypes[], parent: State | Statechart) {
     // Add states first, then transitions, so the context can track transitions.
     for (let item of items) {
-      if (item instanceof State || item instanceof Pseudostate)
+      if (item instanceof StateBase)
         this.addItem(item, parent);
     }
     for (let item of items) {
@@ -768,7 +750,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
           copies = copyItems(selected, this, map);
 
     selected.forEach(item => {
-      if (item instanceof State || item instanceof Pseudostate) {
+      if (item instanceof StateBase) {
         const copy = map.get(item.id);
         if (copy) {
           const translation = this.getToParent(item, statechart);
@@ -784,7 +766,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.transactionManager.beginTransaction('paste');
     items.forEach(item => {
       // Offset paste so copies don't overlap with the originals.
-      if (item instanceof State || item instanceof Pseudostate) {
+      if (item instanceof StateBase) {
         item.x += 16;
         item.y += 16;
       }
@@ -873,11 +855,6 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     state.parent = parent;
     this.updateItem(state);
     this.states.add(state);
-
-    if (state.inTransitions === undefined)
-      state.inTransitions = new Array<Transition>();
-    if (state.outTransitions === undefined)
-      state.outTransitions = new Array<Transition>();
 
     if (state instanceof State && state.statecharts) {
       const self = this;
@@ -2067,7 +2044,7 @@ export class StatechartEditor implements CanvasLayer {
     }
 
     function addItems(item: AllTypes) {
-      if (item instanceof State || item instanceof Pseudostate) {
+      if (item instanceof StateBase) {
         // Layout the state's incoming and outgoing transitions.
         context.forInTransitions(item, addItems);
         context.forOutTransitions(item, addItems);
@@ -2422,7 +2399,7 @@ export class StatechartEditor implements CanvasLayer {
         const offset = this.paletteController.offsetToOtherCanvas(this.canvasController),
               copies = copyItems(drag.items, context) as AllTypes[];
         copies.forEach(copy => {
-          if (copy instanceof State || copy instanceof Pseudostate) {
+          if (copy instanceof StateBase) {
             copy.x -= offset.x;
             copy.y -= offset.y;
           }
