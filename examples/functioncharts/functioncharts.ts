@@ -373,8 +373,8 @@ abstract class ElementBase {
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
   type: Type = nullFunction;
-  inWires = new Array<Wire | undefined>(0);   // one input per pin.
-  outWires = new Array<Array<Wire>>(0);       // array of outputs per pin, outputs have fan out.
+  inWires = new Array<Wire | undefined>();   // one input per pin (no fan in).
+  outWires = new Array<Array<Wire>>();       // multiple outputs per pin (fan out).
 
   constructor(id: number) {
     this.id = id;
@@ -594,7 +594,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         break;
       case 'cond':
         template = condTemplate;
-        typeString = '[v**,*]';
+        typeString = '[v**,*](?)';
         break;
       case 'element':
         template = elementTemplate;
@@ -698,20 +698,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   forInWires(element: ElementTypes, visitor: WireVisitor) {
-    const inputs = element.inWires;
-    if (!inputs)
-      return;
-    inputs.forEach(wire => {
+    element.inWires.forEach(wire => {
       if (wire)
       visitor(wire);
     });
   }
 
   forOutWires(element: ElementTypes, visitor: WireVisitor) {
-    const outputs = element.outWires;
-    if (!outputs)
-      return;
-    outputs.forEach((wires: Wire[]) => {
+    element.outWires.forEach((wires: Wire[]) => {
       wires.forEach(wire => visitor(wire))
     });
   }
@@ -890,10 +884,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.selection.contents();
   }
 
-  selectedElements() : Element[] {
-    const result = new Array<Element>();
+  selectedElements() : (Element | FunctionInstance)[] {
+    const result = new Array<Element | FunctionInstance>();
     this.selection.forEach(item => {
-      if (item instanceof Element)
+      if (item instanceof Element || item instanceof FunctionInstance)
         result.push(item);
     });
     return result;
@@ -1165,24 +1159,24 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       // Update types of inputs and outputs.
       if (item instanceof Pseudoelement) {
         if (item.template.typeName === 'input' || item.template.typeName === 'literal') {
-          const type = self.resolveOutputType(item, 0) || starType,
+          const type = starType,  // self.resolveOutputType(item, 0) || starType,
                 label = item.type.outputs[0].name || '',
                 newTypeString = '[,' + type.typeString + '(' + label + ')' + ']';  // TODO move to parser
           if (item.typeString !== newTypeString)
             item.typeString = newTypeString;
         } else if(item.template.typeName === 'output') {
-          const type = self.resolveInputType(item, 0) || starType,
+          const type = starType,  // self.resolveInputType(item, 0) || starType,
                 label = item.type.inputs[0].name || '',
                 newTypeString = '[' + type.typeString + '(' + label + ')' + ',]';
           if (item.typeString !== newTypeString)
             item.typeString = newTypeString;
         }
       } else if (item instanceof Element && item.template.typeName === 'cond') {
-        const type = self.resolveOutputType(item, 0) ||
-                     self.resolveInputType(item, 1) ||
-                     self.resolveInputType(item, 2) || starType,
+        const type = starType, // self.resolveOutputType(item, 0) ||
+                     //self.resolveInputType(item, 1) ||
+                     //self.resolveInputType(item, 2) || starType,
               typeString = type.typeString,
-              newTypeString = '[v' + typeString + typeString + ',' + typeString + ']';
+              newTypeString = '[v' + typeString + typeString + ',' + typeString + '](?)';
         if (item.typeString !== newTypeString)
           item.typeString = newTypeString;
       } else if (item instanceof Functionchart) {
@@ -1256,13 +1250,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.replaceElement(instance, newInstance);
   }
 
-  exportElement(element: Element) {
-    const result = this.newElement('element');
-    result.typeString = '[,' + element.typeString + ']';
+  exportElement(element: Element | FunctionInstance) {
+    const result = this.newElement('element'),
+          typeString = (element instanceof Element) ? element.typeString : element.type.typeString;
+    result.typeString = '[,' + typeString + ']';
     return result;
   }
 
-  exportElements(elements: Element[]) {
+  exportElements(elements: (Element | FunctionInstance)[]) {
     const self = this,
           selection = this.selection;
 
@@ -1275,16 +1270,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  openElement(element: Element) {
-    const typeString = element.typeString,
-          j = globalTypeParser_.splitTypeString(typeString);
-    const result = this.newElement('element');
+  openElement(element: Element | FunctionInstance) {
+    const result = this.newElement('element'),
+          typeString = (element instanceof Element) ? element.typeString : element.type.typeString;
+    const j = globalTypeParser_.splitTypeString(typeString);
     result.typeString =
-      typeString.substring(0, j) + typeString + typeString.substring(j);
+      typeString.substring(0, j) + typeString + typeString.substring(j);  // TODO move to parser
     return result;
   }
 
-  openElements(elements: Element[]) {
+  openElements(elements: (Element | FunctionInstance)[]) {
     const self = this,
           selection = this.selection;
 
@@ -1359,8 +1354,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     inputs.sort(compareJunctions);
     outputs.sort(compareJunctions);
 
-    function getPinTypeString(pin: Pin) : string {
-      let typeString = pin.typeString;
+    function getPinName(type: Type, pin: Pin) : string {
+      let typeString = type.typeString;
       if (pin.name)
         typeString += '(' + pin.name + ')';
       return typeString;
@@ -1368,13 +1363,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
     let result = '[';
     inputs.forEach(input => {
-      if (input.type)
-        result += getPinTypeString(input.type.outputs[0]);
+      const type = self.resolveOutputType(input, 0);
+      result += getPinName(type || starType, input.type.outputs[0]);
     });
     result += ',';
     outputs.forEach(output => {
-      if (output.type)
-        result += getPinTypeString(output.type.inputs[0]);
+      const type = self.resolveInputType(output, 0);
+      result += getPinName(type || starType, output.type.inputs[0]);
     });
     result += ']';
     result = globalTypeParser_.addLabel(result, label);  // preserve label
@@ -1433,12 +1428,18 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       return;
 
     // Update 'type' property.
-    if (!(item instanceof FunctionInstance)) {
-      const typeString = item.typeString;
-      if (typeString && typeString !== item.type.typeString) {
-        const newType = globalTypeParser_.add(item.typeString);
-        item.type = newType;
+    let typeString;
+    if (item instanceof FunctionInstance) {
+      const functionChart = item.functionchart;
+      if (functionChart) {
+        typeString = functionChart.typeString;
       }
+    } else {
+      typeString = item.typeString;
+    }
+    if (typeString && typeString !== item.type.typeString) {
+      const newType = globalTypeParser_.add(typeString);
+      item.type = newType;
     }
     // Update 'inWires' and 'outWires' properties.
     if (item instanceof ElementBase) {
@@ -1498,12 +1499,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           srcPin = wire.srcPin,
           dst = wire.dst,
           dstPin = wire.dstPin;
-    if (src && srcPin >= 0) {
+    if (src && srcPin >= 0 && srcPin < src.type.outputs.length) {  // TODO how to deal with temporarily invalid wire?
       const outputs = src.outWires[srcPin];
       if (!outputs.includes(wire))
         outputs.push(wire);
     }
-    if (dst && dstPin >= 0) {
+    if (dst && dstPin >= 0 && dstPin < dst.type.inputs.length) {
       dst.inWires[dstPin] = wire;
     }
   }
@@ -2357,22 +2358,22 @@ export class FunctionchartEditor implements CanvasLayer {
 
     context.root = functionchart;
 
-    input.x = input.y = 8;
-    output.x = 40; output.y = 8;
-    literal.x = 72; literal.y = 8;
+    literal.x = 8; literal.y = 8;
+    input.x = 40;  input.y = 8;
+    output.x = 72; output.y = 8;
     newBinop.x = 8; newBinop.y = 32;
     newBinop.typeString = '[vv,v](+)';  // binary addition
     newUnop.x = 48; newUnop.y = 32;
     newUnop.typeString = '[v,v](-)';    // unary negation
     newCond.x = 86; newCond.y = 32;     // conditional
 
-    newFunctionchart.x = 8; newFunctionchart.y = 80;
+    newFunctionchart.x = 8; newFunctionchart.y = 82;
     newFunctionchart.width = this.theme.minFunctionchartWidth;
     newFunctionchart.height = this.theme.minFunctionchartHeight;
 
+    functionchart.nonWires.append(literal);
     functionchart.nonWires.append(input);
     functionchart.nonWires.append(output);
-    functionchart.nonWires.append(literal);
     functionchart.nonWires.append(newBinop);
     functionchart.nonWires.append(newUnop);
     functionchart.nonWires.append(newCond);

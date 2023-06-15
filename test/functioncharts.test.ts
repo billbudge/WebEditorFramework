@@ -120,7 +120,7 @@ describe('FunctionchartContext', () => {
     const context = new FC.FunctionchartContext(),
           element = context.newElement('cond');
 
-    expect(element.typeString).toBe('[v**,*]');
+    expect(element.typeString).toBe('[v**,*](?)');
     expect(element.type.inputs.length).toBe(3);
     expect(element.type.outputs.length).toBe(1);
   });
