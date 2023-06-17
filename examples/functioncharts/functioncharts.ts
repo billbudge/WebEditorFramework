@@ -2316,7 +2316,6 @@ export class FunctionchartEditor implements CanvasLayer {
   private pointerHitInfo: HitResultTypes | undefined;
   private draggableHitInfo: HitResultTypes | undefined;
   private clickInPalette: boolean = false;
-  private moveCopy: boolean = false;
   private dragInfo: DragTypes | undefined;
   private hotTrackInfo: HitResultTypes | undefined;
   private hoverHitInfo: HitResultTypes | undefined;
@@ -2860,7 +2859,6 @@ export class FunctionchartEditor implements CanvasLayer {
         selection.toggle(item);
       } else if (shiftKeyDown) {
         selection.add(item);
-        this.moveCopy = true;
       } else if (!selection.has(item)) {
         selection.set(item);
       } else {
@@ -2909,10 +2907,8 @@ export class FunctionchartEditor implements CanvasLayer {
       pointerHitInfo = this.pointerHitInfo = this.draggableHitInfo;
       if (!(pointerHitInfo instanceof WireHitResult)) {
         if (this.clickInPalette) {
-          this.clickInPalette = false;  // TODO fix
           drag = new NonWireDrag([pointerHitInfo.item], 'copyPalette', 'Create new element or functionchart');
-        } else if (this.moveCopy) {
-          this.moveCopy = false;  // TODO fix
+        } else if (this.canvasController.shiftKeyDown) {
           drag = new NonWireDrag(context.selectedAllElements(), 'moveCopySelection', 'Move copy of selection');
         } else {
           if (pointerHitInfo instanceof FunctionchartHitResult) {

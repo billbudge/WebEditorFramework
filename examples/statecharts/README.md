@@ -1,6 +1,8 @@
 # Introduction
 The Statecharts example implements a graphical editor for Statecharts. It aims to support most Statechart features with a simple, minimal user interface.
 
+[Live Demo](https://billbudge.github.io/WebEditorFramework/examples/statecharts/)
+
 # Statecharts
 [Statecharts: a visual formalism for complex systems](https://www.sciencedirect.com/science/article/pii/0167642387900359) were invented by David Harel as a visual formalism for state machines. With states and transitions between them, Statecharts resemble finite state machines, but introduce two key new concepts.
 

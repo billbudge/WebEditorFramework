@@ -9,6 +9,8 @@ The two principal innovations are:
 
 Since functions can be created and instantiated, more complex programs can be built. This document shows how some classic program structures can be built and discusses the advantages of this approach.
 
+[Live Demo](https://billbudge.github.io/WebEditorFramework/examples/functioncharts/)
+
 <!-- ## Data Flow programming review
 Dataflow diagrams are a graphical programming method where data processing elements, represented by graph nodes, are connected by edges that represent data transfer. The graph is like an electrical circuit, and the advantage is that data flow can more easily be visualized as a graph.
 
