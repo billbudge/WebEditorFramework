@@ -3,7 +3,6 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js';
 (function () {
     const body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette');
     if (body && canvas && palette) {
-        // TODO proper "document" handling.
         const theme = getDefaultTheme(), // or getBlueprintTheme
         canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette), propertyGridController = new PropertyGridController(body, theme), statechartEditor = new StatechartEditor(theme, canvasController, paletteController, propertyGridController);
         document.bgColor = theme.bgColor;
@@ -18,7 +17,7 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js';
         paletteController.setSize(150, 100);
         paletteController.draggable = true;
         window.onbeforeunload = function () {
-            return "Are you sure you want to navigate away?";
+            return "Confirm unload?";
         };
         window.onresize = function () {
             paletteController.onWindowResize();

@@ -235,6 +235,15 @@ describe('FunctionchartContext', () => {
     wire.dst = elem2;
     wire.dstPin = 0
     expect(context.isValidWire(wire)).toBe(true);   // src, dst valid, types match
+    wire.srcPin = -1;
+    expect(context.isValidWire(wire)).toBe(false);   // srcPin out of range
+    wire.srcPin = 2;
+    expect(context.isValidWire(wire)).toBe(false);   // srcPin out of range
+    wire.srcPin = 0;
+    wire.dstPin = -1;
+    expect(context.isValidWire(wire)).toBe(false);   // dstPin out of range
+    wire.dstPin = 2;
+    expect(context.isValidWire(wire)).toBe(false);   // dstPin out of range
     wire.dstPin = 1;
     expect(context.isValidWire(wire)).toBe(false);   // type mismatch
     wire.src = input;

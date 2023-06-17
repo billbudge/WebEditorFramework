@@ -8,7 +8,6 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
         palette = document.getElementById('palette');
   if (body && canvas && palette) {
 
-        // TODO proper "document" handling.
     const theme = getDefaultTheme(),  // or getBlueprintTheme
           canvasController = new CanvasController(canvas as HTMLCanvasElement),
           paletteController = new CanvasController(palette as HTMLCanvasElement),
@@ -30,7 +29,7 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
     paletteController.draggable = true;
 
     window.onbeforeunload = function() {
-      return "Are you sure you want to navigate away?";
+      return "Confirm unload?";
     }
 
     window.onresize = function() {

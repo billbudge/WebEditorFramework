@@ -1066,8 +1066,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (src === dst)
       return false;
     const srcPin = wire.srcPin,
-          dstPin = wire.dstPin,
-          srcType = src.type.outputs[srcPin].type,
+          dstPin = wire.dstPin;
+    if (srcPin < 0 || srcPin >= src.type.outputs.length)
+      return false;
+    if (dstPin < 0 || dstPin >= dst.type.inputs.length)
+      return false;
+    const srcType = src.type.outputs[srcPin].type,
           dstType = dst.type.inputs[dstPin].type;
     // starType is wildcard type. // TODO notion of type covariance.
     if (srcType !== starType && dstType !== starType && srcType !== dstType)
