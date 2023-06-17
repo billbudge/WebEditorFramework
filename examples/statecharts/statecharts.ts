@@ -639,23 +639,6 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.historyManager.redo();
   }
 
-  deleteItem(item: AllTypes) {
-    if (item.parent) {
-      if (item instanceof Transition)
-        item.parent.transitions.remove(item);
-      else if (item instanceof Statechart)
-        item.parent.statecharts.remove(item);
-      else
-        item.parent.states.remove(item);
-    }
-    this.selection.delete(item);
-  }
-
-  deleteItems(items: AllTypes[]) {
-    const self = this;
-    items.forEach(item => self.deleteItem(item));
-  }
-
   select(item: AllTypes) {
     this.selection.add(item);
   }
@@ -689,6 +672,15 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     // Reverse, to preserve the previous order of selection.
     selection.set(roots.reverse());
   }
+
+  disconnectSelection() {
+    const self = this;
+    this.selectedStates().forEach(state => {
+      self.forInTransitions(state, transition => this.deleteItem(transition));
+      self.forOutTransitions(state, transition => this.deleteItem(transition));
+    });
+  }
+
 
   selectInteriorTransitions() {
     const self = this,
@@ -754,6 +746,23 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
+  private deleteItem(item: AllTypes) {
+    if (item.parent) {
+      if (item instanceof Transition)
+        item.parent.transitions.remove(item);
+      else if (item instanceof Statechart)
+        item.parent.statecharts.remove(item);
+      else
+        item.parent.states.remove(item);
+    }
+    this.selection.delete(item);
+  }
+
+  private deleteItems(items: AllTypes[]) {
+    const self = this;
+    items.forEach(item => self.deleteItem(item));
+  }
+
   copy() : AllTypes[] {
     const statechart = this.statechart,
           selection = this.selection;
@@ -795,12 +804,24 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     return copies;
   }
 
+  private deleteSelectionHelper() {
+    this.reduceSelection();
+    this.disconnectSelection();
+    this.deleteItems(this.selection.contents());
+  }
+
   cut() : AllTypes[] {
     this.transactionManager.beginTransaction('cut');
     const result = this.copy();
-    this.deleteItems(this.selection.contents());
+    this.deleteSelectionHelper();
     this.transactionManager.endTransaction();
     return result;
+  }
+
+  deleteSelection() {
+    this.transactionManager.beginTransaction('delete');
+    this.deleteSelectionHelper();
+    this.transactionManager.endTransaction();
   }
 
   group(items: Array<NonStatechartTypes>, grandparent: Statechart, bounds: Rect) {
@@ -2593,10 +2614,7 @@ export class StatechartEditor implements CanvasLayer {
           shiftKey = e.shiftKey;
 
     if (keyCode === 8) { // 'delete'
-      transactionManager.beginTransaction('delete');
-      context.reduceSelection();
-      context.deleteItems(selection.contents());
-      transactionManager.endTransaction();
+      context.deleteSelection();
       return true;
     }
     if (cmdKey) {

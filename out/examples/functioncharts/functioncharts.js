@@ -689,21 +689,6 @@ export class FunctionchartContext extends EventBase {
     redo() {
         this.historyManager.redo();
     }
-    deleteItem(item) {
-        if (item.parent) {
-            if (item instanceof Wire) {
-                item.parent.wires.remove(item);
-            }
-            else {
-                item.parent.nonWires.remove(item);
-            }
-        }
-        this.selection.delete(item);
-    }
-    deleteItems(items) {
-        const self = this;
-        items.forEach(item => self.deleteItem(item));
-    }
     select(item) {
         this.selection.add(item);
     }
@@ -787,6 +772,21 @@ export class FunctionchartContext extends EventBase {
             if (item instanceof Wire)
                 this.addItem(item, parent);
         }
+    }
+    deleteItem(item) {
+        if (item.parent) {
+            if (item instanceof Wire) {
+                item.parent.wires.remove(item);
+            }
+            else {
+                item.parent.nonWires.remove(item);
+            }
+        }
+        this.selection.delete(item);
+    }
+    deleteItems(items) {
+        const self = this;
+        items.forEach(item => self.deleteItem(item));
     }
     copy() {
         const Functionchart = this.functionchart, selection = this.selection;

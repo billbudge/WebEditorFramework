@@ -859,22 +859,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.historyManager.redo();
   }
 
-  private deleteItem(item: AllTypes) {
-    if (item.parent) {
-      if (item instanceof Wire) {
-        item.parent.wires.remove(item);
-      } else {
-        item.parent.nonWires.remove(item);
-      }
-    }
-    this.selection.delete(item);
-  }
-
-  private deleteItems(items: AllTypes[]) {
-    const self = this;
-    items.forEach(item => self.deleteItem(item));
-  }
-
   select(item: AllTypes) {
     this.selection.add(item);
   }
@@ -972,6 +956,22 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (item instanceof Wire)
         this.addItem(item, parent);
     }
+  }
+
+  private deleteItem(item: AllTypes) {
+    if (item.parent) {
+      if (item instanceof Wire) {
+        item.parent.wires.remove(item);
+      } else {
+        item.parent.nonWires.remove(item);
+      }
+    }
+    this.selection.delete(item);
+  }
+
+  private deleteItems(items: AllTypes[]) {
+    const self = this;
+    items.forEach(item => self.deleteItem(item));
   }
 
   copy() : AllTypes[] {

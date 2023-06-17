@@ -513,21 +513,6 @@ export class StatechartContext extends EventBase {
     redo() {
         this.historyManager.redo();
     }
-    deleteItem(item) {
-        if (item.parent) {
-            if (item instanceof Transition)
-                item.parent.transitions.remove(item);
-            else if (item instanceof Statechart)
-                item.parent.statecharts.remove(item);
-            else
-                item.parent.states.remove(item);
-        }
-        this.selection.delete(item);
-    }
-    deleteItems(items) {
-        const self = this;
-        items.forEach(item => self.deleteItem(item));
-    }
     select(item) {
         this.selection.add(item);
     }
@@ -556,6 +541,13 @@ export class StatechartContext extends EventBase {
         const roots = reduceToRoots(selection.contents(), selection);
         // Reverse, to preserve the previous order of selection.
         selection.set(roots.reverse());
+    }
+    disconnectSelection() {
+        const self = this;
+        this.selectedStates().forEach(state => {
+            self.forInTransitions(state, transition => this.deleteItem(transition));
+            self.forOutTransitions(state, transition => this.deleteItem(transition));
+        });
     }
     selectInteriorTransitions() {
         const self = this, graphInfo = this.getSubgraphInfo(this.selectedStates());
@@ -614,6 +606,21 @@ export class StatechartContext extends EventBase {
                 this.addItem(item, parent);
         }
     }
+    deleteItem(item) {
+        if (item.parent) {
+            if (item instanceof Transition)
+                item.parent.transitions.remove(item);
+            else if (item instanceof Statechart)
+                item.parent.statecharts.remove(item);
+            else
+                item.parent.states.remove(item);
+        }
+        this.selection.delete(item);
+    }
+    deleteItems(items) {
+        const self = this;
+        items.forEach(item => self.deleteItem(item));
+    }
     copy() {
         const statechart = this.statechart, selection = this.selection;
         selection.set(this.selectedStates());
@@ -647,12 +654,22 @@ export class StatechartContext extends EventBase {
         this.transactionManager.endTransaction();
         return copies;
     }
+    deleteSelectionHelper() {
+        this.reduceSelection();
+        this.disconnectSelection();
+        this.deleteItems(this.selection.contents());
+    }
     cut() {
         this.transactionManager.beginTransaction('cut');
         const result = this.copy();
-        this.deleteItems(this.selection.contents());
+        this.deleteSelectionHelper();
         this.transactionManager.endTransaction();
         return result;
+    }
+    deleteSelection() {
+        this.transactionManager.beginTransaction('delete');
+        this.deleteSelectionHelper();
+        this.transactionManager.endTransaction();
     }
     group(items, grandparent, bounds) {
         const parent = this.newState();
@@ -2165,10 +2182,7 @@ export class StatechartEditor {
         const self = this, context = this.context, statechart = this.statechart, selection = context.selection, transactionManager = context.transactionManager, keyCode = e.keyCode, // TODO fix
         cmdKey = e.ctrlKey || e.metaKey, shiftKey = e.shiftKey;
         if (keyCode === 8) { // 'delete'
-            transactionManager.beginTransaction('delete');
-            context.reduceSelection();
-            context.deleteItems(selection.contents());
-            transactionManager.endTransaction();
+            context.deleteSelection();
             return true;
         }
         if (cmdKey) {
