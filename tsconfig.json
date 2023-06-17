@@ -16,7 +16,7 @@
               "src/geometry.ts",
               "src/dataModels.ts",
               "examples/statecharts/statecharts.ts",
-              "examples/functioncharts.ts"],
+              "examples/functioncharts/functioncharts.ts"],
 
   "files": ["test/collections.test.ts",
             "test/dataModels.test.ts",
