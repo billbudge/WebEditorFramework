@@ -546,7 +546,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         this.transactionManager.onChanged.bind(this.transactionManager));
 
     function update() {
-      self.eliminateDanglingWires();  // TODO - this is a hack.
       if (!self.sorted)
         self.sorted = self.topologicalSort();
       self.makeConsistent();
@@ -860,7 +859,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.historyManager.redo();
   }
 
-  deleteItem(item: AllTypes) {
+  private deleteItem(item: AllTypes) {
     if (item.parent) {
       if (item instanceof Wire) {
         item.parent.wires.remove(item);
@@ -871,7 +870,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.selection.delete(item);
   }
 
-  deleteItems(items: AllTypes[]) {
+  private deleteItems(items: AllTypes[]) {
     const self = this;
     items.forEach(item => self.deleteItem(item));
   }
@@ -916,6 +915,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const roots = reduceToRoots(selection.contents(), selection);
     // Reverse, to preserve the previous order of selection.
     selection.set(roots.reverse());
+  }
+
+  disconnectSelection() {
+    const self = this;
+    this.selectedAllElements().forEach(element => {
+      self.forInWires(element, wire => this.deleteItem(wire));
+      self.forOutWires(element, wire => this.deleteItem(wire));
+    });
   }
 
   selectInteriorWires() {
@@ -1008,12 +1015,24 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return copies;
   }
 
+  private deleteSelectionHelper() {
+    this.reduceSelection();
+    this.disconnectSelection();
+    this.deleteItems(this.selection.contents());
+  }
+
   cut() : AllTypes[] {
     this.transactionManager.beginTransaction('cut');
     const result = this.copy();
-    this.deleteItems(this.selection.contents());
+    this.deleteSelectionHelper();
     this.transactionManager.endTransaction();
     return result;
+  }
+
+  deleteSelection() {
+    this.transactionManager.beginTransaction('delete');
+    this.deleteSelectionHelper();
+    this.transactionManager.endTransaction();
   }
 
   connectInput(element: ElementTypes, pin: number, pinToPoint: PinPositionFunction) {
@@ -1127,36 +1146,25 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.sorted.length === this.elements.size;
   }
 
-  eliminateDanglingWires() {
-    const self = this;
-    // Eliminate dangling wires.
-    this.wires.forEach(wire => {
-      const src = wire.src,
-            dst = wire.dst;
-      if (!src || !this.elements.has(src) ||
-          !dst || !this.elements.has(dst) ||
-          src.type.outputs.length <= wire.srcPin ||
-          dst.type.inputs.length <= wire.dstPin) {
-        self.deleteItem(wire);
-        return;
-      }
-      // Make sure wires between elements are in lowest common parent functionchart.
-      const srcParent = src.parent!,
-            dstParent = dst.parent!,
-            lca: Functionchart = getLowestCommonAncestor<AllTypes>(srcParent, dstParent) as Functionchart;
-      if (wire.parent !== lca) {
-        self.deleteItem(wire);
-        self.addItem(wire, lca);
-      }
-    });
-  }
-
   makeConsistent() {
     const self = this;
 
     // TODO use topological sort to traverse graph and make types consistent.
     if (!this.sorted)
       this.sorted = this.topologicalSort();
+
+    // Make sure wires between elements are in lowest common parent functionchart.
+    this.wires.forEach(wire => {
+      const src = wire.src!,
+            dst = wire.dst!,
+            srcParent = src.parent!,
+            dstParent = dst.parent!,
+            lca = getLowestCommonAncestor<AllTypes>(srcParent, dstParent) as Functionchart;
+      if (wire.parent !== lca) {
+        self.deleteItem(wire);
+        self.addItem(wire, lca);
+      }
+    });
 
     // Update pseudoelement, conditional, functionchart, and function instance types.
     this.reverseVisitNonWires(this.functionchart, item => {
@@ -1219,7 +1227,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     newElement.y = element.y;
 
     // Update all incoming and outgoing wires if possible; otherwise they
-    // will be deleted as dangling wires by makeConsistent.
+    // are deleted.
     const srcChange = new Array<Wire>(), dstChange = new Array<Wire>();
     function canRewire(index: number, pins: Pin[], newPins: Pin[]) {
       if (index >= newPins.length)
@@ -1231,11 +1239,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.forInWires(element, wire => {
       if (canRewire(wire.dstPin, type.inputs, newType.inputs)) {
         dstChange.push(wire);
+      } else {
+        this.deleteItem(wire);
       }
     });
     this.forOutWires(element, wire => {
       if (canRewire(wire.srcPin, type.outputs, newType.outputs)) {
         srcChange.push(wire);
+      } else {
+        this.deleteItem(wire);
       }
     });
     srcChange.forEach(wire => {
@@ -1258,6 +1270,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const result = this.newElement('element'),
           typeString = (element instanceof Element) ? element.typeString : element.type.typeString;
     result.typeString = '[,' + typeString + ']';
+    // TODO eliminate potential dangling wires by replacing element.
     return result;
   }
 
@@ -1280,6 +1293,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const j = globalTypeParser_.splitTypeString(typeString);
     result.typeString =
       typeString.substring(0, j) + typeString + typeString.substring(j);  // TODO move to parser
+    // TODO eliminate potential dangling wires by replacing element.
     return result;
   }
 
@@ -3119,10 +3133,7 @@ export class FunctionchartEditor implements CanvasLayer {
           shiftKey = e.shiftKey;
 
     if (keyCode === 8) { // 'delete'
-      transactionManager.beginTransaction('delete');
-      context.reduceSelection();
-      context.deleteItems(selection.contents());
-      transactionManager.endTransaction();
+      context.deleteSelection();
       return true;
     }
     if (cmdKey) {
