@@ -550,13 +550,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         self.sorted = self.topologicalSort();
       self.makeConsistent();
     }
-    function updateAndValidate() {
-      update();
+    function validateAndUpdate() {
       if (!self.isValidFunctionchart()) {
         self.transactionManager.cancelTransaction();
       }
+      update();
     }
-    this.transactionManager.addHandler('transactionEnding', updateAndValidate);
+    this.transactionManager.addHandler('transactionEnding', validateAndUpdate);
     this.transactionManager.addHandler('didUndo', update);
     this.transactionManager.addHandler('didRedo', update);
 
@@ -1098,6 +1098,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return true;
   }
 
+  // Topological sort of DAG for update and validation. All wires should be valid.
   topologicalSort() : ElementTypes[] {
     const visiting = new Set<ElementTypes>(),
           visited = new Set<ElementTypes>(),
@@ -1270,7 +1271,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const result = this.newElement('element'),
           typeString = (element instanceof Element) ? element.typeString : element.type.typeString;
     result.typeString = '[,' + typeString + ']';
-    // TODO eliminate potential dangling wires by replacing element.
+    // TODO eliminate potential dangling wires.
     return result;
   }
 
@@ -1293,7 +1294,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const j = globalTypeParser_.splitTypeString(typeString);
     result.typeString =
       typeString.substring(0, j) + typeString + typeString.substring(j);  // TODO move to parser
-    // TODO eliminate potential dangling wires by replacing element.
+    // TODO eliminate potential dangling wires.
     return result;
   }
 

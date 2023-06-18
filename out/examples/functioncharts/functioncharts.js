@@ -403,13 +403,13 @@ export class FunctionchartContext extends EventBase {
                 self.sorted = self.topologicalSort();
             self.makeConsistent();
         }
-        function updateAndValidate() {
-            update();
+        function validateAndUpdate() {
             if (!self.isValidFunctionchart()) {
                 self.transactionManager.cancelTransaction();
             }
+            update();
         }
-        this.transactionManager.addHandler('transactionEnding', updateAndValidate);
+        this.transactionManager.addHandler('transactionEnding', validateAndUpdate);
         this.transactionManager.addHandler('didUndo', update);
         this.transactionManager.addHandler('didRedo', update);
         this.historyManager = new HistoryManager(this.transactionManager, this.selection);
@@ -888,6 +888,7 @@ export class FunctionchartContext extends EventBase {
             return false;
         return true;
     }
+    // Topological sort of DAG for update and validation. All wires should be valid.
     topologicalSort() {
         const visiting = new Set(), visited = new Set(), sorted = new Array();
         let cycle = false;
@@ -1040,7 +1041,7 @@ export class FunctionchartContext extends EventBase {
     exportElement(element) {
         const result = this.newElement('element'), typeString = (element instanceof Element) ? element.typeString : element.type.typeString;
         result.typeString = '[,' + typeString + ']';
-        // TODO eliminate potential dangling wires by replacing element.
+        // TODO eliminate potential dangling wires.
         return result;
     }
     exportElements(elements) {
@@ -1058,7 +1059,7 @@ export class FunctionchartContext extends EventBase {
         const j = globalTypeParser_.splitTypeString(typeString);
         result.typeString =
             typeString.substring(0, j) + typeString + typeString.substring(j); // TODO move to parser
-        // TODO eliminate potential dangling wires by replacing element.
+        // TODO eliminate potential dangling wires.
         return result;
     }
     openElements(elements) {
