@@ -1935,7 +1935,7 @@ export class StatechartEditor {
         return hitInfo;
     }
     setPropertyGrid() {
-        const context = this.context, item = context.selection.lastSelected(), type = item ? item.template.typeName : undefined;
+        const context = this.context, item = context.selection.lastSelected, type = item ? item.template.typeName : undefined;
         this.propertyGridController.show(type, item);
     }
     onClick(canvasController) {

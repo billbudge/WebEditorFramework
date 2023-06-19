@@ -27,6 +27,21 @@ function addFunctionchart(parent) {
 //   }
 // }
 //------------------------------------------------------------------------------
+describe('Type', () => {
+    test('canConnect', () => {
+        const parser = new FC.TypeParser(), starType = parser.add('*'), valueType = parser.add('v');
+        expect(starType.canConnectTo(valueType)).toBe(true);
+        expect(valueType.canConnectTo(starType)).toBe(true);
+        expect(starType.canConnectTo(starType)).toBe(true);
+        expect(valueType.canConnectTo(valueType)).toBe(true);
+        const type1 = parser.add('[v,v]'), type2 = parser.add('[vv,v]');
+        expect(type1.canConnectTo(valueType)).toBe(false);
+        expect(type1.canConnectTo(starType)).toBe(true);
+        expect(type1.canConnectTo(type2)).toBe(false);
+        expect(type2.canConnectTo(type1)).toBe(true);
+        // TODO more tests.
+    });
+});
 describe('Typeparser', () => {
     test('add', () => {
         const parser = new FC.TypeParser();

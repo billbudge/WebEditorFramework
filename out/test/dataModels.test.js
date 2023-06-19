@@ -335,7 +335,7 @@ describe('HistoryManager', () => {
         expect(selectionSet.length()).toBe(2);
         expect(selectionSet.has(child1)).toBe(true);
         expect(selectionSet.has(child2)).toBe(true);
-        expect(selectionSet.lastSelected()).toBe(child2);
+        expect(selectionSet.lastSelected).toBe(child2);
         expect(historyManager.getUndo()).toBeDefined();
         expect(historyManager.getRedo()).toBeUndefined();
         historyManager.undo();
@@ -349,7 +349,7 @@ describe('HistoryManager', () => {
         expect(selectionSet.length()).toBe(2);
         expect(selectionSet.has(child1)).toBe(true);
         expect(selectionSet.has(child2)).toBe(true);
-        expect(selectionSet.lastSelected()).toBe(child2);
+        expect(selectionSet.lastSelected).toBe(child2);
     });
     test('no SelectionOp when selection is unchanged', () => {
         const context = new TestDataContext(), item = new TestDataContextObject(context), transactionManager = new Data.TransactionManager(), selectionSet = new Collections.SelectionSet(), historyManager = new Data.HistoryManager(transactionManager, selectionSet);
@@ -359,7 +359,7 @@ describe('HistoryManager', () => {
         item.x = 1;
         transactionManager.endTransaction();
         expect(selectionSet.length()).toBe(1);
-        expect(selectionSet.lastSelected()).toBe(item);
+        expect(selectionSet.lastSelected).toBe(item);
     });
 });
 //# sourceMappingURL=dataModels.test.js.map

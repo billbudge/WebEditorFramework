@@ -208,7 +208,7 @@ export class SelectionSet<T> {
     return this.map.has(element);
   }
 
-  lastSelected() : T | undefined {
+  get lastSelected() : T | undefined {
     const last: LinkedListNode<T> | undefined = this.list.front();
     return last !== undefined ? last.value : undefined;
   }

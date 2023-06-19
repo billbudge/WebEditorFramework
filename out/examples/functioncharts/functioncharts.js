@@ -39,6 +39,25 @@ export class Type {
         this.outputs = outputs;
         this.name = name;
     }
+    static canConnect(src, dst) {
+        if (src === dst)
+            return true;
+        if (src === starType || dst === starType)
+            return true;
+        if (dst === valueType)
+            return src === valueType;
+        return src.inputs.length >= dst.inputs.length &&
+            src.outputs.length >= dst.outputs.length &&
+            dst.inputs.every((input, i) => {
+                return Type.canConnect(src.inputs[i].type, input.type);
+            }) &&
+            dst.outputs.every((output, i) => {
+                return Type.canConnect(src.outputs[i].type, output.type);
+            });
+    }
+    canConnectTo(dst) {
+        return Type.canConnect(this, dst);
+    }
 }
 const valueType = new Type('v', [], []), starType = new Type('*', [], []);
 export function stringifyType(type) {
@@ -883,10 +902,7 @@ export class FunctionchartContext extends EventBase {
         if (dstPin < 0 || dstPin >= dst.type.inputs.length)
             return false;
         const srcType = src.type.outputs[srcPin].type, dstType = dst.type.inputs[dstPin].type;
-        // starType is wildcard type. // TODO notion of type covariance.
-        if (srcType !== starType && dstType !== starType && srcType !== dstType)
-            return false;
-        return true;
+        return srcType.canConnectTo(dstType);
     }
     // Topological sort of DAG for update and validation. All wires should be valid.
     topologicalSort() {
@@ -1854,8 +1870,18 @@ class Renderer {
 // --------------------------------------------------------------------------------------------
 function isDropTarget(hitInfo) {
     const item = hitInfo.item, selection = item.context.selection;
-    return (hitInfo instanceof FunctionchartHitResult || hitInfo instanceof ElementHitResult) &&
-        !selection.has(item) && !ancestorInSet(item, selection);
+    // We can't drop onto the selection which is being dragged.
+    if (selection.has(item) || ancestorInSet(item, selection))
+        return false;
+    // We can drop anything onto a functionchart.
+    if (hitInfo instanceof FunctionchartHitResult)
+        return true;
+    const lastSelected = selection.lastSelected;
+    if (hitInfo instanceof ElementHitResult && lastSelected instanceof ElementBase) {
+        // Drop onto an element requires type compatibility.
+        return lastSelected.type.canConnectTo(hitInfo.item.type);
+    }
+    return false;
 }
 function isClickable(hitInfo) {
     return true;
@@ -2330,7 +2356,7 @@ export class FunctionchartEditor {
         return hitInfo;
     }
     setPropertyGrid() {
-        const context = this.context, item = context.selection.lastSelected(), type = item ? item.template.typeName : undefined;
+        const context = this.context, item = context.selection.lastSelected, type = item ? item.template.typeName : undefined;
         this.propertyGridController.show(type, item);
     }
     onClick(canvasController) {
@@ -2554,9 +2580,10 @@ export class FunctionchartEditor {
             (drag.type == 'copyPalette' || drag.type === 'moveSelection' ||
                 drag.type === 'moveCopySelection' || drag.type === 'instantiateFunctionchart')) {
             // Find element or functionchart beneath mouse.
-            const hitList = this.hitTestCanvas(cp), hitInfo = this.getFirstHit(hitList, isDropTarget);
-            if (hitInfo instanceof ElementHitResult && drag.items[0] instanceof ElementBase) {
-                context.replaceElement(hitInfo.item, drag.items[0]);
+            const hitList = this.hitTestCanvas(cp), hitInfo = this.getFirstHit(hitList, isDropTarget), lastSelected = selection.lastSelected;
+            if (hitInfo instanceof ElementHitResult && lastSelected instanceof ElementBase &&
+                lastSelected.type.canConnectTo(hitInfo.item.type)) {
+                context.replaceElement(hitInfo.item, lastSelected);
             }
             else {
                 let parent = functionchart;

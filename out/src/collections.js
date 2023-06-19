@@ -171,7 +171,7 @@ export class SelectionSet {
     has(element) {
         return this.map.has(element);
     }
-    lastSelected() {
+    get lastSelected() {
         const last = this.list.front();
         return last !== undefined ? last.value : undefined;
     }

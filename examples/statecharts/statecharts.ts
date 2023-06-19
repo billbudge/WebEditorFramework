@@ -2337,7 +2337,7 @@ export class StatechartEditor implements CanvasLayer {
   }
   setPropertyGrid() {
     const context = this.context,
-          item = context.selection.lastSelected(),
+          item = context.selection.lastSelected,
           type = item ? item.template.typeName : undefined;
     this.propertyGridController.show(type, item);
   }

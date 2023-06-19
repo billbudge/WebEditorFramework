@@ -450,7 +450,7 @@ describe('HistoryManager', () => {
     expect(selectionSet.length()).toBe(2);
     expect(selectionSet.has(child1)).toBe(true);
     expect(selectionSet.has(child2)).toBe(true);
-    expect(selectionSet.lastSelected()).toBe(child2);
+    expect(selectionSet.lastSelected).toBe(child2);
 
     expect(historyManager.getUndo()).toBeDefined();
     expect(historyManager.getRedo()).toBeUndefined();
@@ -468,7 +468,7 @@ describe('HistoryManager', () => {
     expect(selectionSet.length()).toBe(2);
     expect(selectionSet.has(child1)).toBe(true);
     expect(selectionSet.has(child2)).toBe(true);
-    expect(selectionSet.lastSelected()).toBe(child2);
+    expect(selectionSet.lastSelected).toBe(child2);
   });
   test('no SelectionOp when selection is unchanged', () => {
     const context = new TestDataContext(),
@@ -485,7 +485,7 @@ describe('HistoryManager', () => {
     item.x = 1;
     transactionManager.endTransaction();
     expect(selectionSet.length()).toBe(1);
-    expect(selectionSet.lastSelected()).toBe(item);
+    expect(selectionSet.lastSelected).toBe(item);
   });
 });
 
