@@ -235,20 +235,20 @@ export class TypeParser {
     copy.name = label;
     return stringifyType(copy);
   }
-  addInputLabel(typeString: string, label: string | undefined) : string {
-    const type = this.add(typeString),
-          copy = type.copy();
-    if (copy.inputs.length > 0)
-      copy.inputs[0].name = label;
-    return stringifyType(copy);
-  }
-  addOutputLabel(typeString: string, label: string | undefined) : string {
-    const type = this.add(typeString),
-          copy = type.copy();
-    if (copy.outputs.length > 0)
-      copy.outputs[0].name = label;
-    return stringifyType(copy);
-  }
+  // addInputLabel(typeString: string, label: string | undefined) : string {
+  //   const type = this.add(typeString),
+  //         copy = type.copy();
+  //   if (copy.inputs.length > 0)
+  //     copy.inputs[0].name = label;
+  //   return stringifyType(copy);
+  // }
+  // addOutputLabel(typeString: string, label: string | undefined) : string {
+  //   const type = this.add(typeString),
+  //         copy = type.copy();
+  //   if (copy.outputs.length > 0)
+  //     copy.outputs[0].name = label;
+  //   return stringifyType(copy);
+  // }
 
   // Removes any trailing label.
   trimTypeString(typeString: string) : string {
@@ -709,11 +709,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     functionchart.wires.forEach(t => visitor(t));
   }
 
-  getGrandParent(item: AllTypes) : AllTypes | undefined {
-    let result = item.parent;
-    if (result)
-      result = result.parent;
-    return result;
+  getContainingFunctionchart(items: AllTypes[]) : Functionchart {
+    let parent = getLowestCommonAncestor<AllTypes>(...items);
+    if (!parent)
+      return this.functionchart;  // |items| empty.
+    if (!(parent instanceof Functionchart)) {  // |items| is a single element.
+      parent = parent.parent;
+    }
+    if (!parent)
+      return this.functionchart;  // |items| not in the functionchart yet.
+    return parent;
   }
 
   forInWires(element: ElementTypes, visitor: WireVisitor) {
@@ -836,8 +841,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     elements = elements.slice(0);  // Copy input array
     while (elements.length > 0) {
       const element = elements.pop()!;
-
       result.add(element);
+
       if (upstream) {
         this.forInWires(element, wire => {
           const src = wire.src!;
@@ -1028,7 +1033,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         item.y += 16;
       }
     });
-    const copies = copyItems(items, this) as AllTypes[];  // TODO fix
+    const copies = copyItems(items, this) as AllTypes[];
     this.addItems(copies, this.functionchart);
     this.selection.set(copies);
     this.transactionManager.endTransaction();
@@ -1094,6 +1099,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         if (outputs[pin].length === 0)
           self.connectOutput(element, pin, outputToPoint);
       }
+    });
+  }
+
+  disconnectElement(element: ElementTypes, pin: number) {
+    element.inWires.forEach((wire, i) => {
+      if (wire)
+        this.deleteItem(wire);
+    });
+    element.outWires.forEach((wires, i) => {
+      wires.forEach(wire => this.deleteItem(wire));
     });
   }
 
@@ -1307,7 +1322,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   openElement(element: Element | FunctionInstance) {
     const result = this.newElement('element'),
-          typeString = (element instanceof Element) ? element.typeString : element.type.typeString;
+          typeString = element.type.typeString;
     const j = globalTypeParser_.splitTypeString(typeString);
     result.typeString =
       typeString.substring(0, j) + typeString + typeString.substring(j);  // TODO move to parser
@@ -3214,14 +3229,14 @@ export class FunctionchartEditor implements CanvasLayer {
           context.beginTransaction('group items into functionchart');
           const theme = this.theme,
                 bounds = this.renderer.getBounds(context.selectedNonWires()),
-                contents = context.selectionContents(),
-                parent = getLowestCommonAncestor<AllTypes>(...contents) as Functionchart;
+                contents = context.selectionContents();
+          let parent = context.getContainingFunctionchart(contents);
           expandRect(bounds, theme.radius, theme.radius);
           context.group(context.selectionContents(), parent, bounds);
           context.endTransaction();
         }
         case 69: { // 'e'
-          context.selectConnectedElements(true);
+          context.selectConnectedElements(true);  // TODO more nuanced connecting.
           self.canvasController.draw();
           return true;
         }

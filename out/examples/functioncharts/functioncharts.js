@@ -192,18 +192,20 @@ export class TypeParser {
         copy.name = label;
         return stringifyType(copy);
     }
-    addInputLabel(typeString, label) {
-        const type = this.add(typeString), copy = type.copy();
-        if (copy.inputs.length > 0)
-            copy.inputs[0].name = label;
-        return stringifyType(copy);
-    }
-    addOutputLabel(typeString, label) {
-        const type = this.add(typeString), copy = type.copy();
-        if (copy.outputs.length > 0)
-            copy.outputs[0].name = label;
-        return stringifyType(copy);
-    }
+    // addInputLabel(typeString: string, label: string | undefined) : string {
+    //   const type = this.add(typeString),
+    //         copy = type.copy();
+    //   if (copy.inputs.length > 0)
+    //     copy.inputs[0].name = label;
+    //   return stringifyType(copy);
+    // }
+    // addOutputLabel(typeString: string, label: string | undefined) : string {
+    //   const type = this.add(typeString),
+    //         copy = type.copy();
+    //   if (copy.outputs.length > 0)
+    //     copy.outputs[0].name = label;
+    //   return stringifyType(copy);
+    // }
     // Removes any trailing label.
     trimTypeString(typeString) {
         if (typeString[typeString.length - 1] === ')')
@@ -559,11 +561,16 @@ export class FunctionchartContext extends EventBase {
         });
         functionchart.wires.forEach(t => visitor(t));
     }
-    getGrandParent(item) {
-        let result = item.parent;
-        if (result)
-            result = result.parent;
-        return result;
+    getLcaFunctionchart(items) {
+        let parent = getLowestCommonAncestor(...items);
+        if (!parent)
+            return this.functionchart; // should never happen
+        if (!(parent instanceof Functionchart)) { // A single element is its own LCA.
+            parent = parent.parent;
+        }
+        if (!parent)
+            return this.functionchart; // should never happen
+        return parent;
     }
     forInWires(element, visitor) {
         element.inWires.forEach(wire => {
@@ -890,6 +897,15 @@ export class FunctionchartContext extends EventBase {
             }
         });
     }
+    disconnectElement(element, pin) {
+        element.inWires.forEach((wire, i) => {
+            if (wire)
+                this.deleteItem(wire);
+        });
+        element.outWires.forEach((wires, i) => {
+            wires.forEach(wire => this.deleteItem(wire));
+        });
+    }
     isValidWire(wire) {
         const src = wire.src, dst = wire.dst;
         if (!src || !dst)
@@ -1071,7 +1087,7 @@ export class FunctionchartContext extends EventBase {
         });
     }
     openElement(element) {
-        const result = this.newElement('element'), typeString = (element instanceof Element) ? element.typeString : element.type.typeString;
+        const result = this.newElement('element'), typeString = element.type.typeString;
         const j = globalTypeParser_.splitTypeString(typeString);
         result.typeString =
             typeString.substring(0, j) + typeString + typeString.substring(j); // TODO move to parser
@@ -2656,7 +2672,8 @@ export class FunctionchartEditor {
                     context.selectInteriorWires();
                     context.reduceSelection();
                     context.beginTransaction('group items into functionchart');
-                    const theme = this.theme, bounds = this.renderer.getBounds(context.selectedNonWires()), contents = context.selectionContents(), parent = getLowestCommonAncestor(...contents);
+                    const theme = this.theme, bounds = this.renderer.getBounds(context.selectedNonWires()), contents = context.selectionContents();
+                    let parent = context.getLcaFunctionchart(contents);
                     expandRect(bounds, theme.radius, theme.radius);
                     context.group(context.selectionContents(), parent, bounds);
                     context.endTransaction();

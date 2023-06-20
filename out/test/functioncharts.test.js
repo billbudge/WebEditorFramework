@@ -78,18 +78,18 @@ describe('Typeparser', () => {
         expect(parser.addLabel('[vv,v](+)', '-')).toBe('[vv,v](-)');
         expect(parser.addLabel('[v(a)v(b),v(c)]', 'foo')).toBe('[v(a)v(b),v(c)](foo)');
     });
-    test('addInputLabel', () => {
-        const parser = new FC.TypeParser();
-        expect(parser.addInputLabel('[v,v]', 'a')).toBe('[v(a),v]');
-        expect(parser.addInputLabel('[v(a),v]', 'b')).toBe('[v(b),v]');
-        expect(parser.addInputLabel('[v(a),v]', undefined)).toBe('[v,v]');
-    });
-    test('addOutputLabel', () => {
-        const parser = new FC.TypeParser();
-        expect(parser.addOutputLabel('[v,v]', 'a')).toBe('[v,v(a)]');
-        expect(parser.addOutputLabel('[v,v(a)]', 'b')).toBe('[v,v(b)]');
-        expect(parser.addOutputLabel('[v,v(a)]', undefined)).toBe('[v,v]');
-    });
+    // test('addInputLabel', () => {
+    //   const parser = new FC.TypeParser();
+    //   expect(parser.addInputLabel('[v,v]', 'a')).toBe('[v(a),v]');
+    //   expect(parser.addInputLabel('[v(a),v]', 'b')).toBe('[v(b),v]');
+    //   expect(parser.addInputLabel('[v(a),v]', undefined)).toBe('[v,v]');
+    // });
+    // test('addOutputLabel', () => {
+    //   const parser = new FC.TypeParser();
+    //   expect(parser.addOutputLabel('[v,v]', 'a')).toBe('[v,v(a)]');
+    //   expect(parser.addOutputLabel('[v,v(a)]', 'b')).toBe('[v,v(b)]');
+    //   expect(parser.addOutputLabel('[v,v(a)]', undefined)).toBe('[v,v]');
+    // });
 });
 describe('FunctionchartContext', () => {
     test('element interface', () => {
