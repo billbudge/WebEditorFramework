@@ -1203,27 +1203,27 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.reverseVisitNonWires(this.functionchart, item => {
       // Update types of inputs and outputs.
       if (item instanceof Pseudoelement) {
-        if (item.template.typeName === 'input' || item.template.typeName === 'literal') {
-          const type = starType,  // self.resolveOutputType(item, 0) || starType,
-                label = item.type.outputs[0].name || '',
-                newTypeString = '[,' + type.typeString + '(' + label + ')' + ']';  // TODO move to parser
-          if (item.typeString !== newTypeString)
-            item.typeString = newTypeString;
-        } else if(item.template.typeName === 'output') {
-          const type = starType,  // self.resolveInputType(item, 0) || starType,
-                label = item.type.inputs[0].name || '',
-                newTypeString = '[' + type.typeString + '(' + label + ')' + ',]';
-          if (item.typeString !== newTypeString)
-            item.typeString = newTypeString;
-        }
+        // if (item.template.typeName === 'input' || item.template.typeName === 'literal') {
+        //   const type = item.type.copy(),  // self.resolveOutputType(item, 0) || starType,
+        //         label = type.outputs[0].name,
+        //         newTypeString = '[,' + type.typeString + '(' + label + ')' + ']';  // TODO move to parser
+        //   if (item.typeString !== newTypeString)
+        //     item.typeString = newTypeString;
+        // } else if(item.template.typeName === 'output') {
+        //   const type = starType,  // self.resolveInputType(item, 0) || starType,
+        //         label = item.type.inputs[0].name || '',
+        //         newTypeString = '[' + type.typeString + '(' + label + ')' + ',]';
+        //   if (item.typeString !== newTypeString)
+        //     item.typeString = newTypeString;
+        // }
       } else if (item instanceof Element && item.template.typeName === 'cond') {
-        const type = starType, // self.resolveOutputType(item, 0) ||
-                     //self.resolveInputType(item, 1) ||
-                     //self.resolveInputType(item, 2) || starType,
-              typeString = type.typeString,
-              newTypeString = '[v' + typeString + typeString + ',' + typeString + '](?)';
-        if (item.typeString !== newTypeString)
-          item.typeString = newTypeString;
+        // const type = starType, // self.resolveOutputType(item, 0) ||
+        //              //self.resolveInputType(item, 1) ||
+        //              //self.resolveInputType(item, 2) || starType,
+        //       typeString = type.typeString,
+        //       newTypeString = '[v' + typeString + typeString + ',' + typeString + '](?)';
+        // if (item.typeString !== newTypeString)
+        //   item.typeString = newTypeString;
       } else if (item instanceof Functionchart) {
         const newTypeString = self.getFunctionchartTypeString(item);
         if (item.typeString !== newTypeString)
