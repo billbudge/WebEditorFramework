@@ -20,33 +20,43 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
 
 //------------------------------------------------------------------------------
 
-// Parse type strings into type objects.
+// Value and Function type descriptions.
 
 export class Pin {
-  typeString: string;
-  type: Type;
+  readonly type: Type;
   name?: string;
+  get typeString() {
+    let result = stringifyType(this.type);
+    if (this.name)
+      result += '(' + this.name + ')';
+    return result;
+  }
   y = 0;
   width = 0;
   height = 0;
   baseline = 0;
   copy() : Pin {
-    let type = this.type;
-    if (type)
-      type = type.copy();
-    return new Pin(this.typeString, type, this.name);
+    if (this.type === Type.valueType)
+      return new Pin(Type.valueType, this.name);
+    else if (this.type === Type.starType)
+      return new Pin(Type.starType, this.name);
+    return new Pin(this.type.copy(), this.name);
   }
-  constructor(typeString: string, type: Type, name?: string) {
-    this.typeString = typeString;
-    this.name = name;
+  constructor(type: Type, name?: string) {
     this.type = type;
+    this.name = name;
   }
 }
 
 export class Type {
-  typeString: string;
-  inputs: Pin[];
-  outputs: Pin[];
+  static readonly valueType = new Type([], []);
+  static readonly starType = new Type([], []);
+  // static readonly typeMap = new Map<string, Type>();
+
+  get typeString() : string { return stringifyType(this); }
+
+  readonly inputs: Pin[];
+  readonly outputs: Pin[];
   name?: string;
   x = 0;
   y = 0;
@@ -57,12 +67,11 @@ export class Type {
     return this.width === 0;
   }
   copy() : Type {
-    return new Type(this.typeString,
-                    this.inputs.map(pin => pin.copy()),
-                    this.outputs.map(pin => pin.copy()), this.name);
+    return new Type(this.inputs.map(pin => pin.copy()),
+                    this.outputs.map(pin => pin.copy()),
+                    this.name);
   }
-  constructor(typeString: string, inputs: Pin[], outputs: Pin[], name?: string) {
-    this.typeString = typeString;
+  constructor(inputs: Pin[], outputs: Pin[], name?: string) {
     this.inputs = inputs;
     this.outputs = outputs;
     this.name = name;
@@ -70,10 +79,10 @@ export class Type {
   private static canConnect(src: Type, dst: Type) : boolean {
     if (src === dst)
       return true;
-    if (src === starType || dst === starType)
+    if (src === Type.starType || dst === Type.starType)
       return true;
-    if (dst === valueType)
-      return src === valueType;
+    if (dst === Type.valueType)
+      return src === Type.valueType;
 
     return src.inputs.length >= dst.inputs.length &&
            src.outputs.length >= dst.outputs.length &&
@@ -89,12 +98,11 @@ export class Type {
   }
 }
 
-const valueType = new Type('v', [], []),
-      starType = new Type('*', [], []);
-
 export function stringifyType(type: Type) {
-  if (type.typeString == 'v' || type.typeString == '*')
-    return type.typeString;
+  if (type === Type.valueType)
+    return 'v';
+  if (type === Type.starType)
+    return '*';
   let s = '[';
   function stringifyName(item: Type | Pin) {
     if (item.name)
@@ -114,6 +122,8 @@ export function stringifyType(type: Type) {
   return s;
 }
 
+const globalTypeMap = new Map<string, Type>();
+
 // export type TypeVisitor = (type: Type, parent: Type | undefined) => void;
 
 // export function forEachType(type: Type, callback: TypeVisitor) {
@@ -128,8 +138,8 @@ export class TypeParser {
   private readonly map_ = new Map<string, Type>();
 
   constructor() {
-    this.addType('v', valueType);
-    this.addType('*', starType);
+    this.addType('v', Type.valueType);
+    this.addType('*', Type.starType);
   }
 
   private addType(s: string, type: Type) {
@@ -172,23 +182,27 @@ export class TypeParser {
       // value types
       if (s[j] === 'v') {
         j++;
-        return new Pin('v', valueType, parseName());
+        return new Pin(Type.valueType, parseName());
       }
       // wildcard types
       if (s[j] === '*') {
         j++;
-        return new Pin('*', starType, parseName());
+        return new Pin(Type.starType, parseName());
       }
       // function types
       let type = parseFunction(),
           typeString = s.substring(i, j);
       // Add the pin type, without label.
       type = self.addType(typeString, type);
-      return new Pin(typeString, type, parseName());
+      return new Pin(type, parseName());
     }
     function parseFunction() : Type {
       let i = j;
-      if (s[j] === '[') {
+      if (s[j] === 'v') {
+        return Type.valueType;
+      } else if(s[j] === '*') {
+        return Type.starType;
+      } else if (s[j] === '[') {
         j++;
         let inputs = new Array<Pin>, outputs = new Array<Pin>;
         while (s[j] !== ',') {
@@ -200,12 +214,8 @@ export class TypeParser {
         }
         j++;
         const typeString = s.substring(i, j);
-        let type = new Type(typeString, inputs, outputs);
+        let type = new Type(inputs, outputs);
         type = self.addType(typeString, type);
-        return type;
-      } else if (s[j] === 'v' || s[j] === '*') {
-        let type = new Type(s[j], [], []);
-        type = self.addType(type.typeString, type);
         return type;
       } else {
         throw new Error('Invalid type string: ' + s);
@@ -218,9 +228,9 @@ export class TypeParser {
       if (name) {
         // The top level function type includes the label, so duplicate
         // type and pins.
-        const inputs = type.inputs.map(pin => new Pin(pin.typeString, pin.type, pin.name)),
-              outputs = type.outputs.map(pin => new Pin(pin.typeString, pin.type, pin.name));
-        type = new Type(s, inputs, outputs, name);
+        const inputs = type.inputs.map(pin => new Pin(pin.type, pin.name)),
+              outputs = type.outputs.map(pin => new Pin(pin.type, pin.name));
+        type = new Type(inputs, outputs, name);
       }
       type = this.addType(s, type);
     }
@@ -235,6 +245,7 @@ export class TypeParser {
     copy.name = label;
     return stringifyType(copy);
   }
+  // TODO remove these editing methods in favor of direct Type copy/modification and stringification.
   // addInputLabel(typeString: string, label: string | undefined) : string {
   //   const type = this.add(typeString),
   //         copy = type.copy();
@@ -331,7 +342,7 @@ class ElementTemplate extends NonWireTemplate {
   }
 }
 
-export type PseudoelementType = 'input' | 'output' | 'literal';
+export type PseudoelementType = 'input' | 'output' | 'literal' | 'instancer' | 'use';
 
 class PseudoelementTemplate extends NonWireTemplate {
   readonly typeName: PseudoelementType;
@@ -1415,12 +1426,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     let result = '[';
     inputs.forEach(input => {
       const type = self.resolveOutputType(input, 0);
-      result += getPinName(type || starType, input.type.outputs[0]);
+      result += getPinName(type || Type.starType, input.type.outputs[0]);
     });
     result += ',';
     outputs.forEach(output => {
       const type = self.resolveInputType(output, 0);
-      result += getPinName(type || starType, output.type.inputs[0]);
+      result += getPinName(type || Type.starType, output.type.inputs[0]);
     });
     result += ']';
     result = globalTypeParser_.addLabel(result, label);  // preserve label
@@ -1723,8 +1734,8 @@ class FunctionchartTheme extends Theme {
     this.radius = radius;
 
     // Layout the base types.
-    valueType.width = starType.width = radius;
-    valueType.height = starType.height = radius;
+    Type.valueType.width = Type.starType.width = radius;
+    Type.valueType.height = Type.starType.height = radius;
   }
 }
 
