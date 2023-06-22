@@ -25,12 +25,7 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
 export class Pin {
   readonly type: Type;
   name?: string;
-  get typeString() {
-    let result = stringifyType(this.type);
-    if (this.name)
-      result += '(' + this.name + ')';
-    return result;
-  }
+  get typeString() { return this.toString(); }
   y = 0;
   width = 0;
   height = 0;
@@ -46,6 +41,12 @@ export class Pin {
     this.type = type;
     this.name = name;
   }
+  toString() : string {
+    let s = this.type.toString();
+    if (this.name)
+      s += '(' + this.name + ')';
+    return s;
+  }
 }
 
 export class Type {
@@ -53,7 +54,7 @@ export class Type {
   static readonly starType = new Type([], []);
   // static readonly typeMap = new Map<string, Type>();
 
-  get typeString() : string { return stringifyType(this); }
+  get typeString() : string { return this.toString(); }
 
   readonly inputs: Pin[];
   readonly outputs: Pin[];
@@ -76,6 +77,36 @@ export class Type {
     this.outputs = outputs;
     this.name = name;
   }
+  toString() : string {
+    if (this === Type.valueType)
+      return 'v';
+    if (this === Type.starType)
+      return '*';
+    let s = '[';
+    this.inputs.forEach(input => s += input.toString());
+    s += ',';
+    this.outputs.forEach(output => s += output.toString());
+    s += ']';
+    if (this.name)
+      s += '(' + this.name + ')';
+    return s;
+  }
+  private static equal(src: Type, dst: Type) : boolean {
+    if (src === dst)
+      return true;
+
+    return src.inputs.length === dst.inputs.length &&
+           src.outputs.length === dst.outputs.length &&
+           dst.inputs.every((input, i) => {
+              return Type.equal(src.inputs[i].type, input.type );
+           }) &&
+           dst.outputs.every((output, i) => {
+             return Type.equal(src.outputs[i].type, output.type);
+           });
+  }
+  equalTo(dst: Type) : boolean {
+    return Type.equal(this, dst);
+  }
   private static canConnect(src: Type, dst: Type) : boolean {
     if (src === dst)
       return true;
@@ -96,30 +127,6 @@ export class Type {
   canConnectTo(dst: Type) : boolean {
     return Type.canConnect(this, dst);
   }
-}
-
-export function stringifyType(type: Type) {
-  if (type === Type.valueType)
-    return 'v';
-  if (type === Type.starType)
-    return '*';
-  let s = '[';
-  function stringifyName(item: Type | Pin) {
-    if (item.name)
-      s += '(' + item.name + ')';
-  }
-  function stringifyPin(pin: Pin) {
-    s += pin.type ? stringifyType(pin.type) : pin.typeString;
-    stringifyName(pin);
-  }
-  if (type.inputs)
-    type.inputs.forEach(input => stringifyPin(input));
-  s += ',';
-  if (type.outputs)
-    type.outputs.forEach(output => stringifyPin(output));
-  s += ']';
-  stringifyName(type);
-  return s;
 }
 
 const globalTypeMap = new Map<string, Type>();
@@ -243,7 +250,7 @@ export class TypeParser {
     const type = this.add(typeString),
           copy = type.copy();
     copy.name = label;
-    return stringifyType(copy);
+    return copy.toString();
   }
   // TODO remove these editing methods in favor of direct Type copy/modification and stringification.
   // addInputLabel(typeString: string, label: string | undefined) : string {
@@ -261,12 +268,12 @@ export class TypeParser {
   //   return stringifyType(copy);
   // }
 
-  // Removes any trailing label.
-  trimTypeString(typeString: string) : string {
-    if (typeString[typeString.length - 1] === ')')
-      typeString = typeString.substring(0, typeString.lastIndexOf('('));
-    return typeString;
-  }
+  // // Removes any trailing label.
+  // trimTypeString(typeString: string) : string {
+  //   if (typeString[typeString.length - 1] === ')')
+  //     typeString = typeString.substring(0, typeString.lastIndexOf('('));
+  //   return typeString;
+  // }
   // Removes all labels from type string.
   getUnlabeledTypeString(typeString: string) : string {
     let result = '', label = 0;
@@ -1272,23 +1279,21 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
     // Update all incoming and outgoing wires if possible; otherwise they
     // are deleted.
-    const srcChange = new Array<Wire>(), dstChange = new Array<Wire>();
-    function canRewire(index: number, pins: Pin[], newPins: Pin[]) {
-      if (index >= newPins.length)
-        return false;
-      const type = globalTypeParser_.trimTypeString(pins[index].typeString),
-            newType = globalTypeParser_.trimTypeString(newPins[index].typeString);
-      return type === '*' || type === newType;
-    }
+    const srcChange = new Array<Wire>(),
+          dstChange = new Array<Wire>();
     this.forInWires(element, wire => {
-      if (canRewire(wire.dstPin, type.inputs, newType.inputs)) {
+      const src = wire.src!, srcPin = wire.srcPin, dstPin = wire.dstPin;
+      if (dstPin < newType.inputs.length &&
+          src.type.outputs[srcPin].type.canConnectTo(newElement.type.inputs[dstPin].type)) {
         dstChange.push(wire);
       } else {
         this.deleteItem(wire);
       }
     });
     this.forOutWires(element, wire => {
-      if (canRewire(wire.srcPin, type.outputs, newType.outputs)) {
+      const dst = wire.dst!, srcPin = wire.srcPin, dstPin = wire.dstPin;
+      if (srcPin < newType.outputs.length &&
+        newElement.type.inputs[dstPin].type.canConnectTo(dst.type.inputs[dstPin].type)) {
         srcChange.push(wire);
       } else {
         this.deleteItem(wire);

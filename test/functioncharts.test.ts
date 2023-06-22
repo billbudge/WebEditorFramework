@@ -68,7 +68,7 @@ describe('Typeparser', () => {
       '[,[,v][v,v]](@)',
       '[[v,vv(q)](a)v(b),v(c)](foo)',
     ];
-    typeStrings.forEach(typeString => expect(FC.stringifyType(parser.add(typeString)!)).toBe(typeString));
+    typeStrings.forEach(typeString => expect(parser.add(typeString)!.toString()).toBe(typeString));
     typeStrings.forEach(typeString => expect(parser.has(typeString)).toBe(true));
     expect(parser.add('[v,v]').name).toBeUndefined();
     expect(parser.add('[vv,v](+)').name).toBe('+');
