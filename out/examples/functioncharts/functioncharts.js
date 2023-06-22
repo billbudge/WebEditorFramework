@@ -6,19 +6,7 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems
 //------------------------------------------------------------------------------
 // Value and Function type descriptions.
 export class Pin {
-    get typeString() {
-        let result = stringifyType(this.type);
-        if (this.name)
-            result += '(' + this.name + ')';
-        return result;
-    }
-    copy() {
-        if (this.type === Type.valueType)
-            return new Pin(Type.valueType, this.name);
-        else if (this.type === Type.starType)
-            return new Pin(Type.starType, this.name);
-        return new Pin(this.type.copy(), this.name);
-    }
+    get typeString() { return this.toString(); }
     constructor(type, name) {
         this.y = 0;
         this.width = 0;
@@ -27,14 +15,32 @@ export class Pin {
         this.type = type;
         this.name = name;
     }
+    copy() {
+        if (this.type === Type.valueType)
+            return new Pin(Type.valueType, this.name);
+        else if (this.type === Type.starType)
+            return new Pin(Type.starType, this.name);
+        return new Pin(this.type.copy(), this.name);
+    }
+    copyUnlabeled() {
+        if (this.type === Type.valueType)
+            return new Pin(Type.valueType);
+        else if (this.type === Type.starType)
+            return new Pin(Type.starType);
+        return new Pin(this.type.copyUnlabeled());
+    }
+    toString() {
+        let s = this.type.toString();
+        if (this.name)
+            s += '(' + this.name + ')';
+        return s;
+    }
 }
 export class Type {
-    get typeString() { return stringifyType(this); }
+    // static readonly typeMap = new Map<string, Type>();
+    get typeString() { return this.toString(); }
     get needsLayout() {
         return this.width === 0;
-    }
-    copy() {
-        return new Type(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()), this.name);
     }
     constructor(inputs, outputs, name) {
         this.x = 0;
@@ -45,6 +51,41 @@ export class Type {
         this.outputs = outputs;
         this.name = name;
     }
+    copy() {
+        return new Type(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()), this.name);
+    }
+    copyUnlabeled() {
+        return new Type(this.inputs.map(pin => pin.copyUnlabeled()), this.outputs.map(pin => pin.copyUnlabeled()));
+    }
+    toString() {
+        if (this === Type.valueType)
+            return 'v';
+        if (this === Type.starType)
+            return '*';
+        let s = '[';
+        this.inputs.forEach(input => s += input.toString());
+        s += ',';
+        this.outputs.forEach(output => s += output.toString());
+        s += ']';
+        if (this.name)
+            s += '(' + this.name + ')';
+        return s;
+    }
+    // private static equals(src: Type, dst: Type) : boolean {
+    //   if (src === dst)
+    //     return true;
+    //   return src.inputs.length === dst.inputs.length &&
+    //          src.outputs.length === dst.outputs.length &&
+    //          dst.inputs.every((input, i) => {
+    //             return Type.equals(src.inputs[i].type, input.type );
+    //          }) &&
+    //          dst.outputs.every((output, i) => {
+    //            return Type.equals(src.outputs[i].type, output.type);
+    //          });
+    // }
+    // equals(dst: Type) : boolean {
+    //   return Type.equals(this, dst);
+    // }
     static canConnect(src, dst) {
         if (src === dst)
             return true;
@@ -67,29 +108,6 @@ export class Type {
 }
 Type.valueType = new Type([], []);
 Type.starType = new Type([], []);
-export function stringifyType(type) {
-    if (type === Type.valueType)
-        return 'v';
-    if (type === Type.starType)
-        return '*';
-    let s = '[';
-    function stringifyName(item) {
-        if (item.name)
-            s += '(' + item.name + ')';
-    }
-    function stringifyPin(pin) {
-        s += pin.type ? stringifyType(pin.type) : pin.typeString;
-        stringifyName(pin);
-    }
-    if (type.inputs)
-        type.inputs.forEach(input => stringifyPin(input));
-    s += ',';
-    if (type.outputs)
-        type.outputs.forEach(output => stringifyPin(output));
-    s += ']';
-    stringifyName(type);
-    return s;
-}
 const globalTypeMap = new Map();
 // export type TypeVisitor = (type: Type, parent: Type | undefined) => void;
 // export function forEachType(type: Type, callback: TypeVisitor) {
@@ -196,64 +214,13 @@ export class TypeParser {
         }
         return type;
     }
+    // TODO eliminate this method.
     addLabel(typeString, label) {
         if (label === undefined || label === '')
             return typeString;
         const type = this.add(typeString), copy = type.copy();
         copy.name = label;
-        return stringifyType(copy);
-    }
-    // TODO remove these editing methods in favor of direct Type copy/modification and stringification.
-    // addInputLabel(typeString: string, label: string | undefined) : string {
-    //   const type = this.add(typeString),
-    //         copy = type.copy();
-    //   if (copy.inputs.length > 0)
-    //     copy.inputs[0].name = label;
-    //   return stringifyType(copy);
-    // }
-    // addOutputLabel(typeString: string, label: string | undefined) : string {
-    //   const type = this.add(typeString),
-    //         copy = type.copy();
-    //   if (copy.outputs.length > 0)
-    //     copy.outputs[0].name = label;
-    //   return stringifyType(copy);
-    // }
-    // Removes any trailing label.
-    trimTypeString(typeString) {
-        if (typeString[typeString.length - 1] === ')')
-            typeString = typeString.substring(0, typeString.lastIndexOf('('));
-        return typeString;
-    }
-    // Removes all labels from type string.
-    getUnlabeledTypeString(typeString) {
-        let result = '', label = 0;
-        while (true) {
-            label = typeString.indexOf('(');
-            if (label <= 0)
-                break;
-            result += typeString.substring(0, label);
-            label = typeString.indexOf(')', label);
-            if (label <= 0)
-                break;
-            typeString = typeString.substring(label + 1, typeString.length);
-        }
-        return result + typeString;
-    }
-    splitTypeString(typeString) {
-        let j = 0, level = 0;
-        while (true) {
-            if (typeString[j] === '[')
-                level++;
-            else if (typeString[j] === ']')
-                level--;
-            else if (typeString[j] === ',')
-                if (level === 1)
-                    return j;
-            j++;
-        }
-    }
-    hasOutput(typeString) {
-        return !typeString.endsWith(',]');
+        return copy.toString();
     }
 }
 const globalTypeParser_ = new TypeParser(), nullFunction = globalTypeParser_.add('[,]');
@@ -1049,14 +1016,10 @@ export class FunctionchartContext extends EventBase {
         // Update all incoming and outgoing wires if possible; otherwise they
         // are deleted.
         const srcChange = new Array(), dstChange = new Array();
-        function canRewire(index, pins, newPins) {
-            if (index >= newPins.length)
-                return false;
-            const type = globalTypeParser_.trimTypeString(pins[index].typeString), newType = globalTypeParser_.trimTypeString(newPins[index].typeString);
-            return type === '*' || type === newType;
-        }
         this.forInWires(element, wire => {
-            if (canRewire(wire.dstPin, type.inputs, newType.inputs)) {
+            const src = wire.src, srcPin = wire.srcPin, dstPin = wire.dstPin;
+            if (dstPin < newType.inputs.length &&
+                src.type.outputs[srcPin].type.canConnectTo(newElement.type.inputs[dstPin].type)) {
                 dstChange.push(wire);
             }
             else {
@@ -1064,7 +1027,9 @@ export class FunctionchartContext extends EventBase {
             }
         });
         this.forOutWires(element, wire => {
-            if (canRewire(wire.srcPin, type.outputs, newType.outputs)) {
+            const dst = wire.dst, srcPin = wire.srcPin, dstPin = wire.dstPin;
+            if (srcPin < newType.outputs.length &&
+                newElement.type.outputs[srcPin].type.canConnectTo(dst.type.inputs[dstPin].type)) {
                 srcChange.push(wire);
             }
             else {
@@ -1085,8 +1050,8 @@ export class FunctionchartContext extends EventBase {
         this.replaceElement(instance, newInstance);
     }
     exportElement(element) {
-        const result = this.newElement('element'), typeString = (element instanceof Element) ? element.typeString : element.type.typeString;
-        result.typeString = '[,' + typeString + ']';
+        const result = this.newElement('element'), newType = new Type([], [new Pin(element.type)]);
+        result.typeString = newType.toString();
         // TODO eliminate potential dangling wires.
         return result;
     }
@@ -1101,10 +1066,9 @@ export class FunctionchartContext extends EventBase {
         });
     }
     openElement(element) {
-        const result = this.newElement('element'), typeString = element.type.typeString;
-        const j = globalTypeParser_.splitTypeString(typeString);
-        result.typeString =
-            typeString.substring(0, j) + typeString + typeString.substring(j); // TODO move to parser
+        const result = this.newElement('element'), type = element.type, newType = type.copy();
+        newType.inputs.push(new Pin(type));
+        result.typeString = newType.toString();
         // TODO eliminate potential dangling wires.
         return result;
     }
@@ -1184,7 +1148,8 @@ export class FunctionchartContext extends EventBase {
             result += getPinName(type || Type.starType, output.type.inputs[0]);
         });
         result += ']';
-        result = globalTypeParser_.addLabel(result, label); // preserve label
+        if (label)
+            result += '(' + label + ')';
         // contextInputs.sort(comparePins);
         // let contextTypeString = '[';
         // contextInputs.forEach(function(input, i) {
@@ -2025,31 +1990,27 @@ export class FunctionchartEditor {
         }
         function elementLabelSetter(info, item, value) {
             const typeString = getter(info, item);
+            const labelPart = value ? '(' + value + ')' : '';
             let newValue;
-            if (value === undefined) {
-                newValue = globalTypeParser_.getUnlabeledTypeString(typeString);
-            }
-            else {
-                switch (item.template.typeName) {
-                    case 'input': // [,v(label)]
-                        newValue = '[,*(' + value + ')]';
-                        break;
-                    case 'output': // [v(label),]
-                        newValue = '[*(' + value + '),]';
-                        break;
-                    case 'literal': // [,v(label)]
-                        newValue = '[,v(' + value + ')]';
-                        break;
-                    case 'binop': // [vv,v](label)
-                        newValue = globalTypeParser_.addLabel(typeString, value);
-                        break;
-                    case 'unop': // [v,v](label)
-                        newValue = globalTypeParser_.addLabel(typeString, value);
-                        break;
-                    case 'functionchart': // [...](label)
-                        newValue = globalTypeParser_.addLabel(typeString, value);
-                        break;
-                }
+            switch (item.template.typeName) {
+                case 'input': // [,v(label)]
+                    newValue = '[,*' + labelPart + ']';
+                    break;
+                case 'output': // [v(label),]
+                    newValue = '[*' + labelPart + ',]';
+                    break;
+                case 'literal': // [,v(label)]
+                    newValue = '[,v' + labelPart + ']';
+                    break;
+                case 'binop': // [vv,v](label)
+                    newValue = '[vv,v]' + labelPart;
+                    break;
+                case 'unop': // [v,v](label)
+                    newValue = '[v,v]' + labelPart;
+                    break;
+                case 'functionchart': // [...](label)
+                    newValue = globalTypeParser_.addLabel(typeString, value);
+                    break;
             }
             setter(info, item, newValue);
         }
