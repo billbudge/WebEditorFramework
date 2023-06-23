@@ -27,6 +27,10 @@ function addFunctionchart(parent) {
 //   }
 // }
 //------------------------------------------------------------------------------
+// Setup.
+beforeEach(() => {
+    FC.Type.initialize();
+});
 describe('Pin', () => {
     test('Pin', () => {
         const valuePin = new FC.Pin(FC.Type.valueType), starPin = new FC.Pin(FC.Type.starType);
@@ -38,12 +42,9 @@ describe('Pin', () => {
         expect(starPin.name).toBeUndefined();
         expect(starPin.toString()).toBe('*');
         expect(starPin.typeString).toBe('*');
-        valuePin.name = 'pin1';
-        expect(valuePin.toString()).toBe('v(pin1)');
-        expect(valuePin.typeString).toBe('v(pin1)');
-        starPin.name = 'pin2';
-        expect(starPin.toString()).toBe('*(pin2)');
-        expect(starPin.typeString).toBe('*(pin2)');
+        const namedPin = new FC.Pin(valuePin.type, 'pin1');
+        expect(namedPin.toString()).toBe('v(pin1)');
+        expect(namedPin.typeString).toBe('v(pin1)');
         const valuePin2 = valuePin.copy(), starPin2 = starPin.copy();
         expect(valuePin2).not.toBe(valuePin);
         expect(valuePin2.type).toBe(valuePin.type);
@@ -94,6 +95,12 @@ describe('Type', () => {
         expect(valueType).toBe(FC.Type.valueType);
         expect(emptyType).toBe(FC.Type.emptyType);
     });
+    test('atomized', () => {
+        const valueType = FC.Type.valueType, type1 = new FC.Type([new FC.Pin(valueType), new FC.Pin(valueType)], [new FC.Pin(valueType)]), type2 = new FC.Type([new FC.Pin(valueType), new FC.Pin(valueType)], [new FC.Pin(valueType)]);
+        expect(type1).not.toBe(type2);
+        expect(type1.atomized()).toBe(type1);
+        expect(type2.atomized()).toBe(type1);
+    });
     test('canConnect', () => {
         expect(FC.Type.starType.canConnectTo(FC.Type.valueType)).toBe(true);
         expect(FC.Type.valueType.canConnectTo(FC.Type.starType)).toBe(true);
@@ -117,7 +124,7 @@ describe('parseTypeString', () => {
             '[[v,vv(q)](a)v(b),v(c)](foo)',
         ];
         typeStrings.forEach(typeString => expect(FC.parseTypeString(typeString).toString()).toBe(typeString));
-        // typeStrings.forEach(typeString => expect(parser.has(typeString)).toBe(true));  // TODO fix
+        typeStrings.forEach(typeString => expect(FC.Type.atomizedTypes.has(typeString)).toBe(true));
         expect(FC.parseTypeString('[v,v]').name).toBeUndefined();
         expect(FC.parseTypeString('[vv,v](+)').name).toBe('+');
         const type1 = FC.parseTypeString('[v(a)v(b),v(c)]');
@@ -133,26 +140,8 @@ describe('parseTypeString', () => {
         expect(type2.outputs[1].typeString).toBe('[v,v]');
         // Make sure subtypes are present.
         const subTypeStrings = ['[v,v]', '[,v]', '[v,vv(q)]'];
-        // subTypeStrings.forEach(typeString => expect(parser.has(typeString)).toBe(true));
+        subTypeStrings.forEach(typeString => expect(FC.Type.atomizedTypes.has(typeString)).toBe(true));
     });
-    // test('addLabel', () => {
-    //   const parser = new FC.TypeParser();
-    //   expect(parser.addLabel('[vv,v]', '+')).toBe('[vv,v](+)');
-    //   expect(parser.addLabel('[vv,v](+)', '-')).toBe('[vv,v](-)');
-    //   expect(parser.addLabel('[v(a)v(b),v(c)]', 'foo')).toBe('[v(a)v(b),v(c)](foo)');
-    // });
-    // test('addInputLabel', () => {
-    //   const parser = new FC.TypeParser();
-    //   expect(parser.addInputLabel('[v,v]', 'a')).toBe('[v(a),v]');
-    //   expect(parser.addInputLabel('[v(a),v]', 'b')).toBe('[v(b),v]');
-    //   expect(parser.addInputLabel('[v(a),v]', undefined)).toBe('[v,v]');
-    // });
-    // test('addOutputLabel', () => {
-    //   const parser = new FC.TypeParser();
-    //   expect(parser.addOutputLabel('[v,v]', 'a')).toBe('[v,v(a)]');
-    //   expect(parser.addOutputLabel('[v,v(a)]', 'b')).toBe('[v,v(b)]');
-    //   expect(parser.addOutputLabel('[v,v(a)]', undefined)).toBe('[v,v]');
-    // });
 });
 describe('FunctionchartContext', () => {
     test('element interface', () => {

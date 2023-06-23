@@ -15,6 +15,7 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet,
          reduceToRoots, List, TransactionManager, HistoryManager, ScalarPropertyTypes,
          ArrayPropertyTypes } from '../../src/dataModels.js'
+import { types } from '@babel/core';
 
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
@@ -59,17 +60,20 @@ export class Pin {
 }
 
 export class Type {
+  static readonly valueTypeString = 'v';
   static readonly valueType = new Type([], []);
+  static readonly starTypeString = '*';
   static readonly starType = new Type([], []);
+  static readonly emptyTypeString = '[,]';
   static readonly emptyType = new Type([], []);
 
   static readonly atomizedTypes = new Map<string, Type>();
 
   static initialize() {
     Type.atomizedTypes.clear();
-    Type.atomizedTypes.set('v', Type.valueType);
-    Type.atomizedTypes.set('*', Type.starType);
-    Type.atomizedTypes.set('[,]', Type.emptyType);
+    Type.atomizedTypes.set(Type.valueTypeString, Type.valueType);
+    Type.atomizedTypes.set(Type.starTypeString, Type.starType);
+    Type.atomizedTypes.set(Type.emptyTypeString, Type.emptyType);
   }
 
   get typeString() : string { return this.toString(); }
@@ -103,9 +107,9 @@ export class Type {
   }
   toString() : string {
     if (this === Type.valueType)
-      return 'v';
+      return Type.valueTypeString;
     if (this === Type.starType)
-      return '*';
+      return Type.starTypeString;
     let s = '[';
     this.inputs.forEach(input => s += input.toString());
     s += ',';
@@ -189,12 +193,12 @@ export function parseTypeString(s: string) : Type {
   function parsePin() : Pin {
     let i = j;
     // value types
-    if (s[j] === 'v') {
+    if (s[j] === Type.valueTypeString) {
       j++;
       return new Pin(Type.valueType, parseName());
     }
     // wildcard types
-    if (s[j] === '*') {
+    if (s[j] === Type.starTypeString) {
       j++;
       return new Pin(Type.starType, parseName());
     }
@@ -207,9 +211,9 @@ export function parseTypeString(s: string) : Type {
   }
   function parseFunction() : Type {
     let i = j;
-    if (s[j] === 'v') {
+    if (s[j] === Type.valueTypeString) {
       return Type.valueType;
-    } else if(s[j] === '*') {
+    } else if(s[j] === Type.starTypeString) {
       return Type.starType;
     } else if (s[j] === '[') {
       j++;
@@ -311,11 +315,10 @@ class FunctionchartTemplate extends NonWireTemplate {
   readonly width = widthProp;
   readonly height = heightProp;
   readonly name = nameProp;
-  readonly typeString = typeStringProp;
   readonly nonWires = nonWiresProp;
   readonly wires = wiresProp;
   readonly properties = [this.id, this.x, this.y, this.width, this.height, this.name,
-                         this.typeString, this.nonWires, this.wires];
+                         this.nonWires, this.wires];
 }
 
 class FunctionInstanceTemplate extends NonWireTemplate {
@@ -443,8 +446,8 @@ export class Functionchart implements DataContextObject {
   set width(value: number) { this.template.width.set(this, value); }
   get height() { return this.template.height.get(this) || 0; }
   set height(value: number) { this.template.height.set(this, value); }
-  get typeString() : string { return this.template.typeString.get(this); }
-  set typeString(value: string) { this.template.typeString.set(this, value); }
+  get name() { return this.template.name.get(this) || 0; }
+  set name(value: number) { this.template.name.set(this, value); }
 
   get nonWires() { return this.template.nonWires.get(this) as List<NonWireTypes>; }
   get wires() { return this.template.wires.get(this) as List<Wire>; }
@@ -571,7 +574,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         break;
       case 'element':
         template = elementTemplate;
-        typeString = '[,]';
+        typeString = Type.emptyTypeString;
         break;
       default: throw new Error('Unknown element type: ' + typeName);
     }
@@ -1180,8 +1183,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         //   item.typeString = newTypeString;
       } else if (item instanceof Functionchart) {
         const newTypeString = self.getFunctionchartTypeString(item);
-        if (item.typeString !== newTypeString)
-          item.typeString = newTypeString;
+        item.type = parseTypeString(newTypeString);
       }
     });
     this.visitNonWires(this.functionchart, item => {
@@ -1333,7 +1335,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           // graphInfo = this.getSubgraphInfo(nonWires),
           inputs = new Array<Pseudoelement>(),
           outputs = new Array<Pseudoelement>(),
-          label = functionChart.type.name;
+          name = functionChart.name;
 
     // Add pins for inputs, outputs, and disconnected pins on elements.
     nonWires.forEach(item => {
@@ -1373,8 +1375,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       result += getPinName(type || Type.starType, output.type.inputs[0]);
     });
     result += ']';
-    if (label)
-      result += '(' + label + ')';
+    if (name)
+      result += '(' + name + ')';
 
     // contextInputs.sort(comparePins);
 
@@ -1396,7 +1398,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     //   let src = self.getWireSrc(wire),
     //       srcPin = getType(src).outputs[wire.srcPin];
     //   // Trace wires, starting at input junctions.
-    //   if (!isInput(src) || srcPin.type !== '*')
+    //   if (!isInput(src) || srcPin.type !== Type.starTypeString)
     //     return;
     //   let srcPinIndex = src.index,
     //       activeWires = [wire];
@@ -1404,7 +1406,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     //     wire = activeWires.pop();
     //     let dst = self.getWireDst(wire),
     //         dstPin = getType(dst).inputs[wire.dstPin];
-    //     if (isOutput(dst) && dstPin.type === '*') {
+    //     if (isOutput(dst) && dstPin.type === Type.starTypeString) {
     //       passThroughs.add([srcPinIndex, dst.index]);
     //     } else if (dst.passThroughs) {
     //       dst.passThroughs.forEach(function(passThrough) {
@@ -1434,10 +1436,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (item instanceof FunctionInstance) {
       const functionChart = item.functionchart;
       if (functionChart) {
-        typeString = functionChart.typeString;
+        typeString = functionChart.type.toString();
       }
-    } else {
+    } else if (item instanceof ElementBase) {
       typeString = item.typeString;
+    } else if (item instanceof Functionchart) {
+      const newTypeString = self.getFunctionchartTypeString(item);
+      item.type = parseTypeString(newTypeString);
     }
     if (typeString && typeString !== item.type.typeString) {
       const newType = parseTypeString(typeString);
@@ -1950,10 +1955,10 @@ class Renderer {
     const ctx = this.ctx,
           theme = this.theme;
     ctx.strokeStyle = theme.strokeColor;
-    if (pin.typeString === 'v' || pin.typeString === '*') {
+    if (pin.typeString === Type.valueTypeString || pin.typeString === Type.starTypeString) {
       const r = theme.knobbyRadius;
       ctx.beginPath();
-      if (pin.typeString === 'v') {
+      if (pin.typeString === Type.valueTypeString) {
         const d = 2 * r;
         ctx.rect(x, y, d, d);
       } else {
@@ -2422,8 +2427,6 @@ export class FunctionchartEditor implements CanvasLayer {
           return item.type.outputs[0].name || '';
         case 'binop':       // [vv,v](label)
         case 'unop':        // [v,v](label)
-        case 'functionchart':       // [...](label)
-          return item.type.name || '';
       }
       return '';
     }
@@ -2447,12 +2450,6 @@ export class FunctionchartEditor implements CanvasLayer {
         case 'unop':       // [v,v](label)
           newValue = '[v,v]' + labelPart;
           break;
-        case 'functionchart': {     // [...](label)
-          const type = parseTypeString(typeString).copy(),
-                newType = new Type(type.inputs, type.outputs, value);
-          newValue = newType.toString();
-          break;
-        }
       }
     setter(info, item, newValue);
     }
@@ -2510,9 +2507,9 @@ export class FunctionchartEditor implements CanvasLayer {
       {
         label: 'name',
         type: 'text',
-        getter: elementLabelGetter,
-        setter: elementLabelSetter,
-        prop: typeStringProp,
+        getter: getter,
+        setter: setter,
+        prop: nameProp,
       },
     ]);
 
@@ -3329,12 +3326,12 @@ const editingModel = (function() {
         if (isInput(item)) {
           const y = renderer.pinToPoint(item, 0, false).y,
                 type = getInputType(item);
-          if (globalTypeParser_.trimType(type) != '*')
+          if (globalTypeParser_.trimType(type) != Type.starTypeString)
             inputs.push(makePin(item, type, y));
         } else if (isOutput(item)) {
           const y = renderer.pinToPoint(item, 0, true).y,
                 type = getOutputType(item);
-          if (globalTypeParser_.trimType(type) != '*')
+          if (globalTypeParser_.trimType(type) != Type.starTypeString)
             outputs.push(makePin(item, type, y));
         } else if (isElement(item)) {
           // Recursive group instances aren't included in the signature.
@@ -3411,7 +3408,7 @@ const editingModel = (function() {
         let src = self.getWireSrc(wire),
             srcPin = getType(src).outputs[wire.srcPin];
         // Trace wires, starting at input junctions.
-        if (!isInput(src) || srcPin.type !== '*')
+        if (!isInput(src) || srcPin.type !== Type.starTypeString)
           return;
         let srcPinIndex = src.index,
             activeWires = [wire];
@@ -3419,7 +3416,7 @@ const editingModel = (function() {
           wire = activeWires.pop();
           let dst = self.getWireDst(wire),
               dstPin = getType(dst).inputs[wire.dstPin];
-          if (isOutput(dst) && dstPin.type === '*') {
+          if (isOutput(dst) && dstPin.type === Type.starTypeString) {
             passThroughs.add([srcPinIndex, dst.index]);
           } else if (dst.passThroughs) {
             dst.passThroughs.forEach(function(passThrough) {
@@ -3487,7 +3484,7 @@ const editingModel = (function() {
             srcPin = getType(src).outputs[wire.srcPin],
             dst = this.getWireDst(wire),
             dstPin = getType(dst).inputs[wire.dstPin];
-        if (srcPin.type !== '*')
+        if (srcPin.type !== Type.starTypeString)
           return srcPin.type;
         if (isGroupInstance(src)) {
           const group = this.getGroupDefinition_(src);
@@ -3503,7 +3500,7 @@ const editingModel = (function() {
           }
         }
       }
-      return '*';
+      return Type.starTypeString;
     },
 
     findDstType: function(wire) {
@@ -3517,7 +3514,7 @@ const editingModel = (function() {
             dst = this.getWireDst(wire),
             srcPin = getType(src).outputs[wire.srcPin],
             dstPin = getType(dst).inputs[wire.dstPin];
-        if (dstPin.type !== '*')
+        if (dstPin.type !== Type.starTypeString)
           return dstPin.type;
         if (isGroupInstance(dst)) {
           const group = this.getGroupDefinition_(src);
@@ -3532,7 +3529,7 @@ const editingModel = (function() {
           }
         }
       }
-      return '*';
+      return Type.starTypeString;
     },
 
 
