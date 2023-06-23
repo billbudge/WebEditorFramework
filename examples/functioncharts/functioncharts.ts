@@ -63,8 +63,14 @@ export class Type {
   static readonly starType = new Type([], []);
   static readonly emptyType = new Type([], []);
 
-  static readonly atomizedTypes = new Map<string, Type>(
-      [['v', Type.valueType], ['*', Type.starType], ['[,]', Type.emptyType]]);
+  static readonly atomizedTypes = new Map<string, Type>();
+
+  static initialize() {
+    Type.atomizedTypes.clear();
+    Type.atomizedTypes.set('v', Type.valueType);
+    Type.atomizedTypes.set('*', Type.starType);
+    Type.atomizedTypes.set('[,]', Type.emptyType);
+  }
 
   get typeString() : string { return this.toString(); }
 

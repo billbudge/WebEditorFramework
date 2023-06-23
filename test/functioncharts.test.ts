@@ -37,6 +37,11 @@ function addFunctionchart(parent: FC.Functionchart) : FC.Functionchart {
 
 //------------------------------------------------------------------------------
 
+// Setup.
+beforeEach(() => {
+  FC.Type.initialize();
+});
+
 describe('Pin' , () => {
   test('Pin', () => {
     const valuePin = new FC.Pin(FC.Type.valueType),
@@ -114,6 +119,15 @@ describe('Type' , () => {
     expect(valueType).toBe(FC.Type.valueType);
     expect(emptyType).toBe(FC.Type.emptyType);
   });
+  test('atomized', () => {
+    const valueType = FC.Type.valueType,
+          type1 = new FC.Type([new FC.Pin(valueType), new FC.Pin(valueType)], [new FC.Pin(valueType)]),
+          type2 = new FC.Type([new FC.Pin(valueType), new FC.Pin(valueType)], [new FC.Pin(valueType)]);
+    expect(type1).not.toBe(type2);
+    expect(type1.atomized()).toBe(type1);
+    expect(type2.atomized()).toBe(type1);
+
+  });
   test('canConnect', () => {
     expect(FC.Type.starType.canConnectTo(FC.Type.valueType)).toBe(true);
     expect(FC.Type.valueType.canConnectTo(FC.Type.starType)).toBe(true);
@@ -140,7 +154,7 @@ describe('parseTypeString', () => {
       '[[v,vv(q)](a)v(b),v(c)](foo)',
     ];
     typeStrings.forEach(typeString => expect(FC.parseTypeString(typeString)!.toString()).toBe(typeString));
-    typeStrings.forEach(typeString => expect(FC.Type.atomizedTypes.has(typeString)).toBe(true));  // TODO fix
+    typeStrings.forEach(typeString => expect(FC.Type.atomizedTypes.has(typeString)).toBe(true));
     expect(FC.parseTypeString('[v,v]').name).toBeUndefined();
     expect(FC.parseTypeString('[vv,v](+)').name).toBe('+');
     const type1 = FC.parseTypeString('[v(a)v(b),v(c)]');
