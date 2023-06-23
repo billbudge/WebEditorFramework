@@ -1189,8 +1189,7 @@ export class FunctionchartContext extends EventBase {
             typeString = item.typeString;
         }
         else if (item instanceof Functionchart) {
-            const newTypeString = self.getFunctionchartTypeString(item);
-            item.type = parseTypeString(newTypeString);
+            typeString = this.getFunctionchartTypeString(item);
         }
         if (typeString && typeString !== item.type.typeString) {
             const newType = parseTypeString(typeString);
