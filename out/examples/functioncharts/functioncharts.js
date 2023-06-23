@@ -37,7 +37,6 @@ export class Pin {
     }
 }
 export class Type {
-    // static readonly typeMap = new Map<string, Type>();
     get typeString() { return this.toString(); }
     get needsLayout() {
         return this.width === 0;
@@ -70,6 +69,15 @@ export class Type {
         if (this.name)
             s += '(' + this.name + ')';
         return s;
+    }
+    atomized() {
+        let s = this.toString();
+        let atomizedType = Type.atomizedTypes.get(s);
+        if (!atomizedType) {
+            atomizedType = this;
+            Type.atomizedTypes.set(s, atomizedType);
+        }
+        return atomizedType;
     }
     // private static equals(src: Type, dst: Type) : boolean {
     //   if (src === dst)
@@ -108,7 +116,8 @@ export class Type {
 }
 Type.valueType = new Type([], []);
 Type.starType = new Type([], []);
-const globalTypeMap = new Map();
+Type.emptyType = new Type([], []);
+Type.atomizedTypes = new Map([['v', Type.valueType], ['*', Type.starType], ['[,]', Type.emptyType]]);
 // export type TypeVisitor = (type: Type, parent: Type | undefined) => void;
 // export function forEachType(type: Type, callback: TypeVisitor) {
 //   callback(type, undefined);
@@ -117,113 +126,79 @@ const globalTypeMap = new Map();
 //   if (type.outputs)
 //     type.outputs.forEach(output => forEachType(output.type, callback));
 // }
-export class TypeParser {
-    constructor() {
-        this.map_ = new Map();
-        this.addType('v', Type.valueType);
-        this.addType('*', Type.starType);
-    }
-    addType(s, type) {
-        let result = this.map_.get(s);
-        if (!result) {
-            this.map_.set(s, type);
-            result = type;
+export function parseTypeString(s) {
+    let j = 0;
+    // Close over j to avoid extra return values.
+    function parseName() {
+        let name;
+        if (s[j] === '(') {
+            let i = j + 1;
+            j = s.indexOf(')', i);
+            if (j > i)
+                name = s.substring(i, j);
+            j++;
         }
-        return result;
+        return name;
     }
-    get(s) {
-        return this.map_.get(s);
+    function parsePin() {
+        let i = j;
+        // value types
+        if (s[j] === 'v') {
+            j++;
+            return new Pin(Type.valueType, parseName());
+        }
+        // wildcard types
+        if (s[j] === '*') {
+            j++;
+            return new Pin(Type.starType, parseName());
+        }
+        // function types
+        let type = parseFunction(), typeString = s.substring(i, j);
+        // Add the pin type, without label.
+        type = type.atomized();
+        return new Pin(type, parseName());
     }
-    has(s) {
-        return this.map_.has(s);
-    }
-    add(s) {
-        let type = this.map_.get(s);
-        if (type)
+    function parseFunction() {
+        let i = j;
+        if (s[j] === 'v') {
+            return Type.valueType;
+        }
+        else if (s[j] === '*') {
+            return Type.starType;
+        }
+        else if (s[j] === '[') {
+            j++;
+            let inputs = new Array, outputs = new Array;
+            while (s[j] !== ',') {
+                inputs.push(parsePin());
+            }
+            j++;
+            while (s[j] !== ']') {
+                outputs.push(parsePin());
+            }
+            j++;
+            const typeString = s.substring(i, j);
+            let type = new Type(inputs, outputs);
+            type = type.atomized();
             return type;
-        const self = this;
-        let j = 0;
-        // Close over j to avoid extra return values.
-        function parseName() {
-            let name;
-            if (s[j] === '(') {
-                let i = j + 1;
-                j = s.indexOf(')', i);
-                if (j > i)
-                    name = s.substring(i, j);
-                j++;
-            }
-            return name;
         }
-        function parsePin() {
-            let i = j;
-            // value types
-            if (s[j] === 'v') {
-                j++;
-                return new Pin(Type.valueType, parseName());
-            }
-            // wildcard types
-            if (s[j] === '*') {
-                j++;
-                return new Pin(Type.starType, parseName());
-            }
-            // function types
-            let type = parseFunction(), typeString = s.substring(i, j);
-            // Add the pin type, without label.
-            type = self.addType(typeString, type);
-            return new Pin(type, parseName());
+        else {
+            throw new Error('Invalid type string: ' + s);
         }
-        function parseFunction() {
-            let i = j;
-            if (s[j] === 'v') {
-                return Type.valueType;
-            }
-            else if (s[j] === '*') {
-                return Type.starType;
-            }
-            else if (s[j] === '[') {
-                j++;
-                let inputs = new Array, outputs = new Array;
-                while (s[j] !== ',') {
-                    inputs.push(parsePin());
-                }
-                j++;
-                while (s[j] !== ']') {
-                    outputs.push(parsePin());
-                }
-                j++;
-                const typeString = s.substring(i, j);
-                let type = new Type(inputs, outputs);
-                type = self.addType(typeString, type);
-                return type;
-            }
-            else {
-                throw new Error('Invalid type string: ' + s);
-            }
-        }
-        type = parseFunction();
-        if (type) {
-            const name = parseName();
-            if (name) {
-                // The top level function type includes the label, so duplicate
-                // type and pins.
-                const inputs = type.inputs.map(pin => new Pin(pin.type, pin.name)), outputs = type.outputs.map(pin => new Pin(pin.type, pin.name));
-                type = new Type(inputs, outputs, name);
-            }
-            type = this.addType(s, type);
-        }
-        return type;
     }
-    // TODO eliminate this method.
-    addLabel(typeString, label) {
-        if (label === undefined || label === '')
-            return typeString;
-        const type = this.add(typeString), copy = type.copy();
-        copy.name = label;
-        return copy.toString();
+    let type = parseFunction();
+    if (type) {
+        const name = parseName();
+        if (name) {
+            // The top level function type includes the label, so duplicate
+            // type and pins.
+            const inputs = type.inputs.map(pin => new Pin(pin.type, pin.name)), outputs = type.outputs.map(pin => new Pin(pin.type, pin.name));
+            type = new Type(inputs, outputs, name);
+        }
+        type = type.atomized();
     }
+    return type;
 }
-const globalTypeParser_ = new TypeParser(), nullFunction = globalTypeParser_.add('[,]');
 //------------------------------------------------------------------------------
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
@@ -291,7 +266,7 @@ const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 
 class ElementBase {
     constructor(id) {
         this.globalPosition = defaultPoint;
-        this.type = nullFunction;
+        this.type = Type.emptyType;
         this.inWires = new Array(); // one input per pin (no fan in).
         this.outWires = new Array(); // multiple outputs per pin (fan out).
         this.id = id;
@@ -367,7 +342,7 @@ export class Functionchart {
     constructor(context, id) {
         this.template = functionchartTemplate;
         this.globalPosition = defaultPoint;
-        this.type = nullFunction;
+        this.type = Type.emptyType;
         this.context = context;
         this.id = id;
     }
@@ -1209,7 +1184,7 @@ export class FunctionchartContext extends EventBase {
             typeString = item.typeString;
         }
         if (typeString && typeString !== item.type.typeString) {
-            const newType = globalTypeParser_.add(typeString);
+            const newType = parseTypeString(typeString);
             item.type = newType;
         }
         // Update 'inWires' and 'outWires' properties.
@@ -2008,9 +1983,11 @@ export class FunctionchartEditor {
                 case 'unop': // [v,v](label)
                     newValue = '[v,v]' + labelPart;
                     break;
-                case 'functionchart': // [...](label)
-                    newValue = globalTypeParser_.addLabel(typeString, value);
+                case 'functionchart': { // [...](label)
+                    const type = parseTypeString(typeString).copy(), newType = new Type(type.inputs, type.outputs, value);
+                    newValue = newType.toString();
                     break;
+                }
             }
             setter(info, item, newValue);
         }

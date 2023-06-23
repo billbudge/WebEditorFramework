@@ -24,7 +24,7 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
 
 export class Pin {
   readonly type: Type;
-  name?: string;
+  readonly name?: string;
   get typeString() { return this.toString(); }
   y = 0;
   width = 0;
@@ -61,13 +61,16 @@ export class Pin {
 export class Type {
   static readonly valueType = new Type([], []);
   static readonly starType = new Type([], []);
-  // static readonly typeMap = new Map<string, Type>();
+  static readonly emptyType = new Type([], []);
+
+  static readonly atomizedTypes = new Map<string, Type>(
+      [['v', Type.valueType], ['*', Type.starType], ['[,]', Type.emptyType]]);
 
   get typeString() : string { return this.toString(); }
 
   readonly inputs: Pin[];
   readonly outputs: Pin[];
-  name?: string;
+  readonly name?: string;
   x = 0;
   y = 0;
   width = 0;
@@ -105,6 +108,15 @@ export class Type {
     if (this.name)
       s += '(' + this.name + ')';
     return s;
+  }
+  atomized() : Type {
+    let s = this.toString();
+    let atomizedType = Type.atomizedTypes.get(s);
+    if (!atomizedType) {
+      atomizedType = this;
+      Type.atomizedTypes.set(s, atomizedType);
+    }
+    return atomizedType;
   }
   // private static equals(src: Type, dst: Type) : boolean {
   //   if (src === dst)
@@ -144,8 +156,6 @@ export class Type {
   }
 }
 
-const globalTypeMap = new Map<string, Type>();
-
 // export type TypeVisitor = (type: Type, parent: Type | undefined) => void;
 
 // export function forEachType(type: Type, callback: TypeVisitor) {
@@ -156,121 +166,79 @@ const globalTypeMap = new Map<string, Type>();
 //     type.outputs.forEach(output => forEachType(output.type, callback));
 // }
 
-export class TypeParser {
-  private readonly map_ = new Map<string, Type>();
-
-  constructor() {
-    this.addType('v', Type.valueType);
-    this.addType('*', Type.starType);
-  }
-
-  private addType(s: string, type: Type) {
-    let result = this.map_.get(s);
-    if (!result) {
-      this.map_.set(s, type);
-      result = type;
+export function parseTypeString(s: string) : Type {
+  let j = 0;
+  // Close over j to avoid extra return values.
+  function parseName() : string | undefined {
+    let name;
+    if (s[j] === '(') {
+      let i = j + 1;
+      j = s.indexOf(')', i);
+      if (j > i)
+        name = s.substring(i, j);
+      j++;
     }
-    return result;
+    return name;
   }
-
-  get(s: string) : Type | undefined {
-    return this.map_.get(s);
+  function parsePin() : Pin {
+    let i = j;
+    // value types
+    if (s[j] === 'v') {
+      j++;
+      return new Pin(Type.valueType, parseName());
+    }
+    // wildcard types
+    if (s[j] === '*') {
+      j++;
+      return new Pin(Type.starType, parseName());
+    }
+    // function types
+    let type = parseFunction(),
+        typeString = s.substring(i, j);
+    // Add the pin type, without label.
+    type = type.atomized();
+    return new Pin(type, parseName());
   }
-  has(s: string) {
-    return this.map_.has(s);
-  }
-  add(s: string) : Type {
-    let type = this.map_.get(s);
-    if (type)
+  function parseFunction() : Type {
+    let i = j;
+    if (s[j] === 'v') {
+      return Type.valueType;
+    } else if(s[j] === '*') {
+      return Type.starType;
+    } else if (s[j] === '[') {
+      j++;
+      let inputs = new Array<Pin>, outputs = new Array<Pin>;
+      while (s[j] !== ',') {
+        inputs.push(parsePin());
+      }
+      j++;
+      while (s[j] !== ']') {
+        outputs.push(parsePin());
+      }
+      j++;
+      const typeString = s.substring(i, j);
+      let type = new Type(inputs, outputs);
+      type = type.atomized();
       return type;
-
-    const self = this;
-
-    let j = 0;
-    // Close over j to avoid extra return values.
-    function parseName() : string | undefined {
-      let name;
-      if (s[j] === '(') {
-        let i = j + 1;
-        j = s.indexOf(')', i);
-        if (j > i)
-          name = s.substring(i, j);
-        j++;
-      }
-      return name;
+    } else {
+      throw new Error('Invalid type string: ' + s);
     }
-    function parsePin() : Pin {
-      let i = j;
-      // value types
-      if (s[j] === 'v') {
-        j++;
-        return new Pin(Type.valueType, parseName());
-      }
-      // wildcard types
-      if (s[j] === '*') {
-        j++;
-        return new Pin(Type.starType, parseName());
-      }
-      // function types
-      let type = parseFunction(),
-          typeString = s.substring(i, j);
-      // Add the pin type, without label.
-      type = self.addType(typeString, type);
-      return new Pin(type, parseName());
-    }
-    function parseFunction() : Type {
-      let i = j;
-      if (s[j] === 'v') {
-        return Type.valueType;
-      } else if(s[j] === '*') {
-        return Type.starType;
-      } else if (s[j] === '[') {
-        j++;
-        let inputs = new Array<Pin>, outputs = new Array<Pin>;
-        while (s[j] !== ',') {
-          inputs.push(parsePin());
-        }
-        j++;
-        while (s[j] !== ']') {
-          outputs.push(parsePin());
-        }
-        j++;
-        const typeString = s.substring(i, j);
-        let type = new Type(inputs, outputs);
-        type = self.addType(typeString, type);
-        return type;
-      } else {
-        throw new Error('Invalid type string: ' + s);
-      }
-    }
-
-    type = parseFunction();
-    if (type) {
-      const name = parseName();
-      if (name) {
-        // The top level function type includes the label, so duplicate
-        // type and pins.
-        const inputs = type.inputs.map(pin => new Pin(pin.type, pin.name)),
-              outputs = type.outputs.map(pin => new Pin(pin.type, pin.name));
-        type = new Type(inputs, outputs, name);
-      }
-      type = this.addType(s, type);
-    }
-    return type;
   }
-  // TODO eliminate this method.
-  addLabel(typeString: string, label: string | undefined) : string {
-    if (label === undefined || label === '')
-      return typeString;
-    const type = this.add(typeString),
-          copy = type.copy();
-    copy.name = label;
-    return copy.toString();
+
+  let type = parseFunction();
+  if (type) {
+    const name = parseName();
+    if (name) {
+      // The top level function type includes the label, so duplicate
+      // type and pins.
+      const inputs = type.inputs.map(pin => new Pin(pin.type, pin.name)),
+            outputs = type.outputs.map(pin => new Pin(pin.type, pin.name));
+      type = new Type(inputs, outputs, name);
+    }
+    type = type.atomized();
   }
+  return type;
 }
-
-const globalTypeParser_ = new TypeParser(),
-      nullFunction = globalTypeParser_.add('[,]');
 
 //------------------------------------------------------------------------------
 
@@ -372,7 +340,7 @@ abstract class ElementBase {
   // Derived properties.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
-  type: Type = nullFunction;
+  type: Type = Type.emptyType;
   inWires = new Array<Wire | undefined>();   // one input per pin (no fan in).
   outWires = new Array<Array<Wire>>();       // multiple outputs per pin (fan out).
 
@@ -478,7 +446,7 @@ export class Functionchart implements DataContextObject {
   // Derived properties.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
-  type: Type = nullFunction;
+  type: Type = Type.emptyType;
 
   constructor(context: FunctionchartContext, id: number) {
     this.context = context;
@@ -1281,7 +1249,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const result = this.newElement('element'),
           newType = new Type([], [new Pin(element.type)]);
     result.typeString = newType.toString();
-    // TODO eliminate potential dangling wires.
     return result;
   }
 
@@ -1304,7 +1271,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           newType = type.copy();
     newType.inputs.push(new Pin(type));
     result.typeString = newType.toString();
-    // TODO eliminate potential dangling wires.
     return result;
   }
 
@@ -1468,7 +1434,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       typeString = item.typeString;
     }
     if (typeString && typeString !== item.type.typeString) {
-      const newType = globalTypeParser_.add(typeString);
+      const newType = parseTypeString(typeString);
       item.type = newType;
     }
     // Update 'inWires' and 'outWires' properties.
@@ -2475,9 +2441,12 @@ export class FunctionchartEditor implements CanvasLayer {
         case 'unop':       // [v,v](label)
           newValue = '[v,v]' + labelPart;
           break;
-        case 'functionchart':       // [...](label)
-          newValue = globalTypeParser_.addLabel(typeString, value);
-          break
+        case 'functionchart': {     // [...](label)
+          const type = parseTypeString(typeString).copy(),
+                newType = new Type(type.inputs, type.outputs, value);
+          newValue = newType.toString();
+          break;
+        }
       }
     setter(info, item, newValue);
     }

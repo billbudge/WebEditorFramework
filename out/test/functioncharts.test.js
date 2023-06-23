@@ -27,24 +27,87 @@ function addFunctionchart(parent) {
 //   }
 // }
 //------------------------------------------------------------------------------
-describe('Type', () => {
-    test('canConnect', () => {
-        const parser = new FC.TypeParser(), starType = parser.add('*'), valueType = parser.add('v');
-        expect(starType.canConnectTo(valueType)).toBe(true);
-        expect(valueType.canConnectTo(starType)).toBe(true);
-        expect(starType.canConnectTo(starType)).toBe(true);
-        expect(valueType.canConnectTo(valueType)).toBe(true);
-        const type1 = parser.add('[v,v]'), type2 = parser.add('[vv,v]');
-        expect(type1.canConnectTo(valueType)).toBe(false);
-        expect(type1.canConnectTo(starType)).toBe(true);
-        expect(type1.canConnectTo(type2)).toBe(false);
-        expect(type2.canConnectTo(type1)).toBe(true);
-        // TODO more tests.
+describe('Pin', () => {
+    test('Pin', () => {
+        const valuePin = new FC.Pin(FC.Type.valueType), starPin = new FC.Pin(FC.Type.starType);
+        expect(valuePin.type).toBe(FC.Type.valueType);
+        expect(valuePin.name).toBeUndefined();
+        expect(valuePin.toString()).toBe('v');
+        expect(valuePin.typeString).toBe('v');
+        expect(starPin.type).toBe(FC.Type.starType);
+        expect(starPin.name).toBeUndefined();
+        expect(starPin.toString()).toBe('*');
+        expect(starPin.typeString).toBe('*');
+        valuePin.name = 'pin1';
+        expect(valuePin.toString()).toBe('v(pin1)');
+        expect(valuePin.typeString).toBe('v(pin1)');
+        starPin.name = 'pin2';
+        expect(starPin.toString()).toBe('*(pin2)');
+        expect(starPin.typeString).toBe('*(pin2)');
+        const valuePin2 = valuePin.copy(), starPin2 = starPin.copy();
+        expect(valuePin2).not.toBe(valuePin);
+        expect(valuePin2.type).toBe(valuePin.type);
+        expect(valuePin2.name).toBe(valuePin.name);
+        expect(starPin2).not.toBe(starPin);
+        expect(starPin2.type).toBe(starPin.type);
+        expect(starPin2.name).toBe(starPin.name);
+        const unlabeledValuePin = valuePin.copyUnlabeled(), unlabeledStarPin = starPin.copyUnlabeled();
+        expect(unlabeledValuePin).not.toBe(valuePin);
+        expect(unlabeledValuePin.type).toBe(valuePin.type);
+        expect(unlabeledValuePin.name).toBeUndefined();
+        expect(unlabeledStarPin).not.toBe(starPin);
+        expect(unlabeledStarPin.type).toBe(starPin.type);
+        expect(unlabeledStarPin.name).toBeUndefined();
     });
 });
-describe('Typeparser', () => {
-    test('add', () => {
-        const parser = new FC.TypeParser();
+describe('Type', () => {
+    test('Type', () => {
+        const type1 = FC.parseTypeString('[v,v]'), type2 = FC.parseTypeString('[vv,v]');
+        expect(type1).not.toBe(type2);
+        expect(type1.inputs.length).toBe(1);
+        expect(type1.inputs[0].type).toBe(FC.Type.valueType);
+        expect(type1.outputs.length).toBe(1);
+        expect(type1.outputs[0].type).toBe(FC.Type.valueType);
+        expect(type2.inputs.length).toBe(2);
+        expect(type2.inputs[0].type).toBe(FC.Type.valueType);
+        expect(type2.inputs[1].type).toBe(FC.Type.valueType);
+        expect(type2.outputs.length).toBe(1);
+        expect(type2.outputs[0].type).toBe(FC.Type.valueType);
+        const named = new FC.Type(type1.inputs, type1.outputs, 'type1');
+        expect(named).not.toBe(type1);
+        expect(type1.typeString).toBe('[v,v]');
+        expect(named.toString()).toBe('[v,v](type1)');
+        expect(named.typeString).toBe('[v,v](type1)');
+        const copy = type1.copy();
+        expect(copy).not.toBe(type1);
+        expect(copy.inputs[0]).not.toBe(type1.inputs[0]);
+        expect(copy.inputs[0].type).toBe(type1.inputs[0].type);
+        const copyUnlabeled = type1.copyUnlabeled();
+        expect(copyUnlabeled).not.toBe(type1);
+        expect(copyUnlabeled.name).toBeUndefined();
+        expect(copyUnlabeled.toString()).toBe('[v,v]');
+        expect(copyUnlabeled.typeString).toBe('[v,v]');
+    });
+    test('base Types', () => {
+        const starType = FC.parseTypeString('*'), valueType = FC.parseTypeString('v'), emptyType = FC.parseTypeString('[,]');
+        expect(starType).toBe(FC.Type.starType);
+        expect(valueType).toBe(FC.Type.valueType);
+        expect(emptyType).toBe(FC.Type.emptyType);
+    });
+    test('canConnect', () => {
+        expect(FC.Type.starType.canConnectTo(FC.Type.valueType)).toBe(true);
+        expect(FC.Type.valueType.canConnectTo(FC.Type.starType)).toBe(true);
+        expect(FC.Type.starType.canConnectTo(FC.Type.starType)).toBe(true);
+        expect(FC.Type.valueType.canConnectTo(FC.Type.valueType)).toBe(true);
+        const type1 = FC.parseTypeString('[v,v]'), type2 = FC.parseTypeString('[vv,v]');
+        expect(type1.canConnectTo(FC.Type.valueType)).toBe(false);
+        expect(type1.canConnectTo(FC.Type.starType)).toBe(true);
+        expect(type1.canConnectTo(type2)).toBe(false);
+        expect(type2.canConnectTo(type1)).toBe(true);
+    });
+});
+describe('parseTypeString', () => {
+    test('parseTypeString', () => {
         const typeStrings = [
             'v',
             '*',
@@ -53,16 +116,16 @@ describe('Typeparser', () => {
             '[,[,v][v,v]](@)',
             '[[v,vv(q)](a)v(b),v(c)](foo)',
         ];
-        typeStrings.forEach(typeString => expect(parser.add(typeString).toString()).toBe(typeString));
-        typeStrings.forEach(typeString => expect(parser.has(typeString)).toBe(true));
-        expect(parser.add('[v,v]').name).toBeUndefined();
-        expect(parser.add('[vv,v](+)').name).toBe('+');
-        const type1 = parser.add('[v(a)v(b),v(c)]');
+        typeStrings.forEach(typeString => expect(FC.parseTypeString(typeString).toString()).toBe(typeString));
+        // typeStrings.forEach(typeString => expect(parser.has(typeString)).toBe(true));  // TODO fix
+        expect(FC.parseTypeString('[v,v]').name).toBeUndefined();
+        expect(FC.parseTypeString('[vv,v](+)').name).toBe('+');
+        const type1 = FC.parseTypeString('[v(a)v(b),v(c)]');
         expect(type1.name).toBeUndefined();
         expect(type1.inputs[0].name).toBe('a');
         expect(type1.inputs[1].name).toBe('b');
         expect(type1.outputs[0].name).toBe('c');
-        const type2 = parser.add('[,[,v][v,v]](@)');
+        const type2 = FC.parseTypeString('[,[,v][v,v]](@)');
         expect(type2.name).toBe('@');
         expect(type2.inputs.length).toBe(0);
         expect(type2.outputs.length).toBe(2);
@@ -70,14 +133,14 @@ describe('Typeparser', () => {
         expect(type2.outputs[1].typeString).toBe('[v,v]');
         // Make sure subtypes are present.
         const subTypeStrings = ['[v,v]', '[,v]', '[v,vv(q)]'];
-        subTypeStrings.forEach(typeString => expect(parser.has(typeString)).toBe(true));
+        // subTypeStrings.forEach(typeString => expect(parser.has(typeString)).toBe(true));
     });
-    test('addLabel', () => {
-        const parser = new FC.TypeParser();
-        expect(parser.addLabel('[vv,v]', '+')).toBe('[vv,v](+)');
-        expect(parser.addLabel('[vv,v](+)', '-')).toBe('[vv,v](-)');
-        expect(parser.addLabel('[v(a)v(b),v(c)]', 'foo')).toBe('[v(a)v(b),v(c)](foo)');
-    });
+    // test('addLabel', () => {
+    //   const parser = new FC.TypeParser();
+    //   expect(parser.addLabel('[vv,v]', '+')).toBe('[vv,v](+)');
+    //   expect(parser.addLabel('[vv,v](+)', '-')).toBe('[vv,v](-)');
+    //   expect(parser.addLabel('[v(a)v(b),v(c)]', 'foo')).toBe('[v(a)v(b),v(c)](foo)');
+    // });
     // test('addInputLabel', () => {
     //   const parser = new FC.TypeParser();
     //   expect(parser.addInputLabel('[v,v]', 'a')).toBe('[v(a),v]');
