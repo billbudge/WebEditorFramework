@@ -1073,10 +1073,16 @@ export class FunctionchartContext extends EventBase {
             this.addItem(item, parent);
         });
     }
+    // Search for the first non-star Type wired to the element.
     resolveInputType(element, pin) {
+        if (element.type.inputs[pin].type !== Type.starType)
+            return element.type.inputs[pin].type;
         const inWires = element.inWires, wire = inWires[pin];
         if (wire && wire.src) {
-            return wire.src.type.outputs[wire.srcPin].type;
+            const type = wire.src.type.outputs[wire.srcPin].type;
+            if (type !== Type.starType)
+                return type;
+            // Follow pass-throughs until we get a type.
         }
     }
     resolveOutputType(element, pin) {
@@ -1084,8 +1090,10 @@ export class FunctionchartContext extends EventBase {
         for (let i = 0; i < array.length; i++) {
             const wire = array[i];
             if (wire && wire.dst) {
-                return wire.dst.type.inputs[wire.dstPin].type;
-                // TODO we need to check all wires and propagate the type downstream.
+                const type = wire.dst.type.inputs[wire.dstPin].type;
+                if (type !== Type.starType)
+                    return type;
+                // Follow pass-throughs until we get a type.
             }
         }
     }
