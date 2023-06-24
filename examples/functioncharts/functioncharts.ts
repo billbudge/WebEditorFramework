@@ -1311,15 +1311,25 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // Search for the first non-star Type wired to the element.
   resolveInputType(element: ElementBase, pin: number) : Type | undefined {
-    if (element.type.inputs[pin].type !== Type.starType)
+    if (element.type.inputs[pin].type !== Type.starType) {
       return element.type.inputs[pin].type;
+    }
     const inWires = element.inWires,
           wire = inWires[pin];
     if (wire && wire.src) {
-      const type = wire.src.type.outputs[wire.srcPin].type;
+      const src = wire.src,
+            type = src.type.outputs[wire.srcPin].type;
       if (type !== Type.starType)
         return type;
       // Follow pass-throughs until we get a type.
+      if (src instanceof Element) {
+        if (src.template.typeName === 'cond') {
+          let type = this.resolveInputType(src, 0);
+          if (!type)
+            type = this.resolveInputType(src, 1);
+          return type;
+        }
+      }
     }
   }
 
