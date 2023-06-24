@@ -553,6 +553,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
     this.functionchart = root;
     this.insertFunctionchart(root, undefined);
+    this.makeConsistent();
   }
 
   newElement(typeName: ElementType) : Element {
@@ -1889,7 +1890,11 @@ class Renderer {
     const self = this,
           spacing = this.theme.spacing;
     function layout(functionChart: Functionchart) {
-      const nonWires = functionChart.nonWires;
+      const type = functionchart.type,
+            nonWires = functionChart.nonWires;
+      if (type.needsLayout)
+        self.layoutType(type);
+
       let width, height;
       if (nonWires.length === 0) {
         width = self.theme.minFunctionchartWidth;
@@ -1899,12 +1904,9 @@ class Renderer {
               global = functionChart.globalPosition,
               x = global.x,
               y = global.y,
-              margin = 2 * spacing,
-              type = functionChart.type;
+              margin = 2 * spacing;
         width = extents.x + extents.width - x + margin;
         height = extents.y + extents.height - y + margin;
-        if (type.needsLayout)
-          self.layoutType(type);
         width += type.width;
         height = Math.max(height, type.height + margin);
       }
@@ -2069,8 +2071,7 @@ class Renderer {
           r = theme.radius,
           rect = this.getItemRect(functionchart),
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
-          textSize = theme.fontSize,
-          lineBase = y + textSize + theme.textLeading;
+          textSize = theme.fontSize;
     roundRectPath(x, y, w, h, r, ctx);
     switch (mode) {
       case RenderMode.Normal:
@@ -2079,10 +2080,6 @@ class Renderer {
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(x, lineBase);
-        ctx.lineTo(x + w, lineBase);
         ctx.stroke();
         const type = functionchart.type,
               instanceRect = this.getFunctionchartInstanceBounds(type, rect);
