@@ -1074,10 +1074,28 @@ export class FunctionchartContext extends EventBase {
             this.addItem(item, parent);
         });
     }
+    resolveIOType(element) {
+        const type = element.type;
+        for (let i = 0; i < type.inputs.length; i++) {
+            if (type.inputs[i].type === Type.starType) {
+                const type = this.resolveInputType(element, i);
+                if (type)
+                    return type;
+            }
+        }
+        for (let i = 0; i < type.outputs.length; i++) {
+            if (type.outputs[i].type === Type.starType) {
+                const type = this.resolveOutputType(element, i);
+                if (type)
+                    return type;
+            }
+        }
+    }
     // Search for the first non-star Type wired to the element.
     resolveInputType(element, pin) {
-        if (element.type.inputs[pin].type !== Type.starType) {
-            return element.type.inputs[pin].type;
+        const type = element.type.inputs[pin].type;
+        if (type !== Type.starType) {
+            return type;
         }
         const inWires = element.inWires, wire = inWires[pin];
         if (wire && wire.src) {
@@ -1085,25 +1103,26 @@ export class FunctionchartContext extends EventBase {
             if (type !== Type.starType)
                 return type;
             // Follow pass-throughs until we get a type.
-            if (src instanceof Element) {
-                if (src.template.typeName === 'cond') {
-                    let type = this.resolveInputType(src, 0);
-                    if (!type)
-                        type = this.resolveInputType(src, 1);
-                    return type;
-                }
-            }
+            return this.resolveIOType(src);
         }
     }
     resolveOutputType(element, pin) {
-        const outWires = element.outWires, array = outWires[pin], pinType = element.type.outputs[pin].type;
+        const type = element.type.outputs[pin].type;
+        if (type !== Type.starType) {
+            return type;
+        }
+        const outWires = element.outWires, array = outWires[pin];
         for (let i = 0; i < array.length; i++) {
             const wire = array[i];
             if (wire && wire.dst) {
-                const type = wire.dst.type.inputs[wire.dstPin].type;
+                const dst = wire.dst;
+                let type = dst.type.inputs[wire.dstPin].type;
                 if (type !== Type.starType)
                     return type;
                 // Follow pass-throughs until we get a type.
+                type = this.resolveIOType(dst);
+                if (type)
+                    return type;
             }
         }
     }
