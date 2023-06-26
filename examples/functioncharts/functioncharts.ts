@@ -1309,20 +1309,20 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  resolveIOType(element: ElementBase) : Type | undefined {
-    const type = element.type;
-    for (let i = 0; i < type.inputs.length; i++) {
-      if (type.inputs[i].type === Type.starType) {
-        const type = this.resolveInputType(element, i);
-        if (type)
-          return type;
-      }
-    }
-    for (let i = 0; i < type.outputs.length; i++) {
-      if (type.outputs[i].type === Type.starType) {
-        const type = this.resolveOutputType(element, i);
-        if (type)
-          return type;
+  resolveIOType(element: ElementBase, pinLists: number[][]) : Type | undefined {
+    const inputs = element.type.inputs,
+          firstOutput = inputs.length;
+    for (let pinList of pinLists) {
+      for (let pin of pinList) {
+        if (pin < firstOutput) {
+          const type = this.resolveInputType(element, pin);
+          if (type)
+            return type;
+        } else {
+          const type = this.resolveOutputType(element, pin - firstOutput);
+          if (type)
+            return type;
+        }
       }
     }
   }
@@ -1341,7 +1341,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (type !== Type.starType)
         return type;
       // Follow pass-throughs until we get a type.
-      return this.resolveIOType(src);
+      if (src instanceof Element && src.template.typeName === 'cond')
+        return this.resolveIOType(src, [[0, 1, 2]]);
     }
   }
 
@@ -1360,7 +1361,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         if (type !== Type.starType)
           return type;
         // Follow pass-throughs until we get a type.
-        type = this.resolveIOType(dst);
+        if (dst instanceof Element && dst.template.typeName === 'cond')
+          type = this.resolveIOType(dst, [[0, 1, 2]]);
         if (type)
           return type;
       }
