@@ -396,6 +396,10 @@ export class DisjointSet<T> {
     return subset;
   }
 
+  makeSets(items: Array<T>) : Array<DisjointSetSubset<T>> {
+    return items.map(item => this.makeSet(item));
+  }
+
   find(set: DisjointSetSubset<T>) {
     // Path splitting rather than path compression for simplicity.
     while (set.parent != set) {

@@ -1,4 +1,4 @@
-import { SelectionSet } from '../../src/collections.js';
+import { SelectionSet, DisjointSet } from '../../src/collections.js';
 import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, measureNameValuePairs, FileController } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
@@ -302,6 +302,8 @@ export class Pseudoelement extends ElementBase {
     set typeString(value) { this.template.typeString.set(this, value); }
     constructor(context, template, id) {
         super(id);
+        // Derived properties.
+        this.index = -1;
         this.context = context;
         this.template = template;
         switch (this.template.typeName) {
@@ -639,20 +641,20 @@ export class FunctionchartContext extends EventBase {
         while (elements.length > 0) {
             const element = elements.pop();
             result.add(element);
-            if (upstream) {
-                this.forInWires(element, wire => {
-                    const src = wire.src;
-                    if (!result.has(src))
-                        elements.push(src);
-                });
-            }
-            if (downstream) {
-                this.forOutWires(element, wire => {
-                    const dst = wire.dst;
-                    if (!result.has(dst))
-                        elements.push(dst);
-                });
-            }
+            this.forInWires(element, wire => {
+                if (!upstream(wire))
+                    return;
+                const src = wire.src;
+                if (!result.has(src))
+                    elements.push(src);
+            });
+            this.forOutWires(element, wire => {
+                if (!downstream(wire))
+                    return;
+                const dst = wire.dst;
+                if (!result.has(dst))
+                    elements.push(dst);
+            });
         }
         return result;
     }
@@ -725,8 +727,8 @@ export class FunctionchartContext extends EventBase {
         const self = this, graphInfo = this.getSubgraphInfo(this.selectedAllElements());
         graphInfo.interiorWires.forEach(wire => self.selection.add(wire));
     }
-    selectConnectedElements(upstream) {
-        const selectedElements = this.selectedAllElements(), connectedElements = this.getConnectedElements(selectedElements, upstream, true);
+    selectConnectedElements(upstream, downstream) {
+        const selectedElements = this.selectedAllElements(), connectedElements = this.getConnectedElements(selectedElements, upstream, downstream);
         this.selection.set(Array.from(connectedElements));
     }
     addItem(item, parent) {
@@ -1074,18 +1076,20 @@ export class FunctionchartContext extends EventBase {
             this.addItem(item, parent);
         });
     }
-    resolveIOType(element, pinList) {
+    resolveIOType(element, pinLists) {
         const inputs = element.type.inputs, firstOutput = inputs.length;
-        for (let pin of pinList) {
-            if (pin < firstOutput) {
-                const type = this.resolveInputType(element, pin);
-                if (type)
-                    return type;
-            }
-            else {
-                const type = this.resolveOutputType(element, pin - firstOutput);
-                if (type)
-                    return type;
+        for (let pinList of pinLists) {
+            for (let pin of pinList) {
+                if (pin < firstOutput) {
+                    const type = this.resolveInputType(element, pin);
+                    if (type)
+                        return type;
+                }
+                else {
+                    const type = this.resolveOutputType(element, pin - firstOutput);
+                    if (type)
+                        return type;
+                }
             }
         }
     }
@@ -1102,7 +1106,7 @@ export class FunctionchartContext extends EventBase {
                 return type;
             // Follow pass-throughs until we get a type.
             if (src instanceof Element && src.template.typeName === 'cond')
-                return this.resolveIOType(src, [0, 1, 2]);
+                return this.resolveIOType(src, [[0, 1, 2]]);
         }
     }
     resolveOutputType(element, pin) {
@@ -1120,7 +1124,7 @@ export class FunctionchartContext extends EventBase {
                     return type;
                 // Follow pass-throughs until we get a type.
                 if (dst instanceof Element && dst.template.typeName === 'cond')
-                    type = this.resolveIOType(dst, [0, 1, 2]);
+                    type = this.resolveIOType(dst, [[0, 1, 2]]);
                 if (type)
                     return type;
             }
@@ -1147,7 +1151,9 @@ export class FunctionchartContext extends EventBase {
             return p1.y - p2.y;
         }
         inputs.sort(compareJunctions);
+        inputs.forEach((input, i) => { input.index = i; });
         outputs.sort(compareJunctions);
+        outputs.forEach((output, i) => { output.index = i; });
         function getPinName(type, pin) {
             let typeString = type.typeString;
             if (pin.name)
@@ -1167,6 +1173,50 @@ export class FunctionchartContext extends EventBase {
         result += ']';
         if (name)
             result += '(' + name + ')';
+        const pinLists = new DisjointSet(), inputLists = pinLists.makeSets(inputs), outputLists = pinLists.makeSets(outputs), 
+        // Filter that only passes untyped wires.
+        filter = (wire) => {
+            return wire.src !== undefined && wire.dst !== undefined &&
+                wire.src.type.outputs[wire.srcPin].type === Type.starType &&
+                wire.dst.type.inputs[wire.dstPin].type === Type.starType;
+        };
+        for (let i = 0; i < inputs.length; i++) {
+            const input = inputLists[i], connected = this.getConnectedElements([input.item], filter, filter);
+            connected.forEach(element => {
+                if (element instanceof Pseudoelement) {
+                    if (element.template.typeName === 'input') {
+                        pinLists.union(input, inputLists[element.index]);
+                    }
+                    else if (element.template.typeName === 'output') {
+                        pinLists.union(input, outputLists[element.index]);
+                    }
+                }
+            });
+        }
+        const passThroughs = new Array();
+        for (let i = 0; i < inputs.length; i++) {
+            const inputList = inputLists[i];
+            if (pinLists.find(inputList) === inputList) {
+                const connected = new Array();
+                connected.push(inputList.item.index);
+                for (let j = 0; j < inputs.length && j !== i; j++) {
+                    const inputList2 = inputLists[j];
+                    if (pinLists.find(inputList2) === inputList) {
+                        connected.push(j);
+                    }
+                }
+                for (let j = 0; j < outputs.length; j++) {
+                    const outputList = outputLists[j];
+                    if (pinLists.find(outputList) === inputList) {
+                        connected.push(inputs.length + j);
+                    }
+                }
+                if (connected.length > 1)
+                    passThroughs.push(connected);
+            }
+        }
+        if (passThroughs.length)
+            console.log(passThroughs);
         // contextInputs.sort(comparePins);
         // let contextTypeString = '[';
         // contextInputs.forEach(function(input, i) {
@@ -2665,7 +2715,7 @@ export class FunctionchartEditor {
                     context.endTransaction();
                 }
                 case 69: { // 'e'
-                    context.selectConnectedElements(true); // TODO more nuanced connecting.
+                    context.selectConnectedElements((wire) => true, (wire) => true); // TODO more nuanced connecting.
                     self.canvasController.draw();
                     return true;
                 }

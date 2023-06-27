@@ -332,6 +332,9 @@ export class DisjointSet {
         this.sets.push(subset);
         return subset;
     }
+    makeSets(items) {
+        return items.map(item => this.makeSet(item));
+    }
     find(set) {
         // Path splitting rather than path compression for simplicity.
         while (set.parent != set) {

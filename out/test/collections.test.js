@@ -308,5 +308,10 @@ describe('DisjointSet', () => {
         expect(disjointSet.find(d)).not.toBe(b);
         expect(disjointSet.find(d)).not.toBe(c);
     });
+    test('makeSets', () => {
+        const disjointSet = new DisjointSet();
+        const abcd = disjointSet.makeSets(['a', 'b', 'c', 'd']);
+        expect(disjointSet.find(abcd[0])).toBe(abcd[0]);
+    });
 });
 //# sourceMappingURL=collections.test.js.map
