@@ -1,4 +1,4 @@
-import { SelectionSet, DisjointSet } from '../../src/collections.js';
+import { SelectionSet } from '../../src/collections.js';
 import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, measureNameValuePairs, FileController } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
@@ -272,6 +272,16 @@ const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
 class ElementBase {
+    get passThroughs() {
+        if (this instanceof FunctionInstance)
+            return this.functionchart.passThroughs;
+        if (this instanceof Element) {
+            switch (this.template.typeName) {
+                case 'cond':
+                    return [[1, 2, 3]];
+            }
+        }
+    }
     constructor(id) {
         this.globalPosition = defaultPoint;
         this.type = Type.emptyType;
@@ -304,6 +314,7 @@ export class Pseudoelement extends ElementBase {
         super(id);
         // Derived properties.
         this.index = -1;
+        this.resolvedType = Type.emptyType;
         this.context = context;
         this.template = template;
         switch (this.template.typeName) {
@@ -1076,17 +1087,17 @@ export class FunctionchartContext extends EventBase {
             this.addItem(item, parent);
         });
     }
-    resolveIOType(element, pinLists) {
-        const inputs = element.type.inputs, firstOutput = inputs.length;
-        for (let pinList of pinLists) {
-            for (let pin of pinList) {
+    resolveIOType(element, passThroughs, ios) {
+        const firstOutput = element.type.inputs.length;
+        for (let passThrough of passThroughs) {
+            for (let pin of passThrough) {
                 if (pin < firstOutput) {
-                    const type = this.resolveInputType(element, pin);
+                    const type = this.resolveInputType(element, pin, ios);
                     if (type)
                         return type;
                 }
                 else {
-                    const type = this.resolveOutputType(element, pin - firstOutput);
+                    const type = this.resolveOutputType(element, pin - firstOutput, ios);
                     if (type)
                         return type;
                 }
@@ -1094,39 +1105,47 @@ export class FunctionchartContext extends EventBase {
         }
     }
     // Search for the first non-star Type wired to the element.
-    resolveInputType(element, pin) {
+    resolveInputType(element, pin, ios) {
         const type = element.type.inputs[pin].type;
-        if (type !== Type.starType) {
+        if (type !== Type.starType)
             return type;
-        }
-        const inWires = element.inWires, wire = inWires[pin];
+        const wire = element.inWires[pin];
         if (wire && wire.src) {
             const src = wire.src, type = src.type.outputs[wire.srcPin].type;
             if (type !== Type.starType)
                 return type;
+            if (ios.has(src))
+                return;
+            ios.add(src);
             // Follow pass-throughs until we get a type.
-            if (src instanceof Element && src.template.typeName === 'cond')
-                return this.resolveIOType(src, [[0, 1, 2]]);
+            const passThroughs = src.passThroughs;
+            if (passThroughs) {
+                return this.resolveIOType(src, passThroughs, ios);
+            }
         }
     }
-    resolveOutputType(element, pin) {
+    resolveOutputType(element, pin, ios) {
         const type = element.type.outputs[pin].type;
-        if (type !== Type.starType) {
+        if (type !== Type.starType)
             return type;
-        }
-        const outWires = element.outWires, array = outWires[pin];
-        for (let i = 0; i < array.length; i++) {
-            const wire = array[i];
+        const wires = element.outWires[pin];
+        for (let i = 0; i < wires.length; i++) {
+            const wire = wires[i];
             if (wire && wire.dst) {
                 const dst = wire.dst;
                 let type = dst.type.inputs[wire.dstPin].type;
                 if (type !== Type.starType)
                     return type;
+                if (ios.has(dst))
+                    continue;
+                ios.add(dst);
                 // Follow pass-throughs until we get a type.
-                if (dst instanceof Element && dst.template.typeName === 'cond')
-                    type = this.resolveIOType(dst, [[0, 1, 2]]);
-                if (type)
-                    return type;
+                const passThroughs = dst.passThroughs;
+                if (passThroughs) {
+                    type = this.resolveIOType(dst, passThroughs, ios);
+                    if (type)
+                        return type;
+                }
             }
         }
     }
@@ -1150,114 +1169,57 @@ export class FunctionchartContext extends EventBase {
         function compareJunctions(p1, p2) {
             return p1.y - p2.y;
         }
+        function isInputOrOutput(p) {
+            return p.template.typeName === 'input' || p.template.typeName === 'output';
+        }
         inputs.sort(compareJunctions);
         inputs.forEach((input, i) => { input.index = i; });
+        const firstOutput = inputs.length;
         outputs.sort(compareJunctions);
-        outputs.forEach((output, i) => { output.index = i; });
+        outputs.forEach((output, i) => { output.index = i + firstOutput; });
         function getPinName(type, pin) {
             let typeString = type.typeString;
             if (pin.name)
                 typeString += '(' + pin.name + ')';
             return typeString;
         }
+        const passThroughs = new Array();
         let result = '[';
         inputs.forEach(input => {
-            const type = self.resolveOutputType(input, 0);
-            result += getPinName(type || Type.starType, input.type.outputs[0]);
+            const ios = new Set();
+            ios.add(input);
+            let type = self.resolveOutputType(input, 0, ios);
+            if (type) {
+                input.resolvedType = type;
+            }
+            else {
+                type = Type.starType;
+                if (ios.size > 1) {
+                    const inputsOutputs = Array.from(ios).filter(isInputOrOutput);
+                    inputsOutputs.sort(compareJunctions);
+                    passThroughs.push(inputsOutputs.map(input => input.index));
+                }
+            }
+            result += getPinName(type, input.type.outputs[0]);
         });
         result += ',';
         outputs.forEach(output => {
-            const type = self.resolveInputType(output, 0);
-            result += getPinName(type || Type.starType, output.type.inputs[0]);
+            const ios = new Set(); // Ignore these; it suffices to track for inputs.
+            let type = self.resolveInputType(output, 0, ios);
+            if (type) {
+                output.resolvedType = type;
+            }
+            else {
+                type = Type.starType;
+            }
+            result += getPinName(type, output.type.inputs[0]);
         });
         result += ']';
         if (name)
             result += '(' + name + ')';
-        const pinLists = new DisjointSet(), inputLists = pinLists.makeSets(inputs), outputLists = pinLists.makeSets(outputs), 
-        // Filter that only passes untyped wires.
-        filter = (wire) => {
-            return wire.src !== undefined && wire.dst !== undefined &&
-                wire.src.type.outputs[wire.srcPin].type === Type.starType &&
-                wire.dst.type.inputs[wire.dstPin].type === Type.starType;
-        };
-        for (let i = 0; i < inputs.length; i++) {
-            const input = inputLists[i], connected = this.getConnectedElements([input.item], filter, filter);
-            connected.forEach(element => {
-                if (element instanceof Pseudoelement) {
-                    if (element.template.typeName === 'input') {
-                        pinLists.union(input, inputLists[element.index]);
-                    }
-                    else if (element.template.typeName === 'output') {
-                        pinLists.union(input, outputLists[element.index]);
-                    }
-                }
-            });
+        if (passThroughs.length) {
+            functionChart.passThroughs = passThroughs; // TODO this shouldn't be a side-effect.
         }
-        const passThroughs = new Array();
-        for (let i = 0; i < inputs.length; i++) {
-            const inputList = inputLists[i];
-            if (pinLists.find(inputList) === inputList) {
-                const connected = new Array();
-                connected.push(inputList.item.index);
-                for (let j = 0; j < inputs.length && j !== i; j++) {
-                    const inputList2 = inputLists[j];
-                    if (pinLists.find(inputList2) === inputList) {
-                        connected.push(j);
-                    }
-                }
-                for (let j = 0; j < outputs.length; j++) {
-                    const outputList = outputLists[j];
-                    if (pinLists.find(outputList) === inputList) {
-                        connected.push(inputs.length + j);
-                    }
-                }
-                if (connected.length > 1)
-                    passThroughs.push(connected);
-            }
-        }
-        if (passThroughs.length)
-            console.log(passThroughs);
-        // contextInputs.sort(comparePins);
-        // let contextTypeString = '[';
-        // contextInputs.forEach(function(input, i) {
-        //   contextTypeString += input.type;
-        //   input.item.index = i;
-        // });
-        // contextTypeString += ',]';  // no outputs
-        // const info = {
-        //   type: typeString,
-        //   contextType: contextTypeString,
-        // }
-        // // Compute group pass throughs.
-        // const passThroughs = new Set();
-        // graphInfo.interiorWires.forEach(function(wire) {
-        //   let src = self.getWireSrc(wire),
-        //       srcPin = getType(src).outputs[wire.srcPin];
-        //   // Trace wires, starting at input junctions.
-        //   if (!isInput(src) || srcPin.type !== Type.starTypeString)
-        //     return;
-        //   let srcPinIndex = src.index,
-        //       activeWires = [wire];
-        //   while (activeWires.length) {
-        //     wire = activeWires.pop();
-        //     let dst = self.getWireDst(wire),
-        //         dstPin = getType(dst).inputs[wire.dstPin];
-        //     if (isOutput(dst) && dstPin.type === Type.starTypeString) {
-        //       passThroughs.add([srcPinIndex, dst.index]);
-        //     } else if (dst.passThroughs) {
-        //       dst.passThroughs.forEach(function(passThrough) {
-        //         if (passThrough[0] === wire.dstPin) {
-        //           let outgoingWires = functionChartModel.getOutputs(dst)[passThrough[1]];
-        //           outgoingWires.forEach(wire => activeWires.push(wire));
-        //         }
-        //       });
-        //     }
-        //   }
-        // });
-        // if (passThroughs.size) {
-        //   // console.log(passThroughs);
-        //   info.passThroughs = Array.from(passThroughs);
-        // }
         return result;
     }
     updateItem(item) {

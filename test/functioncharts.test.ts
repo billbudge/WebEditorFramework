@@ -359,17 +359,18 @@ describe('FunctionchartContext', () => {
     const context = new FC.FunctionchartContext(),
           functionchart = context.root,
           elem = addElement(functionchart, 'binop'),
-          input = addPseudoelement(functionchart, 'input');
-    let result = context.resolveOutputType(input, 0);
+          input = addPseudoelement(functionchart, 'input'),
+          ios = new Set<FC.ElementTypes>();  // TODO test contents
+    let result = context.resolveOutputType(input, 0, ios);
     expect(result).toBeUndefined();
     const wire = addWire(functionchart, input, 0, elem, 0);
-    result = context.resolveOutputType(input, 0);
+    result = context.resolveOutputType(input, 0, ios);
     expect(result).toBeDefined();
     expect(result!.typeString).toBe('v');
     const elem2 = addElement(functionchart, 'element');
     elem2.typeString = '[[vv,v],v]';
     wire.dst = elem2;
-    result = context.resolveOutputType(input, 0);
+    result = context.resolveOutputType(input, 0, ios);
     expect(result).toBeDefined();
     expect(result!.typeString).toBe('[vv,v]');
   });
@@ -377,17 +378,18 @@ describe('FunctionchartContext', () => {
     const context = new FC.FunctionchartContext(),
           functionchart = context.root,
           elem = addElement(functionchart, 'binop'),
-          output = addPseudoelement(functionchart, 'output');
-    let result = context.resolveInputType(output, 0);
+          output = addPseudoelement(functionchart, 'output'),
+          ios = new Set<FC.ElementTypes>();  // TODO test contents
+    let result = context.resolveInputType(output, 0, ios);
     expect(result).toBeUndefined();
     const wire = addWire(functionchart, elem, 0, output, 0);
-    result = context.resolveInputType(output, 0);
+    result = context.resolveInputType(output, 0, ios);
     expect(result).toBeDefined();
     expect(result!.typeString).toBe('v');
     const elem2 = addElement(functionchart, 'element');
     elem2.typeString = '[v,[vv,v]]';
     wire.src = elem2;
-    result = context.resolveInputType(output, 0);
+    result = context.resolveInputType(output, 0, ios);
     expect(result).toBeDefined();
     expect(result!.typeString).toBe('[vv,v]');
   });
