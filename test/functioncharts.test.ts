@@ -2,29 +2,33 @@ import {describe, expect, test} from '@jest/globals';
 import * as FC from '../examples/functioncharts/functioncharts.js';
 
 function addElement(functionchart: FC.Functionchart, type: FC.ElementType) {
-  const element = functionchart.context.newElement(type);
-  functionchart.nonWires.append(element);
+  const context = functionchart.context,
+        element = context.newElement(type);
+  context.addItem(element, functionchart);
   return element;
 }
 
 function addPseudoelement(functionchart: FC.Functionchart, type: FC.PseudoelementType) {
-  const pseudo = functionchart.context.newPseudoelement(type);
-  functionchart.nonWires.append(pseudo);
+  const context = functionchart.context,
+        pseudo = context.newPseudoelement(type);
+  context.addItem(pseudo, functionchart);
   return pseudo;
 }
 
 function addWire(
     functionchart: FC.Functionchart,
-    elem1: FC.ElementTypes, outPin: number,
-    elem2: FC.ElementTypes, inPin: number) {
-  const wire = functionchart.context.newWire(elem1, outPin, elem2, inPin);
-  functionchart.wires.append(wire);
+    elem1: FC.ElementTypes | undefined, outPin: number,
+    elem2: FC.ElementTypes | undefined, inPin: number) {
+  const context = functionchart.context,
+        wire = context.newWire(elem1, outPin, elem2, inPin);
+  context.addItem(wire, functionchart);
   return wire;
 }
 
 function addFunctionchart(parent: FC.Functionchart) : FC.Functionchart {
-  const functionchart = parent.context.newFunctionchart();
-  functionchart.nonWires.append(functionchart);
+  const context = parent.context,
+        functionchart = parent.context.newFunctionchart();
+  context.addItem(functionchart, parent);
   return functionchart;
 }
 
@@ -266,7 +270,7 @@ describe('FunctionchartContext', () => {
   });
   test('functionchart interface', () => {
     const context = new FC.FunctionchartContext(),
-          functionchart = context.newFunctionchart();
+          functionchart = context.root;
 
     expect(functionchart instanceof FC.Functionchart).toBe(true);
     expect(functionchart.x).toBe(0);
@@ -286,7 +290,7 @@ describe('FunctionchartContext', () => {
       }
     }
     const context = new FC.FunctionchartContext(),
-          functionchart = context.newFunctionchart(),
+          functionchart = context.root,
           elem1 = addElement(functionchart, 'binop'),
           elem2 = addElement(functionchart, 'binop'),
           wire1 = addWire(functionchart, elem1, 0, elem2, 0),
@@ -311,8 +315,8 @@ describe('FunctionchartContext', () => {
   });
   test('isValidWire', () => {
     const context = new FC.FunctionchartContext(),
-          wire = context.newWire(undefined, 0, undefined, 0),
-          functionchart = context.newFunctionchart(),
+          functionchart = context.root,
+          wire = addWire(functionchart, undefined, 0, undefined, 0),
           elem1 = addElement(functionchart, 'element'),
           elem2 = addElement(functionchart, 'element'),
           input = addPseudoelement(functionchart, 'input'),
@@ -347,6 +351,13 @@ describe('FunctionchartContext', () => {
     wire.dst = output;
     wire.dstPin = 0;
     expect(context.isValidWire(wire)).toBe(true);    // wildcard match
+
+    const fc1 = addFunctionchart(functionchart),
+          fc2 = addFunctionchart(functionchart),
+          elem3 = addElement(fc1, 'binop'),
+          elem4 = addElement(fc2, 'binop'),
+          wire2 = addWire(fc1, elem3, 0, elem4, 0);  // straddle sibling functioncharts.
+    expect(context.isValidWire(wire2)).toBe(false);
   });
   test('isValidFunctionchart', () => {
     const context = new FC.FunctionchartContext(),

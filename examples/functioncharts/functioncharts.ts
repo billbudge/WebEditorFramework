@@ -1092,6 +1092,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       return false;
     if (src === dst)
       return false;
+    // Wires must be within the functionchart or to/from an enclosing functionchart.
+    const lca = getLowestCommonAncestor<AllTypes>(src, dst);
+    if (!lca || !(lca === src.parent || lca === dst.parent))
+      return false;
     const srcPin = wire.srcPin,
           dstPin = wire.dstPin;
     if (srcPin < 0 || srcPin >= src.type.outputs.length)
@@ -1612,7 +1616,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
                 oldPin = oldValue as number;
           if (src && oldPin >= 0) {
             const oldOutputs = src.outWires[oldPin];
-            FunctionchartContext.removeWireHelper(oldOutputs, owner);
+            if (oldOutputs)  // oldPin might be invalid.
+              FunctionchartContext.removeWireHelper(oldOutputs, owner);
           }
         } else if (prop === wireTemplate.dstPin) {
           const dst = owner.dst,
