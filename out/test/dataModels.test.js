@@ -69,10 +69,11 @@ class TestDataObjectTemplate {
         this.properties = [this.id, this.x, this.array, this.reference];
     }
 }
+const testDataObjectTemplate = new TestDataObjectTemplate();
 class TestDataContextObject {
     constructor(context) {
+        this.template = testDataObjectTemplate;
         this.context = context;
-        this.template = new TestDataObjectTemplate();
         this.id = TestDataContextObject.nextId++;
         this.context.registerObject(this);
     }
@@ -133,6 +134,32 @@ describe('DataContext', () => {
         expect(item.reference).toBe(child1);
         expect(context.resolvedReference.owner).toBe(item);
         expect(context.resolvedReference.id).toBe(child1.id);
+    });
+});
+//------------------------------------------------------------------------------
+describe('Isomorphism', () => {
+    test('isomorphic', () => {
+        const context = new TestDataContext(), item = new TestDataContextObject(context), child1 = new TestDataContextObject(context), child2 = new TestDataContextObject(context), child3 = new TestDataContextObject(context);
+        expect(Data.isomorphic(item, item)).toBe(true);
+        expect(Data.isomorphic(item, child1)).toBe(true);
+        // item.array.append(child3);
+        // child3.array.append(child1);
+        // child1.reference = item;
+        // child3.array.append(child2);
+        // child2.reference = child1;
+        // const copies = Data.copyItems([child3], context);
+        // expect(copies.length).toBe(1);
+        // expect(copies[0] instanceof TestDataContextObject).toBe(true);
+        // const itemCopy = copies[0] as TestDataContextObject;
+        // expect(itemCopy.array.length).toBe(2);
+        // expect(itemCopy.array.at(0) instanceof TestDataContextObject).toBe(true);
+        // expect(itemCopy.array.at(1) instanceof TestDataContextObject).toBe(true);
+        // const child1Copy = itemCopy.array.at(0) as TestDataContextObject,
+        //       child2Copy = itemCopy.array.at(1) as TestDataContextObject;
+        // expect(child1Copy).not.toBe(child1);
+        // expect(child2Copy).not.toBe(child2);
+        // expect(child1Copy.reference).toBe(item);  // not itemCopy, since item is outside the cloned graph.
+        // expect(child2Copy.reference).toBe(child1Copy);
     });
 });
 //------------------------------------------------------------------------------

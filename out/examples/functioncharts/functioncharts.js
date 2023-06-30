@@ -888,6 +888,10 @@ export class FunctionchartContext extends EventBase {
             return false;
         if (src === dst)
             return false;
+        // Wires must be within the functionchart or to/from an enclosing functionchart.
+        const lca = getLowestCommonAncestor(src, dst);
+        if (!lca || !(lca === src.parent || lca === dst.parent))
+            return false;
         const srcPin = wire.srcPin, dstPin = wire.dstPin;
         if (srcPin < 0 || srcPin >= src.type.outputs.length)
             return false;
@@ -1136,16 +1140,19 @@ export class FunctionchartContext extends EventBase {
         });
         // Sort pins so we encounter them in increasing y-order. This lets us arrange
         // the pins of the group type in an intuitive way.
-        function compareJunctions(p1, p2) {
+        function compareYs(p1, p2) {
             return p1.y - p2.y;
+        }
+        function compareIndices(p1, p2) {
+            return p1.index - p2.index;
         }
         function isInputOrOutput(p) {
             return p.template.typeName === 'input' || p.template.typeName === 'output';
         }
-        inputs.sort(compareJunctions);
+        inputs.sort(compareYs);
         inputs.forEach((input, i) => { input.index = i; });
         const firstOutput = inputs.length;
-        outputs.sort(compareJunctions);
+        outputs.sort(compareYs);
         outputs.forEach((output, i) => { output.index = i + firstOutput; });
         function getPinName(type, pin) {
             let typeString = type.typeString;
@@ -1153,6 +1160,7 @@ export class FunctionchartContext extends EventBase {
                 typeString += '(' + pin.name + ')';
             return typeString;
         }
+        // TODO clean up by separating typeString and passThrough computation.
         const passThroughs = new Array(), visited = new Set();
         let typeString = '[';
         inputs.forEach(input => {
@@ -1167,7 +1175,7 @@ export class FunctionchartContext extends EventBase {
                 if (!visited.has(input)) {
                     const inputsOutputs = Array.from(ios).filter(isInputOrOutput);
                     if (inputsOutputs.length > 1) {
-                        inputsOutputs.sort(compareJunctions);
+                        inputsOutputs.sort(compareIndices);
                         inputsOutputs.forEach(p => { visited.add(p); });
                         passThroughs.push(inputsOutputs.map(input => input.index));
                     }
@@ -1331,7 +1339,8 @@ export class FunctionchartContext extends EventBase {
                     const src = owner.src, oldPin = oldValue;
                     if (src && oldPin >= 0) {
                         const oldOutputs = src.outWires[oldPin];
-                        FunctionchartContext.removeWireHelper(oldOutputs, owner);
+                        if (oldOutputs) // oldPin might be invalid.
+                            FunctionchartContext.removeWireHelper(oldOutputs, owner);
                     }
                 }
                 else if (prop === wireTemplate.dstPin) {
@@ -2738,350 +2747,4 @@ export class FunctionchartEditor {
         this.hoverHitInfo = undefined;
     }
 }
-/*
-
-
-//------------------------------------------------------------------------------
-
-const editingModel = (function() {
-  const proto = {
-
-
-
-
-    getGroupTypeInfo: function(items, group) {
-      const self = this, model = this.model,
-            dataModel = model.dataModel,
-            functionChartModel = model.functionChartModel,
-            graphInfo = model.functionChartModel.getSubgraphInfo(items),
-            renderer = this.model.renderer,
-            inputs = [], outputs = [],
-            contextInputs = [];
-
-      function makePin(item, type, y) {
-        return { item: item, type: type, y: y }
-      }
-
-      function getInputType(input) {
-        const srcPin = getType(input).outputs[0],
-              srcType = self.getPinTypeWithName(srcPin),
-              wires = functionChartModel.getOutputs(input)[0];
-        if (!wires.length)
-          return srcType;
-        const label = srcType.substring(1);
-        return self.findDstType(wires[0]) + label;
-      }
-
-      function getOutputType(output) {
-        const dstPin = getType(output).inputs[0],
-              dstType = self.getPinTypeWithName(dstPin),
-              wire = functionChartModel.getInputs(output)[0];
-        if (!wire)
-          return dstType;
-        const label = dstType.substring(1);
-        return self.findSrcType(wire) + label;
-      }
-
-      // Add pins for inputs, outputs, and disconnected pins on elements.
-      items.forEach(function(item, index) {
-        if (isInput(item)) {
-          const y = renderer.pinToPoint(item, 0, false).y,
-                type = getInputType(item);
-          if (globalTypeParser_.trimType(type) != Type.starTypeString)
-            inputs.push(makePin(item, type, y));
-        } else if (isOutput(item)) {
-          const y = renderer.pinToPoint(item, 0, true).y,
-                type = getOutputType(item);
-          if (globalTypeParser_.trimType(type) != Type.starTypeString)
-            outputs.push(makePin(item, type, y));
-        } else if (isElement(item)) {
-          // Recursive group instances aren't included in the signature.
-          if (group && self.isInstanceOfGroup(item, group))
-            return;
-          const type = getType(item),
-                inputWires = functionChartModel.getInputs(item),
-                outputWires = functionChartModel.getOutputs(item);
-          type.inputs.forEach(function(pin, i) {
-            if (!inputWires[i]) {
-              const y = renderer.pinToPoint(item, i, true).y;
-              inputs.push(makePin(item, pin.type, y));
-            }
-          });
-          type.outputs.forEach(function(pin, i) {
-            if (outputWires[i].length == 0) {
-              const y = renderer.pinToPoint(item, i, false).y;
-              outputs.push(makePin(item, pin.type, y));
-            }
-          });
-        }// else if (isGroup(item)) {
-         // const y = renderer.getItemRect(item).y;
-         // outputs.push(makePin(item, item.type, y));
-        //}
-      });
-
-      // Incoming wires become part of the enclosing context type. Use the
-      // output pin's y to order the pins.
-      graphInfo.incomingWires.forEach(function(wire) {
-        const src = self.getWireSrc(wire),
-              srcPin = getType(src).outputs[wire.srcPin],
-              y = renderer.pinToPoint(src, wire.srcPin, false).y;
-        contextInputs.push(makePin(src, srcPin.type, y));
-      });
-
-      // Sort pins so we encounter them in increasing y-order. This lets us lay
-      // out the group in an intuitively consistent way.
-      function comparePins(pin1, pin2) {
-        return pin1.y - pin2.y;
-      }
-
-      inputs.sort(comparePins);
-      outputs.sort(comparePins);
-
-      let typeString = '[';
-      inputs.forEach(function(input, i) {
-        typeString += input.type;
-        input.item.index = i;
-      });
-      typeString += ',';
-      outputs.forEach(function(output, i) {
-        typeString += output.type;
-        output.item.index = i;
-      });
-      typeString += ']';
-
-      contextInputs.sort(comparePins);
-
-      let contextTypeString = '[';
-      contextInputs.forEach(function(input, i) {
-        contextTypeString += input.type;
-        input.item.index = i;
-      });
-      contextTypeString += ',]';  // no outputs
-
-      const info = {
-        type: typeString,
-        contextType: contextTypeString,
-      }
-
-      // Compute group pass throughs.
-      const passThroughs = new Set();
-      graphInfo.interiorWires.forEach(function(wire) {
-        let src = self.getWireSrc(wire),
-            srcPin = getType(src).outputs[wire.srcPin];
-        // Trace wires, starting at input junctions.
-        if (!isInput(src) || srcPin.type !== Type.starTypeString)
-          return;
-        let srcPinIndex = src.index,
-            activeWires = [wire];
-        while (activeWires.length) {
-          wire = activeWires.pop();
-          let dst = self.getWireDst(wire),
-              dstPin = getType(dst).inputs[wire.dstPin];
-          if (isOutput(dst) && dstPin.type === Type.starTypeString) {
-            passThroughs.add([srcPinIndex, dst.index]);
-          } else if (dst.passThroughs) {
-            dst.passThroughs.forEach(function(passThrough) {
-              if (passThrough[0] === wire.dstPin) {
-                let outgoingWires = functionChartModel.getOutputs(dst)[passThrough[1]];
-                outgoingWires.forEach(wire => activeWires.push(wire));
-              }
-            });
-          }
-        }
-      });
-
-      if (passThroughs.size) {
-        // console.log(passThroughs);
-        info.passThroughs = Array.from(passThroughs);
-      }
-      // console.log(info.type, info.contextType);
-      return info;
-    },
-
-    build: function(items, parent) {
-      const self = this,
-            model = this.model,
-            graphInfo = model.functionChartModel.getSubgraphInfo(items),
-            extents = model.renderer.getBounds(graphInfo.elementsAndGroups),
-            spacing = this.theme.spacing,
-            x = extents.x - spacing,
-            y = extents.y - spacing;
-
-      // Create the new group element.
-      const group = this.newGroup(x, y);
-      Object.assign(group, this.getGroupTypeInfo(items));
-
-      // Add the group before reparenting the items.
-      this.addItem(group, parent);
-      items.forEach(function(item) {
-        // Re-parent group items; wires should remain connected.
-        self.addItem(item, group);
-      });
-      return group;
-    },
-
-    createGroupInstance: function(group, element) {
-      const model = this.model,
-            items = model.copyPasteModel.cloneItems(group.items, new Map()),
-            newGroupItems = {
-              id: 0,  // Temporary id, so deepEqual will match non-identically.
-              kind: 'group items',
-              items: items,
-            };
-      const groupItems = model.canonicalInstanceModel.internalize(newGroupItems);
-      element.groupId = model.dataModel.getId(group);
-      element.definitionId = model.dataModel.getId(groupItems);
-    },
-
-    findSrcType: function(wire) {
-      const self = this,
-            model = this.model,
-            functionChartModel = model.functionChartModel,
-            activeWires = [wire];
-      // TODO eliminate array and while; there can be only one pass through.
-      while (activeWires.length) {
-        wire = activeWires.pop();
-        let src = this.getWireSrc(wire),
-            srcPin = getType(src).outputs[wire.srcPin],
-            dst = this.getWireDst(wire),
-            dstPin = getType(dst).inputs[wire.dstPin];
-        if (srcPin.type !== Type.starTypeString)
-          return srcPin.type;
-        if (isGroupInstance(src)) {
-          const group = this.getGroupDefinition_(src);
-          if (group.passThroughs) {
-            group.passThroughs.forEach(function(passThrough) {
-              if (passThrough[1] === wire.srcPin) {
-                srcPin = group.inputs[passThrough[0]];
-                let incomingWire = functionChartModel.getInputs(src)[passThrough[0]];
-                if (incomingWire)
-                  activeWires.push(incomingWire);
-              }
-            });
-          }
-        }
-      }
-      return Type.starTypeString;
-    },
-
-    findDstType: function(wire) {
-      const self = this,
-            model = this.model,
-            graphInfo = model.functionChartModel.getGraphInfo(),
-            activeWires = [wire];
-      while (activeWires.length) {
-        wire = activeWires.pop();
-        let src = this.getWireSrc(wire),
-            dst = this.getWireDst(wire),
-            srcPin = getType(src).outputs[wire.srcPin],
-            dstPin = getType(dst).inputs[wire.dstPin];
-        if (dstPin.type !== Type.starTypeString)
-          return dstPin.type;
-        if (isGroupInstance(dst)) {
-          const group = this.getGroupDefinition_(src);
-          if (group.passThroughs) {
-            group.passThroughs.forEach(function(passThrough) {
-              if (passThrough[0] === wire.dstPin) {
-                dstPin = group.outputs[passThrough[1]];
-                let outgoingWires = functionChartModel.getOutputs(dst)[passThrough[1]];
-                outgoingWires.forEach(wire => activeWires.push(wire));
-              }
-            });
-          }
-        }
-      }
-      return Type.starTypeString;
-    },
-
-
-
-    makeConsistent: function () {
-      const self = this, model = this.model,
-            diagram = this.diagram,
-            dataModel = model.dataModel,
-            hierarchicalModel = model.hierarchicalModel,
-            selectionModel = model.selectionModel,
-            observableModel = model.observableModel,
-            functionChartModel = model.functionChartModel;
-
-// TODO don't mutate while iterating???
-      let graphInfo, elementsAndGroups, wires;
-      function refreshGraphInfo() {
-       graphInfo = model.functionChartModel.getGraphInfo();
-       elementsAndGroups = graphInfo.elementsAndGroups;
-       wires = graphInfo.wires;
-      }
-      refreshGraphInfo();
-
-      // Update groups. Reverse visit so nested groups work correctly.
-      reverseVisitItems(diagram.items, function(group) {
-        if (group.items.length === 0) {
-          self.deleteItem(group);
-          refreshGraphInfo();
-          return;
-        }
-        const oldType = group.type,
-              oldSig = globalTypeParser_.trimType(group.type),
-              info = self.getGroupTypeInfo(group.items, group);
-        if (oldSig !== info.type) {
-          // Maintain the label of the group.
-          let label = oldType.substring(oldSig.length);
-          info.type += label;
-          // Assign info properties.
-          for (let attr in info) {
-            observableModel.changeValue(group, attr, info[attr]);
-          }
-          // Replace any 'self' instances with instances of the new type.
-          group.items.forEach(function(item) {
-            if (isElement(item) && self.isInstanceOfGroup(item, group)) {
-              const newInstance = self.newGroupInstance(
-                  item.groupId, item.definitionId, info.type, item.x, item.y);
-              self.replaceElement(item, newInstance);
-              // Recalculate the graph data.
-              refreshGraphInfo();
-            }
-          });
-        }
-      }, isGroup);
-
-      elementsAndGroups.forEach(function(element) {
-        if (isGroup(element)) {
-          // Delete empty groups.
-          if (element.items.length === 0) {
-            self.deleteItem(element);
-            // Recalculate the graph data.
-            refreshGraphInfo();
-          }
-        }
-      });
-
-      // Eliminate dangling wires.
-      wires.forEach(function(wire) {
-        const src = self.getWireSrc(wire),
-              dst = self.getWireDst(wire);
-        if (!src ||
-            !dst ||
-            !elementsAndGroups.has(src) ||
-            !elementsAndGroups.has(dst) ||
-            wire.srcPin >= getType(src).outputs.length ||
-            wire.dstPin >= getType(dst).inputs.length) {
-          self.deleteItem(wire);
-          // Recalculate the graph data.
-          refreshGraphInfo();
-          return;
-        }
-        // Make sure wires belong to lowest common container (functionChart or group).
-        const lca = hierarchicalModel.getLowestCommonAncestor(src, dst);
-        if (self.getParent(wire) !== lca) {
-          self.deleteItem(wire);
-          self.addItem(wire, lca);
-          // Reparenting doesn't change the graph structure.
-        }
-      });
-
-      assert(functionChartModel.checkConsistency());
-    },
-  }
-
-*/ 
 //# sourceMappingURL=functioncharts.js.map

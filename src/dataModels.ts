@@ -213,6 +213,45 @@ export class IdProp {
 
 //------------------------------------------------------------------------------
 
+// Isomorphism (equivalently, deepEquality).
+
+export function isomorphic(item1: any, item2: any) : boolean {
+  if (item1 === item2)
+    return true;
+  if (item1 === undefined || item2 === undefined)
+    return false;
+  if (item1.template !== item2.template)
+    return false;
+  for (let p of item1.template.properties) {
+    if (p instanceof IdProp)
+      continue;
+    if (p instanceof ScalarProp && p.get(item1) !== p.get(item2)) {
+      return false;
+    } else if (p instanceof ReferenceProp) {
+      const ref1 = p.get(item1),
+            ref2 = p.get(item2);
+      if (ref1 === undefined)
+        return ref2 === undefined;
+      if (!isomorphic(ref1, ref2))
+        return false;
+    } else if (p instanceof ChildArrayProp) {
+      const list1 = p.get(item1),
+            list2 = p.get(item2);
+      if (list1 === undefined)
+        return list2 === undefined;
+      if (list1.length !== list2.length)
+        return false;
+      for (let i = 0; i < list1.length; ++i) {
+        if (!isomorphic(list1.at(i), list2.at(i)))
+          return false;
+      }
+    }
+  }
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
 // Cloning.
 
 function copyItem(

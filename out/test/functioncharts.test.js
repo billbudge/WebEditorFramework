@@ -1,31 +1,37 @@
 import { describe, expect, test } from '@jest/globals';
 import * as FC from '../examples/functioncharts/functioncharts.js';
 function addElement(functionchart, type) {
-    const element = functionchart.context.newElement(type);
-    functionchart.nonWires.append(element);
+    const context = functionchart.context, element = context.newElement(type);
+    context.addItem(element, functionchart);
     return element;
 }
 function addPseudoelement(functionchart, type) {
-    const pseudo = functionchart.context.newPseudoelement(type);
-    functionchart.nonWires.append(pseudo);
+    const context = functionchart.context, pseudo = context.newPseudoelement(type);
+    context.addItem(pseudo, functionchart);
     return pseudo;
 }
 function addWire(functionchart, elem1, outPin, elem2, inPin) {
-    const wire = functionchart.context.newWire(elem1, outPin, elem2, inPin);
-    functionchart.wires.append(wire);
+    const context = functionchart.context, wire = context.newWire(elem1, outPin, elem2, inPin);
+    context.addItem(wire, functionchart);
     return wire;
 }
 function addFunctionchart(parent) {
-    const functionchart = parent.context.newFunctionchart();
-    functionchart.nonWires.append(functionchart);
+    const context = parent.context, functionchart = parent.context.newFunctionchart();
+    context.addItem(functionchart, parent);
     return functionchart;
 }
-function setEquals(set1, set2) {
-    expect(set1.size).toBe(set2.length);
-    for (const item of set2) {
-        expect(set1.has(item)).toBe(true);
-    }
-}
+// function setEquals(set1: Set<any>, set2: Array<any>) {
+//   expect(set1.size).toBe(set2.length);
+//   for (const item of set2) {
+//     expect(set1.has(item)).toBe(true);
+//   }
+// }
+// function arrayEquals(array1: Array<any>, array2: Array<any>) {
+//   expect(array1.length).toBe(array2.length);
+//   for (let i = 0; i < array1.length; i++) {
+//     expect(array1[i]).toBe(array2[i]);
+//   }
+// }
 //------------------------------------------------------------------------------
 // Setup.
 beforeEach(() => {
@@ -210,7 +216,7 @@ describe('FunctionchartContext', () => {
         expect(wire.dst).toBeUndefined();
     });
     test('functionchart interface', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.newFunctionchart();
+        const context = new FC.FunctionchartContext(), functionchart = context.root;
         expect(functionchart instanceof FC.Functionchart).toBe(true);
         expect(functionchart.x).toBe(0);
         functionchart.x = 10;
@@ -225,7 +231,7 @@ describe('FunctionchartContext', () => {
                 expect(iterated).toContain(item);
             }
         }
-        const context = new FC.FunctionchartContext(), functionchart = context.newFunctionchart(), elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop'), wire1 = addWire(functionchart, elem1, 0, elem2, 0), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire2 = addWire(functionchart, input, 0, elem1, 1), wire3 = addWire(functionchart, input, 0, elem2, 1), wire4 = addWire(functionchart, elem2, 0, output1, 0), wire5 = addWire(functionchart, elem2, 0, output2, 0);
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop'), wire1 = addWire(functionchart, elem1, 0, elem2, 0), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire2 = addWire(functionchart, input, 0, elem1, 1), wire3 = addWire(functionchart, input, 0, elem2, 1), wire4 = addWire(functionchart, elem2, 0, output1, 0), wire5 = addWire(functionchart, elem2, 0, output2, 0);
         context.root = functionchart;
         const inputFn = context.forInWires.bind(context), outputFn = context.forOutWires.bind(context);
         testIterator(inputFn, input, []);
@@ -236,7 +242,7 @@ describe('FunctionchartContext', () => {
         testIterator(outputFn, elem2, [wire4, wire5]);
     });
     test('isValidWire', () => {
-        const context = new FC.FunctionchartContext(), wire = context.newWire(undefined, 0, undefined, 0), functionchart = context.newFunctionchart(), elem1 = addElement(functionchart, 'element'), elem2 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
+        const context = new FC.FunctionchartContext(), functionchart = context.root, wire = addWire(functionchart, undefined, 0, undefined, 0), elem1 = addElement(functionchart, 'element'), elem2 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
         elem1.typeString = '[v,v]';
         elem2.typeString = '[v[v,v],v[v,v]]';
         expect(context.isValidWire(wire)).toBe(false); // src, dst undefined
@@ -267,6 +273,8 @@ describe('FunctionchartContext', () => {
         wire.dst = output;
         wire.dstPin = 0;
         expect(context.isValidWire(wire)).toBe(true); // wildcard match
+        const fc1 = addFunctionchart(functionchart), fc2 = addFunctionchart(functionchart), elem3 = addElement(fc1, 'binop'), elem4 = addElement(fc2, 'binop'), wire2 = addWire(fc1, elem3, 0, elem4, 0); // straddle sibling functioncharts.
+        expect(context.isValidWire(wire2)).toBe(false);
     });
     test('isValidFunctionchart', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop');
@@ -351,9 +359,15 @@ describe('FunctionchartContext', () => {
         expect(typeInfo.typeString).toBe('[*,*]');
         expect(typeInfo.passThroughs.length).toBe(0);
         const wire2 = addWire(functionchart, elem1, 0, output, 0);
+        typeInfo = context.getFunctionchartTypeInfo(functionchart);
         expect(typeInfo.typeString).toBe('[*,*]');
         expect(typeInfo.passThroughs.length).toBe(1);
-        expect(typeInfo.passThroughs[0]).toBe([0, 1, 2]);
+        expect(typeInfo.passThroughs[0]).toStrictEqual([0, 1]);
+        const input2 = addPseudoelement(functionchart, 'input'), wire3 = addWire(functionchart, input2, 0, elem1, 1);
+        typeInfo = context.getFunctionchartTypeInfo(functionchart);
+        expect(typeInfo.typeString).toBe('[**,*]');
+        expect(typeInfo.passThroughs.length).toBe(1);
+        expect(typeInfo.passThroughs[0]).toStrictEqual([0, 1, 2]);
     });
 });
 //# sourceMappingURL=functioncharts.test.js.map

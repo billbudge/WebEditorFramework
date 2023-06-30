@@ -95,17 +95,18 @@ class TestDataObjectTemplate implements Data.DataObjectTemplate {
   }
 }
 
+const testDataObjectTemplate = new TestDataObjectTemplate();
+
 class TestDataContextObject implements Data.DataContextObject, Data.ReferencedObject,
                                        Data.Parented<TestDataContextObject> {
   context: TestDataContext;
-  template: TestDataObjectTemplate;
+  template: TestDataObjectTemplate = testDataObjectTemplate;
 
   id: number;
   static nextId = 1;
 
   constructor(context: TestDataContext) {
     this.context = context;
-    this.template = new TestDataObjectTemplate();
     this.id = TestDataContextObject.nextId++;
     this.context.registerObject(this);
   }
@@ -177,6 +178,38 @@ describe('DataContext', () => {
     expect(item.reference).toBe(child1);
     expect(context.resolvedReference.owner).toBe(item);
     expect(context.resolvedReference.id).toBe(child1.id);
+  });
+});
+
+//------------------------------------------------------------------------------
+
+describe('Isomorphism', () => {
+  test('isomorphic', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          child1 = new TestDataContextObject(context),
+          child2 = new TestDataContextObject(context),
+          child3 = new TestDataContextObject(context);
+
+    expect(Data.isomorphic(item, item)).toBe(true);
+    expect(Data.isomorphic(item, child1)).toBe(true);
+
+    item.array.append(child2);
+    child1.array.append(child3);
+    expect(Data.isomorphic(item, item)).toBe(true);
+    expect(Data.isomorphic(item, child1)).toBe(true);
+    expect(Data.isomorphic(item, child2)).toBe(false);
+    expect(Data.isomorphic(item, child3)).toBe(false);
+
+    item.reference = child1;
+    // child1.reference = item;
+    expect(Data.isomorphic(item, item)).toBe(true);
+    expect(Data.isomorphic(item, child1)).toBe(false);
+    // expect(Data.isomorphic(child1, item)).toBe(true);  // TODO should be able to handle cycles.
+
+    item.x = 10;
+    expect(Data.isomorphic(item, item)).toBe(true);
+    expect(Data.isomorphic(item, child1)).toBe(false);
   });
 });
 
