@@ -366,8 +366,10 @@ describe('FunctionchartContext', () => {
     // Replace concrete element with 'cond' element that has pass-throughs.
     const elem2 = addElement(functionchart, 'cond');
     context.replaceElement(elem1, elem2);
+    expect(wire1.src).toBe(input);
     expect(wire1.dst).toBe(elem2);
     expect(wire2.src).toBe(elem2);
+    expect(wire2.dst).toBe(output);
   });
 
   test('resolveOutputType', () => {
