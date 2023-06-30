@@ -202,10 +202,10 @@ describe('Isomorphism', () => {
     expect(Data.isomorphic(item, child3)).toBe(false);
 
     item.reference = child1;
-    // child1.reference = item;
+    child1.reference = item;
     expect(Data.isomorphic(item, item)).toBe(true);
-    expect(Data.isomorphic(item, child1)).toBe(false);
-    // expect(Data.isomorphic(child1, item)).toBe(true);  // TODO should be able to handle cycles.
+    expect(Data.isomorphic(item, child1)).toBe(true);  // Test cyclic references.
+    expect(Data.isomorphic(child1, item)).toBe(true);
 
     item.x = 10;
     expect(Data.isomorphic(item, item)).toBe(true);

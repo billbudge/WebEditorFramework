@@ -215,7 +215,13 @@ export class IdProp {
 
 // Isomorphism (equivalently, deepEquality).
 
-export function isomorphic(item1: any, item2: any) : boolean {
+function isomorphicHelper(item1: any, item2: any, visited: Map<any, any>) : boolean {
+  // |visited| is used to detect cycles.
+  if (visited.get(item1) === item2)
+    return true;
+  visited.set(item1, item2);
+  visited.set(item2, item1);
+
   if (item1 === item2)
     return true;
   if (item1 === undefined || item2 === undefined)
@@ -232,7 +238,7 @@ export function isomorphic(item1: any, item2: any) : boolean {
             ref2 = p.get(item2);
       if (ref1 === undefined)
         return ref2 === undefined;
-      if (!isomorphic(ref1, ref2))
+      if (!isomorphicHelper(ref1, ref2, visited))
         return false;
     } else if (p instanceof ChildArrayProp) {
       const list1 = p.get(item1),
@@ -242,12 +248,16 @@ export function isomorphic(item1: any, item2: any) : boolean {
       if (list1.length !== list2.length)
         return false;
       for (let i = 0; i < list1.length; ++i) {
-        if (!isomorphic(list1.at(i), list2.at(i)))
+        if (!isomorphicHelper(list1.at(i), list2.at(i), visited))
           return false;
       }
     }
   }
   return true;
+}
+
+export function isomorphic(item1: any, item2: any) : boolean {
+  return isomorphicHelper(item1, item2, new Map<any, any>());
 }
 
 //------------------------------------------------------------------------------
