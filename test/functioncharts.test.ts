@@ -28,19 +28,19 @@ function addFunctionchart(parent: FC.Functionchart) : FC.Functionchart {
   return functionchart;
 }
 
-function setEquals(set1: Set<any>, set2: Array<any>) {
-  expect(set1.size).toBe(set2.length);
-  for (const item of set2) {
-    expect(set1.has(item)).toBe(true);
-  }
-}
+// function setEquals(set1: Set<any>, set2: Array<any>) {
+//   expect(set1.size).toBe(set2.length);
+//   for (const item of set2) {
+//     expect(set1.has(item)).toBe(true);
+//   }
+// }
 
-function arrayEquals(array1: Array<any>, array2: Array<any>) {
-  expect(array1.length).toBe(array2.length);
-  for (let i = 0; i < array1.length; i++) {
-    expect(array1[i]).toBe(array2[i]);
-  }
-}
+// function arrayEquals(array1: Array<any>, array2: Array<any>) {
+//   expect(array1.length).toBe(array2.length);
+//   for (let i = 0; i < array1.length; i++) {
+//     expect(array1[i]).toBe(array2[i]);
+//   }
+// }
 
 //------------------------------------------------------------------------------
 
