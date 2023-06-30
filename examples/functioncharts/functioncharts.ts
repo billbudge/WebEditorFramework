@@ -1172,6 +1172,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
     });
 
+    // Update pseudoelement, conditional, functionchart, and function instance types.
+    this.reverseVisitNonWires(this.functionchart, item => {
+      if (item instanceof Functionchart) {
+        const typeInfo = self.getFunctionchartTypeInfo(item);
+        if (typeInfo.typeString !== item.type.typeString) {
+          item.type = parseTypeString(typeInfo.typeString);
+          item.passThroughs = typeInfo.passThroughs;
+        }
+      }
+    });
     this.visitNonWires(this.functionchart, item => {
       if (item instanceof FunctionInstance) {
         if (item.type !== item.functionchart!.type) {
@@ -1360,10 +1370,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  getFunctionchartTypeString(functionChart: Functionchart) {
+  getFunctionchartTypeInfo(functionChart: Functionchart) {
     const self = this,
           nonWires = functionChart.nonWires.asArray(),
-          // graphInfo = this.getSubgraphInfo(nonWires),
           inputs = new Array<Pseudoelement>(),
           outputs = new Array<Pseudoelement>(),
           name = functionChart.name;
@@ -1381,17 +1390,20 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
     // Sort pins so we encounter them in increasing y-order. This lets us arrange
     // the pins of the group type in an intuitive way.
-    function compareJunctions(p1: Pseudoelement, p2: Pseudoelement) {
+    function compareYs(p1: Pseudoelement, p2: Pseudoelement) {
       return p1.y - p2.y;
+    }
+    function compareIndices(p1: Pseudoelement, p2: Pseudoelement) {
+      return p1.index - p2.index;
     }
     function isInputOrOutput(p: ElementTypes) {
       return p.template.typeName === 'input' || p.template.typeName === 'output';
     }
 
-    inputs.sort(compareJunctions);
+    inputs.sort(compareYs);
     inputs.forEach((input, i) => { input.index = i; });
     const firstOutput = inputs.length;
-    outputs.sort(compareJunctions);
+    outputs.sort(compareYs);
     outputs.forEach((output, i) => { output.index = i + firstOutput; });
 
     function getPinName(type: Type, pin: Pin) : string {
@@ -1403,7 +1415,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
     const passThroughs = new Array<number[]>(),
           visited = new Set<Pseudoelement>();
-    let result = '[';
+    let typeString = '[';
     inputs.forEach(input => {
       const ios = new Set<ElementBase>();
       ios.add(input);
@@ -1412,17 +1424,18 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         input.resolvedType = type;
       } else {
         type = Type.starType;
-        if (!visited.has(input) && ios.size > 1) {
-          const inputsOutputs =
-              Array.from(ios).filter(isInputOrOutput) as Pseudoelement[];
-          inputsOutputs.sort(compareJunctions);
-          inputsOutputs.forEach(p => { visited.add(p); });
-          passThroughs.push(inputsOutputs.map(input => input.index));
+        if (!visited.has(input)) {
+          const inputsOutputs = Array.from(ios).filter(isInputOrOutput) as Pseudoelement[];
+          if (inputsOutputs.length > 1) {
+            inputsOutputs.sort(compareIndices);
+            inputsOutputs.forEach(p => { visited.add(p); });
+            passThroughs.push(inputsOutputs.map(input => input.index));
+          }
         }
       }
-      result += getPinName(type, input.type.outputs[0]);
+      typeString += getPinName(type, input.type.outputs[0]);
     });
-    result += ',';
+    typeString += ',';
     outputs.forEach(output => {
       const ios = new Set<Pseudoelement>();  // Ignore these; it suffices to track for inputs.
       let type = self.resolveInputType(output, 0, ios);
@@ -1431,17 +1444,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       } else {
         type = Type.starType;
       }
-      result += getPinName(type, output.type.inputs[0]);
+      typeString += getPinName(type, output.type.inputs[0]);
     });
-    result += ']';
+    typeString += ']';
     if (name)
-      result += '(' + name + ')';
+      typeString += '(' + name + ')';
 
-    if (passThroughs.length > 0) {
-      functionChart.passThroughs = passThroughs;  // TODO this shouldn't be a side-effect.
-    }
-
-    return result;
+    return { typeString, passThroughs };
   }
 
   private updateItem(item: AllTypes) {
@@ -1459,7 +1468,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     } else if (item instanceof ElementBase) {
       typeString = item.typeString;
     } else if (item instanceof Functionchart) {
-      typeString = this.getFunctionchartTypeString(item);
+      const typeInfo = this.getFunctionchartTypeInfo(item);
+      typeString = typeInfo.typeString;
+      item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
     }
     if (typeString && typeString !== item.type.typeString) {
       const newType = parseTypeString(typeString);

@@ -35,6 +35,13 @@ function setEquals(set1: Set<any>, set2: Array<any>) {
   }
 }
 
+function arrayEquals(array1: Array<any>, array2: Array<any>) {
+  expect(array1.length).toBe(array2.length);
+  for (let i = 0; i < array1.length; i++) {
+    expect(array1[i]).toBe(array2[i]);
+  }
+}
+
 //------------------------------------------------------------------------------
 
 // Setup.
@@ -371,7 +378,6 @@ describe('FunctionchartContext', () => {
     expect(wire2.src).toBe(elem2);
     expect(wire2.dst).toBe(output);
   });
-
   test('resolveOutputType', () => {
     const context = new FC.FunctionchartContext(),
           functionchart = context.root,
@@ -433,6 +439,31 @@ describe('FunctionchartContext', () => {
     expect(ios.has(elem2)).toBe(true);
     expect(ios.has(input)).toBe(true);
     expect(ios.has(output)).toBe(true);
+  });
+  test('getFunctionchartTypeInfo', () => {
+    const context = new FC.FunctionchartContext(),
+          functionchart = context.root,
+          elem1 = addElement(functionchart, 'cond'),
+          input = addPseudoelement(functionchart, 'input'),
+          output = addPseudoelement(functionchart, 'output');
+    let typeInfo = context.getFunctionchartTypeInfo(functionchart);
+    expect(typeInfo.typeString).toBe('[*,*]');
+    expect(typeInfo.passThroughs.length).toBe(0);
+    const wire1 = addWire(functionchart, input, 0, elem1, 1);
+    typeInfo = context.getFunctionchartTypeInfo(functionchart);
+    expect(typeInfo.typeString).toBe('[*,*]');
+    expect(typeInfo.passThroughs.length).toBe(0);
+    const wire2 = addWire(functionchart, elem1, 0, output, 0);
+    typeInfo = context.getFunctionchartTypeInfo(functionchart);
+    expect(typeInfo.typeString).toBe('[*,*]');
+    expect(typeInfo.passThroughs.length).toBe(1);
+    expect(typeInfo.passThroughs[0]).toStrictEqual([0, 1]);
+    const input2 = addPseudoelement(functionchart, 'input'),
+          wire3 = addWire(functionchart, input2, 0, elem1, 1);
+    typeInfo = context.getFunctionchartTypeInfo(functionchart);
+    expect(typeInfo.typeString).toBe('[**,*]');
+    expect(typeInfo.passThroughs.length).toBe(1);
+    expect(typeInfo.passThroughs[0]).toStrictEqual([0, 1, 2]);
   });
 });
 

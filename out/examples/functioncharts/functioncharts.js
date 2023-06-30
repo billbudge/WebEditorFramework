@@ -951,6 +951,16 @@ export class FunctionchartContext extends EventBase {
                 self.addItem(wire, lca);
             }
         });
+        // Update pseudoelement, conditional, functionchart, and function instance types.
+        this.reverseVisitNonWires(this.functionchart, item => {
+            if (item instanceof Functionchart) {
+                const typeInfo = self.getFunctionchartTypeInfo(item);
+                if (typeInfo.typeString !== item.type.typeString) {
+                    item.type = parseTypeString(typeInfo.typeString);
+                    item.passThroughs = typeInfo.passThroughs;
+                }
+            }
+        });
         this.visitNonWires(this.functionchart, item => {
             if (item instanceof FunctionInstance) {
                 if (item.type !== item.functionchart.type) {
@@ -1111,10 +1121,8 @@ export class FunctionchartContext extends EventBase {
             }
         }
     }
-    getFunctionchartTypeString(functionChart) {
-        const self = this, nonWires = functionChart.nonWires.asArray(), 
-        // graphInfo = this.getSubgraphInfo(nonWires),
-        inputs = new Array(), outputs = new Array(), name = functionChart.name;
+    getFunctionchartTypeInfo(functionChart) {
+        const self = this, nonWires = functionChart.nonWires.asArray(), inputs = new Array(), outputs = new Array(), name = functionChart.name;
         // Add pins for inputs, outputs, and disconnected pins on elements.
         nonWires.forEach(item => {
             if (item instanceof Pseudoelement) {
@@ -1146,7 +1154,7 @@ export class FunctionchartContext extends EventBase {
             return typeString;
         }
         const passThroughs = new Array(), visited = new Set();
-        let result = '[';
+        let typeString = '[';
         inputs.forEach(input => {
             const ios = new Set();
             ios.add(input);
@@ -1156,16 +1164,18 @@ export class FunctionchartContext extends EventBase {
             }
             else {
                 type = Type.starType;
-                if (!visited.has(input) && ios.size > 1) {
+                if (!visited.has(input)) {
                     const inputsOutputs = Array.from(ios).filter(isInputOrOutput);
-                    inputsOutputs.sort(compareJunctions);
-                    inputsOutputs.forEach(p => { visited.add(p); });
-                    passThroughs.push(inputsOutputs.map(input => input.index));
+                    if (inputsOutputs.length > 1) {
+                        inputsOutputs.sort(compareJunctions);
+                        inputsOutputs.forEach(p => { visited.add(p); });
+                        passThroughs.push(inputsOutputs.map(input => input.index));
+                    }
                 }
             }
-            result += getPinName(type, input.type.outputs[0]);
+            typeString += getPinName(type, input.type.outputs[0]);
         });
-        result += ',';
+        typeString += ',';
         outputs.forEach(output => {
             const ios = new Set(); // Ignore these; it suffices to track for inputs.
             let type = self.resolveInputType(output, 0, ios);
@@ -1175,15 +1185,12 @@ export class FunctionchartContext extends EventBase {
             else {
                 type = Type.starType;
             }
-            result += getPinName(type, output.type.inputs[0]);
+            typeString += getPinName(type, output.type.inputs[0]);
         });
-        result += ']';
+        typeString += ']';
         if (name)
-            result += '(' + name + ')';
-        if (passThroughs.length > 0) {
-            functionChart.passThroughs = passThroughs; // TODO this shouldn't be a side-effect.
-        }
-        return result;
+            typeString += '(' + name + ')';
+        return { typeString, passThroughs };
     }
     updateItem(item) {
         const self = this;
@@ -1201,7 +1208,9 @@ export class FunctionchartContext extends EventBase {
             typeString = item.typeString;
         }
         else if (item instanceof Functionchart) {
-            typeString = this.getFunctionchartTypeString(item);
+            const typeInfo = this.getFunctionchartTypeInfo(item);
+            typeString = typeInfo.typeString;
+            item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
         }
         if (typeString && typeString !== item.type.typeString) {
             const newType = parseTypeString(typeString);
