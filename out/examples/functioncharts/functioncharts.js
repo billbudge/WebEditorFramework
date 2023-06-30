@@ -951,38 +951,6 @@ export class FunctionchartContext extends EventBase {
                 self.addItem(wire, lca);
             }
         });
-        // Update pseudoelement, conditional, functionchart, and function instance types.
-        this.reverseVisitNonWires(this.functionchart, item => {
-            // Update types of inputs and outputs.
-            if (item instanceof Pseudoelement) {
-                // if (item.template.typeName === 'input' || item.template.typeName === 'literal') {
-                //   const type = item.type.copy(),  // self.resolveOutputType(item, 0) || starType,
-                //         label = type.outputs[0].name,
-                //         newTypeString = '[,' + type.typeString + '(' + label + ')' + ']';  // TODO move to parser
-                //   if (item.typeString !== newTypeString)
-                //     item.typeString = newTypeString;
-                // } else if(item.template.typeName === 'output') {
-                //   const type = starType,  // self.resolveInputType(item, 0) || starType,
-                //         label = item.type.inputs[0].name || '',
-                //         newTypeString = '[' + type.typeString + '(' + label + ')' + ',]';
-                //   if (item.typeString !== newTypeString)
-                //     item.typeString = newTypeString;
-                // }
-            }
-            else if (item instanceof Element && item.template.typeName === 'cond') {
-                // const type = starType, // self.resolveOutputType(item, 0) ||
-                //              //self.resolveInputType(item, 1) ||
-                //              //self.resolveInputType(item, 2) || starType,
-                //       typeString = type.typeString,
-                //       newTypeString = '[v' + typeString + typeString + ',' + typeString + '](?)';
-                // if (item.typeString !== newTypeString)
-                //   item.typeString = newTypeString;
-            }
-            else if (item instanceof Functionchart) {
-                const newTypeString = self.getFunctionchartTypeString(item);
-                item.type = parseTypeString(newTypeString);
-            }
-        });
         this.visitNonWires(this.functionchart, item => {
             if (item instanceof FunctionInstance) {
                 if (item.type !== item.functionchart.type) {
@@ -990,12 +958,6 @@ export class FunctionchartContext extends EventBase {
                 }
             }
         });
-        // // Delete any empty functioncharts (except for the root functionchart).
-        // graphInfo.functioncharts.forEach(functionchart => {
-        //   if (functionchart.parent &&
-        //       functionchart.nonWires.length === 0)
-        //     self.deleteItem(functionchart);
-        // });
     }
     replaceElement(element, newElement) {
         const type = element.type, newType = newElement.type;
@@ -1183,7 +1145,7 @@ export class FunctionchartContext extends EventBase {
                 typeString += '(' + pin.name + ')';
             return typeString;
         }
-        const passThroughs = new Array();
+        const passThroughs = new Array(), visited = new Set();
         let result = '[';
         inputs.forEach(input => {
             const ios = new Set();
@@ -1194,9 +1156,10 @@ export class FunctionchartContext extends EventBase {
             }
             else {
                 type = Type.starType;
-                if (ios.size > 1) {
+                if (!visited.has(input) && ios.size > 1) {
                     const inputsOutputs = Array.from(ios).filter(isInputOrOutput);
                     inputsOutputs.sort(compareJunctions);
+                    inputsOutputs.forEach(p => { visited.add(p); });
                     passThroughs.push(inputsOutputs.map(input => input.index));
                 }
             }
@@ -1217,7 +1180,7 @@ export class FunctionchartContext extends EventBase {
         result += ']';
         if (name)
             result += '(' + name + ')';
-        if (passThroughs.length) {
+        if (passThroughs.length > 0) {
             functionChart.passThroughs = passThroughs; // TODO this shouldn't be a side-effect.
         }
         return result;
