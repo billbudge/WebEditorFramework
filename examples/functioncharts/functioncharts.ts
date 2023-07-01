@@ -1059,18 +1059,25 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   completeElements(
       elements: ElementTypes[], inputToPoint: PinPositionFunction, outputToPoint: PinPositionFunction) {
-    const self = this;
+    const self = this,
+          selection = this.selection;
     // Add junctions for disconnected pins on elements.
     elements.forEach(element => {
       const inputs = element.inWires,
             outputs = element.outWires;
       for (let pin = 0; pin < inputs.length; pin++) {
-        if (inputs[pin] === undefined)
-          self.connectInput(element, pin, inputToPoint);
+        if (inputs[pin] === undefined) {
+          const { junction, wire } = self.connectInput(element, pin, inputToPoint);
+          selection.add(junction);
+          selection.add(wire);
+        }
       }
       for (let pin = 0; pin < outputs.length; pin++) {
-        if (outputs[pin].length === 0)
-          self.connectOutput(element, pin, outputToPoint);
+        if (outputs[pin].length === 0) {
+          const { junction, wire } = self.connectOutput(element, pin, outputToPoint);
+          selection.add(junction);
+          selection.add(wire);
+        }
       }
     });
   }
@@ -1179,8 +1186,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
     this.visitNonWires(this.functionchart, item => {
       if (item instanceof FunctionInstance) {
-        if (item.type !== item.functionchart!.type) {
-          item.type = item.functionchart!.type;
+        const functionchart = item.functionchart!;
+        if (item.type !== functionchart.type) {
+          item.type = functionchart.type;
         }
       }
     });
@@ -1284,7 +1292,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   openElement(element: Element | FunctionInstance) {
     const result = this.newElement('element'),
           type = element.type,
-          newType = type.copy();
+          newType = type.copyUnlabeled();
     newType.inputs.push(new Pin(type));
     result.typeString = newType.toString();
     return result;
@@ -1304,7 +1312,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   group(items: AllTypes[], grandparent: Functionchart, bounds: Rect) {
-    const parent = this.newFunctionchart();
+    const self = this,
+          selection = this.selection,
+          parent = this.newFunctionchart();
     parent.x = bounds.x;
     parent.y = bounds.y;
     // parent.width = bounds.width;
@@ -1312,7 +1322,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.addItem(parent, grandparent);
 
     items.forEach(item => {
-      this.addItem(item, parent);
+      self.addItem(item, parent);
+      selection.add(item);
     });
   }
 
@@ -1492,8 +1503,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
     }
     if (typeString && typeString !== item.type.typeString) {
-      const newType = parseTypeString(typeString);
-      item.type = newType;
+      item.type = parseTypeString(typeString);
     }
     // Update 'inWires' and 'outWires' properties.
     if (item instanceof ElementBase) {
@@ -1767,6 +1777,7 @@ type HitResultTypes = ElementHitResult | WireHitResult | FunctionchartHitResult;
 
 enum RenderMode {
   Normal,
+  Palette,
   Highlight,
   HotTrack,
   Print
@@ -2056,8 +2067,9 @@ class Renderer {
 
     switch (mode) {
       case RenderMode.Normal:
+      case RenderMode.Palette:
       case RenderMode.Print:
-        ctx.fillStyle = /*element.state === 'palette' ? theme.altBgColor :*/ theme.bgColor;
+        ctx.fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
@@ -2077,42 +2089,6 @@ class Renderer {
     }
   }
 
-  drawElementPin(element: ElementTypes, input: number, output: number, mode: RenderMode) {
-    const theme = this.theme,
-          ctx = this.ctx,
-          rect = this.getItemRect(element),
-          type = element.type;
-    let x = rect.x, y = rect.y, w = rect.width, h = rect.height,
-        right = x + w,
-        pin: Pin;
-
-    if (input >= 0) {
-      pin = type.inputs[input];
-    } else if (output >= 0) {
-      pin = type.outputs[output];
-      x = right - pin.width;
-    }
-    ctx.beginPath();
-    ctx.rect(x, y + pin!.y, pin!.width, pin!.height);
-
-    switch (mode) {
-      case RenderMode.Normal:
-      case RenderMode.Print:
-        ctx.strokeStyle = theme.strokeColor;
-        ctx.lineWidth = 1;
-        break;
-      case RenderMode.Highlight:
-        ctx.strokeStyle = theme.highlightColor;
-        ctx.lineWidth = 2;
-        break;
-      case RenderMode.HotTrack:
-        ctx.strokeStyle = theme.hotTrackColor;
-        ctx.lineWidth = 2;
-        break;
-    }
-    ctx.stroke();
-  }
-
   drawFunctionchart(functionchart: Functionchart, mode: RenderMode) {
     const ctx = this.ctx,
           theme = this.theme,
@@ -2123,8 +2099,9 @@ class Renderer {
     roundRectPath(x, y, w, h, r, ctx);
     switch (mode) {
       case RenderMode.Normal:
+      case RenderMode.Palette:
       case RenderMode.Print:
-        ctx.fillStyle = theme.bgColor;
+        ctx.fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
@@ -2138,7 +2115,8 @@ class Renderer {
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
         ctx.stroke();
-        this.drawType(type, instanceRect.x, instanceRect.y, false);
+        if (type !== Type.emptyType)
+          this.drawType(type, instanceRect.x, instanceRect.y, false);
         break;
       case RenderMode.Highlight:
       case RenderMode.HotTrack:
@@ -2193,6 +2171,7 @@ class Renderer {
     bezierEdgePath(wire.bezier, ctx, 0);
     switch (mode) {
       case RenderMode.Normal:
+      case RenderMode.Palette:
       case RenderMode.Print:
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 1;
@@ -2333,11 +2312,11 @@ type NonWireDragType = 'copyPalette' | 'moveSelection' | 'moveCopySelection' |
                        'resizeFunctionchart' | 'instantiateFunctionchart';
 class NonWireDrag {
   items: NonWireTypes[];
-  type: NonWireDragType;
+  kind: NonWireDragType;
   description: string;
   constructor(items: NonWireTypes[], type: NonWireDragType, description: string) {
     this.items = items;
-    this.type = type;
+    this.kind = type;
     this.description = description;
   }
 }
@@ -2345,11 +2324,11 @@ class NonWireDrag {
 type WireDragType = 'connectWireSrc' | 'connectWireDst';
 class WireDrag {
   wire: Wire;
-  type: WireDragType;
+  kind: WireDragType;
   description: string;
   constructor(transition: Wire, type: WireDragType, description: string) {
     this.wire = transition;
-    this.type = type;
+    this.kind = type;
     this.description = description;
   }
 }
@@ -2767,7 +2746,7 @@ export class FunctionchartEditor implements CanvasLayer {
       const ctx = this.paletteController.getCtx();
       renderer.begin(ctx);
       canvasController.applyTransform();
-      this.palette.nonWires.forEach(item => { renderer.draw(item, RenderMode.Print); });
+      this.palette.nonWires.forEach(item => { renderer.draw(item, RenderMode.Palette); });
       // Draw any selected object in the palette. Translate object to palette coordinates.
       const offset = canvasController.offsetToOtherCanvas(this.canvasController);
       ctx.translate(offset.x, offset.y);
@@ -2862,7 +2841,7 @@ export class FunctionchartEditor implements CanvasLayer {
     }
     renderer.begin(ctx);
     this.palette.nonWires.forEachReverse(item => {
-      pushInfo(renderer.hitTest(item, p, tol, RenderMode.Normal));
+      pushInfo(renderer.hitTest(item, p, tol, RenderMode.Palette));
     });
     renderer.end();
     return hitList;
@@ -2982,10 +2961,10 @@ export class FunctionchartEditor implements CanvasLayer {
 
     this.dragInfo = drag;
     if (drag) {
-      if (drag.type === 'moveSelection' || drag.type === 'moveCopySelection') {
+      if (drag.kind === 'moveSelection' || drag.kind === 'moveCopySelection') {
         context.reduceSelection();
       }
-      if (drag.type == 'copyPalette') {
+      if (drag.kind == 'copyPalette') {
         // Transform palette items into the canvas coordinate system.
         const offset = this.paletteController.offsetToOtherCanvas(this.canvasController),
               copies = copyItems(drag.items, context) as NonWireTypes[];
@@ -2996,10 +2975,10 @@ export class FunctionchartEditor implements CanvasLayer {
           }
         });
         drag.items = copies;
-      } else if (drag.type == 'moveCopySelection') {
+      } else if (drag.kind == 'moveCopySelection') {
         const copies = context.copy() as NonWireTypes[];  // TODO fix
         drag.items = copies;
-      } else if  (drag.type === 'instantiateFunctionchart') {
+      } else if  (drag.kind === 'instantiateFunctionchart') {
         const functionchart = drag.items[0] as Functionchart,
               newInstance = context.newFunctionInstance(),
               renderer = this.renderer,
@@ -3018,8 +2997,8 @@ export class FunctionchartEditor implements CanvasLayer {
         context.addItem(newWire, this.functionchart);
         selection.set(newWire);
       } else {
-        if (drag.type == 'copyPalette' || drag.type == 'moveCopySelection' ||
-            drag.type === 'instantiateFunctionchart') {
+        if (drag.kind == 'copyPalette' || drag.kind == 'moveCopySelection' ||
+            drag.kind === 'instantiateFunctionchart') {
           context.addItems(drag.items, this.functionchart);
           selection.set(drag.items);
         }
@@ -3043,7 +3022,7 @@ export class FunctionchartEditor implements CanvasLayer {
           hitList = this.hitTestCanvas(cp);
     let hitInfo;
     if (drag instanceof NonWireDrag) {
-      switch (drag.type) {
+      switch (drag.kind) {
         case 'copyPalette':
         case 'moveCopySelection':
         case 'moveSelection':
@@ -3083,7 +3062,7 @@ export class FunctionchartEditor implements CanvasLayer {
       }
     } else if (drag instanceof WireDrag) {
       const wire = drag.wire;
-      switch (drag.type) {
+      switch (drag.kind) {
         case 'connectWireSrc': {
           const dst = wire.dst,
                 dstPin = wire.dstPin,
@@ -3128,8 +3107,8 @@ export class FunctionchartEditor implements CanvasLayer {
     if (drag instanceof WireDrag) {
       drag.wire.pSrc = drag.wire.pDst = undefined;
     } else if (drag instanceof NonWireDrag &&
-              (drag.type == 'copyPalette' || drag.type === 'moveSelection' ||
-               drag.type === 'moveCopySelection' || drag.type === 'instantiateFunctionchart')) {
+              (drag.kind == 'copyPalette' || drag.kind === 'moveSelection' ||
+               drag.kind === 'moveCopySelection' || drag.kind === 'instantiateFunctionchart')) {
       // Find element or functionchart beneath mouse.
       const hitList = this.hitTestCanvas(cp),
             hitInfo = this.getFirstHit(hitList, isDropTarget),

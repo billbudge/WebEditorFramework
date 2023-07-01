@@ -15,8 +15,6 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
           functionchartEditor = new FunctionchartEditor(
               theme, canvasController, paletteController, propertyGridController);
 
-    document.bgColor = theme.bgColor;
-    palette.style.backgroundColor = theme.altBgColor;
     palette.style.borderColor = theme.strokeColor;
     palette.style.borderStyle = 'solid';
     palette.style.borderWidth = '0.25px';

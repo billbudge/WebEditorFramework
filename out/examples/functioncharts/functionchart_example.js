@@ -5,8 +5,6 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
     if (body && canvas && palette) {
         const theme = getDefaultTheme(), // or getBlueprintTheme
         canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette), propertyGridController = new PropertyGridController(body, theme), functionchartEditor = new FunctionchartEditor(theme, canvasController, paletteController, propertyGridController);
-        document.bgColor = theme.bgColor;
-        palette.style.backgroundColor = theme.altBgColor;
         palette.style.borderColor = theme.strokeColor;
         palette.style.borderStyle = 'solid';
         palette.style.borderWidth = '0.25px';
