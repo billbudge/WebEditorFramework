@@ -248,7 +248,7 @@ describe('Cloning', () => {
 //------------------------------------------------------------------------------
 
 describe('Serialization, deserialization', () => {
-  test('copyItems', () => {
+  test('serialize/deserialize', () => {
     const context = new TestDataContext(),
           item = new TestDataContextObject(context),
           child1 = new TestDataContextObject(context),

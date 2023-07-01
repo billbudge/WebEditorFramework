@@ -134,8 +134,13 @@ export class IdProp {
     }
 }
 //------------------------------------------------------------------------------
-// Isomorphism.
-export function isomorphic(item1, item2) {
+// Isomorphism (equivalently, deepEquality).
+function isomorphicHelper(item1, item2, visited) {
+    // |visited| is used to detect cycles.
+    if (visited.get(item1) === item2)
+        return true;
+    visited.set(item1, item2);
+    visited.set(item2, item1);
     if (item1 === item2)
         return true;
     if (item1 === undefined || item2 === undefined)
@@ -152,7 +157,7 @@ export function isomorphic(item1, item2) {
             const ref1 = p.get(item1), ref2 = p.get(item2);
             if (ref1 === undefined)
                 return ref2 === undefined;
-            if (!isomorphic(ref1, ref2))
+            if (!isomorphicHelper(ref1, ref2, visited))
                 return false;
         }
         else if (p instanceof ChildArrayProp) {
@@ -162,80 +167,16 @@ export function isomorphic(item1, item2) {
             if (list1.length !== list2.length)
                 return false;
             for (let i = 0; i < list1.length; ++i) {
-                if (!isomorphic(list1.at(i), list2.at(i)))
+                if (!isomorphicHelper(list1.at(i), list2.at(i), visited))
                     return false;
             }
         }
     }
     return true;
 }
-/*
-    // Strict deep equality (no working up prototype chain.)
-    isomorphic: function(item1, item2, map) {
-      const dataModel = this.model.dataModel;
-
-      // The first pass matches all items and properties except references. It
-      // builds the id mapping for the second pass.
-      function firstPass(item1, item2) {
-        if (!dataModel.isItem(item1) || !dataModel.isItem(item2))
-          return item1 === item2;
-
-        const keys1 = Object.keys(item1),
-              keys2 = Object.keys(item2);
-        if (keys1.length !== keys2.length)
-          return false;
-        for (let k of keys1) {
-          if (!item2.hasOwnProperty(k))
-            return false;
-          // Skip id's.
-          if (k === 'id')
-            continue;
-          // Skip reference properties.
-          if (dataModel.isReference(item1, k) &&
-              dataModel.isReference(item2, k)) {
-            continue;
-          }
-          if (!firstPass(item1[k], item2[k])) {
-            return false;
-          }
-        }
-
-        // Add item1 -> item2 id mapping.
-        const id1 = dataModel.getId(item1),
-              id2 = dataModel.getId(item2);
-        if (id1 && id2)
-          map.set(id1, id2);
-
-        return true;
-      }
-
-      // The second pass makes sure all reference properties of items are
-      // to the same item, or isomorphic items.
-      function secondPass(item1, item2) {
-        if (dataModel.isItem(item1) && dataModel.isItem(item2)) {
-          const keys1 = Object.keys(item1),
-                keys2 = Object.keys(item2);
-          for (let k of keys1) {
-            // Check reference properties.
-            if (dataModel.isReference(item1, k) &&
-                dataModel.isReference(item2, k)) {
-              // Check for the same external reference, or to an isomorphic
-              // internal reference.
-              if (item1[k] !== item2[k] &&
-                  map.get(item1[k]) !== item2[k]) {
-                return false;
-              }
-            }
-          }
-        }
-        return true;
-      }
-
-      return firstPass(item1, item2) &&
-             secondPass(item1, item2);
-    },
-  }
-*/
+export function isomorphic(item1, item2) {
+    return isomorphicHelper(item1, item2, new Map());
+}
 //------------------------------------------------------------------------------
 // Cloning.
 function copyItem(original, context, map) {

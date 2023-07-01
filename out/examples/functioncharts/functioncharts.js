@@ -947,15 +947,7 @@ export class FunctionchartContext extends EventBase {
         // TODO use topological sort to traverse graph and make types consistent.
         if (!this.sorted)
             this.sorted = this.topologicalSort();
-        // Make sure wires between elements are in lowest common parent functionchart.
-        this.wires.forEach(wire => {
-            const src = wire.src, dst = wire.dst, srcParent = src.parent, dstParent = dst.parent, lca = getLowestCommonAncestor(srcParent, dstParent);
-            if (wire.parent !== lca) {
-                self.deleteItem(wire);
-                self.addItem(wire, lca);
-            }
-        });
-        // Update pseudoelement, conditional, functionchart, and function instance types.
+        // Update functioncharts, and functioninstances.
         this.reverseVisitNonWires(this.functionchart, item => {
             if (item instanceof Functionchart) {
                 const typeInfo = self.getFunctionchartTypeInfo(item);
@@ -964,12 +956,34 @@ export class FunctionchartContext extends EventBase {
                     item.passThroughs = typeInfo.passThroughs;
                 }
             }
+            else if (item instanceof FunctionInstance) {
+                if (!self.functioncharts.has(item.functionchart)) {
+                    self.deleteItem(item);
+                }
+            }
         });
         this.visitNonWires(this.functionchart, item => {
             if (item instanceof FunctionInstance) {
                 if (item.type !== item.functionchart.type) {
                     item.type = item.functionchart.type;
                 }
+            }
+        });
+        // Delete dangling wires.
+        const invalidWires = new Array();
+        this.wires.forEach(wire => {
+            if (!wire.src || !wire.dst || !self.elements.has(wire.src) || !self.elements.has(wire.dst))
+                invalidWires.push(wire);
+        });
+        invalidWires.forEach(wire => self.deleteItem(wire));
+        // Make sure wires between elements are in lowest common parent functionchart.
+        this.wires.forEach(wire => {
+            if (!self.isValidWire(wire))
+                invalidWires.push(wire);
+            const src = wire.src, dst = wire.dst, srcParent = src.parent, dstParent = dst.parent, lca = getLowestCommonAncestor(srcParent, dstParent);
+            if (wire.parent !== lca) {
+                self.deleteItem(wire);
+                self.addItem(wire, lca);
             }
         });
     }
