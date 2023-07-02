@@ -268,7 +268,8 @@ const idProp = new IdProp('id'),
       dstPinProp = new ScalarProp('dstPin'),
       nonWiresProp = new ChildArrayProp('nonWires'),
       wiresProp = new ChildArrayProp('wires'),
-      functionchartProp = new ReferenceProp('functionchart');
+      functionchartProp = new ReferenceProp('functionchart'),
+      elementsProp = new ChildArrayProp('element');
 
 abstract class NonWireTemplate {
   readonly id = idProp;
@@ -282,7 +283,8 @@ class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
   readonly name = nameProp;
   readonly typeString = typeStringProp;
-  readonly properties = [this.id, this.x, this.y, this.name, this.typeString];
+  readonly elements = elementsProp;
+  readonly properties = [this.id, this.x, this.y, this.name, this.typeString, this.elements];
   constructor(typeName: ElementType) {
     super();
     this.typeName = typeName;
@@ -379,6 +381,7 @@ export class Element extends ElementBase implements DataContextObject, Reference
   set y(value: number) { this.template.y.set(this, value); }
   get typeString() { return this.template.typeString.get(this); }
   set typeString(value: string) { this.template.typeString.set(this, value); }
+  get elements() { return this.template.elements.get(this) as List<ElementTypes>; }
 
   constructor(context: FunctionchartContext, template: ElementTemplate, id: number) {
     super(id);
@@ -1269,10 +1272,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.replaceElement(instance, newInstance);
   }
 
-  exportElement(element: Element | FunctionInstance) {
+  exportElement(element: Element | FunctionInstance) : Element {
     const result = this.newElement('element'),
           newType = new Type([], [new Pin(element.type)]);
     result.typeString = newType.toString();
+    result.elements.append(element);
     return result;
   }
 
@@ -1289,7 +1293,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  openElement(element: Element | FunctionInstance) {
+  openElement(element: Element | FunctionInstance) : Element {
     const result = this.newElement('element'),
           type = element.type,
           newType = type.copyUnlabeled();
@@ -1307,6 +1311,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       selection.delete(element);
       const newElement = self.openElement(element);
       self.replaceElement(element, newElement);
+      newElement.elements.append(element);  // Element owns the base element.
       selection.add(newElement);
     });
   }

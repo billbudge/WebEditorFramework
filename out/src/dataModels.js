@@ -136,15 +136,15 @@ export class IdProp {
 //------------------------------------------------------------------------------
 // Isomorphism (equivalently, deepEquality).
 function isomorphicHelper(item1, item2, visited) {
+    if (item1 === item2)
+        return true;
+    if (item1 === undefined || item2 === undefined)
+        return false; // only 1 can be undefined.
     // |visited| is used to detect cycles.
     if (visited.get(item1) === item2)
         return true;
     visited.set(item1, item2);
     visited.set(item2, item1);
-    if (item1 === item2)
-        return true;
-    if (item1 === undefined || item2 === undefined)
-        return false;
     if (item1.template !== item2.template)
         return false;
     for (let p of item1.template.properties) {
