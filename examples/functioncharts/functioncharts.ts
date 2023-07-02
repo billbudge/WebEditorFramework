@@ -269,7 +269,7 @@ const idProp = new IdProp('id'),
       nonWiresProp = new ChildArrayProp('nonWires'),
       wiresProp = new ChildArrayProp('wires'),
       functionchartProp = new ReferenceProp('functionchart'),
-      elementsProp = new ChildArrayProp('element');
+      elementsProp = new ChildArrayProp('elements');
 
 abstract class NonWireTemplate {
   readonly id = idProp;
@@ -277,7 +277,7 @@ abstract class NonWireTemplate {
   readonly y = yProp;
 }
 
-export type ElementType = 'binop' | 'unop' | 'cond' | 'element';
+export type ElementType = 'binop' | 'unop' | 'cond' | 'import' | 'export' | 'element';
 
 class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
@@ -332,6 +332,8 @@ class FunctionInstanceTemplate extends NonWireTemplate {
 const binopTemplate = new ElementTemplate('binop'),
       unopTemplate = new ElementTemplate('unop'),
       condTemplate = new ElementTemplate('cond'),
+      importTemplate = new ElementTemplate('import'),
+      exportTemplate = new ElementTemplate('export'),
       elementTemplate = new ElementTemplate('element'),
       inputPseudoelementTemplate = new PseudoelementTemplate('input'),
       outputPseudoelementTemplate = new PseudoelementTemplate('output'),
@@ -592,6 +594,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'cond':
         template = condTemplate;
         typeString = '[v**,*](?)';
+        break;
+      case 'import':
+        template = importTemplate;
+        typeString = Type.emptyTypeString;
+        break;
+      case 'export':
+        template = exportTemplate;
+        typeString = Type.emptyTypeString;
         break;
       case 'element':
         template = elementTemplate;
@@ -1273,10 +1283,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   exportElement(element: Element | FunctionInstance) : Element {
-    const result = this.newElement('element'),
+    const result = this.newElement('export'),
           newType = new Type([], [new Pin(element.type)]);
     result.typeString = newType.toString();
-    result.elements.append(element);
     return result;
   }
 
@@ -1289,12 +1298,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       selection.delete(element);
       const newElement = self.exportElement(element);
       self.replaceElement(element, newElement);
+      newElement.elements.append(element);  // newElement owns the base element.
       selection.add(newElement);
     });
   }
 
-  openElement(element: Element | FunctionInstance) : Element {
-    const result = this.newElement('element'),
+  importElement(element: Element | FunctionInstance) : Element {
+    const result = this.newElement('import'),
           type = element.type,
           newType = type.copyUnlabeled();
     newType.inputs.push(new Pin(type));
@@ -1302,16 +1312,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
-  openElements(elements: (Element | FunctionInstance)[]) {
+  importElements(elements: (Element | FunctionInstance)[]) {
     const self = this,
           selection = this.selection;
 
     // Open each non-input/output element.
     elements.forEach(element => {
       selection.delete(element);
-      const newElement = self.openElement(element);
+      const newElement = self.importElement(element);
       self.replaceElement(element, newElement);
-      newElement.elements.append(element);  // Element owns the base element.
+      newElement.elements.append(element);  // newElement owns the base element.
       selection.add(newElement);
     });
   }
@@ -1678,15 +1688,21 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
   construct(typeName: string) : AllTypes {
     switch (typeName) {
-      case 'binop': return this.newElement('binop');
-      case 'unop': return this.newElement('unop');
-      case 'cond': return this.newElement('cond');
-      case 'element': return this.newElement('element');
-      case 'input': return this.newPseudoelement('input');
-      case 'output': return this.newPseudoelement('output');
-      case 'literal': return this.newPseudoelement('literal');
+      case 'binop':
+      case 'unop':
+      case 'cond':
+      case 'import':
+      case 'export':
+      case 'element': return this.newElement(typeName);
+
+      case 'input':
+      case 'output':
+      case 'literal': return this.newPseudoelement(typeName);
+
       case 'wire': return this.newWire(undefined, -1, undefined, -1);
+
       case 'functionchart': return this.newFunctionchart();
+
       case 'instance': return this.newFunctionInstance();
     }
     throw new Error('Unknown type');
@@ -3242,7 +3258,7 @@ export class FunctionchartEditor implements CanvasLayer {
         }
         case 76: // 'l'
           context.beginTransaction('open elements');
-          context.openElements(context.selectedElements());
+          context.importElements(context.selectedElements());
           context.endTransaction();
           return true;
         case 78: { // ctrl 'n'   // Can't intercept cmd n.

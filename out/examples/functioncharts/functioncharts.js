@@ -211,7 +211,7 @@ export function parseTypeString(s) {
 //------------------------------------------------------------------------------
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), functionchartProp = new ReferenceProp('functionchart'), elementsProp = new ChildArrayProp('element');
+const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), functionchartProp = new ReferenceProp('functionchart'), elementsProp = new ChildArrayProp('elements');
 class NonWireTemplate {
     constructor() {
         this.id = idProp;
@@ -268,7 +268,7 @@ class FunctionInstanceTemplate extends NonWireTemplate {
         this.properties = [this.id, this.x, this.y, this.functionchart];
     }
 }
-const binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), elementTemplate = new ElementTemplate('element'), inputPseudoelementTemplate = new PseudoelementTemplate('input'), outputPseudoelementTemplate = new PseudoelementTemplate('output'), literalPseudoelementTemplate = new PseudoelementTemplate('literal'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
+const binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), importTemplate = new ElementTemplate('import'), exportTemplate = new ElementTemplate('export'), elementTemplate = new ElementTemplate('element'), inputPseudoelementTemplate = new PseudoelementTemplate('input'), outputPseudoelementTemplate = new PseudoelementTemplate('output'), literalPseudoelementTemplate = new PseudoelementTemplate('literal'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
@@ -442,6 +442,14 @@ export class FunctionchartContext extends EventBase {
             case 'cond':
                 template = condTemplate;
                 typeString = '[v**,*](?)';
+                break;
+            case 'import':
+                template = importTemplate;
+                typeString = Type.emptyTypeString;
+                break;
+            case 'export':
+                template = exportTemplate;
+                typeString = Type.emptyTypeString;
                 break;
             case 'element':
                 template = elementTemplate;
@@ -1045,9 +1053,8 @@ export class FunctionchartContext extends EventBase {
         this.replaceElement(instance, newInstance);
     }
     exportElement(element) {
-        const result = this.newElement('element'), newType = new Type([], [new Pin(element.type)]);
+        const result = this.newElement('export'), newType = new Type([], [new Pin(element.type)]);
         result.typeString = newType.toString();
-        result.elements.append(element);
         return result;
     }
     exportElements(elements) {
@@ -1057,23 +1064,24 @@ export class FunctionchartContext extends EventBase {
             selection.delete(element);
             const newElement = self.exportElement(element);
             self.replaceElement(element, newElement);
+            newElement.elements.append(element); // newElement owns the base element.
             selection.add(newElement);
         });
     }
-    openElement(element) {
-        const result = this.newElement('element'), type = element.type, newType = type.copyUnlabeled();
+    importElement(element) {
+        const result = this.newElement('import'), type = element.type, newType = type.copyUnlabeled();
         newType.inputs.push(new Pin(type));
         result.typeString = newType.toString();
         return result;
     }
-    openElements(elements) {
+    importElements(elements) {
         const self = this, selection = this.selection;
         // Open each non-input/output element.
         elements.forEach(element => {
             selection.delete(element);
-            const newElement = self.openElement(element);
+            const newElement = self.importElement(element);
             self.replaceElement(element, newElement);
-            newElement.elements.append(element); // Element owns the base element.
+            newElement.elements.append(element); // newElement owns the base element.
             selection.add(newElement);
         });
     }
@@ -1397,13 +1405,15 @@ export class FunctionchartContext extends EventBase {
     }
     construct(typeName) {
         switch (typeName) {
-            case 'binop': return this.newElement('binop');
-            case 'unop': return this.newElement('unop');
-            case 'cond': return this.newElement('cond');
-            case 'element': return this.newElement('element');
-            case 'input': return this.newPseudoelement('input');
-            case 'output': return this.newPseudoelement('output');
-            case 'literal': return this.newPseudoelement('literal');
+            case 'binop':
+            case 'unop':
+            case 'cond':
+            case 'import':
+            case 'export':
+            case 'element': return this.newElement(typeName);
+            case 'input':
+            case 'output':
+            case 'literal': return this.newPseudoelement(typeName);
             case 'wire': return this.newWire(undefined, -1, undefined, -1);
             case 'functionchart': return this.newFunctionchart();
             case 'instance': return this.newFunctionInstance();
@@ -2691,7 +2701,7 @@ export class FunctionchartEditor {
                 }
                 case 76: // 'l'
                     context.beginTransaction('open elements');
-                    context.openElements(context.selectedElements());
+                    context.importElements(context.selectedElements());
                     context.endTransaction();
                     return true;
                 case 78: { // ctrl 'n'   // Can't intercept cmd n.
