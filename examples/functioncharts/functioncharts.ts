@@ -2986,7 +2986,6 @@ export class FunctionchartEditor implements CanvasLayer {
               instancerBounds = this.renderer.getFunctionchartInstanceBounds(functionchart.type,
                 bounds);  // TODO simplify this
         newInstance.functionchart = functionchart;
-        newInstance.type = functionchart.type;  // TODO shouldn't have to manually set this.
         newInstance.x = instancerBounds.x;
         newInstance.y = instancerBounds.y;
         drag.items = [newInstance];
@@ -3156,7 +3155,7 @@ export class FunctionchartEditor implements CanvasLayer {
     if (cmdKey) {
       switch (keyCode) {
         case 65: { // 'a'
-          functionchart.nonWires.forEach(function (v) {  // TODO select functioncharts too
+          functionchart.nonWires.forEach(function (v) {
             context.selection.add(v);
           });
           self.canvasController.draw();

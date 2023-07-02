@@ -2470,7 +2470,7 @@ export class FunctionchartEditor {
             else if (drag.kind === 'instantiateFunctionchart') {
                 const functionchart = drag.items[0], newInstance = context.newFunctionInstance(), renderer = this.renderer, bounds = renderer.getItemRect(functionchart), instancerBounds = this.renderer.getFunctionchartInstanceBounds(functionchart.type, bounds); // TODO simplify this
                 newInstance.functionchart = functionchart;
-                newInstance.type = functionchart.type; // TODO shouldn't have to manually set this.
+                // newInstance.type = functionchart.type;  // TODO shouldn't have to manually set this.
                 newInstance.x = instancerBounds.x;
                 newInstance.y = instancerBounds.y;
                 drag.items = [newInstance];

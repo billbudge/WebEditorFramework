@@ -95,7 +95,8 @@ class TestDataObjectTemplate implements Data.DataObjectTemplate {
   }
 }
 
-const testDataObjectTemplate = new TestDataObjectTemplate();
+const testDataObjectTemplate = new TestDataObjectTemplate(),
+      testDataObjectTemplate2 = new TestDataObjectTemplate();
 
 class TestDataContextObject implements Data.DataContextObject, Data.ReferencedObject,
                                        Data.Parented<TestDataContextObject> {
@@ -189,10 +190,14 @@ describe('Isomorphism', () => {
           item = new TestDataContextObject(context),
           child1 = new TestDataContextObject(context),
           child2 = new TestDataContextObject(context),
-          child3 = new TestDataContextObject(context);
+          child3 = new TestDataContextObject(context),
+          child4 = new TestDataContextObject(context);
 
     expect(Data.isomorphic(item, item)).toBe(true);
     expect(Data.isomorphic(item, child1)).toBe(true);
+    expect(Data.isomorphic(item, undefined)).toBe(false);
+    expect(Data.isomorphic(undefined, item)).toBe(false);
+    expect(Data.isomorphic(undefined, undefined)).toBe(true);
 
     item.array.append(child2);
     child1.array.append(child3);
@@ -210,6 +215,10 @@ describe('Isomorphism', () => {
     item.x = 10;
     expect(Data.isomorphic(item, item)).toBe(true);
     expect(Data.isomorphic(item, child1)).toBe(false);
+
+    expect(Data.isomorphic(child3, child4)).toBe(true);
+    child4.template = testDataObjectTemplate2;
+    expect(Data.isomorphic(child3, child4)).toBe(false);
   });
 });
 
