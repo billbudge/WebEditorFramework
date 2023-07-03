@@ -277,7 +277,7 @@ abstract class NonWireTemplate {
   readonly y = yProp;
 }
 
-export type ElementType = 'binop' | 'unop' | 'cond' | 'import' | 'export' | 'element';
+export type ElementType = 'binop' | 'unop' | 'cond' | 'import' | 'export';
 
 class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
@@ -334,7 +334,6 @@ const binopTemplate = new ElementTemplate('binop'),
       condTemplate = new ElementTemplate('cond'),
       importTemplate = new ElementTemplate('import'),
       exportTemplate = new ElementTemplate('export'),
-      elementTemplate = new ElementTemplate('element'),
       inputPseudoelementTemplate = new PseudoelementTemplate('input'),
       outputPseudoelementTemplate = new PseudoelementTemplate('output'),
       literalPseudoelementTemplate = new PseudoelementTemplate('literal'),
@@ -603,11 +602,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         template = exportTemplate;
         typeString = Type.emptyTypeString;
         break;
-      case 'element':
-        template = elementTemplate;
-        typeString = Type.emptyTypeString;
-        break;
-      default: throw new Error('Unknown element type: ' + typeName);
+      default:
+        throw new Error('Unknown element type: ' + typeName);
     }
 
     const result: Element = new Element(this, template, nextId);
@@ -1692,8 +1688,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'unop':
       case 'cond':
       case 'import':
-      case 'export':
-      case 'element': return this.newElement(typeName);
+      case 'export': return this.newElement(typeName);
 
       case 'input':
       case 'output':
