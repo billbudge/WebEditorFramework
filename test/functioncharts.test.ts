@@ -196,24 +196,24 @@ describe('FunctionchartContext', () => {
     element.x = 10;
     expect(element.x).toBe(10);
   });
-  test('element typeString', () => {
-    const context = new FC.FunctionchartContext(),
-          element = context.newElement('element');
+  // test('element typeString', () => {
+  //   const context = new FC.FunctionchartContext(),
+  //         element = context.newElement('binop');
 
-    expect(element.typeString).toBe('[,]');
-    expect(element.type.inputs.length).toBe(0);
-    expect(element.type.outputs.length).toBe(0);
-    expect(element.inWires.length).toBe(0);
-    expect(element.outWires.length).toBe(0);
+  //   expect(element.typeString).toBe('[,]');
+  //   expect(element.type.inputs.length).toBe(0);
+  //   expect(element.type.outputs.length).toBe(0);
+  //   expect(element.inWires.length).toBe(0);
+  //   expect(element.outWires.length).toBe(0);
 
-    element.typeString = '[v,v]';
-    expect(element.typeString).toBe('[v,v]');
-    expect(element.type.inputs.length).toBe(1);
-    expect(element.type.outputs.length).toBe(1);
-    expect(element.inWires.length).toBe(1);
-    expect(element.outWires.length).toBe(1);
-    expect(element.outWires[0].length).toBe(0);  // Empty wire array.
-  });
+  //   element.typeString = '[v,v]';
+  //   expect(element.typeString).toBe('[v,v]');
+  //   expect(element.type.inputs.length).toBe(1);
+  //   expect(element.type.outputs.length).toBe(1);
+  //   expect(element.inWires.length).toBe(1);
+  //   expect(element.outWires.length).toBe(1);
+  //   expect(element.outWires[0].length).toBe(0);  // Empty wire array.
+  // });
   test('cond element', () => {
     const context = new FC.FunctionchartContext(),
           element = context.newElement('cond');

@@ -244,8 +244,6 @@ function isomorphicHelper(item1: any, item2: any, visited: Map<any, any>) : bool
     } else if (p instanceof ChildArrayProp) {
       const list1 = p.get(item1),
             list2 = p.get(item2);
-      if (list1 === undefined)
-        return list2 === undefined;
       if (list1.length !== list2.length)
         return false;
       for (let i = 0; i < list1.length; ++i) {

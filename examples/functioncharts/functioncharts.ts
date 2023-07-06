@@ -15,7 +15,7 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet,
          reduceToRoots, List, TransactionManager, HistoryManager, ScalarPropertyTypes,
          ArrayPropertyTypes } from '../../src/dataModels.js'
-import { types } from '@babel/core';
+import { parse, types } from '@babel/core';
 
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
@@ -291,7 +291,7 @@ class ElementTemplate extends NonWireTemplate {
   }
 }
 
-export type PseudoelementType = 'input' | 'output' | 'literal' | 'use';
+export type PseudoelementType = 'input' | 'output' | 'literal' | 'apply' | 'use';
 
 class PseudoelementTemplate extends NonWireTemplate {
   readonly typeName: PseudoelementType;
@@ -338,6 +338,7 @@ const binopTemplate = new ElementTemplate('binop'),
       inputPseudoelementTemplate = new PseudoelementTemplate('input'),
       outputPseudoelementTemplate = new PseudoelementTemplate('output'),
       literalPseudoelementTemplate = new PseudoelementTemplate('literal'),
+      applyPseudoelementTemplate = new PseudoelementTemplate('apply'),
       wireTemplate = new WireTemplate(),
       functionchartTemplate = new FunctionchartTemplate(),
       functionInstanceTemplate = new FunctionInstanceTemplate();
@@ -364,6 +365,12 @@ abstract class ElementBase {
       switch (this.template.typeName) {
         case 'cond':
           return [[1, 2, 3]];
+      }
+    } else if (this instanceof Pseudoelement) {
+      switch (this.template.typeName) {
+        case 'apply':
+          const firstOutput = this.type.inputs.length;
+          return [[0, firstOutput]];
       }
     }
   }
@@ -421,6 +428,9 @@ export class Pseudoelement extends ElementBase implements DataContextObject, Ref
         break;
       case 'literal':
         this.typeString = '[,v]';
+        break;
+      case 'apply':
+        this.typeString = '[*,*]';
         break;
     }
   }
@@ -622,6 +632,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'input': template = inputPseudoelementTemplate; break;
       case 'output': template = outputPseudoelementTemplate; break;
       case 'literal': template = literalPseudoelementTemplate; break;
+      case 'apply': template = applyPseudoelementTemplate; break;
       default: throw new Error('Unknown pseudoelement type: ' + typeName);
     }
     const result: Pseudoelement = new Pseudoelement(this, template, nextId);
@@ -1185,7 +1196,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
     // Update functioncharts, and functioninstances.
     this.reverseVisitNonWires(this.functionchart, item => {
-      if (item instanceof Functionchart) {
+      if (item instanceof Pseudoelement) {
+        if (item.template.typeName === 'apply') {
+          const type = self.resolveInputType(item, 0, new Set<ElementTypes>());
+          if (type && type !== item.type) {
+            const newType = type.copy();
+            newType.inputs.splice(0, 0, new Pin(Type.starType));
+            newType.outputs.splice(0, 0, new Pin(Type.starType));
+            item.typeString = newType.typeString;
+          }
+        }
+      } else if (item instanceof Functionchart) {
         const typeInfo = self.getFunctionchartTypeInfo(item);
         if (typeInfo.typeString !== item.type.typeString) {
           item.type = parseTypeString(typeInfo.typeString);
@@ -1697,7 +1718,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
       case 'input':
       case 'output':
-      case 'literal': return this.newPseudoelement(typeName);
+      case 'literal':
+      case 'apply': return this.newPseudoelement(typeName);
 
       case 'wire': return this.newWire(undefined, -1, undefined, -1);
 
@@ -2080,6 +2102,9 @@ class Renderer {
           ctx.beginPath();
           ctx.rect(x, y, w, h);
           break;
+        case 'apply':
+          ctx.beginPath();
+          ctx.rect(x, y, w, h);
       }
     } else {
       ctx.beginPath();
@@ -2412,6 +2437,7 @@ export class FunctionchartEditor implements CanvasLayer {
           input = context.newPseudoelement('input'),
           output = context.newPseudoelement('output'),
           literal = context.newPseudoelement('literal'),
+          apply = context.newPseudoelement('apply'),
           newBinop = context.newElement('binop'),
           newUnop = context.newElement('unop'),
           newCond = context.newElement('cond'),
@@ -2422,6 +2448,7 @@ export class FunctionchartEditor implements CanvasLayer {
     literal.x = 8; literal.y = 8;
     input.x = 40;  input.y = 8;
     output.x = 72; output.y = 8;
+    apply.x = 100; apply.y = 8;
     newBinop.x = 8; newBinop.y = 32;
     newBinop.typeString = '[vv,v](+)';  // binary addition
     newUnop.x = 48; newUnop.y = 32;
@@ -2435,6 +2462,7 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nonWires.append(literal);
     functionchart.nonWires.append(input);
     functionchart.nonWires.append(output);
+    functionchart.nonWires.append(apply);
     functionchart.nonWires.append(newBinop);
     functionchart.nonWires.append(newUnop);
     functionchart.nonWires.append(newCond);
