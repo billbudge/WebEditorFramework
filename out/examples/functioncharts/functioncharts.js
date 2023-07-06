@@ -885,6 +885,8 @@ export class FunctionchartContext extends EventBase {
         const self = this, selection = this.selection;
         // Add junctions for disconnected pins on elements.
         elements.forEach(element => {
+            if (element instanceof Pseudoelement && element.template.typeName !== 'apply')
+                return;
             const inputs = element.inWires, outputs = element.outWires;
             for (let pin = 0; pin < inputs.length; pin++) {
                 if (inputs[pin] === undefined) {
@@ -981,11 +983,15 @@ export class FunctionchartContext extends EventBase {
             if (item instanceof Pseudoelement) {
                 if (item.template.typeName === 'apply') {
                     const type = self.resolveInputType(item, 0, new Set());
-                    if (type && type !== item.type) {
+                    let typeString = '[*,*]';
+                    if (type) { // TODO clean up
                         const newType = type.copy();
                         newType.inputs.splice(0, 0, new Pin(Type.starType));
                         newType.outputs.splice(0, 0, new Pin(Type.starType));
-                        item.typeString = newType.typeString;
+                        typeString = newType.typeString;
+                    }
+                    if (typeString !== item.type.typeString) {
+                        item.typeString = typeString;
                     }
                 }
             }
@@ -2719,7 +2725,7 @@ export class FunctionchartEditor {
                     }
                     ;
                     context.beginTransaction('complete elements');
-                    context.completeElements(context.selectedElements(), inputToPoint, outputToPoint);
+                    context.completeElements(context.selectedAllElements(), inputToPoint, outputToPoint);
                     renderer.end();
                     context.endTransaction();
                     return true;
