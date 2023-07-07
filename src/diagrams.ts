@@ -416,10 +416,10 @@ export function getBlueprintTheme() {
 
 //------------------------------------------------------------------------------
 
-export type PropertyType = 'text' | 'enum';
+export type PropertyType = 'text' | 'enum' | 'boolean';
 
-export type PropertyGetter = (info: PropertyInfo, item: any) => string;
-export type PropertySetter = (info: PropertyInfo, item: any, value: string) => void;
+export type PropertyGetter = (info: PropertyInfo, item: any) => any;
+export type PropertySetter = (info: PropertyInfo, item: any, value: any) => void;
 
 export interface PropertyInfo {
   label: string;
@@ -466,14 +466,28 @@ export class PropertyGridController {
     table.style.visibility = 'hidden';
 
     properties.forEach(function (propertyInfo, index) {
-      const label = propertyInfo.label, labelElement = document.createTextNode(label), type = propertyInfo.type, row = table.insertRow(index), cell1 = row.insertCell(), cell2 = row.insertCell();
+      const label = propertyInfo.label,
+            labelElement = document.createTextNode(label),
+            type = propertyInfo.type,
+            row = table.insertRow(index),
+            cell1 = row.insertCell(),
+            cell2 = row.insertCell();
       let editingElement: HTMLElement | undefined = undefined;
       switch (type) {
         case 'text': {
           const inputElement = document.createElement('input') as HTMLInputElement;
           inputElement.setAttribute('type', 'text');
-          inputElement.addEventListener('change', function (event) {
+          inputElement.addEventListener('change', event => {
             propertyInfo.setter(propertyInfo, self.item, inputElement.value);
+          });
+          editingElement = inputElement;
+          break;
+        }
+        case 'boolean': {
+          const inputElement = document.createElement('input') as HTMLInputElement;
+          inputElement.setAttribute('type', 'checkbox');
+          inputElement.addEventListener('change', event => {
+            propertyInfo.setter(propertyInfo, self.item, inputElement.checked);
           });
           editingElement = inputElement;
           break;
@@ -489,7 +503,7 @@ export class PropertyGridController {
               option.text = value;
               selectElement.add(option);
             }
-            selectElement.addEventListener('change', function (event) {
+            selectElement.addEventListener('change', event => {
               propertyInfo.setter(propertyInfo, self.item, selectElement.value);
             });
             editingElement = selectElement;

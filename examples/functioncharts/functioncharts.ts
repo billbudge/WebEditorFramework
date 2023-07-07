@@ -266,6 +266,7 @@ const idProp = new IdProp('id'),
       srcPinProp = new ScalarProp('srcPin'),
       dstProp = new ReferenceProp('dst'),
       dstPinProp = new ScalarProp('dstPin'),
+      explicitProp = new ScalarProp('explicit'),
       nonWiresProp = new ChildArrayProp('nonWires'),
       wiresProp = new ChildArrayProp('wires'),
       functionchartProp = new ReferenceProp('functionchart'),
@@ -317,10 +318,11 @@ class FunctionchartTemplate extends NonWireTemplate {
   readonly width = widthProp;
   readonly height = heightProp;
   readonly name = nameProp;
+  readonly explicit = explicitProp;
   readonly nonWires = nonWiresProp;
   readonly wires = wiresProp;
   readonly properties = [this.id, this.x, this.y, this.width, this.height, this.name,
-                         this.nonWires, this.wires];
+                         this.explicit, this.nonWires, this.wires];
 }
 
 class FunctionInstanceTemplate extends NonWireTemplate {
@@ -478,6 +480,8 @@ export class Functionchart implements DataContextObject {
   set height(value: number) { this.template.height.set(this, value); }
   get name() { return this.template.name.get(this) || 0; }
   set name(value: number) { this.template.name.set(this, value); }
+  get explicit() { return this.template.explicit.get(this); }
+  set explicit(value: number) { this.template.explicit.set(this, value); }
 
   get nonWires() { return this.template.nonWires.get(this) as List<NonWireTypes>; }
   get wires() { return this.template.wires.get(this) as List<Wire>; }
@@ -1445,7 +1449,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   getFunctionchartTypeInfo(functionchart: Functionchart) {
     const self = this,
-          nonWires = functionchart.nonWires.asArray(),
           inputs = new Array<Pseudoelement>(),
           outputs = new Array<Pseudoelement>(),
           name = functionchart.name;
@@ -1463,11 +1466,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         }
       }
     });
+    if (!functionchart.explicit) {
+    }
 
     // Evaluate context.
-    if (subgraphInfo.inWires) {
-      
-    }
+    // if (subgraphInfo.inWires) {
+
+    // }
 
     // Sort pins in increasing y-order. This lets users arrange the pins of the
     // new type in an intuitive way.
@@ -2602,6 +2607,13 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
         prop: nameProp,
+      },
+      {
+        label: 'explicit',
+        type: 'boolean',
+        getter: getter,
+        setter: setter,
+        prop: explicitProp,
       },
     ]);
 

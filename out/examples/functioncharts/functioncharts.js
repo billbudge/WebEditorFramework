@@ -211,7 +211,7 @@ export function parseTypeString(s) {
 //------------------------------------------------------------------------------
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), functionchartProp = new ReferenceProp('functionchart'), elementsProp = new ChildArrayProp('elements');
+const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), explicitProp = new ScalarProp('explicit'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), functionchartProp = new ReferenceProp('functionchart'), elementsProp = new ChildArrayProp('elements');
 class NonWireTemplate {
     constructor() {
         this.id = idProp;
@@ -254,10 +254,11 @@ class FunctionchartTemplate extends NonWireTemplate {
         this.width = widthProp;
         this.height = heightProp;
         this.name = nameProp;
+        this.explicit = explicitProp;
         this.nonWires = nonWiresProp;
         this.wires = wiresProp;
         this.properties = [this.id, this.x, this.y, this.width, this.height, this.name,
-            this.nonWires, this.wires];
+            this.explicit, this.nonWires, this.wires];
     }
 }
 class FunctionInstanceTemplate extends NonWireTemplate {
@@ -370,6 +371,8 @@ export class Functionchart {
     set height(value) { this.template.height.set(this, value); }
     get name() { return this.template.name.get(this) || 0; }
     set name(value) { this.template.name.set(this, value); }
+    get explicit() { return this.template.explicit.get(this); }
+    set explicit(value) { this.template.explicit.set(this, value); }
     get nonWires() { return this.template.nonWires.get(this); }
     get wires() { return this.template.wires.get(this); }
     constructor(context, id) {
@@ -923,6 +926,7 @@ export class FunctionchartContext extends EventBase {
         const lca = getLowestCommonAncestor(src, dst);
         if (!lca || !(lca === src.parent || lca === dst.parent))
             return false;
+        // TODO no wires to dst out of functionchart.
         const srcPin = wire.srcPin, dstPin = wire.dstPin;
         if (srcPin < 0 || srcPin >= src.type.outputs.length)
             return false;
@@ -1122,6 +1126,7 @@ export class FunctionchartContext extends EventBase {
         // parent.width = bounds.width;
         // parent.height = bounds.height;
         this.addItem(parent, grandparent);
+        // TODO - make outputs from outgoing wires, then delete them.
         items.forEach(item => {
             self.addItem(item, parent);
             selection.add(item);
@@ -1189,10 +1194,12 @@ export class FunctionchartContext extends EventBase {
             }
         }
     }
-    getFunctionchartTypeInfo(functionChart) {
-        const self = this, nonWires = functionChart.nonWires.asArray(), inputs = new Array(), outputs = new Array(), name = functionChart.name;
-        // Add pins for inputs, outputs, and disconnected pins on elements.
-        nonWires.forEach(item => {
+    getFunctionchartTypeInfo(functionchart) {
+        const self = this, nonWires = functionchart.nonWires.asArray(), inputs = new Array(), outputs = new Array(), name = functionchart.name;
+        // Collect subgraph info.
+        const subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray());
+        // Collect inputs and outputs.
+        subgraphInfo.elements.forEach(item => {
             if (item instanceof Pseudoelement) {
                 if (item.template.typeName === 'input') {
                     inputs.push(item);
@@ -1202,8 +1209,11 @@ export class FunctionchartContext extends EventBase {
                 }
             }
         });
-        // Sort pins so we encounter them in increasing y-order. This lets us arrange
-        // the pins of the group type in an intuitive way.
+        // Evaluate context.
+        if (subgraphInfo.inWires) {
+        }
+        // Sort pins in increasing y-order. This lets users arrange the pins of the
+        // new type in an intuitive way.
         function compareYs(p1, p2) {
             return p1.y - p2.y;
         }
@@ -1768,6 +1778,9 @@ class Renderer {
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
+                // const passThroughs = element.passThroughs;  // TODO passthrough rendering
+                // if (passThroughs) {
+                // }
                 this.drawType(element.type, x, y, false);
                 break;
             case RenderMode.Highlight:
@@ -2123,6 +2136,13 @@ export class FunctionchartEditor {
                 getter: getter,
                 setter: setter,
                 prop: nameProp,
+            },
+            {
+                label: 'explicit',
+                type: 'boolean',
+                getter: getter,
+                setter: setter,
+                prop: explicitProp,
             },
         ]);
         this.propertyInfo.forEach((info, key) => {

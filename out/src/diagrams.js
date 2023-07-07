@@ -349,8 +349,17 @@ export class PropertyGridController {
                 case 'text': {
                     const inputElement = document.createElement('input');
                     inputElement.setAttribute('type', 'text');
-                    inputElement.addEventListener('change', function (event) {
+                    inputElement.addEventListener('change', event => {
                         propertyInfo.setter(propertyInfo, self.item, inputElement.value);
+                    });
+                    editingElement = inputElement;
+                    break;
+                }
+                case 'boolean': {
+                    const inputElement = document.createElement('input');
+                    inputElement.setAttribute('type', 'checkbox');
+                    inputElement.addEventListener('change', event => {
+                        propertyInfo.setter(propertyInfo, self.item, inputElement.checked);
                     });
                     editingElement = inputElement;
                     break;
@@ -366,7 +375,7 @@ export class PropertyGridController {
                             option.text = value;
                             selectElement.add(option);
                         }
-                        selectElement.addEventListener('change', function (event) {
+                        selectElement.addEventListener('change', event => {
                             propertyInfo.setter(propertyInfo, self.item, selectElement.value);
                         });
                         editingElement = selectElement;
