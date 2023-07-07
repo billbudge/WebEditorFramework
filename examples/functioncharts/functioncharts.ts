@@ -1129,6 +1129,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const lca = getLowestCommonAncestor<AllTypes>(src, dst);
     if (!lca || !(lca === src.parent || lca === dst.parent))
       return false;
+    // TODO no wires to dst out of functionchart.
     const srcPin = wire.srcPin,
           dstPin = wire.dstPin;
     if (srcPin < 0 || srcPin >= src.type.outputs.length)
@@ -1363,6 +1364,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // parent.height = bounds.height;
     this.addItem(parent, grandparent);
 
+    // TODO - make outputs from outgoing wires, then delete them.
     items.forEach(item => {
       self.addItem(item, parent);
       selection.add(item);
@@ -1441,15 +1443,18 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  getFunctionchartTypeInfo(functionChart: Functionchart) {
+  getFunctionchartTypeInfo(functionchart: Functionchart) {
     const self = this,
-          nonWires = functionChart.nonWires.asArray(),
+          nonWires = functionchart.nonWires.asArray(),
           inputs = new Array<Pseudoelement>(),
           outputs = new Array<Pseudoelement>(),
-          name = functionChart.name;
+          name = functionchart.name;
 
-    // Add pins for inputs, outputs, and disconnected pins on elements.
-    nonWires.forEach(item => {
+    // Collect subgraph info.
+    const subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray());
+
+    // Collect inputs and outputs.
+    subgraphInfo.elements.forEach(item => {
       if (item instanceof Pseudoelement) {
         if (item.template.typeName === 'input') {
           inputs.push(item);
@@ -1459,8 +1464,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
     });
 
-    // Sort pins so we encounter them in increasing y-order. This lets us arrange
-    // the pins of the group type in an intuitive way.
+    // Evaluate context.
+    if (subgraphInfo.inWires) {
+      
+    }
+
+    // Sort pins in increasing y-order. This lets users arrange the pins of the
+    // new type in an intuitive way.
     function compareYs(p1: Pseudoelement, p2: Pseudoelement) {
       return p1.y - p2.y;
     }
@@ -2126,6 +2136,10 @@ class Renderer {
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
         ctx.stroke();
+        // const passThroughs = element.passThroughs;  // TODO passthrough rendering
+        // if (passThroughs) {
+
+        // }
         this.drawType(element.type, x, y, false);
         break;
       case RenderMode.Highlight:
