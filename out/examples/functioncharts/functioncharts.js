@@ -320,11 +320,10 @@ export class Pseudoelement extends ElementBase {
     set y(value) { this.template.y.set(this, value); }
     get typeString() { return this.template.typeString.get(this); }
     set typeString(value) { this.template.typeString.set(this, value); }
+    // Derived properties.
+    // index: number = -1;
     constructor(context, template, id) {
         super(id);
-        // Derived properties.
-        this.index = -1;
-        this.resolvedType = Type.emptyType;
         this.context = context;
         this.template = template;
         switch (this.template.typeName) {
@@ -1195,23 +1194,46 @@ export class FunctionchartContext extends EventBase {
         }
     }
     getFunctionchartTypeInfo(functionchart) {
-        const self = this, nonWires = functionchart.nonWires.asArray(), inputs = new Array(), outputs = new Array(), name = functionchart.name;
+        const self = this, inputs = new Array(), outputs = new Array(), elementToPinInfo = new Map(), name = functionchart.name;
         // Collect subgraph info.
         const subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray());
-        // Collect inputs and outputs.
+        // Collect the functionchart's inputs and outputs.
         subgraphInfo.elements.forEach(item => {
+            if (item.parent !== functionchart)
+                return;
             if (item instanceof Pseudoelement) {
                 if (item.template.typeName === 'input') {
-                    inputs.push(item);
+                    const connected = new Set();
+                    connected.add(item);
+                    const type = self.resolveOutputType(item, 0, connected) || Type.starType;
+                    const pinInfo = { element: item, pin: 0, y: item.y, index: -1, type, connected };
+                    inputs.push(pinInfo);
+                    elementToPinInfo.set(item, pinInfo);
                 }
                 else if (item.template.typeName === 'output') {
-                    outputs.push(item);
+                    const connected = new Set();
+                    connected.add(item);
+                    const type = self.resolveInputType(item, 0, connected) || Type.starType;
+                    const pinInfo = { element: item, pin: 0, y: item.y, index: -1, type, connected };
+                    outputs.push(pinInfo);
+                    elementToPinInfo.set(item, pinInfo);
                 }
             }
         });
-        // Evaluate context.
-        if (subgraphInfo.inWires) {
+        if (!functionchart.explicit) {
+            // // Add all disconnected inputs and outputs as pins.
+            // subgraphInfo.elements.forEach(item => {
+            //   item.inWires.forEach((wire, index) => {
+            //     if (!wire) {
+            //       const pin = item.type.inputs[index].type;
+            //       inputs.push(pin);
+            //     }
+            //   });
+            // });
         }
+        // Evaluate context.
+        // if (subgraphInfo.inWires) {
+        // }
         // Sort pins in increasing y-order. This lets users arrange the pins of the
         // new type in an intuitive way.
         function compareYs(p1, p2) {
@@ -1234,40 +1256,29 @@ export class FunctionchartContext extends EventBase {
                 typeString += '(' + pin.name + ')';
             return typeString;
         }
-        // TODO clean up by separating typeString and passThrough computation.
         const passThroughs = new Array(), visited = new Set();
         let typeString = '[';
         inputs.forEach(input => {
-            const ios = new Set();
-            ios.add(input);
-            let type = self.resolveOutputType(input, 0, ios);
-            if (type) {
-                input.resolvedType = type;
-            }
-            else {
-                type = Type.starType;
-                if (!visited.has(input)) {
-                    const inputsOutputs = Array.from(ios).filter(isInputOrOutput);
-                    if (inputsOutputs.length > 1) {
-                        inputsOutputs.sort(compareIndices);
-                        inputsOutputs.forEach(p => { visited.add(p); });
-                        passThroughs.push(inputsOutputs.map(input => input.index));
+            const element = input.element;
+            // For unresolved pin types, compute the pass-throughs. We only need to do this for inputs,
+            // since we connect to outputs during resolution.
+            if (input.type === Type.starType) {
+                if (element instanceof Pseudoelement && !visited.has(input)) {
+                    const inputsOutputs = Array.from(input.connected).filter(isInputOrOutput);
+                    const connected = inputsOutputs.map(e => elementToPinInfo.get(e));
+                    if (connected.length > 1) {
+                        connected.sort(compareIndices);
+                        connected.forEach(p => { visited.add(p); });
+                        passThroughs.push(connected.map(input => input.index));
                     }
                 }
             }
-            typeString += getPinName(type, input.type.outputs[0]);
+            typeString += getPinName(input.type, element.type.outputs[0]);
         });
         typeString += ',';
         outputs.forEach(output => {
-            const ios = new Set(); // Ignore these; it suffices to track for inputs.
-            let type = self.resolveInputType(output, 0, ios);
-            if (type) {
-                output.resolvedType = type;
-            }
-            else {
-                type = Type.starType;
-            }
-            typeString += getPinName(type, output.type.inputs[0]);
+            const element = output.element;
+            typeString += getPinName(output.type, element.type.inputs[0]);
         });
         typeString += ']';
         if (name)
