@@ -1206,7 +1206,8 @@ export class FunctionchartContext extends EventBase {
                     const connected = new Set();
                     connected.add(item);
                     const type = self.resolveOutputType(item, 0, connected) || Type.starType;
-                    const pinInfo = { element: item, pin: 0, y: item.y, index: -1, type, connected };
+                    const pin = item.type.outputs[0];
+                    const pinInfo = { element: item, pin, y: item.y, index: -1, type, connected };
                     inputs.push(pinInfo);
                     elementToPinInfo.set(item, pinInfo);
                 }
@@ -1214,22 +1215,32 @@ export class FunctionchartContext extends EventBase {
                     const connected = new Set();
                     connected.add(item);
                     const type = self.resolveInputType(item, 0, connected) || Type.starType;
-                    const pinInfo = { element: item, pin: 0, y: item.y, index: -1, type, connected };
+                    const pin = item.type.inputs[0];
+                    const pinInfo = { element: item, pin, y: item.y, index: -1, type, connected };
                     outputs.push(pinInfo);
                     elementToPinInfo.set(item, pinInfo);
                 }
             }
         });
         if (!functionchart.explicit) {
-            // // Add all disconnected inputs and outputs as pins.
-            // subgraphInfo.elements.forEach(item => {
-            //   item.inWires.forEach((wire, index) => {
-            //     if (!wire) {
-            //       const pin = item.type.inputs[index].type;
-            //       inputs.push(pin);
-            //     }
-            //   });
-            // });
+            const emptySet = new Set();
+            // Add all disconnected inputs and outputs as pins.
+            subgraphInfo.elements.forEach(item => {
+                item.inWires.forEach((wire, index) => {
+                    if (wire === undefined) {
+                        const pin = item.type.inputs[index], pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
+                            type: pin.type, connected: emptySet };
+                        inputs.push(pinInfo);
+                    }
+                });
+                item.outWires.forEach((wires, index) => {
+                    if (wires.length === 0) {
+                        const pin = item.type.outputs[index], pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
+                            type: pin.type, connected: emptySet };
+                        outputs.push(pinInfo);
+                    }
+                });
+            });
         }
         // Evaluate context.
         // if (subgraphInfo.inWires) {
@@ -1267,18 +1278,18 @@ export class FunctionchartContext extends EventBase {
                     const inputsOutputs = Array.from(input.connected).filter(isInputOrOutput);
                     const connected = inputsOutputs.map(e => elementToPinInfo.get(e));
                     if (connected.length > 1) {
-                        connected.sort(compareIndices);
                         connected.forEach(p => { visited.add(p); });
+                        connected.sort(compareIndices);
                         passThroughs.push(connected.map(input => input.index));
                     }
                 }
             }
-            typeString += getPinName(input.type, element.type.outputs[0]);
+            typeString += getPinName(input.type, input.pin);
         });
         typeString += ',';
         outputs.forEach(output => {
             const element = output.element;
-            typeString += getPinName(output.type, element.type.inputs[0]);
+            typeString += getPinName(output.type, output.pin);
         });
         typeString += ']';
         if (name)
@@ -1311,11 +1322,11 @@ export class FunctionchartContext extends EventBase {
         // Update 'inWires' and 'outWires' properties.
         if (item instanceof ElementBase) {
             const type = item.type, inputs = type.inputs.length, outputs = type.outputs.length, inWires = item.inWires, outWires = item.outWires;
-            inWires.length = inputs;
-            outWires.length = outputs;
-            for (let i = 0; i < outputs; i++) {
-                if (outWires[i] === undefined)
-                    outWires[i] = new Array();
+            for (let i = inWires.length; i < inputs; i++) {
+                inWires[i] = undefined;
+            }
+            for (let i = outWires.length; i < outputs; i++) {
+                outWires[i] = new Array();
             }
         }
         this.visitNonWires(item, item => self.setGlobalPosition(item));

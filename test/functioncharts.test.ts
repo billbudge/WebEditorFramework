@@ -457,6 +457,7 @@ describe('FunctionchartContext', () => {
           elem1 = addElement(functionchart, 'cond'),
           input = addPseudoelement(functionchart, 'input'),
           output = addPseudoelement(functionchart, 'output');
+    functionchart.explicit = true;
     let typeInfo = context.getFunctionchartTypeInfo(functionchart);
     expect(typeInfo.typeString).toBe('[*,*]');
     expect(typeInfo.passThroughs.length).toBe(0);
