@@ -269,7 +269,7 @@ class FunctionInstanceTemplate extends NonWireTemplate {
         this.properties = [this.id, this.x, this.y, this.functionchart];
     }
 }
-const binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), importTemplate = new ElementTemplate('import'), exportTemplate = new ElementTemplate('export'), elementTemplate = new ElementTemplate('element'), inputPseudoelementTemplate = new PseudoelementTemplate('input'), outputPseudoelementTemplate = new PseudoelementTemplate('output'), literalPseudoelementTemplate = new PseudoelementTemplate('literal'), passPseudoelementTemplate = new PseudoelementTemplate('pass'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
+const binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), importTemplate = new ElementTemplate('import'), exportTemplate = new ElementTemplate('export'), elementTemplate = new ElementTemplate('element'), inputPseudoelementTemplate = new PseudoelementTemplate('input'), outputPseudoelementTemplate = new PseudoelementTemplate('output'), literalPseudoelementTemplate = new PseudoelementTemplate('literal'), applyPseudoelementTemplate = new PseudoelementTemplate('apply'), passPseudoelementTemplate = new PseudoelementTemplate('pass'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
@@ -334,6 +334,9 @@ export class Pseudoelement extends ElementBase {
                 break;
             case 'literal':
                 this.typeString = '[,v]';
+                break;
+            case 'apply':
+                this.typeString = '[*,]';
                 break;
             case 'pass':
                 this.typeString = '[*,*]';
@@ -485,6 +488,9 @@ export class FunctionchartContext extends EventBase {
                 break;
             case 'literal':
                 template = literalPseudoelementTemplate;
+                break;
+            case 'apply':
+                template = applyPseudoelementTemplate;
                 break;
             case 'pass':
                 template = passPseudoelementTemplate;
@@ -981,19 +987,19 @@ export class FunctionchartContext extends EventBase {
         // Update functioncharts, and functioninstances.
         this.reverseVisitNonWires(this.functionchart, item => {
             if (item instanceof Pseudoelement) {
-                // if (item.template.typeName === 'apply') {
-                //   const type = self.resolveInputType(item, 0, new Set<ElementTypes>());
-                //   let typeString = '[*,*]';
-                //   if (type) {  // TODO clean up
-                //     const newType = type.copy();
-                //     newType.inputs.splice(0, 0, new Pin(Type.starType));
-                //     newType.outputs.splice(0, 0, new Pin(Type.starType));
-                //     typeString = newType.typeString;
-                //   }
-                //   if (typeString !== item.type.typeString) {
-                //     item.typeString = typeString;
-                //   }
-                // }
+                if (item.template.typeName === 'apply') {
+                    const index = item.type.inputs.length - 1;
+                    const type = self.resolveInputType(item, index, new Set());
+                    let typeString = '[*,]';
+                    if (type) { // TODO clean up
+                        const newType = type.copy();
+                        newType.inputs.push(new Pin(Type.starType));
+                        typeString = newType.typeString;
+                    }
+                    if (typeString !== item.type.typeString) {
+                        item.typeString = typeString;
+                    }
+                }
             }
             else if (item instanceof Functionchart) {
                 const typeInfo = self.getFunctionchartTypeInfo(item);
@@ -1471,6 +1477,7 @@ export class FunctionchartContext extends EventBase {
             case 'input':
             case 'output':
             case 'literal':
+            case 'apply':
             case 'pass': return this.newPseudoelement(typeName);
             case 'wire': return this.newWire(undefined, -1, undefined, -1);
             case 'functionchart': return this.newFunctionchart();
@@ -1774,9 +1781,7 @@ class Renderer {
                     outFlagPath(x, y, w, h, spacing, ctx);
                     break;
                 case 'literal':
-                    ctx.beginPath();
-                    ctx.rect(x, y, w, h);
-                    break;
+                case 'apply':
                 case 'pass':
                     ctx.beginPath();
                     ctx.rect(x, y, w, h);
@@ -2011,7 +2016,7 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(), functionchart = context.newFunctionchart(), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newPseudoelement('literal'), pass = context.newPseudoelement('pass'), newBinop = context.newElement('binop'), newUnop = context.newElement('unop'), newCond = context.newElement('cond'), newFunctionchart = context.newFunctionchart();
+        const context = new FunctionchartContext(), functionchart = context.newFunctionchart(), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newPseudoelement('literal'), apply = context.newPseudoelement('apply'), pass = context.newPseudoelement('pass'), newBinop = context.newElement('binop'), newUnop = context.newElement('unop'), newCond = context.newElement('cond'), newFunctionchart = context.newFunctionchart();
         context.root = functionchart;
         literal.x = 8;
         literal.y = 8;
@@ -2019,7 +2024,9 @@ export class FunctionchartEditor {
         input.y = 8;
         output.x = 72;
         output.y = 8;
-        pass.x = 100;
+        apply.x = 100;
+        apply.y = 8;
+        pass.x = 128;
         pass.y = 8;
         newBinop.x = 8;
         newBinop.y = 32;
@@ -2036,6 +2043,7 @@ export class FunctionchartEditor {
         functionchart.nonWires.append(literal);
         functionchart.nonWires.append(input);
         functionchart.nonWires.append(output);
+        functionchart.nonWires.append(apply);
         functionchart.nonWires.append(pass);
         functionchart.nonWires.append(newBinop);
         functionchart.nonWires.append(newUnop);
