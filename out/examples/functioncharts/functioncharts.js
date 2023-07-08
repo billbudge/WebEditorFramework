@@ -269,7 +269,7 @@ class FunctionInstanceTemplate extends NonWireTemplate {
         this.properties = [this.id, this.x, this.y, this.functionchart];
     }
 }
-const binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), importTemplate = new ElementTemplate('import'), exportTemplate = new ElementTemplate('export'), elementTemplate = new ElementTemplate('element'), inputPseudoelementTemplate = new PseudoelementTemplate('input'), outputPseudoelementTemplate = new PseudoelementTemplate('output'), literalPseudoelementTemplate = new PseudoelementTemplate('literal'), applyPseudoelementTemplate = new PseudoelementTemplate('apply'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
+const binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), importTemplate = new ElementTemplate('import'), exportTemplate = new ElementTemplate('export'), elementTemplate = new ElementTemplate('element'), inputPseudoelementTemplate = new PseudoelementTemplate('input'), outputPseudoelementTemplate = new PseudoelementTemplate('output'), literalPseudoelementTemplate = new PseudoelementTemplate('literal'), passPseudoelementTemplate = new PseudoelementTemplate('pass'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
@@ -280,14 +280,13 @@ class ElementBase {
         if (this instanceof Element) {
             switch (this.template.typeName) {
                 case 'cond':
-                    return [[1, 2, 3]];
+                    return [[1, 2, 3]]; // '0' is the condition input, of valueType.
             }
         }
         else if (this instanceof Pseudoelement) {
             switch (this.template.typeName) {
-                case 'apply':
-                    const firstOutput = this.type.inputs.length;
-                    return [[0, firstOutput]];
+                case 'pass':
+                    return [[0, 1]];
             }
         }
     }
@@ -336,7 +335,7 @@ export class Pseudoelement extends ElementBase {
             case 'literal':
                 this.typeString = '[,v]';
                 break;
-            case 'apply':
+            case 'pass':
                 this.typeString = '[*,*]';
                 break;
         }
@@ -487,8 +486,8 @@ export class FunctionchartContext extends EventBase {
             case 'literal':
                 template = literalPseudoelementTemplate;
                 break;
-            case 'apply':
-                template = applyPseudoelementTemplate;
+            case 'pass':
+                template = passPseudoelementTemplate;
                 break;
             default: throw new Error('Unknown pseudoelement type: ' + typeName);
         }
@@ -887,8 +886,6 @@ export class FunctionchartContext extends EventBase {
         const self = this, selection = this.selection;
         // Add junctions for disconnected pins on elements.
         elements.forEach(element => {
-            if (element instanceof Pseudoelement && element.template.typeName !== 'apply')
-                return;
             const inputs = element.inWires, outputs = element.outWires;
             for (let pin = 0; pin < inputs.length; pin++) {
                 if (inputs[pin] === undefined) {
@@ -984,19 +981,19 @@ export class FunctionchartContext extends EventBase {
         // Update functioncharts, and functioninstances.
         this.reverseVisitNonWires(this.functionchart, item => {
             if (item instanceof Pseudoelement) {
-                if (item.template.typeName === 'apply') {
-                    const type = self.resolveInputType(item, 0, new Set());
-                    let typeString = '[*,*]';
-                    if (type) { // TODO clean up
-                        const newType = type.copy();
-                        newType.inputs.splice(0, 0, new Pin(Type.starType));
-                        newType.outputs.splice(0, 0, new Pin(Type.starType));
-                        typeString = newType.typeString;
-                    }
-                    if (typeString !== item.type.typeString) {
-                        item.typeString = typeString;
-                    }
-                }
+                // if (item.template.typeName === 'apply') {
+                //   const type = self.resolveInputType(item, 0, new Set<ElementTypes>());
+                //   let typeString = '[*,*]';
+                //   if (type) {  // TODO clean up
+                //     const newType = type.copy();
+                //     newType.inputs.splice(0, 0, new Pin(Type.starType));
+                //     newType.outputs.splice(0, 0, new Pin(Type.starType));
+                //     typeString = newType.typeString;
+                //   }
+                //   if (typeString !== item.type.typeString) {
+                //     item.typeString = typeString;
+                //   }
+                // }
             }
             else if (item instanceof Functionchart) {
                 const typeInfo = self.getFunctionchartTypeInfo(item);
@@ -1102,9 +1099,8 @@ export class FunctionchartContext extends EventBase {
         });
     }
     importElement(element) {
-        const result = this.newElement('import'), type = element.type, newType = type.copyUnlabeled();
-        newType.inputs.push(new Pin(type));
-        result.typeString = newType.toString();
+        const result = this.newPseudoelement('input'), type = element.type, newType = type.copyUnlabeled();
+        result.typeString = '[,' + newType.toString() + ']';
         return result;
     }
     importElements(elements) {
@@ -1114,7 +1110,6 @@ export class FunctionchartContext extends EventBase {
             selection.delete(element);
             const newElement = self.importElement(element);
             self.replaceElement(element, newElement);
-            newElement.elements.append(element); // newElement owns the base element.
             selection.add(newElement);
         });
     }
@@ -1476,7 +1471,7 @@ export class FunctionchartContext extends EventBase {
             case 'input':
             case 'output':
             case 'literal':
-            case 'apply': return this.newPseudoelement(typeName);
+            case 'pass': return this.newPseudoelement(typeName);
             case 'wire': return this.newWire(undefined, -1, undefined, -1);
             case 'functionchart': return this.newFunctionchart();
             case 'instance': return this.newFunctionInstance();
@@ -1782,7 +1777,7 @@ class Renderer {
                     ctx.beginPath();
                     ctx.rect(x, y, w, h);
                     break;
-                case 'apply':
+                case 'pass':
                     ctx.beginPath();
                     ctx.rect(x, y, w, h);
             }
@@ -1800,7 +1795,7 @@ class Renderer {
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
-                // const passThroughs = element.passThroughs;  // TODO passthrough rendering
+                // const passThroughs = element.passThroughs;  // TODO pass rendering
                 // if (passThroughs) {
                 // }
                 this.drawType(element.type, x, y, false);
@@ -2016,7 +2011,7 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(), functionchart = context.newFunctionchart(), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newPseudoelement('literal'), apply = context.newPseudoelement('apply'), newBinop = context.newElement('binop'), newUnop = context.newElement('unop'), newCond = context.newElement('cond'), newFunctionchart = context.newFunctionchart();
+        const context = new FunctionchartContext(), functionchart = context.newFunctionchart(), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newPseudoelement('literal'), pass = context.newPseudoelement('pass'), newBinop = context.newElement('binop'), newUnop = context.newElement('unop'), newCond = context.newElement('cond'), newFunctionchart = context.newFunctionchart();
         context.root = functionchart;
         literal.x = 8;
         literal.y = 8;
@@ -2024,8 +2019,8 @@ export class FunctionchartEditor {
         input.y = 8;
         output.x = 72;
         output.y = 8;
-        apply.x = 100;
-        apply.y = 8;
+        pass.x = 100;
+        pass.y = 8;
         newBinop.x = 8;
         newBinop.y = 32;
         newBinop.typeString = '[vv,v](+)'; // binary addition
@@ -2041,7 +2036,7 @@ export class FunctionchartEditor {
         functionchart.nonWires.append(literal);
         functionchart.nonWires.append(input);
         functionchart.nonWires.append(output);
-        functionchart.nonWires.append(apply);
+        functionchart.nonWires.append(pass);
         functionchart.nonWires.append(newBinop);
         functionchart.nonWires.append(newUnop);
         functionchart.nonWires.append(newCond);

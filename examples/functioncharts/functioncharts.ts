@@ -292,7 +292,7 @@ class ElementTemplate extends NonWireTemplate {
   }
 }
 
-export type PseudoelementType = 'input' | 'output' | 'literal' | 'apply' | 'use';
+export type PseudoelementType = 'input' | 'output' | 'literal' | 'pass' | 'use';
 
 class PseudoelementTemplate extends NonWireTemplate {
   readonly typeName: PseudoelementType;
@@ -340,7 +340,7 @@ const binopTemplate = new ElementTemplate('binop'),
       inputPseudoelementTemplate = new PseudoelementTemplate('input'),
       outputPseudoelementTemplate = new PseudoelementTemplate('output'),
       literalPseudoelementTemplate = new PseudoelementTemplate('literal'),
-      applyPseudoelementTemplate = new PseudoelementTemplate('apply'),
+      passPseudoelementTemplate = new PseudoelementTemplate('pass'),
       wireTemplate = new WireTemplate(),
       functionchartTemplate = new FunctionchartTemplate(),
       functionInstanceTemplate = new FunctionInstanceTemplate();
@@ -366,13 +366,12 @@ abstract class ElementBase {
     if (this instanceof Element) {
       switch (this.template.typeName) {
         case 'cond':
-          return [[1, 2, 3]];
+          return [[1, 2, 3]];  // '0' is the condition input, of valueType.
       }
     } else if (this instanceof Pseudoelement) {
       switch (this.template.typeName) {
-        case 'apply':
-          const firstOutput = this.type.inputs.length;
-          return [[0, firstOutput]];
+        case 'pass':
+          return [[0, 1]];
       }
     }
   }
@@ -430,7 +429,7 @@ export class Pseudoelement extends ElementBase implements DataContextObject, Ref
       case 'literal':
         this.typeString = '[,v]';
         break;
-      case 'apply':
+      case 'pass':
         this.typeString = '[*,*]';
         break;
     }
@@ -644,7 +643,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'input': template = inputPseudoelementTemplate; break;
       case 'output': template = outputPseudoelementTemplate; break;
       case 'literal': template = literalPseudoelementTemplate; break;
-      case 'apply': template = applyPseudoelementTemplate; break;
+      case 'pass': template = passPseudoelementTemplate; break;
       default: throw new Error('Unknown pseudoelement type: ' + typeName);
     }
     const result: Pseudoelement = new Pseudoelement(this, template, nextId);
@@ -1099,8 +1098,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           selection = this.selection;
     // Add junctions for disconnected pins on elements.
     elements.forEach(element => {
-      if (element instanceof Pseudoelement && element.template.typeName !== 'apply')
-        return;
       const inputs = element.inWires,
             outputs = element.outWires;
       for (let pin = 0; pin < inputs.length; pin++) {
@@ -1212,19 +1209,19 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // Update functioncharts, and functioninstances.
     this.reverseVisitNonWires(this.functionchart, item => {
       if (item instanceof Pseudoelement) {
-        if (item.template.typeName === 'apply') {
-          const type = self.resolveInputType(item, 0, new Set<ElementTypes>());
-          let typeString = '[*,*]';
-          if (type) {  // TODO clean up
-            const newType = type.copy();
-            newType.inputs.splice(0, 0, new Pin(Type.starType));
-            newType.outputs.splice(0, 0, new Pin(Type.starType));
-            typeString = newType.typeString;
-          }
-          if (typeString !== item.type.typeString) {
-            item.typeString = typeString;
-          }
-        }
+        // if (item.template.typeName === 'apply') {
+        //   const type = self.resolveInputType(item, 0, new Set<ElementTypes>());
+        //   let typeString = '[*,*]';
+        //   if (type) {  // TODO clean up
+        //     const newType = type.copy();
+        //     newType.inputs.splice(0, 0, new Pin(Type.starType));
+        //     newType.outputs.splice(0, 0, new Pin(Type.starType));
+        //     typeString = newType.typeString;
+        //   }
+        //   if (typeString !== item.type.typeString) {
+        //     item.typeString = typeString;
+        //   }
+        // }
       } else if (item instanceof Functionchart) {
         const typeInfo = self.getFunctionchartTypeInfo(item);
         if (typeInfo.typeString !== item.type.typeString) {
@@ -1343,12 +1340,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  importElement(element: Element | FunctionInstance) : Element {
-    const result = this.newElement('import'),
+  importElement(element: Element | FunctionInstance) : Pseudoelement {
+    const result = this.newPseudoelement('input'),
           type = element.type,
           newType = type.copyUnlabeled();
-    newType.inputs.push(new Pin(type));
-    result.typeString = newType.toString();
+    result.typeString = '[,' + newType.toString() + ']';
     return result;
   }
 
@@ -1361,7 +1357,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       selection.delete(element);
       const newElement = self.importElement(element);
       self.replaceElement(element, newElement);
-      newElement.elements.append(element);  // newElement owns the base element.
       selection.add(newElement);
     });
   }
@@ -1774,7 +1769,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'input':
       case 'output':
       case 'literal':
-      case 'apply': return this.newPseudoelement(typeName);
+      case 'pass': return this.newPseudoelement(typeName);
 
       case 'wire': return this.newWire(undefined, -1, undefined, -1);
 
@@ -2157,7 +2152,7 @@ class Renderer {
           ctx.beginPath();
           ctx.rect(x, y, w, h);
           break;
-        case 'apply':
+        case 'pass':
           ctx.beginPath();
           ctx.rect(x, y, w, h);
       }
@@ -2175,7 +2170,7 @@ class Renderer {
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
         ctx.stroke();
-        // const passThroughs = element.passThroughs;  // TODO passthrough rendering
+        // const passThroughs = element.passThroughs;  // TODO pass rendering
         // if (passThroughs) {
 
         // }
@@ -2496,7 +2491,7 @@ export class FunctionchartEditor implements CanvasLayer {
           input = context.newPseudoelement('input'),
           output = context.newPseudoelement('output'),
           literal = context.newPseudoelement('literal'),
-          apply = context.newPseudoelement('apply'),
+          pass = context.newPseudoelement('pass'),
           newBinop = context.newElement('binop'),
           newUnop = context.newElement('unop'),
           newCond = context.newElement('cond'),
@@ -2507,7 +2502,7 @@ export class FunctionchartEditor implements CanvasLayer {
     literal.x = 8; literal.y = 8;
     input.x = 40;  input.y = 8;
     output.x = 72; output.y = 8;
-    apply.x = 100; apply.y = 8;
+    pass.x = 100; pass.y = 8;
     newBinop.x = 8; newBinop.y = 32;
     newBinop.typeString = '[vv,v](+)';  // binary addition
     newUnop.x = 48; newUnop.y = 32;
@@ -2521,7 +2516,7 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nonWires.append(literal);
     functionchart.nonWires.append(input);
     functionchart.nonWires.append(output);
-    functionchart.nonWires.append(apply);
+    functionchart.nonWires.append(pass);
     functionchart.nonWires.append(newBinop);
     functionchart.nonWires.append(newUnop);
     functionchart.nonWires.append(newCond);
