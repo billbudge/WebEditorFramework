@@ -41,11 +41,12 @@ export class Type {
         Type.atomizedTypes.clear();
         Type.atomizedTypes.set(Type.valueTypeString, Type.valueType);
         Type.atomizedTypes.set(Type.starTypeString, Type.starType);
+        Type.atomizedTypes.set(Type.spacerTypeString, Type.spacerType);
         Type.atomizedTypes.set(Type.emptyTypeString, Type.emptyType);
     }
     get typeString() { return this.toString(); }
     get needsLayout() {
-        return this.width === 0;
+        return this.height === 0; // width may be 0 in the case of spacer type.
     }
     constructor(inputs, outputs, name) {
         this.x = 0;
@@ -67,6 +68,8 @@ export class Type {
             return Type.valueTypeString;
         if (this === Type.starType)
             return Type.starTypeString;
+        if (this === Type.spacerType)
+            return Type.spacerTypeString;
         let s = '[';
         this.inputs.forEach(input => s += input.toString());
         s += ',';
@@ -105,6 +108,8 @@ export class Type {
             return true;
         if (src === Type.starType || dst === Type.starType)
             return true;
+        if (src === Type.spacerType || dst === Type.spacerType)
+            return false;
         if (dst === Type.valueType)
             return src === Type.valueType;
         return src.inputs.length >= dst.inputs.length &&
@@ -124,6 +129,8 @@ Type.valueTypeString = 'v';
 Type.valueType = new Type([], []);
 Type.starTypeString = '*';
 Type.starType = new Type([], []);
+Type.spacerTypeString = ' ';
+Type.spacerType = new Type([], []);
 Type.emptyTypeString = '[,]';
 Type.emptyType = new Type([], []);
 Type.atomizedTypes = new Map();
@@ -151,15 +158,20 @@ export function parseTypeString(s) {
     }
     function parsePin() {
         let i = j;
-        // value types
+        // value type
         if (s[j] === Type.valueTypeString) {
             j++;
             return new Pin(Type.valueType, parseName());
         }
-        // wildcard types
+        // wildcard type
         if (s[j] === Type.starTypeString) {
             j++;
             return new Pin(Type.starType, parseName());
+        }
+        // Layout spacer type.
+        if (s[j] === Type.spacerTypeString) {
+            j++;
+            return new Pin(Type.spacerType, parseName());
         }
         // function types
         let type = parseFunction(), typeString = s.substring(i, j);
@@ -174,6 +186,9 @@ export function parseTypeString(s) {
         }
         else if (s[j] === Type.starTypeString) {
             return Type.starType;
+        }
+        else if (s[j] === Type.spacerTypeString) {
+            return Type.spacerType;
         }
         else if (s[j] === '[') {
             j++;
@@ -304,7 +319,10 @@ export class Element extends ElementBase {
     get y() { return this.template.y.get(this) || 0; }
     set y(value) { this.template.y.set(this, value); }
     get typeString() { return this.template.typeString.get(this); }
-    set typeString(value) { this.template.typeString.set(this, value); }
+    set typeString(value) {
+        this.template.typeString.set(this, value);
+        this.context.changeType(this, value);
+    }
     get elements() { return this.template.elements.get(this); }
     constructor(context, template, id) {
         super(id);
@@ -318,7 +336,10 @@ export class Pseudoelement extends ElementBase {
     get y() { return this.template.y.get(this) || 0; }
     set y(value) { this.template.y.set(this, value); }
     get typeString() { return this.template.typeString.get(this); }
-    set typeString(value) { this.template.typeString.set(this, value); }
+    set typeString(value) {
+        this.template.typeString.set(this, value);
+        this.context.changeType(this, value);
+    }
     // Derived properties.
     // index: number = -1;
     constructor(context, template, id) {
@@ -520,6 +541,15 @@ export class FunctionchartContext extends EventBase {
         const result = new FunctionInstance(this, nextId);
         this.referentMap.set(nextId, result);
         return result;
+    }
+    contains(item) {
+        if (item instanceof ElementBase)
+            return this.elements.has(item);
+        if (item instanceof Wire)
+            return this.wires.has(item);
+        if (item instanceof Functionchart)
+            return this.functioncharts.has(item);
+        return false;
     }
     visitAll(item, visitor) {
         const self = this;
@@ -988,17 +1018,15 @@ export class FunctionchartContext extends EventBase {
         this.reverseVisitNonWires(this.functionchart, item => {
             if (item instanceof Pseudoelement) {
                 if (item.template.typeName === 'apply') {
-                    const index = item.type.inputs.length - 1;
-                    const type = self.resolveInputType(item, index, new Set());
+                    const type = self.resolveInputType(item, 0, new Set());
                     let typeString = '[*,]';
                     if (type) { // TODO clean up
                         const newType = type.copy();
-                        newType.inputs.push(new Pin(Type.starType));
+                        newType.inputs.splice(0, 0, new Pin(Type.starType));
+                        newType.outputs.splice(0, 0, new Pin(Type.spacerType));
                         typeString = newType.typeString;
                     }
-                    if (typeString !== item.type.typeString) {
-                        item.typeString = typeString;
-                    }
+                    item.typeString = typeString;
                 }
             }
             else if (item instanceof Functionchart) {
@@ -1083,11 +1111,11 @@ export class FunctionchartContext extends EventBase {
         });
         this.deleteItem(element);
     }
-    updateType(instance) {
-        const newInstance = this.newFunctionInstance();
-        newInstance.functionchart = instance.functionchart;
-        this.replaceElement(instance, newInstance);
-    }
+    // updateType(instance: FunctionInstance) {
+    //   const newInstance = this.newFunctionInstance();
+    //   newInstance.functionchart = instance.functionchart;
+    //   this.replaceElement(instance, newInstance);
+    // }
     exportElement(element) {
         const result = this.newElement('export'), newType = new Type([], [new Pin(element.type)]);
         result.typeString = newType.toString();
@@ -1297,6 +1325,56 @@ export class FunctionchartContext extends EventBase {
             typeString += '(' + name + ')';
         return { typeString, passThroughs };
     }
+    changeType(element, typeString) {
+        const self = this;
+        if (element.type.typeString !== typeString) {
+            // The element's type has changed.  Update type and inWires and outWires arrays.
+            const newType = parseTypeString(typeString), inputs = newType.inputs.length, outputs = newType.outputs.length, inWires = element.inWires, outWires = element.outWires;
+            if (inputs > inWires.length) {
+                for (let i = inWires.length; i < inputs; i++) {
+                    inWires.push(undefined);
+                }
+            }
+            // inWires.length >= inputs.
+            for (let i = 0; i < inWires.length; i++) {
+                const wire = inWires[i];
+                if (wire) {
+                    if (i >= inputs) { // no pin at this index.
+                        self.deleteItem(wire);
+                    }
+                    else {
+                        const src = wire.src;
+                        if (src && !src.type.canConnectTo(newType.inputs[i].type)) { // incompatible types.
+                            self.deleteItem(wire);
+                        }
+                    }
+                }
+            }
+            inWires.length = inputs;
+            if (outputs > outWires.length) {
+                for (let i = outWires.length; i < outputs; i++) {
+                    outWires.push(new Array());
+                }
+            }
+            // outWires.length >= outputs.
+            for (let i = 0; i < outWires.length; i++) {
+                const wires = outWires[i];
+                wires.forEach(wire => {
+                    if (i >= outputs) { // no pin at this index.
+                        self.deleteItem(wire);
+                    }
+                    else {
+                        const dst = wire.dst;
+                        if (dst && !newType.outputs[i].type.canConnectTo(dst.type)) { // incompatible types.
+                            self.deleteItem(wire);
+                        }
+                    }
+                });
+            }
+            outWires.length = outputs;
+            element.type = newType;
+        }
+    }
     updateItem(item) {
         const self = this;
         if (item instanceof Wire)
@@ -1307,28 +1385,15 @@ export class FunctionchartContext extends EventBase {
             const functionChart = item.functionchart;
             if (functionChart) {
                 typeString = functionChart.type.toString();
+                this.changeType(item, typeString);
             }
-        }
-        else if (item instanceof ElementBase) {
-            typeString = item.typeString;
         }
         else if (item instanceof Functionchart) {
             const typeInfo = this.getFunctionchartTypeInfo(item);
-            typeString = typeInfo.typeString;
+            if (item.type.typeString !== typeInfo.typeString) {
+                item.type = parseTypeString(typeInfo.typeString);
+            }
             item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
-        }
-        if (typeString && typeString !== item.type.typeString) {
-            item.type = parseTypeString(typeString);
-        }
-        // Update 'inWires' and 'outWires' properties.
-        if (item instanceof ElementBase) {
-            const type = item.type, inputs = type.inputs.length, outputs = type.outputs.length, inWires = item.inWires, outWires = item.outWires;
-            for (let i = inWires.length; i < inputs; i++) {
-                inWires[i] = undefined;
-            }
-            for (let i = outWires.length; i < outputs; i++) {
-                outWires[i] = new Array();
-            }
         }
         this.visitNonWires(item, item => self.setGlobalPosition(item));
     }
@@ -1380,7 +1445,7 @@ export class FunctionchartContext extends EventBase {
     }
     removeWire(wire) {
         this.wires.delete(wire);
-        this.sorted = undefined; // Removal might make an invalid graph valid.
+        this.sorted = undefined; // Removal might break a cycle, making an unsortable graph sortable.
         const src = wire.src, dst = wire.dst;
         if (src) {
             const outputs = src.outWires[wire.srcPin];
@@ -1523,7 +1588,7 @@ class FunctionchartTheme extends Theme {
         this.radius = radius;
         // Layout the base types.
         Type.valueType.width = Type.starType.width = radius;
-        Type.valueType.height = Type.starType.height = radius;
+        Type.valueType.height = Type.starType.height = Type.spacerType.height = radius;
     }
 }
 class ElementHitResult {
@@ -1746,6 +1811,7 @@ class Renderer {
     drawPin(pin, x, y, fill) {
         const ctx = this.ctx, theme = this.theme;
         ctx.strokeStyle = theme.strokeColor;
+        // TODO use type instead?
         if (pin.typeString === Type.valueTypeString || pin.typeString === Type.starTypeString) {
             const r = theme.knobbyRadius;
             ctx.beginPath();
@@ -2271,26 +2337,28 @@ export class FunctionchartEditor {
         });
         changedItems.forEach(item => {
             layout(item, item => {
-                if (item instanceof Wire)
+                if (item instanceof Wire && context.contains(item)) // Wire may have been deleted by consistency check.
                     renderer.layout(item);
             });
         });
         changedItems.clear();
     }
     updateBounds() {
-        const ctx = this.canvasController.getCtx(), renderer = this.renderer, context = this.context, functionchart = this.functionchart, changedTopLevelStates = this.changedTopLevelFunctioncharts;
+        const ctx = this.canvasController.getCtx(), renderer = this.renderer, context = this.context, functionchart = this.functionchart, changedTopLevelFunctioncharts = this.changedTopLevelFunctioncharts;
         renderer.begin(ctx);
         // Update any changed items first.
         this.updateLayout();
         // Then update the bounds of super states, bottom up.
-        changedTopLevelStates.forEach(state => context.reverseVisitAll(state, item => {
+        changedTopLevelFunctioncharts.forEach(functionchart => context.reverseVisitAll(functionchart, item => {
+            if (!context.contains(item))
+                return;
             if (!(item instanceof Wire))
                 renderer.layout(item);
         }));
         // Finally update the root functionchart's bounds.
         renderer.layoutFunctionchart(functionchart);
         renderer.end();
-        changedTopLevelStates.clear();
+        changedTopLevelFunctioncharts.clear();
         // Make sure the canvas is large enough to contain the root functionchart.
         const canvasController = this.canvasController, canvasSize = canvasController.getSize();
         let width = functionchart.width, height = functionchart.height;
