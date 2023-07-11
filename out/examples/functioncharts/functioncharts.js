@@ -432,6 +432,7 @@ export class FunctionchartContext extends EventBase {
         }
         function validateAndUpdate() {
             if (!self.isValidFunctionchart()) {
+                // TODO some kind of error message.
                 self.transactionManager.cancelTransaction();
             }
             update();
@@ -609,7 +610,7 @@ export class FunctionchartContext extends EventBase {
         });
     }
     forOutWires(element, visitor) {
-        element.outWires.forEach((wires) => {
+        element.outWires.forEach(wires => {
             wires.forEach(wire => visitor(wire));
         });
     }
@@ -781,12 +782,25 @@ export class FunctionchartContext extends EventBase {
         // Reverse, to preserve the previous order of selection.
         selection.set(roots.reverse());
     }
+    disconnectElement(element) {
+        const self = this;
+        element.inWires.forEach(wire => {
+            if (wire)
+                self.deleteItem(wire);
+        });
+        element.outWires.forEach(wires => {
+            if (wires.length === 0)
+                return;
+            // Copy array since we're mutating it.
+            wires.splice(0).forEach(wire => {
+                if (wire)
+                    self.deleteItem(wire);
+            });
+        });
+    }
     disconnectSelection() {
         const self = this;
-        this.selectedAllElements().forEach(element => {
-            self.forInWires(element, wire => this.deleteItem(wire));
-            self.forOutWires(element, wire => this.deleteItem(wire));
-        });
+        this.selectedAllElements().forEach(element => self.disconnectElement(element));
     }
     selectInteriorWires() {
         const self = this, graphInfo = this.getSubgraphInfo(this.selectedAllElements());
@@ -933,15 +947,6 @@ export class FunctionchartContext extends EventBase {
             }
         });
     }
-    disconnectElement(element, pin) {
-        element.inWires.forEach((wire, i) => {
-            if (wire)
-                this.deleteItem(wire);
-        });
-        element.outWires.forEach((wires, i) => {
-            wires.forEach(wire => this.deleteItem(wire));
-        });
-    }
     isValidWire(wire) {
         const src = wire.src, dst = wire.dst;
         if (!src || !dst)
@@ -1014,7 +1019,7 @@ export class FunctionchartContext extends EventBase {
                 if (item.template.typeName === 'apply') {
                     const type = self.resolveInputType(item, 0, new Set());
                     let typeString = '[*,]';
-                    if (type) { // TODO clean up
+                    if (type) {
                         const newType = type.copy();
                         newType.inputs.splice(0, 0, new Pin(Type.starType));
                         newType.outputs.splice(0, 0, new Pin(Type.spacerType));
@@ -1044,17 +1049,8 @@ export class FunctionchartContext extends EventBase {
                 }
             }
         });
-        // Delete dangling wires.
-        const invalidWires = new Array();
-        this.wires.forEach(wire => {
-            if (!wire.src || !wire.dst || !self.elements.has(wire.src) || !self.elements.has(wire.dst))
-                invalidWires.push(wire);
-        });
-        invalidWires.forEach(wire => self.deleteItem(wire));
-        // Make sure wires between elements are in lowest common parent functionchart.
-        this.wires.forEach(wire => {
-            if (!self.isValidWire(wire))
-                invalidWires.push(wire);
+        // Make sure wires between elements are contained by the lowest common parent functionchart.
+        Array.from(this.wires.values()).forEach(wire => {
             const src = wire.src, dst = wire.dst, srcParent = src.parent, dstParent = dst.parent, lca = getLowestCommonAncestor(srcParent, dstParent);
             if (wire.parent !== lca) {
                 self.deleteItem(wire);
@@ -1077,7 +1073,9 @@ export class FunctionchartContext extends EventBase {
         // Update all incoming and outgoing wires if possible; otherwise they
         // are deleted.
         const srcChange = new Array(), dstChange = new Array();
-        this.forInWires(element, wire => {
+        element.inWires.forEach(wire => {
+            if (!wire)
+                return;
             const src = wire.src, srcPin = wire.srcPin, dstPin = wire.dstPin;
             if (dstPin < newType.inputs.length &&
                 src.type.outputs[srcPin].type.canConnectTo(newElement.type.inputs[dstPin].type)) {
@@ -1087,15 +1085,22 @@ export class FunctionchartContext extends EventBase {
                 this.deleteItem(wire);
             }
         });
-        this.forOutWires(element, wire => {
-            const dst = wire.dst, srcPin = wire.srcPin, dstPin = wire.dstPin;
-            if (srcPin < newType.outputs.length &&
-                newElement.type.outputs[srcPin].type.canConnectTo(dst.type.inputs[dstPin].type)) {
-                srcChange.push(wire);
-            }
-            else {
-                this.deleteItem(wire);
-            }
+        element.outWires.forEach(wires => {
+            if (wires.length === 0)
+                return;
+            // Copy array since we're mutating.
+            wires.splice(0).forEach(wire => {
+                if (!wire)
+                    return;
+                const dst = wire.dst, srcPin = wire.srcPin, dstPin = wire.dstPin;
+                if (srcPin < newType.outputs.length &&
+                    newElement.type.outputs[srcPin].type.canConnectTo(dst.type.inputs[dstPin].type)) {
+                    srcChange.push(wire);
+                }
+                else {
+                    this.deleteItem(wire);
+                }
+            });
         });
         srcChange.forEach(wire => {
             wire.src = newElement;
@@ -1105,11 +1110,6 @@ export class FunctionchartContext extends EventBase {
         });
         this.deleteItem(element);
     }
-    // updateType(instance: FunctionInstance) {
-    //   const newInstance = this.newFunctionInstance();
-    //   newInstance.functionchart = instance.functionchart;
-    //   this.replaceElement(instance, newInstance);
-    // }
     exportElement(element) {
         const result = this.newElement('export'), newType = new Type([], [new Pin(element.type)]);
         result.typeString = newType.toString();
@@ -1353,7 +1353,9 @@ export class FunctionchartContext extends EventBase {
             // outWires.length >= outputs.
             for (let i = 0; i < outWires.length; i++) {
                 const wires = outWires[i];
-                wires.forEach(wire => {
+                if (wires.length === 0)
+                    continue;
+                wires.splice(0).forEach(wire => {
                     if (i >= outputs) { // no pin at this index.
                         self.deleteItem(wire);
                     }
@@ -1422,7 +1424,8 @@ export class FunctionchartContext extends EventBase {
         this.updateItem(wire);
         this.sorted = undefined;
         const src = wire.src, srcPin = wire.srcPin, dst = wire.dst, dstPin = wire.dstPin;
-        if (src && srcPin >= 0 && srcPin < src.type.outputs.length) { // TODO how to deal with temporarily invalid wire?
+        if (src && srcPin >= 0 && srcPin < src.type.outputs.length) {
+            // TODO how to deal with temporarily invalid wire?
             const outputs = src.outWires[srcPin];
             if (!outputs.includes(wire))
                 outputs.push(wire);
@@ -1959,7 +1962,7 @@ class Renderer {
         ctx.stroke();
     }
     hitTestWire(wire, p, tol, mode) {
-        // TODO don't hit test new wire as it's dragged!
+        // TODO don't hit test new wire as it's dragged.
         const hitInfo = hitTestBezier(wire.bezier, p, tol);
         if (hitInfo) {
             return new WireHitResult(wire, hitInfo);
