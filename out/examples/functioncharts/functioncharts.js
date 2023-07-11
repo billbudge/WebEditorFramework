@@ -1810,8 +1810,7 @@ class Renderer {
     drawPin(pin, x, y, fill) {
         const ctx = this.ctx, theme = this.theme;
         ctx.strokeStyle = theme.strokeColor;
-        // TODO use type instead?
-        if (pin.typeString === Type.valueTypeString || pin.typeString === Type.starTypeString) {
+        if (pin.type === Type.valueType || pin.type === Type.starType) {
             const r = theme.knobbyRadius;
             ctx.beginPath();
             if (pin.typeString === Type.valueTypeString) {
