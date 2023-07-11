@@ -292,7 +292,7 @@ abstract class NonWireTemplate {
   readonly y = yProp;
 }
 
-export type ElementType = 'binop' | 'unop' | 'cond' | 'store' | 'import' | 'export' | 'element';
+export type ElementType = 'literal' | 'binop' | 'unop' | 'cond' | 'store' | 'import' | 'export' | 'element';
 
 class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
@@ -306,7 +306,7 @@ class ElementTemplate extends NonWireTemplate {
   }
 }
 
-export type PseudoelementType = 'input' | 'output' | 'literal' | 'apply' | 'pass' | 'use';
+export type PseudoelementType = 'input' | 'output' | 'apply' | 'pass' | 'use';
 
 class PseudoelementTemplate extends NonWireTemplate {
   readonly typeName: PseudoelementType;
@@ -345,7 +345,8 @@ class FunctionInstanceTemplate extends NonWireTemplate {
   readonly properties = [this.id, this.x, this.y, this.functionchart];
 }
 
-const binopTemplate = new ElementTemplate('binop'),
+const literalTemplate = new ElementTemplate('literal'),
+      binopTemplate = new ElementTemplate('binop'),
       unopTemplate = new ElementTemplate('unop'),
       condTemplate = new ElementTemplate('cond'),
       storeTemplate = new ElementTemplate('store'),
@@ -354,7 +355,6 @@ const binopTemplate = new ElementTemplate('binop'),
       elementTemplate = new ElementTemplate('element'),
       inputTemplate = new PseudoelementTemplate('input'),
       outputTemplate = new PseudoelementTemplate('output'),
-      literalTemplate = new PseudoelementTemplate('literal'),  // TODO literal should be element
       applyTemplate = new PseudoelementTemplate('apply'),
       passTemplate = new PseudoelementTemplate('pass'),
       wireTemplate = new WireTemplate(),
@@ -443,9 +443,6 @@ export class Pseudoelement extends ElementBase implements DataContextObject, Ref
         break;
       case 'output':
         this.typeString = '[*,]';
-        break;
-      case 'literal':
-        this.typeString = '[,v]';
         break;
       case 'apply':
         this.typeString = '[*,]';
@@ -626,6 +623,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     let template: ElementTemplate,
         typeString: string;
     switch (typeName) {
+      case 'literal':
+        template = literalTemplate;
+        typeString = '[,v]';
+        break;
       case 'binop':
         template = binopTemplate;
         typeString = '[vv,v]';
@@ -668,7 +669,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     switch (typeName) {
       case 'input': template = inputTemplate; break;
       case 'output': template = outputTemplate; break;
-      case 'literal': template = literalTemplate; break;
       case 'apply': template = applyTemplate; break;
       case 'pass': template = passTemplate; break;
       default: throw new Error('Unknown pseudoelement type: ' + typeName);
@@ -1831,6 +1831,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
   construct(typeName: string) : AllTypes {
     switch (typeName) {
+      case 'literal':
       case 'binop':
       case 'unop':
       case 'cond':
@@ -1841,7 +1842,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
       case 'input':
       case 'output':
-      case 'literal':
       case 'apply':
       case 'pass': return this.newPseudoelement(typeName);
 
@@ -2222,7 +2222,6 @@ class Renderer {
         case 'output':
           outFlagPath(x, y, w, h, spacing, ctx);
           break;
-        case 'literal':
         case 'apply':
         case 'pass':
           ctx.beginPath();
@@ -2562,9 +2561,9 @@ export class FunctionchartEditor implements CanvasLayer {
           functionchart = context.newFunctionchart(),
           input = context.newPseudoelement('input'),
           output = context.newPseudoelement('output'),
-          literal = context.newPseudoelement('literal'),
           apply = context.newPseudoelement('apply'),
           pass = context.newPseudoelement('pass'),
+          literal = context.newElement('literal'),
           binop = context.newElement('binop'),
           unop = context.newElement('unop'),
           cond = context.newElement('cond'),
@@ -2573,28 +2572,28 @@ export class FunctionchartEditor implements CanvasLayer {
 
     context.root = functionchart;
 
-    literal.x = 8; literal.y = 8;
-    input.x = 40;  input.y = 8;
-    output.x = 72; output.y = 8;
-    apply.x = 100; apply.y = 8;
-    pass.x = 128; pass.y = 8;
-    binop.x = 8; binop.y = 32;
+    input.x = 8;  input.y = 8;
+    output.x = 40; output.y = 8;
+    apply.x = 68; apply.y = 8;
+    pass.x = 96; pass.y = 8;
+    literal.x = 8; literal.y = 32;
+    binop.x = 40; binop.y = 32;
     binop.typeString = '[vv,v](+)';  // binary addition
-    unop.x = 48; unop.y = 32;
+    unop.x = 80; unop.y = 32;
     unop.typeString = '[v,v](-)';    // unary negation
-    cond.x = 86; cond.y = 32;     // conditional
-    store.x = 124; store.y = 32;
+    cond.x = 118; cond.y = 32;     // conditional
+    store.x = 156; store.y = 32;
 
     newFunctionchart.x = 8; newFunctionchart.y = 82;
     newFunctionchart.width = this.theme.minFunctionchartWidth;
     newFunctionchart.height = this.theme.minFunctionchartHeight;
 
-    functionchart.nonWires.append(literal);
     functionchart.nonWires.append(input);
     functionchart.nonWires.append(output);
     functionchart.nonWires.append(apply);
     functionchart.nonWires.append(store);
     functionchart.nonWires.append(pass);
+    functionchart.nonWires.append(literal);
     functionchart.nonWires.append(binop);
     functionchart.nonWires.append(unop);
     functionchart.nonWires.append(cond);

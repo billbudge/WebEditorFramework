@@ -284,8 +284,7 @@ class FunctionInstanceTemplate extends NonWireTemplate {
         this.properties = [this.id, this.x, this.y, this.functionchart];
     }
 }
-const binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), storeTemplate = new ElementTemplate('store'), importTemplate = new ElementTemplate('import'), exportTemplate = new ElementTemplate('export'), elementTemplate = new ElementTemplate('element'), inputTemplate = new PseudoelementTemplate('input'), outputTemplate = new PseudoelementTemplate('output'), literalTemplate = new PseudoelementTemplate('literal'), // TODO literal should be element
-applyTemplate = new PseudoelementTemplate('apply'), passTemplate = new PseudoelementTemplate('pass'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
+const literalTemplate = new ElementTemplate('literal'), binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), storeTemplate = new ElementTemplate('store'), importTemplate = new ElementTemplate('import'), exportTemplate = new ElementTemplate('export'), elementTemplate = new ElementTemplate('element'), inputTemplate = new PseudoelementTemplate('input'), outputTemplate = new PseudoelementTemplate('output'), applyTemplate = new PseudoelementTemplate('apply'), passTemplate = new PseudoelementTemplate('pass'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
@@ -349,9 +348,6 @@ export class Pseudoelement extends ElementBase {
                 break;
             case 'output':
                 this.typeString = '[*,]';
-                break;
-            case 'literal':
-                this.typeString = '[,v]';
                 break;
             case 'apply':
                 this.typeString = '[*,]';
@@ -464,6 +460,10 @@ export class FunctionchartContext extends EventBase {
         const nextId = ++this.highestId;
         let template, typeString;
         switch (typeName) {
+            case 'literal':
+                template = literalTemplate;
+                typeString = '[,v]';
+                break;
             case 'binop':
                 template = binopTemplate;
                 typeString = '[vv,v]';
@@ -508,9 +508,6 @@ export class FunctionchartContext extends EventBase {
                 break;
             case 'output':
                 template = outputTemplate;
-                break;
-            case 'literal':
-                template = literalTemplate;
                 break;
             case 'apply':
                 template = applyTemplate;
@@ -1542,6 +1539,7 @@ export class FunctionchartContext extends EventBase {
     }
     construct(typeName) {
         switch (typeName) {
+            case 'literal':
             case 'binop':
             case 'unop':
             case 'cond':
@@ -1551,7 +1549,6 @@ export class FunctionchartContext extends EventBase {
             case 'element': return this.newElement(typeName);
             case 'input':
             case 'output':
-            case 'literal':
             case 'apply':
             case 'pass': return this.newPseudoelement(typeName);
             case 'wire': return this.newWire(undefined, -1, undefined, -1);
@@ -1855,7 +1852,6 @@ class Renderer {
                 case 'output':
                     outFlagPath(x, y, w, h, spacing, ctx);
                     break;
-                case 'literal':
                 case 'apply':
                 case 'pass':
                     ctx.beginPath();
@@ -2091,38 +2087,38 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(), functionchart = context.newFunctionchart(), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newPseudoelement('literal'), apply = context.newPseudoelement('apply'), pass = context.newPseudoelement('pass'), binop = context.newElement('binop'), unop = context.newElement('unop'), cond = context.newElement('cond'), store = context.newElement('store'), newFunctionchart = context.newFunctionchart();
+        const context = new FunctionchartContext(), functionchart = context.newFunctionchart(), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), apply = context.newPseudoelement('apply'), pass = context.newPseudoelement('pass'), literal = context.newElement('literal'), binop = context.newElement('binop'), unop = context.newElement('unop'), cond = context.newElement('cond'), store = context.newElement('store'), newFunctionchart = context.newFunctionchart();
         context.root = functionchart;
-        literal.x = 8;
-        literal.y = 8;
-        input.x = 40;
+        input.x = 8;
         input.y = 8;
-        output.x = 72;
+        output.x = 40;
         output.y = 8;
-        apply.x = 100;
+        apply.x = 68;
         apply.y = 8;
-        pass.x = 128;
+        pass.x = 96;
         pass.y = 8;
-        binop.x = 8;
+        literal.x = 8;
+        literal.y = 32;
+        binop.x = 40;
         binop.y = 32;
         binop.typeString = '[vv,v](+)'; // binary addition
-        unop.x = 48;
+        unop.x = 80;
         unop.y = 32;
         unop.typeString = '[v,v](-)'; // unary negation
-        cond.x = 86;
+        cond.x = 118;
         cond.y = 32; // conditional
-        store.x = 124;
+        store.x = 156;
         store.y = 32;
         newFunctionchart.x = 8;
         newFunctionchart.y = 82;
         newFunctionchart.width = this.theme.minFunctionchartWidth;
         newFunctionchart.height = this.theme.minFunctionchartHeight;
-        functionchart.nonWires.append(literal);
         functionchart.nonWires.append(input);
         functionchart.nonWires.append(output);
         functionchart.nonWires.append(apply);
         functionchart.nonWires.append(store);
         functionchart.nonWires.append(pass);
+        functionchart.nonWires.append(literal);
         functionchart.nonWires.append(binop);
         functionchart.nonWires.append(unop);
         functionchart.nonWires.append(cond);
