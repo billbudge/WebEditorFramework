@@ -319,10 +319,7 @@ export class Element extends ElementBase {
     get y() { return this.template.y.get(this) || 0; }
     set y(value) { this.template.y.set(this, value); }
     get typeString() { return this.template.typeString.get(this); }
-    set typeString(value) {
-        this.template.typeString.set(this, value);
-        this.context.changeType(this, value);
-    }
+    set typeString(value) { this.template.typeString.set(this, value); }
     get elements() { return this.template.elements.get(this); }
     constructor(context, template, id) {
         super(id);
@@ -336,10 +333,7 @@ export class Pseudoelement extends ElementBase {
     get y() { return this.template.y.get(this) || 0; }
     set y(value) { this.template.y.set(this, value); }
     get typeString() { return this.template.typeString.get(this); }
-    set typeString(value) {
-        this.template.typeString.set(this, value);
-        this.context.changeType(this, value);
-    }
+    set typeString(value) { this.template.typeString.set(this, value); }
     // Derived properties.
     // index: number = -1;
     constructor(context, template, id) {
@@ -1510,6 +1504,11 @@ export class FunctionchartContext extends EventBase {
                         dst.inWires[oldPin] = undefined;
                 }
                 this.insertWire(owner, owner.parent);
+            }
+        }
+        else if (owner instanceof Element || owner instanceof Pseudoelement) {
+            if (prop === typeStringProp) {
+                this.changeType(owner, owner.typeString);
             }
         }
         this.onValueChanged(owner, prop, oldValue);

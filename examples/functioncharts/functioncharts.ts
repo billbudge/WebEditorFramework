@@ -405,10 +405,7 @@ export class Element extends ElementBase implements DataContextObject, Reference
   get y() { return this.template.y.get(this) || 0; }
   set y(value: number) { this.template.y.set(this, value); }
   get typeString() { return this.template.typeString.get(this); }
-  set typeString(value: string) {
-    this.template.typeString.set(this, value);
-    this.context.changeType(this, value);
-  }
+  set typeString(value: string) { this.template.typeString.set(this, value); }
   get elements() { return this.template.elements.get(this) as List<ElementTypes>; }
 
   constructor(context: FunctionchartContext, template: ElementTemplate, id: number) {
@@ -427,10 +424,7 @@ export class Pseudoelement extends ElementBase implements DataContextObject, Ref
   get y() { return this.template.y.get(this) || 0; }
   set y(value: number) { this.template.y.set(this, value); }
   get typeString() : string { return this.template.typeString.get(this); }
-  set typeString(value: string) {
-    this.template.typeString.set(this, value);
-    this.context.changeType(this, value);
-  }
+  set typeString(value: string) { this.template.typeString.set(this, value); }
 
   // Derived properties.
   // index: number = -1;
@@ -1808,6 +1802,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
             dst.inWires[oldPin] = undefined;
         }
         this.insertWire(owner, owner.parent!);
+      }
+    } else if (owner instanceof Element || owner instanceof Pseudoelement) {
+      if (prop === typeStringProp) {
+        this.changeType(owner, owner.typeString);
       }
     }
     this.onValueChanged(owner, prop, oldValue);
