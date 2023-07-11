@@ -936,6 +936,8 @@ export class FunctionchartContext extends EventBase {
         elements.forEach(element => {
             const inputs = element.inWires, outputs = element.outWires;
             for (let pin = 0; pin < inputs.length; pin++) {
+                if (element.type.inputs[pin].type === Type.spacerType)
+                    continue;
                 if (inputs[pin] === undefined) {
                     const { junction, wire } = self.connectInput(element, pin, inputToPoint);
                     selection.add(junction);
@@ -943,6 +945,8 @@ export class FunctionchartContext extends EventBase {
                 }
             }
             for (let pin = 0; pin < outputs.length; pin++) {
+                if (element.type.outputs[pin].type === Type.spacerType)
+                    continue;
                 if (outputs[pin].length === 0) {
                     const { junction, wire } = self.connectOutput(element, pin, outputToPoint);
                     selection.add(junction);
@@ -1255,14 +1259,20 @@ export class FunctionchartContext extends EventBase {
             subgraphInfo.elements.forEach(item => {
                 item.inWires.forEach((wire, index) => {
                     if (wire === undefined) {
-                        const pin = item.type.inputs[index], pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
+                        const pin = item.type.inputs[index];
+                        if (pin.type === Type.spacerType)
+                            return;
+                        const pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
                             type: pin.type, connected: emptySet };
                         inputs.push(pinInfo);
                     }
                 });
                 item.outWires.forEach((wires, index) => {
                     if (wires.length === 0) {
-                        const pin = item.type.outputs[index], pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
+                        const pin = item.type.outputs[index];
+                        if (pin.type === Type.spacerType)
+                            return;
+                        const pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
                             type: pin.type, connected: emptySet };
                         outputs.push(pinInfo);
                     }

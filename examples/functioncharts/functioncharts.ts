@@ -1158,7 +1158,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         }
       }
       for (let pin = 0; pin < outputs.length; pin++) {
-        if (element.type.inputs[pin].type === Type.spacerType) continue;
+        if (element.type.outputs[pin].type === Type.spacerType) continue;
         if (outputs[pin].length === 0) {
           const { junction, wire } = self.connectOutput(element, pin, outputToPoint);
           selection.add(junction);
