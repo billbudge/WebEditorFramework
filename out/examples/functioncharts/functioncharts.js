@@ -1260,8 +1260,6 @@ export class FunctionchartContext extends EventBase {
                 item.inWires.forEach((wire, index) => {
                     if (wire === undefined) {
                         const pin = item.type.inputs[index];
-                        if (!pin)
-                            return;
                         if (pin.type === Type.spacerType)
                             return;
                         const pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
@@ -1272,8 +1270,6 @@ export class FunctionchartContext extends EventBase {
                 item.outWires.forEach((wires, index) => {
                     if (wires.length === 0) {
                         const pin = item.type.outputs[index];
-                        if (!pin)
-                            return;
                         if (pin.type === Type.spacerType)
                             return;
                         const pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
@@ -1389,15 +1385,13 @@ export class FunctionchartContext extends EventBase {
         }
     }
     updateItem(item) {
-        const self = this;
         if (item instanceof Wire)
             return;
-        // Update 'type' property.
-        let typeString;
+        // Update 'type' property for functioncharts and instances.
         if (item instanceof FunctionInstance) {
             const functionChart = item.functionchart;
             if (functionChart) {
-                typeString = functionChart.type.toString();
+                const typeString = functionChart.type.toString();
                 this.changeType(item, typeString);
             }
         }
@@ -1408,7 +1402,8 @@ export class FunctionchartContext extends EventBase {
             }
             item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
         }
-        this.visitNonWires(item, item => self.setGlobalPosition(item));
+        // Update child items with our current position.
+        this.visitNonWires(item, item => this.setGlobalPosition(item));
     }
     insertElement(element, parent) {
         this.elements.add(element);
@@ -1427,6 +1422,8 @@ export class FunctionchartContext extends EventBase {
         const self = this;
         functionchart.nonWires.forEach(item => self.insertItem(item, functionchart));
         functionchart.wires.forEach(wire => self.insertWire(wire, functionchart));
+        // Update function chart after all descendants have been added and updated. We need that
+        // in order to compute the type info for the functionchart.
         this.updateItem(functionchart);
     }
     removeFunctionchart(functionchart) {
@@ -2451,11 +2448,10 @@ export class FunctionchartEditor {
     }
     print() {
         const renderer = this.renderer, context = this.context, functionchart = this.functionchart, canvasController = this.canvasController;
-        // Calculate document bounds.
+        // Calculate document bounds. We don't need to consider wires as they should be  mostly
+        // in the bounds of the elements.
         const items = new Array();
-        context.visitAll(functionchart, function (item) {
-            items.push(item);
-        });
+        functionchart.nonWires.forEach(item => items.push(item));
         const bounds = renderer.getBounds(items);
         // Adjust all edges 1 pixel out.
         const ctx = new window.C2S(bounds.width + 2, bounds.height + 2);

@@ -2956,11 +2956,10 @@ export class FunctionchartEditor implements CanvasLayer {
           functionchart = this.functionchart,
           canvasController = this.canvasController;
 
-    // Calculate document bounds.
+    // Calculate document bounds. We don't need to consider wires as they should be  mostly
+    // in the bounds of the elements.
     const items: AllTypes[] = new Array();
-    context.visitAll(functionchart, function (item) {
-      items.push(item);
-    });
+    functionchart.nonWires.forEach(item => items.push(item));
 
     const bounds = renderer.getBounds(items);
     // Adjust all edges 1 pixel out.
