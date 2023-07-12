@@ -1520,6 +1520,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         item.inWires.forEach((wire, index) => {
           if (wire === undefined) {
             const pin = item.type.inputs[index];
+            if  (!pin)
+              return;
             if (pin.type === Type.spacerType) return;
             const pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
                               type: pin.type, connected: emptySet };
@@ -1612,7 +1614,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
       if (inputs > inWires.length) {
         for (let i = inWires.length; i < inputs; i++) {
-          inWires.push(undefined);
+          inWires[i] = undefined;;
         }
       }
       // inWires.length >= inputs.
@@ -1632,7 +1634,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       inWires.length = inputs;
       if (outputs > outWires.length) {
         for (let i = outWires.length; i < outputs; i++) {
-          outWires.push(new Array<Wire>());
+          outWires[i] = new Array<Wire>();
         }
       }
       // outWires.length >= outputs.
@@ -2638,7 +2640,6 @@ export class FunctionchartEditor implements CanvasLayer {
       return '';
     }
     function elementLabelSetter(info: ItemInfo, item: AllTypes, value: any) {
-      const typeString = getter(info, item);
       const labelPart = value ? '(' + value + ')' : '';
       let newValue;
       switch (item.template.typeName) {

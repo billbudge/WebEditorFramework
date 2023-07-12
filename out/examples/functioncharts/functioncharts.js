@@ -1260,6 +1260,8 @@ export class FunctionchartContext extends EventBase {
                 item.inWires.forEach((wire, index) => {
                     if (wire === undefined) {
                         const pin = item.type.inputs[index];
+                        if (!pin)
+                            return;
                         if (pin.type === Type.spacerType)
                             return;
                         const pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
@@ -1340,7 +1342,8 @@ export class FunctionchartContext extends EventBase {
             const newType = parseTypeString(typeString), inputs = newType.inputs.length, outputs = newType.outputs.length, inWires = element.inWires, outWires = element.outWires;
             if (inputs > inWires.length) {
                 for (let i = inWires.length; i < inputs; i++) {
-                    inWires.push(undefined);
+                    inWires[i] = undefined;
+                    ;
                 }
             }
             // inWires.length >= inputs.
@@ -1361,7 +1364,7 @@ export class FunctionchartContext extends EventBase {
             inWires.length = inputs;
             if (outputs > outWires.length) {
                 for (let i = outWires.length; i < outputs; i++) {
-                    outWires.push(new Array());
+                    outWires[i] = new Array();
                 }
             }
             // outWires.length >= outputs.
@@ -2166,7 +2169,6 @@ export class FunctionchartEditor {
             return '';
         }
         function elementLabelSetter(info, item, value) {
-            const typeString = getter(info, item);
             const labelPart = value ? '(' + value + ')' : '';
             let newValue;
             switch (item.template.typeName) {

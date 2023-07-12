@@ -23,9 +23,19 @@ To begin, let's start with simple types.
 1. The scalar value type V, which can represent numbers, strings, arrays, or other pure data types.
 2. The wildcard type *, which is used by pseudoelements that can be wired to any type pin.
 
-Circuit elements for built-in operations can be provided by the language, and combined to form useful expressions. Elements have wire input and output ports, called pins, of either value or function type. Here's a simple example of an expression to compute the signum function:
+Circuit elements for built-in operations can be provided by the language, and combined to form useful expressions. Elements have wire input and output ports, called pins, of either value or function type. Pseudoelements are used for various roles, but aren't true functions that calculate anything.
 
+Here's a simple example of an expression to compute the signum function:
 
+<figure>
+  <img src="./resources/signum.svg"  alt="" title="Signum function.">
+</figure>
+
+We can create new elements using child functioncharts to hold elements. For the above example, we can define some useful primitives that make our function much easier to understand.
+
+<figure>
+  <img src="./resources/signum2.svg"  alt="" title="Signum function.">
+</figure>
 
 Having a single kind of wire that can connect elements makes our circuits simpler, since we don't need any color or pattern scheme to give them a type. They acquire their type from their source and destination connections.
 
