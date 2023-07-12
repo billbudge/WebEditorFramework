@@ -2451,7 +2451,7 @@ export class FunctionchartEditor {
         // Calculate document bounds. We don't need to consider wires as they should be  mostly
         // in the bounds of the elements.
         const items = new Array();
-        functionchart.nonWires.forEach(item => items.push(item));
+        this.palette.nonWires.forEach(item => items.push(item));
         const bounds = renderer.getBounds(items);
         // Adjust all edges 1 pixel out.
         const ctx = new window.C2S(bounds.width + 2, bounds.height + 2);
@@ -2459,11 +2459,11 @@ export class FunctionchartEditor {
         renderer.begin(ctx);
         canvasController.applyTransform();
         // Don't draw the root functionchart.
-        functionchart.nonWires.forEach(item => {
-            context.visitNonWires(item, item => { renderer.draw(item, RenderMode.Print); });
+        this.palette.nonWires.forEach(item => {
+            context.visitNonWires(item, item => { renderer.draw(item, RenderMode.Palette); });
         });
         // Draw wires after elements.
-        context.visitWires(functionchart, wire => {
+        context.visitWires(this.palette, wire => {
             renderer.drawWire(wire, RenderMode.Print);
         });
         renderer.end();

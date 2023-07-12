@@ -1,50 +1,43 @@
 # Functioncharts: A Graphical Representation for Functional Programs
-Functioncharts is an experimental graphical programming language and environment. It uses a "node and wire" representation for programs, with values flowing along wires, into elements that perform computations and pass results out along outgoing wires. The wires and elements form a computational circuit.
+Functioncharts is an experimental graphical programming language and editor. It uses a "node and wire" representation for programs, with values flowing along wires, into elements that perform computations and pass results out along outgoing wires. With appropriate wires and elements we can compute any function.
 
 The two principal innovations are:
 
-1. Wires aren't limited to passing numbers, strings or other pure data types, but may also pass functions. This gives the language much greater expressive power, like a conventional functional programming language with a textual representation.
+1. Wires aren't limited to passing pure data types like numbers and strings, but may also pass functions. This gives the language much greater expressive power, like a conventional (textual) functional programming language.
 
-2. Elements aren't limited to a fixed set of primitives like binary addition and multiplication, but may be defined by the user using sub-functioncharts. The sub-functionchart is an editable representation of the new element, allowing us to use a function inside its own definition (for recursion and thus iteration). Functioncharts may be nested to multiple levels, allowing powerful functional idioms such as currying and closures.
+2. Elements aren't limited to a fixed set of primitives like binary addition and multiplication, but may be defined by the user using sub-functioncharts which allow "live grouping" of subcircuits. The sub-functionchart is an editable representation of the new element, allowing us to use a function inside its own definition (the mechanism for iteration and recursion). Functioncharts may be nested to multiple levels, allowing powerful functional idioms such as currying and closures.
 
 Since functions can be created and instantiated, more complex programs can be built. This document shows how some classic program structures can be built and discusses the advantages of this approach.
 
 [Live Demo](https://billbudge.github.io/WebEditorFramework/examples/functioncharts/)
 
-<!-- ## Data Flow programming review
-Dataflow diagrams are a graphical programming method where data processing elements, represented by graph nodes, are connected by edges that represent data transfer. The graph is like an electrical circuit, and the advantage is that data flow can more easily be visualized as a graph.
-
-Most data flow systems model restricted domains, and have limited ability to represent abstractions. \input{palette.svg}
-Functioncharts add a way to easily define and use new families of functions, and to create abstractions that make the diagrams more widely useful.
- -->
 ## Simple expressions
-To begin, let's start with simple types.
-
-1. The scalar value type V, which can represent numbers, strings, arrays, or other pure data types.
-2. The wildcard type *, which is used by pseudoelements that can be wired to any type pin.
-
 Circuit elements for built-in operations can be provided by the language, and combined to form useful expressions. Elements have wire input and output ports, called pins, of either value or function type. Pseudoelements are used for various roles, but aren't true functions that calculate anything.
 
-Here's a simple example of an expression to compute the signum function:
+Below is a simple example of an expression to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x === 0, or -1 if x < 0. We use the following built in elements:
+
+1) literal elements (0, 1, 2), which have no inputs and output the literal value.
+2) binary operators (<, >), which take two input values and output a boolean value.
+3) the conditional operator (?), which takes an input value and two generic inputs and outputs the first if the value is true, and the second if the value is false.
+
+The input value x is represented by a pseudoelement, to feed the same value into several function elements. The literals and binary operations have values as inputs and outputs, while the conditional element is more generic, with a single (boolean) value input, and two generic inputs and an output, so it can operate on values or functions.
 
 <figure>
   <img src="./resources/signum.svg"  alt="" title="Signum function.">
 </figure>
 
-We can create new elements using child functioncharts to hold elements. For the above example, we can define some useful primitives that make our function much easier to understand.
+This diagram is already a little hard to read. We can simplify by defining new elements using child functioncharts to hold elements. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function much easier to read. Then we can use the new elements to represent the final signum function, which is also defined in a functionchart so we can use the new function.
 
 <figure>
   <img src="./resources/signum2.svg"  alt="" title="Signum function.">
 </figure>
 
-Having a single kind of wire that can connect elements makes our circuits simpler, since we don't need any color or pattern scheme to give them a type. They acquire their type from their source and destination connections.
-
+Our palette contains the built in elements and pseudoelements. On the top are the input, output, apply, and pass pseudoelements. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an element and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
 
 <figure>
   <img src="./resources/palette.svg"  alt="" title="Palette (pseudoelements and primitive computational elements)">
 </figure>
 
-In addition to computational elements, it is necessary to add some pseudo-elements that act as glue. In our palette, these pseudoelements are on the first row. First is the literal pseudoelement, with no inputs and a single output. Literals can represent numbers, strings and other simple data types. Next are the input and output pseudoelements.
 
 3. Function types, which take input values and produce output values. The primitive addition element has type [VV,V] for example, since it takes two inputs of scalar type and produces a sum with type V.
 
@@ -72,6 +65,13 @@ We can combine these primitive functions to compute simple expressions. In the d
 Note that there is fan-out but no fan-in in our circuit graphs. There are no cycles, so the circuit is a DAG (directed acyclic graph). Each circuit element is conceptually a function and wires connect outputs of one function to inputs of another. Evaluation proceeds left-to-right, since inputs must be evaluated before producing outputs. The evaluation order of the graph is only partially ordered (by topologically sorting) so we have to take extra care when a specific sequential evaluation order is required.
 
 Expressions can be used to build more complex diagrams, but this quickly leads to large, unreadable graphs. A better way is to turn expressions into new functions, which allow us to program at a higher level of abstraction. Grouping is how we create new functions. In this diagram, we take the expressions above and group them to form new functions that we can use just like the primitive ones. Each group is a separate context, denoted by a dotted boundary. New elements an be dragged and dropped into the context. Disconnected inputs or outputs become the new function's inputs and outputs. Input and output junctions can be connected to inputs and outputs in order to assign names to them. They can also be used to identify common inputs, since ordinarily each disconnected input leads to a unique group input. The "min" and "max" functions use input junctions this way.
+
+To begin, let's start with simple types.
+
+1. The scalar value type V, which can represent numbers, strings, arrays, or other pure data types.
+2. The wildcard type *, which is used by pseudoelements that can be wired to any type pin.
+
+Having a single kind of wire that can connect elements makes our circuits simpler, since we don't need any color or pattern scheme to give them a type. They acquire their type from their source and destination connections.
 
 <figure>
   <img src="/resources/basic_grouping.png"  alt="" title="Basic Grouping">
