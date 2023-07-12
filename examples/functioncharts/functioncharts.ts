@@ -1520,8 +1520,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         item.inWires.forEach((wire, index) => {
           if (wire === undefined) {
             const pin = item.type.inputs[index];
-            if  (!pin)
-              return;
             if (pin.type === Type.spacerType) return;
             const pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
                               type: pin.type, connected: emptySet };
@@ -1612,12 +1610,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
             inWires = element.inWires,
             outWires = element.outWires;
 
-      if (inputs > inWires.length) {
-        for (let i = inWires.length; i < inputs; i++) {
-          inWires[i] = undefined;;
-        }
-      }
-      // inWires.length >= inputs.
       for (let i = 0; i < inWires.length; i++) {
         const wire = inWires[i];
         if (wire) {
@@ -1631,12 +1623,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           }
         }
       }
-      inWires.length = inputs;
-      if (outputs > outWires.length) {
-        for (let i = outWires.length; i < outputs; i++) {
-          outWires[i] = new Array<Wire>();
+      if (inputs > inWires.length) {
+        for (let i = inWires.length; i < inputs; i++) {
+          inWires[i] = undefined;
         }
       }
+      inWires.length = inputs;
       // outWires.length >= outputs.
       for (let i = 0; i < outWires.length; i++) {
         const wires = outWires[i];
@@ -1652,6 +1644,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           }
         });
       }
+      if (outputs > outWires.length) {
+        for (let i = outWires.length; i < outputs; i++) {
+          outWires[i] = new Array<Wire>();
+        }
+      }
       outWires.length = outputs;
 
       element.type = newType;
@@ -1659,16 +1656,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   private updateItem(item: AllTypes) {
-    const self = this;
     if (item instanceof Wire)
       return;
 
-    // Update 'type' property.
-    let typeString;
+    // Update 'type' property for functioncharts and instances.
     if (item instanceof FunctionInstance) {
       const functionChart = item.functionchart;
       if (functionChart) {
-        typeString = functionChart.type.toString();
+        const typeString = functionChart.type.toString();
         this.changeType(item, typeString);
       }
     } else if (item instanceof Functionchart) {
@@ -1679,7 +1674,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
     }
 
-    this.visitNonWires(item, item => self.setGlobalPosition(item));
+    // Update child items with our current position.
+    this.visitNonWires(item, item => this.setGlobalPosition(item));
   }
 
   private insertElement(element: ElementTypes, parent: Functionchart) {
@@ -1698,11 +1694,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   private insertFunctionchart(functionchart: Functionchart, parent: Functionchart | undefined) {
     this.functioncharts.add(functionchart);
     functionchart.parent = parent;
-    this.updateItem(functionchart);
 
     const self = this;
     functionchart.nonWires.forEach(item => self.insertItem(item, functionchart));
     functionchart.wires.forEach(wire => self.insertWire(wire, functionchart));
+
+    // Update function chart after all descendants have been added and updated. We need that
+    // in order to compute the type info for the functionchart.
+    this.updateItem(functionchart);
   }
 
   private removeFunctionchart(functionchart: Functionchart) {
@@ -2191,7 +2190,7 @@ class Renderer {
     if (pin.type === Type.valueType || pin.type === Type.starType) {
       const r = theme.knobbyRadius;
       ctx.beginPath();
-      if (pin.typeString === Type.valueTypeString) {
+      if (pin.type === Type.valueType) {
         const d = 2 * r;
         ctx.rect(x, y, d, d);
       } else {

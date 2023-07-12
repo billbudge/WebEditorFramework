@@ -1272,6 +1272,8 @@ export class FunctionchartContext extends EventBase {
                 item.outWires.forEach((wires, index) => {
                     if (wires.length === 0) {
                         const pin = item.type.outputs[index];
+                        if (!pin)
+                            return;
                         if (pin.type === Type.spacerType)
                             return;
                         const pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
@@ -1340,13 +1342,6 @@ export class FunctionchartContext extends EventBase {
         if (element.type.typeString !== typeString) {
             // The element's type has changed.  Update type and inWires and outWires arrays.
             const newType = parseTypeString(typeString), inputs = newType.inputs.length, outputs = newType.outputs.length, inWires = element.inWires, outWires = element.outWires;
-            if (inputs > inWires.length) {
-                for (let i = inWires.length; i < inputs; i++) {
-                    inWires[i] = undefined;
-                    ;
-                }
-            }
-            // inWires.length >= inputs.
             for (let i = 0; i < inWires.length; i++) {
                 const wire = inWires[i];
                 if (wire) {
@@ -1361,12 +1356,12 @@ export class FunctionchartContext extends EventBase {
                     }
                 }
             }
-            inWires.length = inputs;
-            if (outputs > outWires.length) {
-                for (let i = outWires.length; i < outputs; i++) {
-                    outWires[i] = new Array();
+            if (inputs > inWires.length) {
+                for (let i = inWires.length; i < inputs; i++) {
+                    inWires[i] = undefined;
                 }
             }
+            inWires.length = inputs;
             // outWires.length >= outputs.
             for (let i = 0; i < outWires.length; i++) {
                 const wires = outWires[i];
@@ -1383,6 +1378,11 @@ export class FunctionchartContext extends EventBase {
                         }
                     }
                 });
+            }
+            if (outputs > outWires.length) {
+                for (let i = outWires.length; i < outputs; i++) {
+                    outWires[i] = new Array();
+                }
             }
             outWires.length = outputs;
             element.type = newType;
@@ -1424,10 +1424,10 @@ export class FunctionchartContext extends EventBase {
     insertFunctionchart(functionchart, parent) {
         this.functioncharts.add(functionchart);
         functionchart.parent = parent;
-        this.updateItem(functionchart);
         const self = this;
         functionchart.nonWires.forEach(item => self.insertItem(item, functionchart));
         functionchart.wires.forEach(wire => self.insertWire(wire, functionchart));
+        this.updateItem(functionchart);
     }
     removeFunctionchart(functionchart) {
         this.functioncharts.delete(functionchart);
@@ -1834,7 +1834,7 @@ class Renderer {
         if (pin.type === Type.valueType || pin.type === Type.starType) {
             const r = theme.knobbyRadius;
             ctx.beginPath();
-            if (pin.typeString === Type.valueTypeString) {
+            if (pin.type === Type.valueType) {
                 const d = 2 * r;
                 ctx.rect(x, y, d, d);
             }
