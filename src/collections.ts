@@ -374,6 +374,55 @@ export class PriorityQueue<T> {
 }
 
 //------------------------------------------------------------------------------
+// PairSet.
+
+export class PairSet<T, U> {
+  private map: Map<T, Set<U>> = new Map();
+  private size_: number = 0;
+
+  get size() : number {
+    return this.size_;
+  }
+  has(value: [T, U]) : boolean {
+    const subset = this.map.get(value[0]);
+    if (!subset) return false;
+    return subset.has(value[1]);
+  }
+  add(value: [T, U]) : void {
+    let subset = this.map.get(value[0]);
+    if (!subset) {
+      subset = new Set<U>();
+      this.map.set(value[0], subset);
+    }
+    const size = subset.size;
+    subset.add(value[1]);
+    if (size !== subset.size)
+      this.size_++;
+  }
+  delete(value: [T, U]) : boolean {
+    const subset = this.map.get(value[0]);
+    if (!subset) return false;
+    const result = subset.delete(value[1]);
+    if (result)
+      this.size_--;
+    if (!subset.size)
+      this.map.delete(value[0]);
+    return result;
+  }
+  clear() : void {
+    this.map.clear();
+    this.size_ = 0;
+  }
+  forEach(fn: (value: [T, U]) => void) : void {
+    this.map.forEach((subset, key) => {
+      subset.forEach(value => {
+        fn([key, value]);
+      });
+    });
+  }
+}
+
+//------------------------------------------------------------------------------
 // DisjointSet, a simple Union-Find implementation.
 
 export class DisjointSetSubset<T> {
@@ -394,10 +443,6 @@ export class DisjointSet<T> {
     const subset = new DisjointSetSubset<T>(item);
     this.sets.push(subset);
     return subset;
-  }
-
-  makeSets(items: Array<T>) : Array<DisjointSetSubset<T>> {
-    return items.map(item => this.makeSet(item));
   }
 
   find(set: DisjointSetSubset<T>) {
