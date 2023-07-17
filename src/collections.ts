@@ -1,6 +1,8 @@
 type VisitorFunction<T> = (value: T) => void;
 type CompareFunction<T> = (val1: T, val2: T) => number;
 
+"use strict";
+
 //------------------------------------------------------------------------------
 // Linked list.
 
@@ -376,7 +378,7 @@ export class PriorityQueue<T> {
 //------------------------------------------------------------------------------
 // PairSet.
 
-export class PairSet<T, U> {
+export class PairSet<T, U> implements Iterable<[T, U]>{
   private map: Map<T, Set<U>> = new Map();
   private size_: number = 0;
 
@@ -412,6 +414,12 @@ export class PairSet<T, U> {
   clear() : void {
     this.map.clear();
     this.size_ = 0;
+  }
+  *[Symbol.iterator]() : Iterator<[T, U]> {
+    function* gen(value: [T, U]) {
+      yield value;
+    }
+    this.forEach(value => gen(value));
   }
   forEach(fn: (value: [T, U]) => void) : void {
     this.map.forEach((subset, key) => {

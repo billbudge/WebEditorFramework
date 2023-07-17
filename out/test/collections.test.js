@@ -1,6 +1,6 @@
 // Collections tests.
 import { describe, expect, test } from '@jest/globals';
-import { LinkedList, Queue, PriorityQueue, SelectionSet, DisjointSet } from '../src/collections.js';
+import { LinkedList, Queue, PriorityQueue, SelectionSet, PairSet, DisjointSet } from '../src/collections.js';
 'use strict';
 function stringify(iterable) {
     let result = '';
@@ -290,6 +290,65 @@ describe('SelectionSet', () => {
         expect(reverse).toBe('ab');
     });
 });
+describe('PairSet', () => {
+    test('constructor', () => {
+        const pairSet = new PairSet();
+        expect(pairSet.size).toBe(0);
+        let size = 0;
+        pairSet.forEach(() => size++);
+        expect(size).toBe(0);
+    });
+    test('add', () => {
+        const pairSet = new PairSet();
+        pairSet.add(['a', 1]);
+        expect(pairSet.size).toBe(1);
+        expect(pairSet.has(['a', 1])).toBe(true);
+        pairSet.add(['a', 1]);
+        expect(pairSet.size).toBe(1);
+        pairSet.add(['a', 2]);
+        expect(pairSet.size).toBe(2);
+        pairSet.add(['b', 1]);
+        expect(pairSet.size).toBe(3);
+    });
+    test('delete', () => {
+        const pairSet = new PairSet();
+        pairSet.add(['a', 1]);
+        pairSet.add(['a', 2]);
+        pairSet.add(['b', 1]);
+        expect(pairSet.size).toBe(3);
+        expect(pairSet.delete(['a', 1])).toBe(true);
+        expect(pairSet.size).toBe(2);
+        expect(pairSet.delete(['a', 1])).toBe(false);
+        expect(pairSet.size).toBe(2);
+        expect(pairSet.delete(['b', 1])).toBe(true);
+        expect(pairSet.size).toBe(1);
+        expect(pairSet.delete(['a', 2])).toBe(true);
+        expect(pairSet.size).toBe(0);
+    });
+    test('clear', () => {
+        const pairSet = new PairSet();
+        pairSet.add(['a', 1]);
+        pairSet.add(['a', 2]);
+        pairSet.add(['b', 1]);
+        expect(pairSet.size).toBe(3);
+        pairSet.clear();
+        expect(pairSet.size).toBe(0);
+        expect(pairSet.has(['a', 1])).toBe(false);
+        expect(pairSet.has(['a', 2])).toBe(false);
+        expect(pairSet.has(['b', 1])).toBe(false);
+    });
+    test('forEach', () => {
+        const pairSet = new PairSet(), testSet = new PairSet();
+        pairSet.add(['a', 1]);
+        pairSet.add(['a', 2]);
+        pairSet.add(['b', 1]);
+        pairSet.forEach((value) => testSet.add(value));
+        expect(testSet.size).toBe(3);
+        expect(testSet.has(['a', 1])).toBe(true);
+        expect(testSet.has(['a', 2])).toBe(true);
+        expect(testSet.has(['b', 1])).toBe(true);
+    });
+});
 describe('DisjointSet', () => {
     test('constructor', () => {
         const disjointSet = new DisjointSet();
@@ -308,10 +367,10 @@ describe('DisjointSet', () => {
         expect(disjointSet.find(d)).not.toBe(b);
         expect(disjointSet.find(d)).not.toBe(c);
     });
-    test('makeSets', () => {
-        const disjointSet = new DisjointSet();
-        const abcd = disjointSet.makeSets(['a', 'b', 'c', 'd']);
-        expect(disjointSet.find(abcd[0])).toBe(abcd[0]);
-    });
+    // test('makeSets', () => {
+    //   const disjointSet = new DisjointSet();
+    //   const abcd = disjointSet.makeSets(['a', 'b', 'c', 'd']);
+    //   expect(disjointSet.find(abcd[0])).toBe(abcd[0]);
+    // });
 });
 //# sourceMappingURL=collections.test.js.map

@@ -26,12 +26,12 @@ function addFunctionchart(parent) {
 //     expect(set1.has(item)).toBe(true);
 //   }
 // }
-// function arrayEquals(array1: Array<any>, array2: Array<any>) {
-//   expect(array1.length).toBe(array2.length);
-//   for (let i = 0; i < array1.length; i++) {
-//     expect(array1[i]).toBe(array2[i]);
-//   }
-// }
+function arrayEquals(array1, array2) {
+    expect(array1.length).toBe(array2.length);
+    for (let i = 0; i < array1.length; i++) {
+        expect(array1[i]).toBe(array2[i]);
+    }
+}
 //------------------------------------------------------------------------------
 // Setup.
 beforeEach(() => {
@@ -298,78 +298,101 @@ describe('FunctionchartContext', () => {
         expect(wire2.src).toBe(elem2);
         expect(wire2.dst).toBe(output);
     });
-    test('resolveOutputType', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output'), ios = new Set(); // TODO test contents
-        elem1.typeString = '[v[vv,v],v]';
-        let result = context.resolveOutputType(input, 0, ios);
-        expect(result).toBeUndefined();
-        expect(ios.size).toBe(0);
-        const wire1 = addWire(functionchart, input, 0, elem1, 1);
-        result = context.resolveOutputType(input, 0, ios);
-        expect(result).toBeDefined();
-        expect(result.typeString).toBe('[vv,v]');
-        expect(ios.size).toBe(0);
-        // Replace concrete element with 'cond' element that has pass-throughs.
-        const elem2 = addElement(functionchart, 'cond');
-        context.replaceElement(elem1, elem2);
-        expect(context.resolveOutputType(input, 0, ios)).toBeUndefined();
-        expect(ios.size).toBe(2);
-        expect(ios.has(elem2)).toBe(true);
-        expect(ios.has(input)).toBe(true); // from back edge of cond passthrough.
-        ios.clear();
-        const wire2 = addWire(functionchart, elem2, 0, output, 0);
-        expect(context.resolveOutputType(input, 0, ios)).toBeUndefined();
-        expect(ios.size).toBe(3);
-        expect(ios.has(elem2)).toBe(true);
-        expect(ios.has(input)).toBe(true);
-        expect(ios.has(output)).toBe(true);
-    });
-    test('resolveInputType', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output'), ios = new Set();
-        elem1.typeString = '[v[vv,v],[vv,v]]]';
-        let result = context.resolveInputType(output, 0, ios);
-        expect(result).toBeUndefined();
-        expect(ios.size).toBe(0);
-        const wire1 = addWire(functionchart, elem1, 0, output, 0);
-        result = context.resolveInputType(output, 0, ios);
-        expect(result).toBeDefined();
-        expect(result.typeString).toBe('[vv,v]');
-        expect(ios.size).toBe(0);
-        // Replace concrete element with 'cond' element that has pass-throughs.
-        const elem2 = addElement(functionchart, 'cond');
-        context.replaceElement(elem1, elem2);
-        expect(context.resolveInputType(output, 0, ios)).toBeUndefined();
-        expect(ios.size).toBe(2);
-        expect(ios.has(elem2)).toBe(true);
-        expect(ios.has(output)).toBe(true); // from front edge of cond passthrough.
-        ios.clear();
-        const wire2 = addWire(functionchart, input, 0, elem2, 1);
-        expect(context.resolveInputType(output, 0, ios)).toBeUndefined();
-        expect(ios.size).toBe(3);
-        expect(ios.has(elem2)).toBe(true);
-        expect(ios.has(input)).toBe(true);
-        expect(ios.has(output)).toBe(true);
-    });
+    // test('resolveOutputType', () => {
+    //   const context = new FC.FunctionchartContext(),
+    //         functionchart = context.root,
+    //         elem1 = addElement(functionchart, 'element'),
+    //         input = addPseudoelement(functionchart, 'input'),
+    //         output = addPseudoelement(functionchart, 'output'),
+    //         ios = new Set<FC.ElementTypes>();  // TODO test contents
+    //   elem1.typeString = '[v[vv,v],v]';
+    //   let result = context.resolveOutputType(input, 0, ios);
+    //   expect(result).toBeUndefined();
+    //   expect(ios.size).toBe(0);
+    //   const wire1 = addWire(functionchart, input, 0, elem1, 1);
+    //   result = context.resolveOutputType(input, 0, ios);
+    //   expect(result).toBeDefined();
+    //   expect(result!.typeString).toBe('[vv,v]');
+    //   expect(ios.size).toBe(0);
+    //   // Replace concrete element with 'cond' element that has pass-throughs.
+    //   const elem2 = addElement(functionchart, 'cond');
+    //   context.replaceElement(elem1, elem2);
+    //   expect(context.resolveOutputType(input, 0, ios)).toBeUndefined();
+    //   expect(ios.size).toBe(2);
+    //   expect(ios.has(elem2)).toBe(true);
+    //   expect(ios.has(input)).toBe(true);  // from back edge of cond passthrough.
+    //   ios.clear();
+    //   const wire2 = addWire(functionchart, elem2, 0, output, 0);
+    //   expect(context.resolveOutputType(input, 0, ios)).toBeUndefined();
+    //   expect(ios.size).toBe(3);
+    //   expect(ios.has(elem2)).toBe(true);
+    //   expect(ios.has(input)).toBe(true);
+    //   expect(ios.has(output)).toBe(true);
+    // });
+    // test('resolvePinType', () => {
+    //   const context = new FC.FunctionchartContext(),
+    //         functionchart = context.root,
+    //         elem1 = addElement(functionchart, 'element'),
+    //         input = addPseudoelement(functionchart, 'input'),
+    //         output = addPseudoelement(functionchart, 'output'),
+    //         pins = new Array<FC.PinRef>();
+    //   elem1.typeString = '[v[vv,v],[vv,v]]';
+    //   let result = context.resolvePinType(output, 0, pins);
+    //   expect(result).toBeUndefined();
+    //   expect(pins.length).toBe(1);output.type.inputs
+    //   expect(pins.has([0])).toBe(true);
+    //   const wire1 = addWire(functionchart, elem1, 0, output, 0);
+    //   pins.clear();
+    //   result = context.resolvePinType(output, 0, pins);
+    //   expect(result).toBeDefined();
+    //   expect(result!.typeString).toBe('[vv,v]');
+    //   expect(pins.size).toBe(2);
+    //   expect(pins.has(output.type.inputs[0])).toBe(true);
+    //   expect(pins.has(elem1.type.outputs[0])).toBe(true);
+    //   // Replace concrete element with 'cond' element that has pass-throughs.
+    //   const elem2 = addElement(functionchart, 'cond');
+    //   context.replaceElement(elem1, elem2);
+    //   pins.clear();
+    //   expect(context.resolvePinType(output, 0, pins)).toBeUndefined();
+    //   expect(pins.size).toBe(4);
+    //   expect(pins.has(output.type.inputs[0])).toBe(true);
+    //   expect(pins.has(elem2.type.outputs[0])).toBe(true);
+    //   expect(pins.has(elem2.type.inputs[1])).toBe(true);
+    //   expect(pins.has(elem2.type.inputs[2])).toBe(true);
+    //   const wire2 = addWire(functionchart, input, 0, elem2, 1);
+    //   pins.clear();
+    //   expect(context.resolvePinType(output, 0, pins)).toBeUndefined();
+    //   expect(pins.size).toBe(5);
+    //   expect(pins.has(output.type.inputs[0])).toBe(true);
+    //   expect(pins.has(elem2.type.outputs[0])).toBe(true);
+    //   expect(pins.has(elem2.type.inputs[1])).toBe(true);
+    //   expect(pins.has(elem2.type.inputs[2])).toBe(true);
+    //   expect(pins.has(input.type.outputs[0])).toBe(true);
+    // });
     test('getFunctionchartTypeInfo', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'cond'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
-        functionchart.explicit = true;
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'cond'), elem2 = addElement(functionchart, 'cond');
+        functionchart.explicit = false;
         let typeInfo = context.getFunctionchartTypeInfo(functionchart);
-        expect(typeInfo.typeString).toBe('[*,*]');
-        expect(typeInfo.passThroughs.length).toBe(0);
-        const wire1 = addWire(functionchart, input, 0, elem1, 1);
+        // No wires, explicit, all inputs and outputs become pins.
+        expect(typeInfo.typeString).toBe('[v**v**,**]');
+        console.log(typeInfo.passThroughs);
+        expect(typeInfo.passThroughs.length).toBe(2);
+        arrayEquals(typeInfo.passThroughs, [[1, 2, 6], [4, 5, 7]]);
+        const wire1 = addWire(functionchart, elem1, 0, elem2, 2);
         typeInfo = context.getFunctionchartTypeInfo(functionchart);
-        expect(typeInfo.typeString).toBe('[*,*]');
-        expect(typeInfo.passThroughs.length).toBe(0);
-        const wire2 = addWire(functionchart, elem1, 0, output, 0);
-        typeInfo = context.getFunctionchartTypeInfo(functionchart);
-        expect(typeInfo.typeString).toBe('[*,*]');
-        expect(typeInfo.passThroughs.length).toBe(1);
-        expect(typeInfo.passThroughs[0]).toStrictEqual([0, 1]);
-        const input2 = addPseudoelement(functionchart, 'input'), wire3 = addWire(functionchart, input2, 0, elem1, 1);
-        typeInfo = context.getFunctionchartTypeInfo(functionchart);
-        expect(typeInfo.typeString).toBe('[**,*]');
-        expect(typeInfo.passThroughs.length).toBe(1);
-        expect(typeInfo.passThroughs[0]).toStrictEqual([0, 1, 2]);
+        expect(typeInfo.typeString).toBe('[v**v*,*]');
+        // expect(typeInfo.passThroughs.length).toBe(0);
+        // const wire2 = addWire(functionchart, elem1, 0, output, 0);
+        // typeInfo = context.getFunctionchartTypeInfo(functionchart);
+        // expect(typeInfo.typeString).toBe('[*,*]');
+        // expect(typeInfo.passThroughs.length).toBe(1);
+        // expect(typeInfo.passThroughs[0]).toStrictEqual([0, 1]);
+        // const input2 = addPseudoelement(functionchart, 'input'),
+        //       wire3 = addWire(functionchart, input2, 0, elem1, 1);
+        // typeInfo = context.getFunctionchartTypeInfo(functionchart);
+        // expect(typeInfo.typeString).toBe('[**,*]');
+        // expect(typeInfo.passThroughs.length).toBe(1);
+        // expect(typeInfo.passThroughs[0]).toStrictEqual([0, 1, 2]);
     });
 });
 //# sourceMappingURL=functioncharts.test.js.map

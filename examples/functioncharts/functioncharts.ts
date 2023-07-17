@@ -1,4 +1,4 @@
-import { SelectionSet } from '../../src/collections.js'
+import { SelectionSet, PairSet } from '../../src/collections.js'
 
 import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, RectHitResult,
@@ -393,6 +393,13 @@ abstract class ElementBase {
       }
     }
   }
+  getPin(index: number) : Pin {
+    const type = this.type,
+          firstOutput = type.inputs.length,
+          pin = index < firstOutput ? this.type.inputs[index] :
+                                      this.type.outputs[index - firstOutput];
+    return pin;
+  }
 
   constructor(id: number) {
     this.id = id;
@@ -542,14 +549,21 @@ export type WireFilter = (wire: Wire) => boolean;
 
 export type PinPositionFunction = (element: ElementTypes, pin: number) => PointWithNormal;
 
-type PinInfo = {
+export type PinRef = [ElementTypes, number];
+
+export type PinRefSet = PairSet<ElementTypes, number>;
+
+export type PinInfo = {
   element: ElementTypes,
-  pin: Pin,
-  y: number,
   index: number,
   type: Type,
-  connected: Set<ElementBase>,
+  connected: Array<PinRef>,
+  fcIndex: number,
 };
+
+// Circuit visitor for type resolution. Index specifies input or output pin,
+// depending on range. Returns true if the circuit should be traversed further.
+export type PinVisitor = (element: ElementTypes, index: number) => void;
 
 export interface GraphInfo {
   elements: Set<ElementTypes>;
@@ -1251,7 +1265,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.reverseVisitNonWires(this.functionchart, item => {
       if (item instanceof Pseudoelement) {
         if (item.template.typeName === 'apply') {
-          const type = self.resolveInputType(item, 0, new Set<ElementTypes>());
+          const type = self.resolvePinType(item, 0);
           let typeString = '[*,]';
           if (type) {
             const newType = type.copy();
@@ -1407,83 +1421,77 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  resolveIOType(
-      element: ElementBase, passThroughs: number[][], ios: Set<ElementBase>) : Type | undefined {
-    const firstOutput = element.type.inputs.length;
-    for (let passThrough of passThroughs) {
-      for (let pin of passThrough) {
-        if (pin < firstOutput) {
-          const type = this.resolveInputType(element, pin, ios);
-          if (type)
-            return type;
-        } else {
-          const type = this.resolveOutputType(element, pin - firstOutput, ios);
-          if (type)
-            return type;
+  // Visit pins along the first pass-through containing the given pin.
+  visitPassthroughs(element: ElementTypes, index: number, visitor: PinVisitor, visited: PinRefSet) {
+    const passThroughs = element.passThroughs;
+    if (passThroughs) {
+      for (let passThrough of passThroughs) {
+        if (passThrough.includes(index)) {
+          for (let i of passThrough) {
+            this.visitPin(element, i, visitor, visited);
+          }
+          break;
         }
       }
     }
   }
 
-  // Search for the first non-star Type wired to the element.
-  resolveInputType(element: ElementBase, pin: number, ios: Set<ElementBase>) : Type | undefined {
-    const type = element.type.inputs[pin].type;
-    if (type !== Type.starType)
-      return type;
+  // Visit the given pin, then follow wires and pass-throughs.
+  visitPin(element: ElementTypes, index: number, visitor: PinVisitor, visited: PinRefSet) {
+    const pinRef: PinRef = [element, index];
+    if (visited.has(pinRef))
+      return;
+    visited.add(pinRef);
+    visitor(element, index);
 
-    const wire = element.inWires[pin];
-    if (wire && wire.src) {
-      const src = wire.src,
-            type = src.type.outputs[wire.srcPin].type;
-      if (type !== Type.starType)
-        return type;
-
-      if (ios.has(src))
-        return;
-      ios.add(src);
-
-      // Follow pass-throughs until we get a type.
-      const passThroughs = src.passThroughs;
-      if (passThroughs) {
-        return this.resolveIOType(src, passThroughs, ios);
+    const type = element.type,
+          firstOutput = type.inputs.length;
+    if (index < firstOutput) {
+      const wire = element.inWires[index];
+      if (wire) {
+        const src = wire.src!,
+              srcPin = wire.srcPin,
+              index = src.type.inputs.length + srcPin;
+        this.visitPin(src, index, visitor, visited);
       }
-    }
-  }
-
-  resolveOutputType(element: ElementBase, pin: number, ios: Set<ElementBase>) : Type | undefined {
-    const type = element.type.outputs[pin].type;
-    if (type !== Type.starType)
-      return type;
-
-    const wires = element.outWires[pin];
-    for (let i = 0; i < wires.length; i++) {
-      const wire = wires[i];
-      if (wire && wire.dst) {
-        const dst = wire.dst;
-        let type: Type | undefined = dst.type.inputs[wire.dstPin].type;
-        if (type !== Type.starType)
-          return type;
-
-        if (ios.has(dst))
-          continue;
-        ios.add(dst);
-
-        // Follow pass-throughs until we get a type.
-        const passThroughs = dst.passThroughs;
-        if (passThroughs) {
-          type = this.resolveIOType(dst, passThroughs, ios);
-          if (type)
-            return type;
+    } else {
+      const wires = element.outWires[index - firstOutput];
+      for (let i = 0; i < wires.length; i++) {
+        const wire = wires[i];
+        if (wire) {
+          const dst = wire.dst!,
+                dstPin = wire.dstPin;
+          this.visitPin(dst, dstPin, visitor, visited);
         }
       }
     }
+    this.visitPassthroughs(element, index, visitor, visited);
+  }
+
+  // Visits the pin, all pins wired to it, and all pass-throughs containing it, and returns
+  // the type of the first non-star pin it finds.
+  resolvePinType(element: ElementTypes, index: number,
+                 pins = new Array<PinRef>()) : Type | undefined {
+    let type: Type | undefined;
+    function visit(element: ElementTypes, index: number) : boolean {
+      pins.push([element, index]);
+      const pin = element.getPin(index);
+      if (pin.type !== Type.starType) {
+        type = pin.type;
+      }
+      return true;
+    }
+    const visited = new PairSet<ElementTypes, number>();
+    this.visitPin(element, index, visit, visited);
+    for (let pinRef of visited)
+      pins.push(pinRef);
+    return type;
   }
 
   getFunctionchartTypeInfo(functionchart: Functionchart) {
     const self = this,
           inputs = new Array<PinInfo>(),
           outputs = new Array<PinInfo>(),
-          elementToPinInfo = new Map<ElementBase, PinInfo>(),
           name = functionchart.name;
 
     // Collect subgraph info.
@@ -1495,43 +1503,40 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         return;
       if (item instanceof Pseudoelement) {
         if (item.template.typeName === 'input') {
-          const connected = new Set<ElementBase>();
-          connected.add(item);
-          const type = self.resolveOutputType(item, 0, connected) || Type.starType;
-          const pin = item.type.outputs[0];
-          const pinInfo = { element: item, pin,  y: item.y, index: -1, type, connected };
+          const connected = new Array<PinRef>();
+          const type = self.resolvePinType(item, 0, connected) || Type.starType;
+          const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
           inputs.push(pinInfo);
-          elementToPinInfo.set(item, pinInfo);
         } else if(item.template.typeName === 'output') {
-          const connected = new Set<ElementBase>();
-          connected.add(item);
-          const type = self.resolveInputType(item, 0, connected) || Type.starType;
-          const pin = item.type.inputs[0];
-          const pinInfo = { element: item, pin, y: item.y, index: -1, type, connected };
+          const connected = new Array<[ElementTypes, number]>();
+          const type = self.resolvePinType(item, 0, connected) || Type.starType;
+          const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
           outputs.push(pinInfo);
-          elementToPinInfo.set(item, pinInfo);
         }
+        // TODO 'pass' pseudoelement.
       }
     });
     if (!functionchart.explicit) {
-      const emptySet = new Set<ElementBase>();
       // Add all disconnected inputs and outputs as pins.
-      subgraphInfo.elements.forEach(item => {
-        item.inWires.forEach((wire, index) => {
+      subgraphInfo.elements.forEach(element => {
+        element.inWires.forEach((wire, index) => {
           if (wire === undefined) {
-            const pin = item.type.inputs[index];
+            const connected = new Array<[ElementTypes, number]>();
+            const pin = element.type.inputs[index];
             if (pin.type === Type.spacerType) return;
-            const pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
-                              type: pin.type, connected: emptySet };
+            const type = self.resolvePinType(element, index, connected) || Type.starType;
+            const pinInfo = { element, index, type, connected, fcIndex: -1 };
             inputs.push(pinInfo);
           }
         });
-        item.outWires.forEach((wires, index) => {
+        element.outWires.forEach((wires, index) => {
           if (wires.length === 0) {
-            const pin = item.type.outputs[index];
+            const connected = new Array<[ElementTypes, number]>();
+            const pin = element.type.outputs[index];
             if (pin.type === Type.spacerType) return;
-            const pinInfo = { element: item, pin, y: item.y + pin.y, index: -1,
-                              type: pin.type, connected: emptySet };
+            const firstOutput = element.type.inputs.length;
+            const type = self.resolvePinType(element, index + firstOutput, connected) || Type.starType;
+            const pinInfo = { element, index: index + firstOutput, type, connected, fcIndex: -1 };
             outputs.push(pinInfo);
           }
         });
@@ -1546,21 +1551,29 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // Sort pins in increasing y-order. This lets users arrange the pins of the
     // new type in an intuitive way.
     function compareYs(p1: PinInfo, p2: PinInfo) {
-      return p1.y - p2.y;
+      const element1 = p1.element,
+            element2 = p2.element,
+            pin1 = element1.getPin(p1.index),
+            pin2 = element2.getPin(p2.index),
+            y1 = element1.y + pin1.y,
+            y2 = element2.y + pin2.y;
+      return y1 - y2;
     }
     function compareIndices(p1: PinInfo, p2: PinInfo) {
       return p1.index - p2.index;
     }
-    function isInputOrOutput(p: ElementTypes) {
-      return p.template.typeName === 'input' || p.template.typeName === 'output';
-    }
-
     inputs.sort(compareYs);
-    inputs.forEach((input, i) => { input.index = i; });
+    inputs.forEach((input, i) => { input.fcIndex = i; });
     const firstOutput = inputs.length;
     outputs.sort(compareYs);
-    outputs.forEach((output, i) => { output.index = i + firstOutput; });
+    outputs.forEach((output, i) => { output.fcIndex = i + firstOutput; });
 
+    function getPinInfo(element: ElementTypes, index: number) : PinInfo {
+      if (index < firstOutput)
+        return inputs[index];
+      else
+        return outputs[index - firstOutput];
+    }
     function getPinName(type: Type, pin: Pin) : string {
       let typeString = type.typeString;
       if (pin.name)
@@ -1569,29 +1582,48 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
 
     const passThroughs = new Array<Array<number>>(),
-          visited = new Set<PinInfo>();
+          inPassthrough = new PairSet<ElementTypes, number>();
     let typeString = '[';
-    inputs.forEach(input => {
-      const element = input.element;
-      // For unresolved pin types, compute the pass-throughs. We only need to do this for inputs,
-      // since we connect to outputs during resolution.
+    inputs.forEach((input, i) => {
+      // For unresolved pin types, compute the pass-throughs.
       if (input.type === Type.starType) {
-        if (element instanceof Pseudoelement && !visited.has(input)) {
-          const inputsOutputs = Array.from(input.connected).filter(isInputOrOutput) as Pseudoelement[];
-          const connected = inputsOutputs.map(e => elementToPinInfo.get(e) as PinInfo);
+        if (!inPassthrough.has([input.element, input.index])) {
+          const pinClique = input.connected,
+                connected = new Array<PinInfo>();
+          pinClique.forEach(pinRef => {
+            if (inPassthrough.has([pinRef[0], pinRef[1]])) {
+              inPassthrough.add([pinRef[0], pinRef[1]]);
+              connected.push(getPinInfo(pinRef[0], pinRef[1]));
+            }
+          });
           if (connected.length > 1) {
-            connected.forEach(p => { visited.add(p); });
             connected.sort(compareIndices);
-            passThroughs.push(connected.map(input => input.index));
+            passThroughs.push(connected.map(info => info.fcIndex));
           }
         }
       }
-      typeString += getPinName(input.type, input.pin);
+      typeString += getPinName(input.type, input.element.getPin(input.index));
     });
     typeString += ',';
     outputs.forEach(output => {
-      const element = output.element;
-      typeString += getPinName(output.type, output.pin);
+      // For unresolved pin types, compute the pass-throughs.
+      if (output.type === Type.starType) {
+        if (!inPassthrough.has([output.element, output.index])) {
+          const pinClique = output.connected,
+                connected = new Array<PinInfo>();
+          pinClique.forEach(pinRef => {
+            if (inPassthrough.has([pinRef[0], pinRef[1]])) {
+              inPassthrough.add([pinRef[0], pinRef[1]]);
+              connected.push(getPinInfo(pinRef[0], pinRef[1]));
+            }
+          });
+          if (connected.length > 1) {
+            connected.sort(compareIndices);
+            passThroughs.push(connected.map(info => info.fcIndex));
+          }
+        }
+      }
+      typeString += getPinName(output.type, output.element.getPin(output.index));
     });
     typeString += ']';
     if (name)

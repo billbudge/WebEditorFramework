@@ -12,7 +12,7 @@ Since functions can be created and instantiated, more complex programs can be bu
 [Live Demo](https://billbudge.github.io/WebEditorFramework/examples/functioncharts/)
 
 ## Simple expressions
-Circuit elements for built-in operations can be provided by the language, and combined to form useful expressions. Elements have wire input and output ports, called pins, of either value or function type. Pseudoelements are used for various roles, but aren't true functions that calculate anything.
+Circuit elements for built-in operations can be provided by the language, and combined to form useful expressions. Elements have wire input and output pins, of either value, generic, or function type. Pseudoelements are used for various roles, but aren't true functions that calculate anything. They usually have 
 
 Below is a simple example of an expression to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x === 0, or -1 if x < 0. We use the following built in elements:
 

@@ -1,3 +1,4 @@
+"use strict";
 //------------------------------------------------------------------------------
 // Linked list.
 export class LinkedListNode {
@@ -315,6 +316,62 @@ export class PriorityQueue {
     }
 }
 //------------------------------------------------------------------------------
+// PairSet.
+export class PairSet {
+    constructor() {
+        this.map = new Map();
+        this.size_ = 0;
+    }
+    get size() {
+        return this.size_;
+    }
+    has(value) {
+        const subset = this.map.get(value[0]);
+        if (!subset)
+            return false;
+        return subset.has(value[1]);
+    }
+    add(value) {
+        let subset = this.map.get(value[0]);
+        if (!subset) {
+            subset = new Set();
+            this.map.set(value[0], subset);
+        }
+        const size = subset.size;
+        subset.add(value[1]);
+        if (size !== subset.size)
+            this.size_++;
+    }
+    delete(value) {
+        const subset = this.map.get(value[0]);
+        if (!subset)
+            return false;
+        const result = subset.delete(value[1]);
+        if (result)
+            this.size_--;
+        if (!subset.size)
+            this.map.delete(value[0]);
+        return result;
+    }
+    clear() {
+        this.map.clear();
+        this.size_ = 0;
+    }
+    *[Symbol.iterator]() {
+        function* gen(value) {
+            yield value;
+        }
+        this.forEach(value => gen(value));
+    }
+    forEach(fn) {
+        this.map.forEach((subset, key) => {
+            subset.forEach(value => {
+                fn([key, value]);
+            });
+        });
+    }
+}
+//------------------------------------------------------------------------------
 // DisjointSet, a simple Union-Find implementation.
 export class DisjointSetSubset {
     constructor(item) {
@@ -331,9 +388,6 @@ export class DisjointSet {
         const subset = new DisjointSetSubset(item);
         this.sets.push(subset);
         return subset;
-    }
-    makeSets(items) {
-        return items.map(item => this.makeSet(item));
     }
     find(set) {
         // Path splitting rather than path compression for simplicity.
