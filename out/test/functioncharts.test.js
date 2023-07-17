@@ -1,4 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
+import * as Collections from '../src/collections.js';
 import * as FC from '../examples/functioncharts/functioncharts.js';
 function addElement(functionchart, type) {
     const context = functionchart.context, element = context.newElement(type);
@@ -329,70 +330,56 @@ describe('FunctionchartContext', () => {
     //   expect(ios.has(input)).toBe(true);
     //   expect(ios.has(output)).toBe(true);
     // });
-    // test('resolvePinType', () => {
-    //   const context = new FC.FunctionchartContext(),
-    //         functionchart = context.root,
-    //         elem1 = addElement(functionchart, 'element'),
-    //         input = addPseudoelement(functionchart, 'input'),
-    //         output = addPseudoelement(functionchart, 'output'),
-    //         pins = new Array<FC.PinRef>();
-    //   elem1.typeString = '[v[vv,v],[vv,v]]';
-    //   let result = context.resolvePinType(output, 0, pins);
-    //   expect(result).toBeUndefined();
-    //   expect(pins.length).toBe(1);output.type.inputs
-    //   expect(pins.has([0])).toBe(true);
-    //   const wire1 = addWire(functionchart, elem1, 0, output, 0);
-    //   pins.clear();
-    //   result = context.resolvePinType(output, 0, pins);
-    //   expect(result).toBeDefined();
-    //   expect(result!.typeString).toBe('[vv,v]');
-    //   expect(pins.size).toBe(2);
-    //   expect(pins.has(output.type.inputs[0])).toBe(true);
-    //   expect(pins.has(elem1.type.outputs[0])).toBe(true);
-    //   // Replace concrete element with 'cond' element that has pass-throughs.
-    //   const elem2 = addElement(functionchart, 'cond');
-    //   context.replaceElement(elem1, elem2);
-    //   pins.clear();
-    //   expect(context.resolvePinType(output, 0, pins)).toBeUndefined();
-    //   expect(pins.size).toBe(4);
-    //   expect(pins.has(output.type.inputs[0])).toBe(true);
-    //   expect(pins.has(elem2.type.outputs[0])).toBe(true);
-    //   expect(pins.has(elem2.type.inputs[1])).toBe(true);
-    //   expect(pins.has(elem2.type.inputs[2])).toBe(true);
-    //   const wire2 = addWire(functionchart, input, 0, elem2, 1);
-    //   pins.clear();
-    //   expect(context.resolvePinType(output, 0, pins)).toBeUndefined();
-    //   expect(pins.size).toBe(5);
-    //   expect(pins.has(output.type.inputs[0])).toBe(true);
-    //   expect(pins.has(elem2.type.outputs[0])).toBe(true);
-    //   expect(pins.has(elem2.type.inputs[1])).toBe(true);
-    //   expect(pins.has(elem2.type.inputs[2])).toBe(true);
-    //   expect(pins.has(input.type.outputs[0])).toBe(true);
-    // });
+    test('resolvePinType', () => {
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output'), pins = new Collections.PairSet();
+        elem1.typeString = '[v[vv,v],[vv,v]]';
+        let result = context.resolvePinType(output, 0, pins);
+        expect(result).toBeUndefined();
+        expect(pins.size).toBe(1);
+        output.type.inputs;
+        expect(pins.has([output, 0])).toBe(true);
+        const wire1 = addWire(functionchart, elem1, 0, output, 0);
+        pins.clear();
+        result = context.resolvePinType(output, 0, pins);
+        expect(result).toBeDefined();
+        expect(result.typeString).toBe('[vv,v]');
+        expect(pins.size).toBe(2);
+        expect(pins.has([output, 0])).toBe(true);
+        expect(pins.has([elem1, 2])).toBe(true);
+        // Replace concrete element with 'cond' element that has pass-throughs.
+        const elem2 = addElement(functionchart, 'cond');
+        context.replaceElement(elem1, elem2);
+        pins.clear();
+        expect(context.resolvePinType(output, 0, pins)).toBeUndefined();
+        expect(pins.size).toBe(4);
+        expect(pins.has([output, 0])).toBe(true);
+        expect(pins.has([elem2, 3])).toBe(true);
+        expect(pins.has([elem2, 1])).toBe(true);
+        expect(pins.has([elem2, 2])).toBe(true);
+        const wire2 = addWire(functionchart, input, 0, elem2, 1);
+        pins.clear();
+        expect(context.resolvePinType(output, 0, pins)).toBeUndefined();
+        expect(pins.size).toBe(5);
+        expect(pins.has([output, 0])).toBe(true);
+        expect(pins.has([elem2, 3])).toBe(true);
+        expect(pins.has([elem2, 1])).toBe(true);
+        expect(pins.has([elem2, 2])).toBe(true);
+        expect(pins.has([input, 0])).toBe(true);
+    });
     test('getFunctionchartTypeInfo', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'cond'), elem2 = addElement(functionchart, 'cond');
         functionchart.explicit = false;
         let typeInfo = context.getFunctionchartTypeInfo(functionchart);
         // No wires, explicit, all inputs and outputs become pins.
         expect(typeInfo.typeString).toBe('[v**v**,**]');
-        console.log(typeInfo.passThroughs);
         expect(typeInfo.passThroughs.length).toBe(2);
-        arrayEquals(typeInfo.passThroughs, [[1, 2, 6], [4, 5, 7]]);
+        arrayEquals(typeInfo.passThroughs[0], [1, 2, 6]);
+        arrayEquals(typeInfo.passThroughs[1], [4, 5, 7]);
         const wire1 = addWire(functionchart, elem1, 0, elem2, 2);
         typeInfo = context.getFunctionchartTypeInfo(functionchart);
         expect(typeInfo.typeString).toBe('[v**v*,*]');
-        // expect(typeInfo.passThroughs.length).toBe(0);
-        // const wire2 = addWire(functionchart, elem1, 0, output, 0);
-        // typeInfo = context.getFunctionchartTypeInfo(functionchart);
-        // expect(typeInfo.typeString).toBe('[*,*]');
-        // expect(typeInfo.passThroughs.length).toBe(1);
-        // expect(typeInfo.passThroughs[0]).toStrictEqual([0, 1]);
-        // const input2 = addPseudoelement(functionchart, 'input'),
-        //       wire3 = addWire(functionchart, input2, 0, elem1, 1);
-        // typeInfo = context.getFunctionchartTypeInfo(functionchart);
-        // expect(typeInfo.typeString).toBe('[**,*]');
-        // expect(typeInfo.passThroughs.length).toBe(1);
-        // expect(typeInfo.passThroughs[0]).toStrictEqual([0, 1, 2]);
+        expect(typeInfo.passThroughs.length).toBe(1);
+        arrayEquals(typeInfo.passThroughs[0], [1, 2, 4, 5]);
     });
 });
 //# sourceMappingURL=functioncharts.test.js.map

@@ -557,7 +557,7 @@ export type PinInfo = {
   element: ElementTypes,
   index: number,
   type: Type,
-  connected: Array<PinRef>,
+  connected: PinRefSet,
   fcIndex: number,
 };
 
@@ -1471,20 +1471,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   // Visits the pin, all pins wired to it, and all pass-throughs containing it, and returns
   // the type of the first non-star pin it finds.
   resolvePinType(element: ElementTypes, index: number,
-                 pins = new Array<PinRef>()) : Type | undefined {
+                 visited = new PairSet<ElementTypes, number>()) : Type | undefined {
     let type: Type | undefined;
     function visit(element: ElementTypes, index: number) : boolean {
-      pins.push([element, index]);
       const pin = element.getPin(index);
       if (pin.type !== Type.starType) {
         type = pin.type;
       }
       return true;
     }
-    const visited = new PairSet<ElementTypes, number>();
     this.visitPin(element, index, visit, visited);
-    for (let pinRef of visited)
-      pins.push(pinRef);
+    // As a side effect, 'visited' is populated.
     return type;
   }
 
@@ -1503,12 +1500,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         return;
       if (item instanceof Pseudoelement) {
         if (item.template.typeName === 'input') {
-          const connected = new Array<PinRef>();
+          const connected = new PairSet<ElementTypes, number>();
           const type = self.resolvePinType(item, 0, connected) || Type.starType;
           const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
           inputs.push(pinInfo);
         } else if(item.template.typeName === 'output') {
-          const connected = new Array<[ElementTypes, number]>();
+          const connected = new PairSet<ElementTypes, number>();
           const type = self.resolvePinType(item, 0, connected) || Type.starType;
           const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
           outputs.push(pinInfo);
@@ -1521,7 +1518,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       subgraphInfo.elements.forEach(element => {
         element.inWires.forEach((wire, index) => {
           if (wire === undefined) {
-            const connected = new Array<[ElementTypes, number]>();
+            const connected = new PairSet<ElementTypes, number>();
             const pin = element.type.inputs[index];
             if (pin.type === Type.spacerType) return;
             const type = self.resolvePinType(element, index, connected) || Type.starType;
@@ -1531,7 +1528,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         });
         element.outWires.forEach((wires, index) => {
           if (wires.length === 0) {
-            const connected = new Array<[ElementTypes, number]>();
+            const connected = new PairSet<ElementTypes, number>();
             const pin = element.type.outputs[index];
             if (pin.type === Type.spacerType) return;
             const firstOutput = element.type.inputs.length;
@@ -1560,7 +1557,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       return y1 - y2;
     }
     function compareIndices(p1: PinInfo, p2: PinInfo) {
-      return p1.index - p2.index;
+      return p1.fcIndex - p2.fcIndex;
     }
     inputs.sort(compareYs);
     inputs.forEach((input, i) => { input.fcIndex = i; });
@@ -1568,11 +1565,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     outputs.sort(compareYs);
     outputs.forEach((output, i) => { output.fcIndex = i + firstOutput; });
 
-    function getPinInfo(element: ElementTypes, index: number) : PinInfo {
-      if (index < firstOutput)
-        return inputs[index];
-      else
-        return outputs[index - firstOutput];
+    function getPinInfo(element: ElementTypes, index: number) : PinInfo | undefined {
+      for (let i = 0; i < inputs.length; i++) {
+        const input = inputs[i];
+        if (input.element === element && input.index === index)
+          return input;
+      }
+      for (let i = 0; i < outputs.length; i++) {
+        const output = outputs[i];
+        if (output.element === element && output.index === index)
+          return output;
+      }
     }
     function getPinName(type: Type, pin: Pin) : string {
       let typeString = type.typeString;
@@ -1584,16 +1587,18 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const passThroughs = new Array<Array<number>>(),
           inPassthrough = new PairSet<ElementTypes, number>();
     let typeString = '[';
-    inputs.forEach((input, i) => {
+    inputs.forEach(input => {
       // For unresolved pin types, compute the pass-throughs.
       if (input.type === Type.starType) {
         if (!inPassthrough.has([input.element, input.index])) {
           const pinClique = input.connected,
                 connected = new Array<PinInfo>();
           pinClique.forEach(pinRef => {
-            if (inPassthrough.has([pinRef[0], pinRef[1]])) {
+            if (!inPassthrough.has([pinRef[0], pinRef[1]])) {
               inPassthrough.add([pinRef[0], pinRef[1]]);
-              connected.push(getPinInfo(pinRef[0], pinRef[1]));
+              const pinInfo = getPinInfo(pinRef[0], pinRef[1]);
+              if (pinInfo)
+                connected.push(pinInfo);
             }
           });
           if (connected.length > 1) {
@@ -1612,9 +1617,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           const pinClique = output.connected,
                 connected = new Array<PinInfo>();
           pinClique.forEach(pinRef => {
-            if (inPassthrough.has([pinRef[0], pinRef[1]])) {
+            if (!inPassthrough.has([pinRef[0], pinRef[1]])) {
               inPassthrough.add([pinRef[0], pinRef[1]]);
-              connected.push(getPinInfo(pinRef[0], pinRef[1]));
+              const pinInfo = getPinInfo(pinRef[0], pinRef[1]);
+              if (pinInfo)
+                connected.push(pinInfo);
             }
           });
           if (connected.length > 1) {

@@ -1210,20 +1210,17 @@ export class FunctionchartContext extends EventBase {
     }
     // Visits the pin, all pins wired to it, and all pass-throughs containing it, and returns
     // the type of the first non-star pin it finds.
-    resolvePinType(element, index, pins = new Array()) {
+    resolvePinType(element, index, visited = new PairSet()) {
         let type;
         function visit(element, index) {
-            pins.push([element, index]);
             const pin = element.getPin(index);
             if (pin.type !== Type.starType) {
                 type = pin.type;
             }
             return true;
         }
-        const visited = new PairSet();
         this.visitPin(element, index, visit, visited);
-        for (let pinRef of visited)
-            pins.push(pinRef);
+        // As a side effect, 'visited' is populated.
         return type;
     }
     getFunctionchartTypeInfo(functionchart) {
@@ -1236,13 +1233,13 @@ export class FunctionchartContext extends EventBase {
                 return;
             if (item instanceof Pseudoelement) {
                 if (item.template.typeName === 'input') {
-                    const connected = new Array();
+                    const connected = new PairSet();
                     const type = self.resolvePinType(item, 0, connected) || Type.starType;
                     const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
                     inputs.push(pinInfo);
                 }
                 else if (item.template.typeName === 'output') {
-                    const connected = new Array();
+                    const connected = new PairSet();
                     const type = self.resolvePinType(item, 0, connected) || Type.starType;
                     const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
                     outputs.push(pinInfo);
@@ -1255,7 +1252,7 @@ export class FunctionchartContext extends EventBase {
             subgraphInfo.elements.forEach(element => {
                 element.inWires.forEach((wire, index) => {
                     if (wire === undefined) {
-                        const connected = new Array();
+                        const connected = new PairSet();
                         const pin = element.type.inputs[index];
                         if (pin.type === Type.spacerType)
                             return;
@@ -1266,7 +1263,7 @@ export class FunctionchartContext extends EventBase {
                 });
                 element.outWires.forEach((wires, index) => {
                     if (wires.length === 0) {
-                        const connected = new Array();
+                        const connected = new PairSet();
                         const pin = element.type.outputs[index];
                         if (pin.type === Type.spacerType)
                             return;
@@ -1288,7 +1285,7 @@ export class FunctionchartContext extends EventBase {
             return y1 - y2;
         }
         function compareIndices(p1, p2) {
-            return p1.index - p2.index;
+            return p1.fcIndex - p2.fcIndex;
         }
         inputs.sort(compareYs);
         inputs.forEach((input, i) => { input.fcIndex = i; });
@@ -1296,10 +1293,16 @@ export class FunctionchartContext extends EventBase {
         outputs.sort(compareYs);
         outputs.forEach((output, i) => { output.fcIndex = i + firstOutput; });
         function getPinInfo(element, index) {
-            if (index < firstOutput)
-                return inputs[index];
-            else
-                return outputs[index - firstOutput];
+            for (let i = 0; i < inputs.length; i++) {
+                const input = inputs[i];
+                if (input.element === element && input.index === index)
+                    return input;
+            }
+            for (let i = 0; i < outputs.length; i++) {
+                const output = outputs[i];
+                if (output.element === element && output.index === index)
+                    return output;
+            }
         }
         function getPinName(type, pin) {
             let typeString = type.typeString;
@@ -1309,15 +1312,17 @@ export class FunctionchartContext extends EventBase {
         }
         const passThroughs = new Array(), inPassthrough = new PairSet();
         let typeString = '[';
-        inputs.forEach((input, i) => {
+        inputs.forEach(input => {
             // For unresolved pin types, compute the pass-throughs.
             if (input.type === Type.starType) {
                 if (!inPassthrough.has([input.element, input.index])) {
                     const pinClique = input.connected, connected = new Array();
                     pinClique.forEach(pinRef => {
-                        if (inPassthrough.has([pinRef[0], pinRef[1]])) {
+                        if (!inPassthrough.has([pinRef[0], pinRef[1]])) {
                             inPassthrough.add([pinRef[0], pinRef[1]]);
-                            connected.push(getPinInfo(pinRef[0], pinRef[1]));
+                            const pinInfo = getPinInfo(pinRef[0], pinRef[1]);
+                            if (pinInfo)
+                                connected.push(pinInfo);
                         }
                     });
                     if (connected.length > 1) {
@@ -1335,9 +1340,11 @@ export class FunctionchartContext extends EventBase {
                 if (!inPassthrough.has([output.element, output.index])) {
                     const pinClique = output.connected, connected = new Array();
                     pinClique.forEach(pinRef => {
-                        if (inPassthrough.has([pinRef[0], pinRef[1]])) {
+                        if (!inPassthrough.has([pinRef[0], pinRef[1]])) {
                             inPassthrough.add([pinRef[0], pinRef[1]]);
-                            connected.push(getPinInfo(pinRef[0], pinRef[1]));
+                            const pinInfo = getPinInfo(pinRef[0], pinRef[1]);
+                            if (pinInfo)
+                                connected.push(pinInfo);
                         }
                     });
                     if (connected.length > 1) {
