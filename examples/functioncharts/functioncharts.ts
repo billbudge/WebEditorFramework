@@ -549,8 +549,6 @@ export type WireFilter = (wire: Wire) => boolean;
 
 export type PinPositionFunction = (element: ElementTypes, pin: number) => PointWithNormal;
 
-export type PinRef = [ElementTypes, number];
-
 export type PinRefSet = PairSet<ElementTypes, number>;
 
 export type PinInfo = {
@@ -1438,10 +1436,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // Visit the given pin, then follow wires and pass-throughs.
   visitPin(element: ElementTypes, index: number, visitor: PinVisitor, visited: PinRefSet) {
-    const pinRef: PinRef = [element, index];
-    if (visited.has(pinRef))
+    if (visited.has(element, index))
       return;
-    visited.add(pinRef);
+    visited.add(element, index);
     visitor(element, index);
 
     const type = element.type,
@@ -1590,13 +1587,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     inputs.forEach(input => {
       // For unresolved pin types, compute the pass-throughs.
       if (input.type === Type.starType) {
-        if (!inPassthrough.has([input.element, input.index])) {
+        if (!inPassthrough.has(input.element, input.index)) {
           const pinClique = input.connected,
                 connected = new Array<PinInfo>();
-          pinClique.forEach(pinRef => {
-            if (!inPassthrough.has([pinRef[0], pinRef[1]])) {
-              inPassthrough.add([pinRef[0], pinRef[1]]);
-              const pinInfo = getPinInfo(pinRef[0], pinRef[1]);
+          pinClique.forEach((e, i) => {
+            if (!inPassthrough.has(e, i)) {
+              inPassthrough.add(e, i);
+              const pinInfo = getPinInfo(e, i);
               if (pinInfo)
                 connected.push(pinInfo);
             }
@@ -1613,13 +1610,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     outputs.forEach(output => {
       // For unresolved pin types, compute the pass-throughs.
       if (output.type === Type.starType) {
-        if (!inPassthrough.has([output.element, output.index])) {
+        if (!inPassthrough.has(output.element, output.index)) {
           const pinClique = output.connected,
                 connected = new Array<PinInfo>();
-          pinClique.forEach(pinRef => {
-            if (!inPassthrough.has([pinRef[0], pinRef[1]])) {
-              inPassthrough.add([pinRef[0], pinRef[1]]);
-              const pinInfo = getPinInfo(pinRef[0], pinRef[1]);
+          pinClique.forEach((e, i) => {
+            if (!inPassthrough.has(e, i)) {
+              inPassthrough.add(e, i);
+              const pinInfo = getPinInfo(e, i);
               if (pinInfo)
                 connected.push(pinInfo);
             }

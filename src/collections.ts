@@ -378,37 +378,37 @@ export class PriorityQueue<T> {
 //------------------------------------------------------------------------------
 // PairSet.
 
-export class PairSet<T, U> implements Iterable<[T, U]>{
+export class PairSet<T, U> implements Iterable<[T, U]> {
   private map: Map<T, Set<U>> = new Map();
   private size_: number = 0;
 
   get size() : number {
     return this.size_;
   }
-  has(value: [T, U]) : boolean {
-    const subset = this.map.get(value[0]);
+  has(t: T, u: U) : boolean {
+    const subset = this.map.get(t);
     if (!subset) return false;
-    return subset.has(value[1]);
+    return subset.has(u);
   }
-  add(value: [T, U]) : void {
-    let subset = this.map.get(value[0]);
+  add(t: T, u: U) : void {
+    let subset = this.map.get(t);
     if (!subset) {
       subset = new Set<U>();
-      this.map.set(value[0], subset);
+      this.map.set(t, subset);
     }
     const size = subset.size;
-    subset.add(value[1]);
+    subset.add(u);
     if (size !== subset.size)
       this.size_++;
   }
-  delete(value: [T, U]) : boolean {
-    const subset = this.map.get(value[0]);
+  delete(t: T, u: U) : boolean {
+    const subset = this.map.get(t);
     if (!subset) return false;
-    const result = subset.delete(value[1]);
+    const result = subset.delete(u);
     if (result)
       this.size_--;
     if (!subset.size)
-      this.map.delete(value[0]);
+      this.map.delete(t);
     return result;
   }
   clear() : void {
@@ -419,12 +419,12 @@ export class PairSet<T, U> implements Iterable<[T, U]>{
     function* gen(value: [T, U]) {
       yield value;
     }
-    this.forEach(value => gen(value));
+    this.forEach((t: T, u: U) => gen([t, u]));
   }
-  forEach(fn: (value: [T, U]) => void) : void {
-    this.map.forEach((subset, key) => {
-      subset.forEach(value => {
-        fn([key, value]);
+  forEach(fn: (t: T, u: U) => void) : void {
+    this.map.forEach((subset, t) => {
+      subset.forEach(u => {
+        fn(t, u);
       });
     });
   }

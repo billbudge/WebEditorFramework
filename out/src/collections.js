@@ -325,32 +325,32 @@ export class PairSet {
     get size() {
         return this.size_;
     }
-    has(value) {
-        const subset = this.map.get(value[0]);
+    has(t, u) {
+        const subset = this.map.get(t);
         if (!subset)
             return false;
-        return subset.has(value[1]);
+        return subset.has(u);
     }
-    add(value) {
-        let subset = this.map.get(value[0]);
+    add(t, u) {
+        let subset = this.map.get(t);
         if (!subset) {
             subset = new Set();
-            this.map.set(value[0], subset);
+            this.map.set(t, subset);
         }
         const size = subset.size;
-        subset.add(value[1]);
+        subset.add(u);
         if (size !== subset.size)
             this.size_++;
     }
-    delete(value) {
-        const subset = this.map.get(value[0]);
+    delete(t, u) {
+        const subset = this.map.get(t);
         if (!subset)
             return false;
-        const result = subset.delete(value[1]);
+        const result = subset.delete(u);
         if (result)
             this.size_--;
         if (!subset.size)
-            this.map.delete(value[0]);
+            this.map.delete(t);
         return result;
     }
     clear() {
@@ -361,12 +361,12 @@ export class PairSet {
         function* gen(value) {
             yield value;
         }
-        this.forEach(value => gen(value));
+        this.forEach((t, u) => gen([t, u]));
     }
     forEach(fn) {
         this.map.forEach((subset, key) => {
             subset.forEach(value => {
-                fn([key, value]);
+                fn(key, value);
             });
         });
     }
