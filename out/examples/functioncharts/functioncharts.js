@@ -2474,11 +2474,20 @@ export class FunctionchartEditor {
         }
     }
     print() {
-        const renderer = this.renderer, context = this.context, functionchart = this.functionchart, canvasController = this.canvasController;
+        const renderer = this.renderer, context = this.context, canvasController = this.canvasController;
+        let functionchart = this.functionchart, renderMode = RenderMode.Print;
+        if (true) {
+            // Print functionchart.
+        }
+        else {
+            functionchart = this.palette;
+            renderMode = RenderMode.Palette;
+            // Print palette.
+        }
         // Calculate document bounds. We don't need to consider wires as they should be  mostly
         // in the bounds of the elements.
         const items = new Array();
-        this.palette.nonWires.forEach(item => items.push(item));
+        functionchart.nonWires.forEach(item => items.push(item));
         const bounds = renderer.getBounds(items);
         // Adjust all edges 1 pixel out.
         const ctx = new window.C2S(bounds.width + 2, bounds.height + 2);
@@ -2486,12 +2495,12 @@ export class FunctionchartEditor {
         renderer.begin(ctx);
         canvasController.applyTransform();
         // Don't draw the root functionchart.
-        this.palette.nonWires.forEach(item => {
-            context.visitNonWires(item, item => { renderer.draw(item, RenderMode.Palette); });
+        functionchart.nonWires.forEach(item => {
+            context.visitNonWires(item, item => { renderer.draw(item, renderMode); });
         });
         // Draw wires after elements.
-        context.visitWires(this.palette, wire => {
-            renderer.drawWire(wire, RenderMode.Print);
+        context.visitWires(functionchart, wire => {
+            renderer.drawWire(wire, renderMode);
         });
         renderer.end();
         // Write out the SVG file.
