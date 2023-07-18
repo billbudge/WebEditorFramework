@@ -981,6 +981,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   reduceSelection() {
     const selection = this.selection;
+    // Deselect any items whose ancestors are selected.
     const roots = reduceToRoots(selection.contents(), selection);
     // Reverse, to preserve the previous order of selection.
     selection.set(roots.reverse());
@@ -2790,6 +2791,17 @@ export class FunctionchartEditor implements CanvasLayer {
     context.transactionManager.addHandler('didRedo', update);
   }
   setContext(context: FunctionchartContext) {
+    // Make sure any function instances don't get detached from their functioncharts.
+    const functioncharts = new Set<Functionchart>();
+    this.scrap.forEach(item => {
+      context.visitAll(item, item => {
+        if (item instanceof FunctionInstance) {
+          functioncharts.add(item.functionchart);  // prepend so they precede instances.
+        }
+      });
+    });
+    this.scrap.splice(0, 0, ...functioncharts);
+
     const functionchart = context.root,
           renderer = this.renderer;
 
@@ -3419,7 +3431,7 @@ export class FunctionchartEditor implements CanvasLayer {
           return true;
         }
         case 88: { // 'x'
-          this.scrap = context.cut()
+          this.scrap = context.cut();
           self.canvasController.draw();
           return true;
         }

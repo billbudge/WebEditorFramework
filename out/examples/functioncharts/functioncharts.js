@@ -790,6 +790,7 @@ export class FunctionchartContext extends EventBase {
     }
     reduceSelection() {
         const selection = this.selection;
+        // Deselect any items whose ancestors are selected.
         const roots = reduceToRoots(selection.contents(), selection);
         // Reverse, to preserve the previous order of selection.
         selection.set(roots.reverse());
@@ -2305,6 +2306,16 @@ export class FunctionchartEditor {
         context.transactionManager.addHandler('didRedo', update);
     }
     setContext(context) {
+        // Make sure any function instances don't get detached from their functioncharts.
+        const functioncharts = new Set();
+        this.scrap.forEach(item => {
+            context.visitAll(item, item => {
+                if (item instanceof FunctionInstance) {
+                    functioncharts.add(item.functionchart); // prepend so they precede instances.
+                }
+            });
+        });
+        this.scrap.splice(0, 0, ...functioncharts);
         const functionchart = context.root, renderer = this.renderer;
         this.context = context;
         this.functionchart = functionchart;
