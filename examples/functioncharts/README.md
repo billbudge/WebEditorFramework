@@ -32,7 +32,7 @@ This diagram is already a little hard to read. We can simplify by defining new e
   <img src="./resources/signum2.svg"  alt="" title="Signum function.">
 </figure>
 
-Similarly we can define useful functions like maximum, minimum, and absolute value.
+Similarly we can define useful functions like increment, decrement, maximum, minimum, and absolute value.
 
 <figure>
   <img src="./resources/simpleFns.svg"  alt="" title="Maximum, minimum, and absolute value.">
