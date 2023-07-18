@@ -364,9 +364,9 @@ export class PairSet {
         this.forEach((t, u) => gen([t, u]));
     }
     forEach(fn) {
-        this.map.forEach((subset, key) => {
-            subset.forEach(value => {
-                fn(key, value);
+        this.map.forEach((subset, t) => {
+            subset.forEach(u => {
+                fn(t, u);
             });
         });
     }

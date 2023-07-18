@@ -270,6 +270,7 @@ class FunctionchartTemplate extends NonWireTemplate {
         this.height = heightProp;
         this.name = nameProp;
         this.explicit = explicitProp;
+        this.typeString = typeStringProp;
         this.nonWires = nonWiresProp;
         this.wires = wiresProp;
         this.properties = [this.id, this.x, this.y, this.width, this.height, this.name,
@@ -391,6 +392,8 @@ export class Functionchart {
     set height(value) { this.template.height.set(this, value); }
     get name() { return this.template.name.get(this) || 0; }
     set name(value) { this.template.name.set(this, value); }
+    get typeString() { return this.template.typeString.get(this); }
+    set typeString(value) { this.template.typeString.set(this, value); }
     get explicit() { return this.template.explicit.get(this); }
     set explicit(value) { this.template.explicit.set(this, value); }
     get nonWires() { return this.template.nonWires.get(this); }
@@ -1417,14 +1420,14 @@ export class FunctionchartContext extends EventBase {
         if (item instanceof FunctionInstance) {
             const functionChart = item.functionchart;
             if (functionChart) {
-                const typeString = functionChart.type.toString();
+                const typeString = functionChart.typeString;
                 this.changeType(item, typeString);
             }
         }
         else if (item instanceof Functionchart) {
             const typeInfo = this.getFunctionchartTypeInfo(item);
-            if (item.type.typeString !== typeInfo.typeString) {
-                item.type = parseTypeString(typeInfo.typeString);
+            if (item.typeString !== typeInfo.typeString) {
+                item.typeString = typeInfo.typeString;
             }
             item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
         }
@@ -1552,6 +1555,11 @@ export class FunctionchartContext extends EventBase {
         else if (owner instanceof Element || owner instanceof Pseudoelement) {
             if (prop === typeStringProp) {
                 this.changeType(owner, owner.typeString);
+            }
+        }
+        else if (owner instanceof Functionchart) {
+            if (prop === typeStringProp) {
+                owner.type = parseTypeString(owner.typeString);
             }
         }
         this.onValueChanged(owner, prop, oldValue);

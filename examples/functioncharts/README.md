@@ -12,7 +12,7 @@ Since functions can be created and instantiated, more complex programs can be bu
 [Live Demo](https://billbudge.github.io/WebEditorFramework/examples/functioncharts/)
 
 ## Simple expressions
-Circuit elements for built-in operations can be provided by the language, and combined to form useful expressions. Elements have wire input and output pins, of either value, generic, or function type. Pseudoelements are used for various roles, but aren't true functions that calculate anything. They usually have 
+Circuit elements for built-in operations can be provided by the language, and combined to form useful expressions. Elements have wire input and output pins, of either value, generic, or function type. Pseudoelements are used for various roles, but aren't true functions that calculate anything. They usually have
 
 Below is a simple example of an expression to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x === 0, or -1 if x < 0. We use the following built in elements:
 
@@ -30,6 +30,12 @@ This diagram is already a little hard to read. We can simplify by defining new e
 
 <figure>
   <img src="./resources/signum2.svg"  alt="" title="Signum function.">
+</figure>
+
+Similarly we can define useful functions like maximum, minimum, and absolute value.
+
+<figure>
+  <img src="./resources/simpleFns.svg"  alt="" title="Maximum, minimum, and absolute value.">
 </figure>
 
 Our palette contains the built in elements and pseudoelements. On the top are the input, output, apply, and pass pseudoelements. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an element and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
