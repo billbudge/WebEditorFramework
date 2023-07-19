@@ -1,4 +1,4 @@
-import { SelectionSet, PairSet } from '../../src/collections.js'
+import { SelectionSet, Multimap } from '../../src/collections.js'
 
 import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, RectHitResult,
@@ -552,7 +552,7 @@ export type WireFilter = (wire: Wire) => boolean;
 
 export type PinPositionFunction = (element: ElementTypes, pin: number) => PointWithNormal;
 
-export type PinRefSet = PairSet<ElementTypes, number>;
+export type PinRefSet = Multimap<ElementTypes, number>;
 
 export type PinInfo = {
   element: ElementTypes,
@@ -1472,7 +1472,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   // Visits the pin, all pins wired to it, and all pass-throughs containing it, and returns
   // the type of the first non-star pin it finds.
   resolvePinType(element: ElementTypes, index: number,
-                 visited = new PairSet<ElementTypes, number>()) : Type | undefined {
+                 visited = new Multimap<ElementTypes, number>()) : Type | undefined {
     let type: Type | undefined;
     function visit(element: ElementTypes, index: number) : boolean {
       const pin = element.getPin(index);
@@ -1496,17 +1496,18 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray());
 
     // Collect the functionchart's inputs and outputs.
+    // First, explicit inputs and outputs.
     subgraphInfo.elements.forEach(item => {
       if (item.parent !== functionchart)
         return;
       if (item instanceof Pseudoelement) {
         if (item.template.typeName === 'input') {
-          const connected = new PairSet<ElementTypes, number>();
+          const connected = new Multimap<ElementTypes, number>();
           const type = self.resolvePinType(item, 0, connected) || Type.starType;
           const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
           inputs.push(pinInfo);
         } else if(item.template.typeName === 'output') {
-          const connected = new PairSet<ElementTypes, number>();
+          const connected = new Multimap<ElementTypes, number>();
           const type = self.resolvePinType(item, 0, connected) || Type.starType;
           const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
           outputs.push(pinInfo);
@@ -1514,12 +1515,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         // TODO 'pass' pseudoelement.
       }
     });
+    // Now, implicit inputs and outputs.
     if (!functionchart.explicit) {
       // Add all disconnected inputs and outputs as pins.
       subgraphInfo.elements.forEach(element => {
+        if (element instanceof FunctionInstance && element.functionchart === functionchart)
+          return;  // We don't expose a recursive instance of the functionchart.
         element.inWires.forEach((wire, index) => {
           if (wire === undefined) {
-            const connected = new PairSet<ElementTypes, number>();
+            const connected = new Multimap<ElementTypes, number>();
             const pin = element.type.inputs[index];
             if (pin.type === Type.spacerType) return;
             const type = self.resolvePinType(element, index, connected) || Type.starType;
@@ -1529,7 +1533,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         });
         element.outWires.forEach((wires, index) => {
           if (wires.length === 0) {
-            const connected = new PairSet<ElementTypes, number>();
+            const connected = new Multimap<ElementTypes, number>();
             const pin = element.type.outputs[index];
             if (pin.type === Type.spacerType) return;
             const firstOutput = element.type.inputs.length;
@@ -1586,7 +1590,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
 
     const passThroughs = new Array<Array<number>>(),
-          inPassthrough = new PairSet<ElementTypes, number>();
+          inPassthrough = new Multimap<ElementTypes, number>();
     let typeString = '[';
     inputs.forEach(input => {
       // For unresolved pin types, compute the pass-throughs.

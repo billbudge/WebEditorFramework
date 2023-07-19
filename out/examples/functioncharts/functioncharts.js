@@ -1231,6 +1231,7 @@ export class FunctionchartContext extends EventBase {
         // Collect subgraph info.
         const subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray());
         // Collect the functionchart's inputs and outputs.
+        // First, explicit inputs and outputs.
         subgraphInfo.elements.forEach(item => {
             if (item.parent !== functionchart)
                 return;
@@ -1250,9 +1251,12 @@ export class FunctionchartContext extends EventBase {
                 // TODO 'pass' pseudoelement.
             }
         });
+        // Now, implicit inputs and outputs.
         if (!functionchart.explicit) {
             // Add all disconnected inputs and outputs as pins.
             subgraphInfo.elements.forEach(element => {
+                if (element instanceof FunctionInstance && element.functionchart === functionchart)
+                    return; // We don't expose a recursive instance of the functionchart.
                 element.inWires.forEach((wire, index) => {
                     if (wire === undefined) {
                         const connected = new PairSet();

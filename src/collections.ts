@@ -431,6 +431,61 @@ export class PairSet<T, U> implements Iterable<[T, U]> {
 }
 
 //------------------------------------------------------------------------------
+// Multimap associates multiple values with a single key. Use it when you want
+// to associate a small number of values with each key.
+
+export class Multimap<T, U> implements Iterable<[T, U]> {
+  private map: Map<T, Array<U>> = new Map();
+  private size_: number = 0;
+
+  get size() : number {
+    return this.size_;
+  }
+  has(t: T, u: U) : boolean {
+    const values = this.map.get(t);
+    if (!values) return false;
+    return values.includes(u);
+  }
+  add(t: T, u: U) : void {
+    let values = this.map.get(t);
+    if (!values) {
+      values = new Array<U>();
+      this.map.set(t, values);
+    }
+    if (!values.includes(u)) {
+      values.push(u);
+      this.size_++;
+    }
+  }
+  delete(t: T, u: U) : boolean {
+    const values = this.map.get(t);
+    if (!values) return false;
+    const index = values.indexOf(u);
+    if (index < 0) return false;
+    values.splice(index, 1);
+    this.size_--;
+    return true;
+  }
+  clear() : void {
+    this.map.clear();
+    this.size_ = 0;
+  }
+  *[Symbol.iterator]() : Iterator<[T, U]> {
+    function* gen(value: [T, U]) {
+      yield value;
+    }
+    this.forEach((t: T, u: U) => gen([t, u]));
+  }
+  forEach(fn: (t: T, u: U) => void) : void {
+    this.map.forEach((values, t) => {
+      values.forEach(u => {
+        fn(t, u);
+      });
+    });
+  }
+}
+
+//------------------------------------------------------------------------------
 // DisjointSet, a simple Union-Find implementation.
 
 export class DisjointSetSubset<T> {
