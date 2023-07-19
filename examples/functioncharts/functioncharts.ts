@@ -1661,8 +1661,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
             self.deleteItem(wire);
           } else {
             const src = wire.src;
-            if (src && !src.type.canConnectTo(newType.inputs[i].type)) {  // incompatible types.
-              self.deleteItem(wire);
+            if (src) {
+              const srcType = src.type.outputs[wire.srcPin].type;
+              if (!srcType.canConnectTo(newType.inputs[i].type)) {  // incompatible types.
+                self.deleteItem(wire);
+              }
             }
           }
         }
@@ -1682,8 +1685,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
             self.deleteItem(wire);
           } else {
             const dst = wire.dst;
-            if (dst && !newType.outputs[i].type.canConnectTo(dst.type)) {  // incompatible types.
-              self.deleteItem(wire);
+            if (dst) {
+              const dstType = dst.type.inputs[wire.dstPin].type;
+              if (!newType.outputs[i].type.canConnectTo(dstType)) {  // incompatible types.
+                self.deleteItem(wire);
+              }
             }
           }
         });

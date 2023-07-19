@@ -1,4 +1,4 @@
-import { SelectionSet, PairSet } from '../../src/collections.js';
+import { SelectionSet, Multimap } from '../../src/collections.js';
 import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, measureNameValuePairs, FileController } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
@@ -1213,7 +1213,7 @@ export class FunctionchartContext extends EventBase {
     }
     // Visits the pin, all pins wired to it, and all pass-throughs containing it, and returns
     // the type of the first non-star pin it finds.
-    resolvePinType(element, index, visited = new PairSet()) {
+    resolvePinType(element, index, visited = new Multimap()) {
         let type;
         function visit(element, index) {
             const pin = element.getPin(index);
@@ -1237,13 +1237,13 @@ export class FunctionchartContext extends EventBase {
                 return;
             if (item instanceof Pseudoelement) {
                 if (item.template.typeName === 'input') {
-                    const connected = new PairSet();
+                    const connected = new Multimap();
                     const type = self.resolvePinType(item, 0, connected) || Type.starType;
                     const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
                     inputs.push(pinInfo);
                 }
                 else if (item.template.typeName === 'output') {
-                    const connected = new PairSet();
+                    const connected = new Multimap();
                     const type = self.resolvePinType(item, 0, connected) || Type.starType;
                     const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
                     outputs.push(pinInfo);
@@ -1259,7 +1259,7 @@ export class FunctionchartContext extends EventBase {
                     return; // We don't expose a recursive instance of the functionchart.
                 element.inWires.forEach((wire, index) => {
                     if (wire === undefined) {
-                        const connected = new PairSet();
+                        const connected = new Multimap();
                         const pin = element.type.inputs[index];
                         if (pin.type === Type.spacerType)
                             return;
@@ -1270,7 +1270,7 @@ export class FunctionchartContext extends EventBase {
                 });
                 element.outWires.forEach((wires, index) => {
                     if (wires.length === 0) {
-                        const connected = new PairSet();
+                        const connected = new Multimap();
                         const pin = element.type.outputs[index];
                         if (pin.type === Type.spacerType)
                             return;
@@ -1317,7 +1317,7 @@ export class FunctionchartContext extends EventBase {
                 typeString += '(' + pin.name + ')';
             return typeString;
         }
-        const passThroughs = new Array(), inPassthrough = new PairSet();
+        const passThroughs = new Array(), inPassthrough = new Multimap();
         let typeString = '[';
         inputs.forEach(input => {
             // For unresolved pin types, compute the pass-throughs.
@@ -1380,8 +1380,11 @@ export class FunctionchartContext extends EventBase {
                     }
                     else {
                         const src = wire.src;
-                        if (src && !src.type.canConnectTo(newType.inputs[i].type)) { // incompatible types.
-                            self.deleteItem(wire);
+                        if (src) {
+                            const srcType = src.type.outputs[wire.srcPin].type;
+                            if (!srcType.canConnectTo(newType.inputs[i].type)) { // incompatible types.
+                                self.deleteItem(wire);
+                            }
                         }
                     }
                 }
@@ -1403,8 +1406,11 @@ export class FunctionchartContext extends EventBase {
                     }
                     else {
                         const dst = wire.dst;
-                        if (dst && !newType.outputs[i].type.canConnectTo(dst.type)) { // incompatible types.
-                            self.deleteItem(wire);
+                        if (dst) {
+                            const dstType = dst.type.inputs[wire.dstPin].type;
+                            if (!newType.outputs[i].type.canConnectTo(dstType)) { // incompatible types.
+                                self.deleteItem(wire);
+                            }
                         }
                     }
                 });

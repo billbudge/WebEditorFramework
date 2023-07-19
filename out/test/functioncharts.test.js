@@ -330,8 +330,8 @@ describe('FunctionchartContext', () => {
     //   expect(ios.has(input)).toBe(true);
     //   expect(ios.has(output)).toBe(true);
     // });
-    test('resolvePinType', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output'), pins = new Collections.PairSet();
+    test('resolvePinType - input type', () => {
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output'), pins = new Collections.Multimap();
         elem1.typeString = '[v[vv,v],[vv,v]]';
         let result = context.resolvePinType(output, 0, pins);
         expect(result).toBeUndefined();

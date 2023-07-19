@@ -1,6 +1,6 @@
 // Collections tests.
 import { describe, expect, test } from '@jest/globals';
-import { LinkedList, Queue, PriorityQueue, SelectionSet, PairSet, DisjointSet } from '../src/collections.js';
+import { LinkedList, Queue, PriorityQueue, SelectionSet, PairSet, Multimap, DisjointSet } from '../src/collections.js';
 'use strict';
 function stringify(iterable) {
     let result = '';
@@ -343,6 +343,65 @@ describe('PairSet', () => {
         pairSet.add('a', 2);
         pairSet.add('b', 1);
         pairSet.forEach((t, u) => testSet.add(t, u));
+        expect(testSet.size).toBe(3);
+        expect(testSet.has('a', 1)).toBe(true);
+        expect(testSet.has('a', 2)).toBe(true);
+        expect(testSet.has('b', 1)).toBe(true);
+    });
+});
+describe('Multimap', () => {
+    test('constructor', () => {
+        const multimap = new Multimap();
+        expect(multimap.size).toBe(0);
+        let size = 0;
+        multimap.forEach(() => size++);
+        expect(size).toBe(0);
+    });
+    test('add', () => {
+        const multimap = new Multimap();
+        multimap.add('a', 1);
+        expect(multimap.size).toBe(1);
+        expect(multimap.has('a', 1)).toBe(true);
+        multimap.add('a', 1);
+        expect(multimap.size).toBe(1);
+        multimap.add('a', 2);
+        expect(multimap.size).toBe(2);
+        multimap.add('b', 1);
+        expect(multimap.size).toBe(3);
+    });
+    test('delete', () => {
+        const multimap = new Multimap();
+        multimap.add('a', 1);
+        multimap.add('a', 2);
+        multimap.add('b', 1);
+        expect(multimap.size).toBe(3);
+        expect(multimap.delete('a', 1)).toBe(true);
+        expect(multimap.size).toBe(2);
+        expect(multimap.delete('a', 1)).toBe(false);
+        expect(multimap.size).toBe(2);
+        expect(multimap.delete('b', 1)).toBe(true);
+        expect(multimap.size).toBe(1);
+        expect(multimap.delete('a', 2)).toBe(true);
+        expect(multimap.size).toBe(0);
+    });
+    test('clear', () => {
+        const multimap = new Multimap();
+        multimap.add('a', 1);
+        multimap.add('a', 2);
+        multimap.add('b', 1);
+        expect(multimap.size).toBe(3);
+        multimap.clear();
+        expect(multimap.size).toBe(0);
+        expect(multimap.has('a', 1)).toBe(false);
+        expect(multimap.has('a', 2)).toBe(false);
+        expect(multimap.has('b', 1)).toBe(false);
+    });
+    test('forEach', () => {
+        const multimap = new Multimap(), testSet = new Multimap();
+        multimap.add('a', 1);
+        multimap.add('a', 2);
+        multimap.add('b', 1);
+        multimap.forEach((t, u) => testSet.add(t, u));
         expect(testSet.size).toBe(3);
         expect(testSet.has('a', 1)).toBe(true);
         expect(testSet.has('a', 2)).toBe(true);

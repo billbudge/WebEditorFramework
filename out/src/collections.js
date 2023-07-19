@@ -372,6 +372,63 @@ export class PairSet {
     }
 }
 //------------------------------------------------------------------------------
+// Multimap associates multiple values with a single key. Use it when you want
+// to associate a small number of values with each key.
+export class Multimap {
+    constructor() {
+        this.map = new Map();
+        this.size_ = 0;
+    }
+    get size() {
+        return this.size_;
+    }
+    has(t, u) {
+        const values = this.map.get(t);
+        if (!values)
+            return false;
+        return values.includes(u);
+    }
+    add(t, u) {
+        let values = this.map.get(t);
+        if (!values) {
+            values = new Array();
+            this.map.set(t, values);
+        }
+        if (!values.includes(u)) {
+            values.push(u);
+            this.size_++;
+        }
+    }
+    delete(t, u) {
+        const values = this.map.get(t);
+        if (!values)
+            return false;
+        const index = values.indexOf(u);
+        if (index < 0)
+            return false;
+        values.splice(index, 1);
+        this.size_--;
+        return true;
+    }
+    clear() {
+        this.map.clear();
+        this.size_ = 0;
+    }
+    *[Symbol.iterator]() {
+        function* gen(value) {
+            yield value;
+        }
+        this.forEach((t, u) => gen([t, u]));
+    }
+    forEach(fn) {
+        this.map.forEach((values, t) => {
+            values.forEach(u => {
+                fn(t, u);
+            });
+        });
+    }
+}
+//------------------------------------------------------------------------------
 // DisjointSet, a simple Union-Find implementation.
 export class DisjointSetSubset {
     constructor(item) {

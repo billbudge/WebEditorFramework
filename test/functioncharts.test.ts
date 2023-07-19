@@ -390,6 +390,8 @@ describe('FunctionchartContext', () => {
     expect(wire2.src).toBe(elem2);
     expect(wire2.dst).toBe(output);
   });
+  // TODO changeType
+  // TODO resolve output type
   // test('resolveOutputType', () => {
   //   const context = new FC.FunctionchartContext(),
   //         functionchart = context.root,
