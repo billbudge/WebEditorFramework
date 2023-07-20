@@ -736,7 +736,6 @@ export class FunctionchartContext extends EventBase {
         }
         return result;
     }
-    // TODO make transaction manager private?
     beginTransaction(name) {
         this.transactionManager.beginTransaction(name);
     }
@@ -745,6 +744,9 @@ export class FunctionchartContext extends EventBase {
     }
     cancelTransaction(name) {
         this.transactionManager.cancelTransaction();
+    }
+    getOldValue(item, property) {
+        this.transactionManager.getOldValue(item, property);
     }
     getUndo() {
         return this.historyManager.getUndo();
@@ -757,6 +759,9 @@ export class FunctionchartContext extends EventBase {
     }
     redo() {
         this.historyManager.redo();
+    }
+    addTransactionHandler(name, handler) {
+        this.transactionManager.addHandler(name, handler);
     }
     select(item) {
         this.selection.add(item);
@@ -899,11 +904,7 @@ export class FunctionchartContext extends EventBase {
             }
         });
         const copies = copyItems(items, this);
-        // Add items in this order: functioncharts, instances and other elements, wires.
-        this.addItems(copies.filter(item => item instanceof Functionchart), this.functionchart);
-        this.addItems(copies.filter(item => item instanceof FunctionInstance), this.functionchart);
-        this.addItems(copies.filter(item => item instanceof Wire), this.functionchart);
-        // this.addItems(copies, this.functionchart);
+        this.addItems(copies, this.functionchart);
         this.selection.set(copies);
         this.transactionManager.endTransaction();
         return copies;
@@ -1570,7 +1571,7 @@ export class FunctionchartContext extends EventBase {
         }
         else if (owner instanceof FunctionInstance) {
             if (prop === functionchartProp) {
-                this.updateType(owner, owner.functionchart.typeString);
+                owner.type = owner.functionchart.type;
             }
         }
         else if (owner instanceof Element || owner instanceof Pseudoelement) {
@@ -2200,10 +2201,10 @@ export class FunctionchartEditor {
         }
         function setter(info, item, value) {
             if (item && (info.prop instanceof ScalarProp || info.prop instanceof ReferenceProp)) {
-                const description = 'change ' + info.label, transactionManager = self.context.transactionManager;
-                transactionManager.beginTransaction(description);
+                const description = 'change ' + info.label, context = self.context;
+                context.beginTransaction(description);
                 info.prop.set(item, value);
-                transactionManager.endTransaction();
+                context.endTransaction();
                 self.canvasController.draw();
             }
         }
@@ -2321,9 +2322,9 @@ export class FunctionchartEditor {
         function update() {
             self.updateBounds();
         }
-        context.transactionManager.addHandler('transactionEnding', update);
-        context.transactionManager.addHandler('didUndo', update);
-        context.transactionManager.addHandler('didRedo', update);
+        context.addTransactionHandler('transactionEnding', update);
+        context.addTransactionHandler('didUndo', update);
+        context.addTransactionHandler('didRedo', update);
     }
     setContext(context) {
         // Make sure any function instances don't get detached from their functioncharts.
@@ -2728,7 +2729,7 @@ export class FunctionchartEditor {
                 newInstance.y = instancerBounds.y;
                 drag.items = [newInstance];
             }
-            context.transactionManager.beginTransaction(drag.description);
+            context.beginTransaction(drag.description);
             if (newWire) {
                 context.addItem(newWire, this.functionchart);
                 selection.set(newWire);
@@ -2746,7 +2747,7 @@ export class FunctionchartEditor {
         const drag = this.dragInfo;
         if (!drag)
             return;
-        const context = this.context, transactionManager = context.transactionManager, renderer = this.renderer, p0 = canvasController.getClickPointerPosition(), cp0 = this.getCanvasPosition(canvasController, p0), p = canvasController.getCurrentPointerPosition(), cp = this.getCanvasPosition(canvasController, p), dx = cp.x - cp0.x, dy = cp.y - cp0.y, pointerHitInfo = this.pointerHitInfo, hitList = this.hitTestCanvas(cp);
+        const context = this.context, renderer = this.renderer, p0 = canvasController.getClickPointerPosition(), cp0 = this.getCanvasPosition(canvasController, p0), p = canvasController.getCurrentPointerPosition(), cp = this.getCanvasPosition(canvasController, p), dx = cp.x - cp0.x, dy = cp.y - cp0.y, pointerHitInfo = this.pointerHitInfo, hitList = this.hitTestCanvas(cp);
         let hitInfo;
         if (drag instanceof NonWireDrag) {
             switch (drag.kind) {
@@ -2758,14 +2759,14 @@ export class FunctionchartEditor {
                     context.selection.forEach(item => {
                         if (item instanceof Wire)
                             return;
-                        const oldX = transactionManager.getOldValue(item, 'x'), oldY = transactionManager.getOldValue(item, 'y');
+                        const oldX = context.getOldValue(item, 'x'), oldY = context.getOldValue(item, 'y');
                         item.x = oldX + dx;
                         item.y = oldY + dy;
                     });
                     break;
                 }
                 case 'resizeFunctionchart': {
-                    const hitInfo = pointerHitInfo, item = drag.items[0], oldX = transactionManager.getOldValue(item, 'x'), oldY = transactionManager.getOldValue(item, 'y'), oldWidth = transactionManager.getOldValue(item, 'width'), oldHeight = transactionManager.getOldValue(item, 'height');
+                    const hitInfo = pointerHitInfo, item = drag.items[0], oldX = context.getOldValue(item, 'x'), oldY = context.getOldValue(item, 'y'), oldWidth = context.getOldValue(item, 'width'), oldHeight = context.getOldValue(item, 'height');
                     if (hitInfo.inner.left) {
                         item.x = oldX + dx;
                         item.width = oldWidth - dx;
@@ -2817,7 +2818,7 @@ export class FunctionchartEditor {
         const drag = this.dragInfo;
         if (!drag)
             return;
-        const context = this.context, functionchart = this.functionchart, selection = context.selection, transactionManager = context.transactionManager, p = canvasController.getCurrentPointerPosition(), cp = this.getCanvasPosition(canvasController, p);
+        const context = this.context, functionchart = this.functionchart, selection = context.selection, p = canvasController.getCurrentPointerPosition(), cp = this.getCanvasPosition(canvasController, p);
         if (drag instanceof WireDrag) {
             drag.wire.pSrc = drag.wire.pDst = undefined;
         }
@@ -2841,7 +2842,7 @@ export class FunctionchartEditor {
                 });
             }
         }
-        transactionManager.endTransaction();
+        context.endTransaction();
         this.setPropertyGrid();
         this.dragInfo = undefined;
         this.pointerHitInfo = undefined;
@@ -2850,7 +2851,7 @@ export class FunctionchartEditor {
         this.canvasController.draw();
     }
     onKeyDown(e) {
-        const self = this, context = this.context, functionchart = this.functionchart, selection = context.selection, transactionManager = context.transactionManager, keyCode = e.keyCode, // TODO fix me.
+        const self = this, context = this.context, functionchart = this.functionchart, selection = context.selection, keyCode = e.keyCode, // TODO fix me.
         cmdKey = e.ctrlKey || e.metaKey, shiftKey = e.shiftKey;
         if (keyCode === 8) { // 'delete'
             context.deleteSelection();
