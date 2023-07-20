@@ -899,7 +899,11 @@ export class FunctionchartContext extends EventBase {
             }
         });
         const copies = copyItems(items, this);
-        this.addItems(copies, this.functionchart);
+        // Add items in this order: functioncharts, instances and other elements, wires.
+        this.addItems(copies.filter(item => item instanceof Functionchart), this.functionchart);
+        this.addItems(copies.filter(item => item instanceof FunctionInstance), this.functionchart);
+        this.addItems(copies.filter(item => item instanceof Wire), this.functionchart);
+        // this.addItems(copies, this.functionchart);
         this.selection.set(copies);
         this.transactionManager.endTransaction();
         return copies;
@@ -1367,7 +1371,9 @@ export class FunctionchartContext extends EventBase {
             typeString += '(' + name + ')';
         return { typeString, passThroughs };
     }
-    changeType(element, typeString) {
+    // Update the derived 'type' property. Delete any wires that are no longer compatible with
+    // the type.
+    updateType(element, typeString) {
         const self = this;
         if (element.type.typeString !== typeString) {
             // The element's type has changed.  Update type and inWires and outWires arrays.
@@ -1431,8 +1437,7 @@ export class FunctionchartContext extends EventBase {
         if (item instanceof FunctionInstance) {
             const functionChart = item.functionchart;
             if (functionChart) {
-                const typeString = functionChart.typeString;
-                this.changeType(item, typeString);
+                this.updateType(item, functionChart.typeString);
             }
         }
         else if (item instanceof Functionchart) {
@@ -1563,9 +1568,14 @@ export class FunctionchartContext extends EventBase {
                 this.insertWire(owner, owner.parent);
             }
         }
+        else if (owner instanceof FunctionInstance) {
+            if (prop === functionchartProp) {
+                this.updateType(owner, owner.functionchart.typeString);
+            }
+        }
         else if (owner instanceof Element || owner instanceof Pseudoelement) {
             if (prop === typeStringProp) {
-                this.changeType(owner, owner.typeString);
+                this.updateType(owner, owner.typeString);
             }
         }
         else if (owner instanceof Functionchart) {

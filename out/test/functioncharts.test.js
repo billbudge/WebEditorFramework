@@ -299,6 +299,23 @@ describe('FunctionchartContext', () => {
         expect(wire2.src).toBe(elem2);
         expect(wire2.dst).toBe(output);
     });
+    test('changeType', () => {
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
+        elem1.typeString = '[v,v]';
+        const wire1 = addWire(functionchart, input, 0, elem1, 0), wire2 = addWire(functionchart, elem1, 0, output, 0);
+        let graphInfo = context.getGraphInfo();
+        expect(graphInfo.elements.has(elem1)).toBe(true);
+        expect(graphInfo.elements.has(input)).toBe(true);
+        expect(graphInfo.elements.has(output)).toBe(true);
+        expect(graphInfo.wires.has(wire1)).toBe(true);
+        expect(graphInfo.wires.has(wire2)).toBe(true);
+        context.updateType(elem1, '[vvv,vv]');
+        expect(elem1.typeString).toBe('[vvv,vv]');
+        expect(graphInfo.wires.has(wire1)).toBe(true);
+        expect(graphInfo.wires.has(wire2)).toBe(true);
+    });
+    // TODO changeType
+    // TODO resolve output type
     // test('resolveOutputType', () => {
     //   const context = new FC.FunctionchartContext(),
     //         functionchart = context.root,

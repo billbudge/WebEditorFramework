@@ -1644,7 +1644,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return { typeString, passThroughs };
   }
 
-  changeType(element: Element | Pseudoelement | FunctionInstance, typeString: string) {
+  // Update the derived 'type' property. Delete any wires that are no longer compatible with
+  // the type.
+  updateType(element: ElementTypes, typeString: string) {
     const self = this;
     if (element.type.typeString !== typeString) {
       // The element's type has changed.  Update type and inWires and outWires arrays.
@@ -1713,8 +1715,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (item instanceof FunctionInstance) {
       const functionChart = item.functionchart;
       if (functionChart) {
-        const typeString = functionChart.typeString;
-        this.changeType(item, typeString);
+        this.updateType(item, functionChart.typeString);
       }
     } else if (item instanceof Functionchart) {
       const typeInfo = this.getFunctionchartTypeInfo(item);
@@ -1860,9 +1861,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         }
         this.insertWire(owner, owner.parent!);
       }
+    } else if (owner instanceof FunctionInstance) {
+      if (prop === functionchartProp) {
+        owner.type = owner.functionchart.type;
+      }
     } else if (owner instanceof Element || owner instanceof Pseudoelement) {
       if (prop === typeStringProp) {
-        this.changeType(owner, owner.typeString);
+        this.updateType(owner, owner.typeString);
       }
     } else if (owner instanceof Functionchart) {
       if (prop === typeStringProp) {
