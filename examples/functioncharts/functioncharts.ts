@@ -504,6 +504,8 @@ export class Functionchart implements DataContextObject {
   set height(value: number) { this.template.height.set(this, value); }
   get name() { return this.template.name.get(this) || 0; }
   set name(value: number) { this.template.name.set(this, value); }
+  get typeString() { return this.template.typeString.get(this); }
+  set typeString(value: string) { this.template.typeString.set(this, value); }
   get explicit() { return this.template.explicit.get(this); }
   set explicit(value: boolean) { this.template.explicit.set(this, value); }
 
@@ -1718,13 +1720,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (item instanceof FunctionInstance) {
       const functionChart = item.functionchart;
       if (functionChart) {
-        this.updateType(item, functionChart.type.typeString);
+        this.updateType(item, functionChart.typeString);
       }
     } else if (item instanceof Functionchart) {
-      const typeInfo = this.getFunctionchartTypeInfo(item),
-            typeString = typeInfo.typeString;
-      if (item.type.typeString !== typeString) {
-        item.type = parseTypeString(typeString);
+      const typeInfo = this.getFunctionchartTypeInfo(item);
+      if (item.typeString !== typeInfo.typeString) {
+        item.typeString = typeInfo.typeString;
       }
       item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
     }
@@ -1872,6 +1873,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     } else if (owner instanceof Element || owner instanceof Pseudoelement) {
       if (prop === typeStringProp) {
         this.updateType(owner, owner.typeString);
+      }
+    } else if (owner instanceof Functionchart) {
+      if (prop === typeStringProp) {
+        owner.type = parseTypeString(owner.typeString);
       }
     }
     this.onValueChanged(owner, prop, oldValue);
