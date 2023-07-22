@@ -11,11 +11,11 @@ import { Point, Rect, PointWithNormal, getExtents, projectPointToCircle,
          BezierCurve, evaluateBezier, CurveHitResult, expandRect } from '../../src/geometry.js'
 
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
-         ReferencedObject, DataContext, DataContextObject, EventBase, Change, ChangeEvents,
-         copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet,
-         reduceToRoots, List, TransactionManager, HistoryManager, ScalarPropertyTypes,
+         ReferencedObject, DataContext, DataContextObject, EventBase, EventHandler,
+         Change, ChangeEvents, CompoundOp, copyItems, Serialize, Deserialize,
+         getLowestCommonAncestor, ancestorInSet, reduceToRoots,
+         List, TransactionManager, TransactionEvent, HistoryManager, ScalarPropertyTypes,
          ArrayPropertyTypes } from '../../src/dataModels.js'
-import { parse, types } from '@babel/core';
 
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
@@ -586,8 +586,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   private wires = new Set<Wire>;
   private sorted? = new Array<ElementTypes>();  // Topologically sorted elements.
 
-  readonly transactionManager: TransactionManager;
-  readonly historyManager: HistoryManager;
+  private readonly transactionManager: TransactionManager;
+  private readonly historyManager: HistoryManager;
 
   selection = new SelectionSet<AllTypes>();
 
@@ -921,7 +921,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
-  // TODO make transaction manager private?
   beginTransaction(name: string) {
     this.transactionManager.beginTransaction(name);
   }
@@ -930,6 +929,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
   cancelTransaction(name: string) {
     this.transactionManager.cancelTransaction();
+  }
+  getOldValue(item: any, property: string) : any {
+    this.transactionManager.getOldValue(item, property);
   }
   getUndo() {
     return this.historyManager.getUndo();
@@ -942,6 +944,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
   redo() {
     this.historyManager.redo();
+  }
+  addTransactionHandler(name: TransactionEvent, handler: EventHandler<CompoundOp>) {
+    this.transactionManager.addHandler(name, handler);
   }
 
   select(item: AllTypes) {
@@ -2677,10 +2682,10 @@ export class FunctionchartEditor implements CanvasLayer {
     function setter(info: ItemInfo, item: AllTypes, value: any) {
       if (item && (info.prop instanceof ScalarProp || info.prop instanceof ReferenceProp)) {
         const description = 'change ' + info.label,
-              transactionManager = self.context.transactionManager;
-        transactionManager.beginTransaction(description);
+              context = self.context;
+        context.beginTransaction(description);
         info.prop.set(item, value);
-        transactionManager.endTransaction();
+        context.endTransaction();
         self.canvasController.draw();
       }
     }
@@ -2801,9 +2806,9 @@ export class FunctionchartEditor implements CanvasLayer {
     function update() {
       self.updateBounds();
     }
-    context.transactionManager.addHandler('transactionEnding', update);
-    context.transactionManager.addHandler('didUndo', update);
-    context.transactionManager.addHandler('didRedo', update);
+    context.addTransactionHandler('transactionEnding', update);
+    context.addTransactionHandler('didUndo', update);
+    context.addTransactionHandler('didRedo', update);
   }
   setContext(context: FunctionchartContext) {
     // Make sure any function instances don't get detached from their functioncharts.
@@ -3261,7 +3266,7 @@ export class FunctionchartEditor implements CanvasLayer {
         drag.items = [newInstance];
       }
 
-      context.transactionManager.beginTransaction(drag.description);
+      context.beginTransaction(drag.description);
       if (newWire) {
         context.addItem(newWire, this.functionchart);
         selection.set(newWire);
@@ -3279,7 +3284,6 @@ export class FunctionchartEditor implements CanvasLayer {
     if (!drag)
       return;
     const context = this.context,
-          transactionManager = context.transactionManager,
           renderer = this.renderer,
           p0 = canvasController.getClickPointerPosition(),
           cp0 = this.getCanvasPosition(canvasController, p0),
@@ -3300,8 +3304,8 @@ export class FunctionchartEditor implements CanvasLayer {
           context.selection.forEach(item => {
             if (item instanceof Wire)
               return;
-            const oldX = transactionManager.getOldValue(item, 'x'),
-                  oldY = transactionManager.getOldValue(item, 'y');
+            const oldX = context.getOldValue(item, 'x'),
+                  oldY = context.getOldValue(item, 'y');
             item.x = oldX + dx;
             item.y = oldY + dy;
           });
@@ -3310,10 +3314,10 @@ export class FunctionchartEditor implements CanvasLayer {
         case 'resizeFunctionchart': {
           const hitInfo = pointerHitInfo as ElementHitResult,
                 item = drag.items[0] as Functionchart,
-                oldX = transactionManager.getOldValue(item, 'x'),
-                oldY = transactionManager.getOldValue(item, 'y'),
-                oldWidth =  transactionManager.getOldValue(item, 'width'),
-                oldHeight =  transactionManager.getOldValue(item, 'height');
+                oldX = context.getOldValue(item, 'x'),
+                oldY = context.getOldValue(item, 'y'),
+                oldWidth =  context.getOldValue(item, 'width'),
+                oldHeight =  context.getOldValue(item, 'height');
         if (hitInfo.inner.left) {
             item.x = oldX + dx;
             item.width = oldWidth - dx;
@@ -3370,7 +3374,6 @@ export class FunctionchartEditor implements CanvasLayer {
     const context = this.context,
           functionchart = this.functionchart,
           selection = context.selection,
-          transactionManager = context.transactionManager,
           p = canvasController.getCurrentPointerPosition(),
           cp = this.getCanvasPosition(canvasController, p);
     if (drag instanceof WireDrag) {
@@ -3397,7 +3400,7 @@ export class FunctionchartEditor implements CanvasLayer {
       }
     }
 
-    transactionManager.endTransaction();
+    context.endTransaction();
 
     this.setPropertyGrid();
 
@@ -3413,7 +3416,6 @@ export class FunctionchartEditor implements CanvasLayer {
           context = this.context,
           functionchart = this.functionchart,
           selection = context.selection,
-          transactionManager = context.transactionManager,
           keyCode = e.keyCode,  // TODO fix me.
           cmdKey = e.ctrlKey || e.metaKey,
           shiftKey = e.shiftKey;

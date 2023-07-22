@@ -488,7 +488,7 @@ export function reduceToRoots<T extends Parented<T>>(items: T[], set: SetLike<T>
 
 // EventBase class.
 
-type EventHandler<T> = (event: T) => void;
+export type EventHandler<T> = (event: T) => void;
 type EventHandlers<T> = EventHandler<T>[];
 
 export class EventBase<TArg, TEvents> {
@@ -615,8 +615,9 @@ export class CompoundOp implements Operation {
   }
 }
 
-type TransactionEvent = 'transactionBegan' | 'transactionEnding' | 'transactionEnded' |
-                        'transactionCancelled' | 'didUndo' | 'didRedo';
+export type TransactionEvent =
+    'transactionBegan' | 'transactionEnding' | 'transactionEnded' | 'transactionCancelled' |
+    'didUndo' | 'didRedo';
 
 export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> {
   private transaction: CompoundOp | undefined;
