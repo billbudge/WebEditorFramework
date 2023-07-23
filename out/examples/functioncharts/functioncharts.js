@@ -744,7 +744,7 @@ export class FunctionchartContext extends EventBase {
         this.transactionManager.cancelTransaction();
     }
     getOldValue(item, property) {
-        this.transactionManager.getOldValue(item, property);
+        return this.transactionManager.getOldValue(item, property);
     }
     getUndo() {
         return this.historyManager.getUndo();
@@ -1463,10 +1463,11 @@ export class FunctionchartContext extends EventBase {
     insertFunctionchart(functionchart, parent) {
         this.functioncharts.add(functionchart);
         functionchart.parent = parent;
-        this.updateItem(functionchart);
         const self = this;
         functionchart.nonWires.forEach(item => self.insertItem(item, functionchart));
         functionchart.wires.forEach(wire => self.insertWire(wire, functionchart));
+        // Update function chart after all descendants have been added and updated. We need that
+        // in order to compute the type info for the functionchart.
         this.updateItem(functionchart);
     }
     removeFunctionchart(functionchart) {

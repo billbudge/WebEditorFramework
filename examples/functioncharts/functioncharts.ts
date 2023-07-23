@@ -379,7 +379,7 @@ abstract class ElementBase {
 
   get passThroughs() : Array<Array<number>> | undefined {
     if (this instanceof FunctionInstance)
-      return this.functionchart.passThroughs;
+      return this.functionchart?.passThroughs;
     if (this instanceof Element) {
       switch (this.template.typeName) {
         case 'cond':
@@ -929,7 +929,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.transactionManager.cancelTransaction();
   }
   getOldValue(item: any, property: string) : any {
-    this.transactionManager.getOldValue(item, property);
+    return this.transactionManager.getOldValue(item, property);
   }
   getUndo() {
     return this.historyManager.getUndo();
