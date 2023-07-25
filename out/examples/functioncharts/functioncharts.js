@@ -290,9 +290,10 @@ const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
 class ElementBase {
-    get passThroughs() {
+    getPassThroughs() {
+        var _a;
         if (this instanceof FunctionInstance)
-            return this.functionchart.passThroughs;
+            return (_a = this.functionchart) === null || _a === void 0 ? void 0 : _a.passThroughs;
         if (this instanceof Element) {
             switch (this.template.typeName) {
                 case 'cond':
@@ -1176,7 +1177,7 @@ export class FunctionchartContext extends EventBase {
     }
     // Visit pins along the first pass-through containing the given pin.
     visitPassthroughs(element, index, visitor, visited) {
-        const passThroughs = element.passThroughs;
+        const passThroughs = element.getPassThroughs();
         if (passThroughs) {
             for (let passThrough of passThroughs) {
                 if (passThrough.includes(index)) {

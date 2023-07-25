@@ -377,7 +377,7 @@ abstract class ElementBase {
   inWires = new Array<Wire | undefined>();   // one input per pin (no fan in).
   outWires = new Array<Array<Wire>>();       // multiple outputs per pin (fan out).
 
-  get passThroughs() : Array<Array<number>> | undefined {
+  getPassThroughs() : Array<Array<number>> | undefined {
     if (this instanceof FunctionInstance)
       return this.functionchart?.passThroughs;
     if (this instanceof Element) {
@@ -1428,7 +1428,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // Visit pins along the first pass-through containing the given pin.
   visitPassthroughs(element: ElementTypes, index: number, visitor: PinVisitor, visited: PinRefSet) {
-    const passThroughs = element.passThroughs;
+    const passThroughs = element.getPassThroughs();
     if (passThroughs) {
       for (let passThrough of passThroughs) {
         if (passThrough.includes(index)) {
