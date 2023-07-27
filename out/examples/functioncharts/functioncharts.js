@@ -426,7 +426,10 @@ export class FunctionchartContext extends EventBase {
         this.elements = new Set;
         this.functioncharts = new Set;
         this.wires = new Set;
-        this.sorted = new Array(); // Topologically sorted elements.
+        // Topologically sorted elements, or undefined if needs update.
+        this.sorted = new Array();
+        // Map from functionchart to its instances.
+        this.fcMap = new Multimap();
         this.selection = new SelectionSet();
         const self = this;
         this.transactionManager = new TransactionManager();
@@ -850,9 +853,13 @@ export class FunctionchartContext extends EventBase {
         return item;
     }
     addItems(items, parent) {
-        // Add elements first, then transitions, so the context can track transitions.
+        // Add functioncharts, then elements, then wires.
         for (let item of items) {
-            if (!(item instanceof Wire))
+            if (item instanceof Functionchart)
+                this.addItem(item, parent);
+        }
+        for (let item of items) {
+            if (item instanceof ElementBase)
                 this.addItem(item, parent);
         }
         for (let item of items) {
@@ -987,7 +994,8 @@ export class FunctionchartContext extends EventBase {
         const srcType = src.type.outputs[srcPin].type, dstType = dst.type.inputs[dstPin].type;
         return srcType.canConnectTo(dstType);
     }
-    // Topological sort of DAG for update and validation. All wires should be valid.
+    // Topological sort of elements for update and validation. The circuit should form a DAG.
+    // All wires should be valid.
     topologicalSort() {
         const visiting = new Set(), visited = new Set(), sorted = new Array();
         let cycle = false;
@@ -1020,8 +1028,10 @@ export class FunctionchartContext extends EventBase {
         const self = this, invalidWires = new Array(), graphInfo = this.getGraphInfo();
         // Check wires.
         graphInfo.wires.forEach(wire => {
-            if (!self.isValidWire(wire))
+            if (!self.isValidWire(wire)) {
+                console.log(wire, self.isValidWire(wire));
                 invalidWires.push(wire);
+            }
         });
         if (invalidWires.length !== 0)
             return false;
@@ -1328,7 +1338,7 @@ export class FunctionchartContext extends EventBase {
             if (input.type === Type.starType) {
                 if (!inPassthrough.has(input.element, input.index)) {
                     const pinClique = input.connected, connected = new Array();
-                    pinClique.forEach((e, i) => {
+                    pinClique.forAll((e, i) => {
                         if (!inPassthrough.has(e, i)) {
                             inPassthrough.add(e, i);
                             const pinInfo = getPinInfo(e, i);
@@ -1350,7 +1360,7 @@ export class FunctionchartContext extends EventBase {
             if (output.type === Type.starType) {
                 if (!inPassthrough.has(output.element, output.index)) {
                     const pinClique = output.connected, connected = new Array();
-                    pinClique.forEach((e, i) => {
+                    pinClique.forAll((e, i) => {
                         if (!inPassthrough.has(e, i)) {
                             inPassthrough.add(e, i);
                             const pinInfo = getPinInfo(e, i);
@@ -1374,66 +1384,64 @@ export class FunctionchartContext extends EventBase {
     // Update the derived 'type' property. Delete any wires that are no longer compatible with
     // the type.
     updateType(element, typeString) {
-        const self = this;
-        if (element.type.typeString !== typeString) {
-            // The element's type has changed.  Update type and inWires and outWires arrays.
-            const newType = parseTypeString(typeString), inputs = newType.inputs.length, outputs = newType.outputs.length, inWires = element.inWires, outWires = element.outWires;
-            for (let i = 0; i < inWires.length; i++) {
-                const wire = inWires[i];
-                if (wire) {
-                    if (i >= inputs) { // no pin at this index.
-                        self.deleteItem(wire);
-                    }
-                    else {
-                        const src = wire.src;
-                        if (src) {
-                            const srcType = src.type.outputs[wire.srcPin].type;
-                            if (!srcType.canConnectTo(newType.inputs[i].type)) { // incompatible types.
-                                self.deleteItem(wire);
-                            }
+        // Make sure type and inWires and outWires arrays are consistent.
+        // TODO split into two functions.
+        const newType = parseTypeString(typeString), inputs = newType.inputs.length, outputs = newType.outputs.length, inWires = element.inWires, outWires = element.outWires;
+        for (let i = 0; i < inWires.length; i++) {
+            const wire = inWires[i];
+            if (wire) {
+                if (i >= inputs) { // no pin at this index.
+                    this.deleteItem(wire);
+                }
+                else {
+                    const src = wire.src;
+                    if (src) {
+                        const srcType = src.type.outputs[wire.srcPin].type;
+                        if (!srcType.canConnectTo(newType.inputs[i].type)) { // incompatible types.
+                            this.deleteItem(wire);
                         }
                     }
                 }
             }
-            if (inputs > inWires.length) {
-                for (let i = inWires.length; i < inputs; i++) {
-                    inWires[i] = undefined;
-                }
-            }
-            inWires.length = inputs;
-            // outWires.length >= outputs.
-            for (let i = 0; i < outWires.length; i++) {
-                const wires = outWires[i];
-                if (wires.length === 0)
-                    continue;
-                wires.splice(0).forEach(wire => {
-                    if (i >= outputs) { // no pin at this index.
-                        self.deleteItem(wire);
-                    }
-                    else {
-                        const dst = wire.dst;
-                        if (dst) {
-                            const dstType = dst.type.inputs[wire.dstPin].type;
-                            if (!newType.outputs[i].type.canConnectTo(dstType)) { // incompatible types.
-                                self.deleteItem(wire);
-                            }
-                        }
-                    }
-                });
-            }
-            if (outputs > outWires.length) {
-                for (let i = outWires.length; i < outputs; i++) {
-                    outWires[i] = new Array();
-                }
-            }
-            outWires.length = outputs;
-            element.type = newType;
         }
+        if (inputs > inWires.length) {
+            for (let i = inWires.length; i < inputs; i++) {
+                inWires[i] = undefined;
+            }
+        }
+        inWires.length = inputs;
+        // outWires.length >= outputs.
+        for (let i = 0; i < outWires.length; i++) {
+            const wires = outWires[i];
+            if (wires.length === 0)
+                continue;
+            wires.splice(0).forEach(wire => {
+                if (i >= outputs) { // no pin at this index.
+                    this.deleteItem(wire);
+                }
+                else {
+                    const dst = wire.dst;
+                    if (dst) {
+                        const dstType = dst.type.inputs[wire.dstPin].type;
+                        if (!newType.outputs[i].type.canConnectTo(dstType)) { // incompatible types.
+                            this.deleteItem(wire);
+                        }
+                    }
+                }
+            });
+        }
+        if (outputs > outWires.length) {
+            for (let i = outWires.length; i < outputs; i++) {
+                outWires[i] = new Array();
+            }
+        }
+        outWires.length = outputs;
+        element.type = newType;
     }
     updateItem(item) {
         if (item instanceof Wire)
             return;
-        // Update 'type' property for functioncharts and instances.
+        // Update 'type' property for functioncharts and their instances.
         if (item instanceof FunctionInstance) {
             const functionChart = item.functionchart;
             if (functionChart) {
@@ -1446,6 +1454,10 @@ export class FunctionchartContext extends EventBase {
                 item.type = parseTypeString(typeString);
             }
             item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
+            // Update all instances of the functionchart.
+            this.fcMap.forValues(item, instance => {
+                this.updateType(instance, typeString);
+            });
         }
         // Update child items with our current position.
         this.visitNonWires(item, item => this.setGlobalPosition(item));
@@ -1455,12 +1467,21 @@ export class FunctionchartContext extends EventBase {
         element.parent = parent;
         this.updateItem(element);
         this.sorted = undefined;
+        // TODO clean up.
+        if (element instanceof FunctionInstance) {
+            const functionChart = element.functionchart;
+            this.fcMap.add(functionChart, element);
+        }
     }
     removeElement(element) {
         this.elements.delete(element);
         this.sorted = undefined;
+        if (element instanceof FunctionInstance) {
+            const functionChart = element.functionchart;
+            this.fcMap.delete(functionChart, element);
+        }
     }
-    // Allow parent to be undefined for the root functionchart.
+    // Parent can be undefined in the case of the root functionchart.
     insertFunctionchart(functionchart, parent) {
         this.functioncharts.add(functionchart);
         functionchart.parent = parent;
@@ -1470,6 +1491,11 @@ export class FunctionchartContext extends EventBase {
         // Update function chart after all descendants have been added and updated. We need that
         // in order to compute the type info for the functionchart.
         this.updateItem(functionchart);
+        functionchart.nonWires.forEach(item => {
+            if (item instanceof FunctionInstance) {
+                self.updateType(item, item.parent.type.typeString);
+            }
+        });
     }
     removeFunctionchart(functionchart) {
         this.functioncharts.delete(functionchart);

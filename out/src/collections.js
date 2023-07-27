@@ -418,9 +418,15 @@ export class Multimap {
         function* gen(value) {
             yield value;
         }
-        this.forEach((t, u) => gen([t, u]));
+        this.forAll((t, u) => gen([t, u]));
     }
-    forEach(fn) {
+    forValues(t, fn) {
+        const values = this.map.get(t);
+        if (!values)
+            return;
+        values.forEach(fn);
+    }
+    forAll(fn) {
         this.map.forEach((values, t) => {
             values.forEach(u => {
                 fn(t, u);

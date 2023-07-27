@@ -382,7 +382,7 @@ describe('Multimap', () => {
     const multimap = new Multimap<string, number>();
     expect(multimap.size).toBe(0);
     let size = 0;
-    multimap.forEach(() => size++);
+    multimap.forAll(() => size++);
     expect(size).toBe(0);
   });
   test('add', () => {
@@ -430,7 +430,7 @@ describe('Multimap', () => {
     multimap.add('a', 1);
     multimap.add('a', 2);
     multimap.add('b', 1);
-    multimap.forEach((t, u) => testSet.add(t, u));
+    multimap.forAll((t, u) => testSet.add(t, u));
     expect(testSet.size).toBe(3);
     expect(testSet.has('a', 1)).toBe(true);
     expect(testSet.has('a', 2)).toBe(true);

@@ -474,9 +474,14 @@ export class Multimap<T, U> implements Iterable<[T, U]> {
     function* gen(value: [T, U]) {
       yield value;
     }
-    this.forEach((t: T, u: U) => gen([t, u]));
+    this.forAll((t: T, u: U) => gen([t, u]));
   }
-  forEach(fn: (t: T, u: U) => void) : void {
+  forValues(t: T, fn: (u: U) => void) {
+    const values = this.map.get(t);
+    if (!values) return;
+    values.forEach(fn);
+  }
+  forAll(fn: (t: T, u: U) => void) : void {
     this.map.forEach((values, t) => {
       values.forEach(u => {
         fn(t, u);
