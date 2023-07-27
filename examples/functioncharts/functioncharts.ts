@@ -1195,6 +1195,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   isValidWire(wire: Wire) {
+    if (wire.pSrc || wire.pDst)
+      return true;  // Dragging a new wire is temporarily invalid.
     const src = wire.src,
           dst = wire.dst;
     if (!src || !dst)

@@ -976,6 +976,8 @@ export class FunctionchartContext extends EventBase {
         });
     }
     isValidWire(wire) {
+        if (wire.pSrc || wire.pDst)
+            return true; // Dragging a new wire is temporarily invalid.
         const src = wire.src, dst = wire.dst;
         if (!src || !dst)
             return false;
