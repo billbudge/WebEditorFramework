@@ -1293,8 +1293,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       } else if (item instanceof Functionchart) {
         const typeInfo = self.getFunctionchartTypeInfo(item);
         if (typeInfo.typeString !== item.type.typeString) {
-          item.type = parseTypeString(typeInfo.typeString);
-          item.passThroughs = typeInfo.passThroughs;
+          this.updateItem(item);
         }
       } else if (item instanceof FunctionInstance) {
         if (!self.functioncharts.has(item.functionchart)) {
@@ -1671,15 +1670,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     for (let i = 0; i < inWires.length; i++) {
       const wire = inWires[i];
       if (wire) {
-        if (i >= inputs) {  // no pin at this index.
+        if (i >= inputs || !this.isValidWire(wire)) {  // no pin at this index.
           this.deleteItem(wire);
         } else {
-          const src = wire.src;
-          if (src) {
-            const srcType = src.type.outputs[wire.srcPin].type;
-            if (!srcType.canConnectTo(newType.inputs[i].type)) {  // incompatible types.
-              this.deleteItem(wire);
-            }
+          const src = wire.src!,
+                srcType = src.type.outputs[wire.srcPin].type;
+          if (!srcType.canConnectTo(newType.inputs[i].type)) {  // incompatible types.
+            this.deleteItem(wire);
           }
         }
       }
@@ -1695,15 +1692,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       const wires = outWires[i];
       if (wires.length === 0) continue;
       wires.splice(0).forEach(wire => {
-        if (i >= outputs) {  // no pin at this index.
+        if (i >= outputs || !this.isValidWire(wire)) {  // no pin at this index.
           this.deleteItem(wire);
         } else {
-          const dst = wire.dst;
-          if (dst) {
-            const dstType = dst.type.inputs[wire.dstPin].type;
-            if (!newType.outputs[i].type.canConnectTo(dstType)) {  // incompatible types.
-              this.deleteItem(wire);
-            }
+          const dst = wire.dst!,
+                dstType = dst.type.inputs[wire.dstPin].type;
+          if (!newType.outputs[i].type.canConnectTo(dstType)) {  // incompatible types.
+            this.deleteItem(wire);
           }
         }
       });
@@ -1778,11 +1773,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // Update function chart after all descendants have been added and updated. We need that
     // in order to compute the type info for the functionchart.
     this.updateItem(functionchart);
-    functionchart.nonWires.forEach(item => {
-      if (item instanceof FunctionInstance) {
-        self.updateType(item, item.parent!.type.typeString);
-      }
-    });
   }
 
   private removeFunctionchart(functionchart: Functionchart) {
@@ -1814,9 +1804,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   private static removeWireHelper(array: Array<Wire>, wire: Wire) {
-    const index = array.indexOf(wire);
-    if (index >= 0) {
-      array.splice(index, 1);
+    if (array) {
+      const index = array.indexOf(wire);
+      if (index >= 0) {
+        array.splice(index, 1);
+      }
     }
   }
 
@@ -2939,7 +2931,7 @@ export class FunctionchartEditor implements CanvasLayer {
     });
     changedItems.forEach(item => {
       layout(item, item => {
-        if (item instanceof Wire && context.contains(item))  // Wire may have been deleted by consistency check.
+        if (item instanceof Wire && context.isValidWire(item))  // Wire may be invalid after edit.
           renderer.layout(item);
       });
     });

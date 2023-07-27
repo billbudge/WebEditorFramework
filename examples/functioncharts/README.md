@@ -38,6 +38,12 @@ Similarly we can define useful functions like increment, decrement, maximum, min
   <img src="./resources/simpleFns.svg"  alt="" title="Maximum, minimum, and absolute value.">
 </figure>
 
+Since functioncharts can contain instances of themselves, we can define a recursive Factorial (N!) function. The recursion is equivalent to a simple iteration, and in fact this is how the graphs represent iteration.
+
+<figure>
+  <img src="./resources/factorial.svg"  alt="" title="Recursive definition of factorial function N!.">
+</figure>
+
 Our palette contains the built in elements and pseudoelements. On the top are the input, output, apply, and pass pseudoelements. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an element and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
 
 <figure>
