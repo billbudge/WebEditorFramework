@@ -270,7 +270,6 @@ class FunctionchartTemplate extends NonWireTemplate {
         this.height = heightProp;
         this.name = nameProp;
         this.explicit = explicitProp;
-        this.typeString = typeStringProp;
         this.nonWires = nonWiresProp;
         this.wires = wiresProp;
         this.properties = [this.id, this.x, this.y, this.width, this.height, this.name,

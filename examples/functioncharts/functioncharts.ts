@@ -333,7 +333,6 @@ class FunctionchartTemplate extends NonWireTemplate {
   readonly height = heightProp;
   readonly name = nameProp;
   readonly explicit = explicitProp;
-  readonly typeString = typeStringProp;
   readonly nonWires = nonWiresProp;
   readonly wires = wiresProp;
   readonly properties = [this.id, this.x, this.y, this.width, this.height, this.name,
@@ -576,7 +575,7 @@ export interface GraphInfo {
 export class FunctionchartContext extends EventBase<Change, ChangeEvents>
                                   implements DataContext {
   private highestId: number = 0;  // 0 stands for no id.
-  private readonly referentMap = new Map<number, ElementTypes | Functionchart>();
+  private readonly referentMap = new Map<number, ReferencedObject>();
 
   private functionchart: Functionchart;  // The root functionchart.
   private readonly elements = new Set<ElementTypes>;
@@ -1906,7 +1905,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.removeItem(oldValue);
     this.onElementRemoved(owner, prop, index, oldValue);
   }
-  resolveReference(owner: AllTypes, prop: ReferenceProp) : ElementTypes | Functionchart | undefined {
+  resolveReference(owner: AllTypes, prop: ReferenceProp) : ReferencedObject | undefined {
     // Look up element id.
     const id: number = prop.getId(owner);
     if  (!id)
