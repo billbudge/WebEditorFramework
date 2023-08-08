@@ -383,20 +383,22 @@ describe('FunctionchartContext', () => {
         expect(pins.has(elem2, 2)).toBe(true);
         expect(pins.has(input, 0)).toBe(true);
     });
-    test('getFunctionchartTypeInfo', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'cond'), elem2 = addElement(functionchart, 'cond');
-        functionchart.explicit = false;
-        let typeInfo = context.getFunctionchartTypeInfo(functionchart);
-        // No wires, explicit, all inputs and outputs become pins.
-        expect(typeInfo.typeString).toBe('[v**v**,**]');
-        expect(typeInfo.passThroughs.length).toBe(2);
-        arrayEquals(typeInfo.passThroughs[0], [1, 2, 6]);
-        arrayEquals(typeInfo.passThroughs[1], [4, 5, 7]);
-        const wire1 = addWire(functionchart, elem1, 0, elem2, 2);
-        typeInfo = context.getFunctionchartTypeInfo(functionchart);
-        expect(typeInfo.typeString).toBe('[v**v*,*]');
-        expect(typeInfo.passThroughs.length).toBe(1);
-        arrayEquals(typeInfo.passThroughs[0], [1, 2, 4, 5]);
-    });
+    // test('getFunctionchartTypeInfo', () => {
+    //   const context = new FC.FunctionchartContext(),
+    //         functionchart = context.root,
+    //         elem1 = addElement(functionchart, 'cond'),
+    //         elem2 = addElement(functionchart, 'cond');
+    //   let typeInfo = context.getFunctionchartTypeInfo(functionchart);
+    //   // No wires, all inputs and outputs become pins.
+    //   expect(typeInfo.typeString).toBe('[v**v**,**]');
+    //   expect(typeInfo.passThroughs.length).toBe(2);
+    //   arrayEquals(typeInfo.passThroughs[0], [1, 2, 6]);
+    //   arrayEquals(typeInfo.passThroughs[1], [4, 5, 7]);
+    //   const wire1 = addWire(functionchart, elem1, 0, elem2, 2);
+    //   typeInfo = context.getFunctionchartTypeInfo(functionchart);
+    //   expect(typeInfo.typeString).toBe('[v**v*,*]');
+    //   expect(typeInfo.passThroughs.length).toBe(1);
+    //   arrayEquals(typeInfo.passThroughs[0], [1, 2, 4, 5]);
+    // });
 });
 //# sourceMappingURL=functioncharts.test.js.map

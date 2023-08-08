@@ -226,7 +226,7 @@ export function parseTypeString(s) {
 //------------------------------------------------------------------------------
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), explicitProp = new ScalarProp('explicit'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), functionchartProp = new ReferenceProp('functionchart'), elementsProp = new ChildArrayProp('elements');
+const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), functionchartProp = new ReferenceProp('functionchart'), elementsProp = new ChildArrayProp('elements');
 class NonWireTemplate {
     constructor() {
         this.id = idProp;
@@ -269,11 +269,10 @@ class FunctionchartTemplate extends NonWireTemplate {
         this.width = widthProp;
         this.height = heightProp;
         this.name = nameProp;
-        this.explicit = explicitProp;
         this.nonWires = nonWiresProp;
         this.wires = wiresProp;
         this.properties = [this.id, this.x, this.y, this.width, this.height, this.name,
-            this.explicit, this.nonWires, this.wires];
+            this.nonWires, this.wires];
     }
 }
 class FunctionInstanceTemplate extends NonWireTemplate {
@@ -392,8 +391,6 @@ export class Functionchart {
     set height(value) { this.template.height.set(this, value); }
     get name() { return this.template.name.get(this) || 0; }
     set name(value) { this.template.name.set(this, value); }
-    get explicit() { return this.template.explicit.get(this); }
-    set explicit(value) { this.template.explicit.set(this, value); }
     get nonWires() { return this.template.nonWires.get(this); }
     get wires() { return this.template.wires.get(this); }
     constructor(context, id) {
@@ -1245,7 +1242,6 @@ export class FunctionchartContext extends EventBase {
         // Collect subgraph info.
         const subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray());
         // Collect the functionchart's inputs and outputs.
-        // First, explicit inputs and outputs.
         subgraphInfo.elements.forEach(item => {
             if (item.parent !== functionchart)
                 return;
@@ -1265,37 +1261,35 @@ export class FunctionchartContext extends EventBase {
                 // TODO 'pass' pseudoelement.
             }
         });
-        // Now, implicit inputs and outputs.
-        if (!functionchart.explicit) {
-            // Add all disconnected inputs and outputs as pins.
-            subgraphInfo.elements.forEach(element => {
-                if (element instanceof FunctionInstance && element.functionchart === functionchart)
-                    return; // We don't expose a recursive instance of the functionchart.
-                element.inWires.forEach((wire, index) => {
-                    if (wire === undefined) {
-                        const connected = new Multimap();
-                        const pin = element.type.inputs[index];
-                        if (pin.type === Type.spacerType)
-                            return;
-                        const type = self.resolvePinType(element, index, connected) || Type.starType;
-                        const pinInfo = { element, index, type, connected, fcIndex: -1 };
-                        inputs.push(pinInfo);
-                    }
-                });
-                element.outWires.forEach((wires, index) => {
-                    if (wires.length === 0) {
-                        const connected = new Multimap();
-                        const pin = element.type.outputs[index];
-                        if (pin.type === Type.spacerType)
-                            return;
-                        const firstOutput = element.type.inputs.length;
-                        const type = self.resolvePinType(element, index + firstOutput, connected) || Type.starType;
-                        const pinInfo = { element, index: index + firstOutput, type, connected, fcIndex: -1 };
-                        outputs.push(pinInfo);
-                    }
-                });
-            });
-        }
+        // // Now, implicit inputs and outputs.
+        // if (!functionchart.explicit) {
+        //   // Add all disconnected inputs and outputs as pins.
+        //   subgraphInfo.elements.forEach(element => {
+        //     if (element instanceof FunctionInstance && element.functionchart === functionchart)
+        //       return;  // We don't expose a recursive instance of the functionchart.
+        //     element.inWires.forEach((wire, index) => {
+        //       if (wire === undefined) {
+        //         const connected = new Multimap<ElementTypes, number>();
+        //         const pin = element.type.inputs[index];
+        //         if (pin.type === Type.spacerType) return;
+        //         const type = self.resolvePinType(element, index, connected) || Type.starType;
+        //         const pinInfo = { element, index, type, connected, fcIndex: -1 };
+        //         inputs.push(pinInfo);
+        //       }
+        //     });
+        //     element.outWires.forEach((wires, index) => {
+        //       if (wires.length === 0) {
+        //         const connected = new Multimap<ElementTypes, number>();
+        //         const pin = element.type.outputs[index];
+        //         if (pin.type === Type.spacerType) return;
+        //         const firstOutput = element.type.inputs.length;
+        //         const type = self.resolvePinType(element, index + firstOutput, connected) || Type.starType;
+        //         const pinInfo = { element, index: index + firstOutput, type, connected, fcIndex: -1 };
+        //         outputs.push(pinInfo);
+        //       }
+        //     });
+        //   });
+        // }
         // Evaluate context.
         // if (subgraphInfo.inWires) {
         // }
@@ -1386,7 +1380,7 @@ export class FunctionchartContext extends EventBase {
     updateType(element, typeString) {
         // Make sure type and inWires and outWires arrays are consistent.
         // TODO split into two functions.
-        const newType = parseTypeString(typeString), inputs = newType.inputs.length, outputs = newType.outputs.length, inWires = element.inWires, outWires = element.outWires;
+        const newType = typeString ? parseTypeString(typeString) : Type.emptyType, inputs = newType.inputs.length, outputs = newType.outputs.length, inWires = element.inWires, outWires = element.outWires;
         for (let i = 0; i < inWires.length; i++) {
             const wire = inWires[i];
             if (wire) {
@@ -1436,13 +1430,7 @@ export class FunctionchartContext extends EventBase {
         if (item instanceof Wire)
             return;
         // Update 'type' property for functioncharts and their instances.
-        if (item instanceof FunctionInstance) {
-            const functionChart = item.functionchart;
-            if (functionChart) {
-                this.updateType(item, functionChart.type.typeString);
-            }
-        }
-        else if (item instanceof Functionchart) {
+        if (item instanceof Functionchart) {
             const typeInfo = this.getFunctionchartTypeInfo(item), typeString = typeInfo.typeString;
             if (item.type.typeString !== typeString) {
                 item.type = parseTypeString(typeString);
@@ -1452,6 +1440,15 @@ export class FunctionchartContext extends EventBase {
             this.fcMap.forValues(item, instance => {
                 this.updateType(instance, typeString);
             });
+        }
+        else if (item instanceof FunctionInstance) {
+            const functionChart = item.functionchart;
+            if (functionChart) {
+                this.updateType(item, functionChart.type.typeString);
+            }
+        }
+        else {
+            this.updateType(item, item.typeString);
         }
         // Update child items with our current position.
         this.visitNonWires(item, item => this.setGlobalPosition(item));
@@ -1586,13 +1583,17 @@ export class FunctionchartContext extends EventBase {
             }
         }
         else if (owner instanceof FunctionInstance) {
-            if (prop === functionchartProp) {
-                owner.type = owner.functionchart.type;
+            if (this.elements.has(owner)) {
+                if (prop === functionchartProp) {
+                    owner.type = owner.functionchart.type;
+                }
             }
         }
         else if (owner instanceof Element || owner instanceof Pseudoelement) {
-            if (prop === typeStringProp) {
-                this.updateType(owner, owner.typeString);
+            if (this.elements.has(owner)) {
+                if (prop === typeStringProp) {
+                    this.updateType(owner, owner.typeString);
+                }
             }
         }
         this.onValueChanged(owner, prop, oldValue);
@@ -2312,13 +2313,13 @@ export class FunctionchartEditor {
                 setter: setter,
                 prop: nameProp,
             },
-            {
-                label: 'explicit',
-                type: 'boolean',
-                getter: getter,
-                setter: setter,
-                prop: explicitProp,
-            },
+            // {
+            //   label: 'explicit',
+            //   type: 'boolean',
+            //   getter: getter,
+            //   setter: setter,
+            //   prop: explicitProp,
+            // },
         ]);
         this.propertyInfo.forEach((info, key) => {
             propertyGridController.register(key, info);
