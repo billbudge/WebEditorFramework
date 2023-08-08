@@ -808,7 +808,7 @@ export class FunctionchartContext extends EventBase {
             if (wires.length === 0)
                 return;
             // Copy array since we're mutating it.
-            wires.splice(0).forEach(wire => {
+            wires.slice().forEach(wire => {
                 if (wire)
                     self.deleteItem(wire);
             });
@@ -1117,7 +1117,7 @@ export class FunctionchartContext extends EventBase {
             if (wires.length === 0)
                 return;
             // Copy array since we're mutating.
-            wires.splice(0).forEach(wire => {
+            wires.slice().forEach(wire => {
                 if (!wire)
                     return;
                 const dst = wire.dst, srcPin = wire.srcPin, dstPin = wire.dstPin;
@@ -1406,7 +1406,7 @@ export class FunctionchartContext extends EventBase {
             const wires = outWires[i];
             if (wires.length === 0)
                 continue;
-            wires.splice(0).forEach(wire => {
+            wires.slice().forEach(wire => {
                 if (i >= outputs || !this.isValidWire(wire)) { // no pin at this index.
                     this.deleteItem(wire);
                 }
