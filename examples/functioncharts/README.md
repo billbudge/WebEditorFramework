@@ -32,13 +32,19 @@ This diagram is already a little hard to read. We can simplify by defining new e
   <img src="./resources/signum2.svg"  alt="" title="Signum function.">
 </figure>
 
-Similarly we can define useful functions like increment, decrement, maximum, minimum, and absolute value.
+Similarly we can define useful functions like increment, decrement, maximum, minimum, and absolute value. Note the use of the "< 0" function in the abs functionchart.
 
 <figure>
-  <img src="./resources/simpleFns.svg"  alt="" title="Maximum, minimum, and absolute value.">
+  <img src="./resources/simpleFns.svg"  alt="" title="Comparisons, maximum, minimum, and absolute value.">
 </figure>
 
 Since functioncharts can contain instances of themselves, we can define a recursive Factorial (N!) function. The recursion is equivalent to a simple iteration, and in fact this is how the graphs represent iteration.
+
+<figure>
+  <img src="./resources/factorial.svg"  alt="" title="Recursive definition of factorial function N!.">
+</figure>
+
+Similarly, we can define a Fibonacci function. We define a helper which takes 3 parameters, and then "call" it with n, 1, 1, to start the iteration.
 
 <figure>
   <img src="./resources/factorial.svg"  alt="" title="Recursive definition of factorial function N!.">
