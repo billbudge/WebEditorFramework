@@ -1212,11 +1212,13 @@ export class FunctionchartContext extends EventBase {
         }
         else {
             const wires = element.outWires[index - firstOutput];
-            for (let i = 0; i < wires.length; i++) {
-                const wire = wires[i];
-                if (wire) {
-                    const dst = wire.dst, dstPin = wire.dstPin;
-                    this.visitPin(dst, dstPin, visitor, visited);
+            if (wires) {
+                for (let i = 0; i < wires.length; i++) {
+                    const wire = wires[i];
+                    if (wire) {
+                        const dst = wire.dst, dstPin = wire.dstPin;
+                        this.visitPin(dst, dstPin, visitor, visited);
+                    }
                 }
             }
         }
@@ -1228,7 +1230,7 @@ export class FunctionchartContext extends EventBase {
         let type;
         function visit(element, index) {
             const pin = element.getPin(index);
-            if (pin.type !== Type.starType) {
+            if (pin && pin.type !== Type.starType) {
                 type = pin.type;
             }
             return true;

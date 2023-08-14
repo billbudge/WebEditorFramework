@@ -47,7 +47,7 @@ Since functioncharts can contain instances of themselves, we can define a recurs
 Similarly, we can define a Fibonacci function. We define a helper which takes 3 parameters, and then "call" it with n, 1, 1, to start the iteration.
 
 <figure>
-  <img src="./resources/factorial.svg"  alt="" title="Recursive definition of factorial function N!.">
+  <img src="./resources/fibonacci.svg"  alt="" title="Recursive definition of fibonacci function.">
 </figure>
 
 Our palette contains the built in elements and pseudoelements. On the top are the input, output, apply, and pass pseudoelements. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an element and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
