@@ -764,10 +764,10 @@ export class FunctionchartContext extends EventBase {
     select(item) {
         this.selection.add(item);
     }
-    selectionContents() {
+    selectedAllTypes() {
         return this.selection.contents();
     }
-    selectedElements() {
+    selectedTrueElements() {
         const result = new Array();
         this.selection.forEach(item => {
             if (item instanceof Element || item instanceof FunctionInstance)
@@ -775,7 +775,7 @@ export class FunctionchartContext extends EventBase {
         });
         return result;
     }
-    selectedAllElements() {
+    selectedElements() {
         const result = new Array();
         this.selection.forEach(item => {
             if (item instanceof ElementBase)
@@ -816,14 +816,14 @@ export class FunctionchartContext extends EventBase {
     }
     disconnectSelection() {
         const self = this;
-        this.selectedAllElements().forEach(element => self.disconnectElement(element));
+        this.selectedElements().forEach(element => self.disconnectElement(element));
     }
     selectInteriorWires() {
-        const self = this, graphInfo = this.getSubgraphInfo(this.selectedAllElements());
+        const self = this, graphInfo = this.getSubgraphInfo(this.selectedElements());
         graphInfo.interiorWires.forEach(wire => self.selection.add(wire));
     }
     selectConnectedElements(upstream, downstream) {
-        const selectedElements = this.selectedAllElements(), connectedElements = this.getConnectedElements(selectedElements, upstream, downstream);
+        const selectedElements = this.selectedElements(), connectedElements = this.getConnectedElements(selectedElements, upstream, downstream);
         this.selection.set(Array.from(connectedElements));
     }
     addItem(item, parent) {
@@ -1212,13 +1212,11 @@ export class FunctionchartContext extends EventBase {
         }
         else {
             const wires = element.outWires[index - firstOutput];
-            if (wires) {
-                for (let i = 0; i < wires.length; i++) {
-                    const wire = wires[i];
-                    if (wire) {
-                        const dst = wire.dst, dstPin = wire.dstPin;
-                        this.visitPin(dst, dstPin, visitor, visited);
-                    }
+            for (let i = 0; i < wires.length; i++) {
+                const wire = wires[i];
+                if (wire) {
+                    const dst = wire.dst, dstPin = wire.dstPin;
+                    this.visitPin(dst, dstPin, visitor, visited);
                 }
             }
         }
@@ -1230,7 +1228,7 @@ export class FunctionchartContext extends EventBase {
         let type;
         function visit(element, index) {
             const pin = element.getPin(index);
-            if (pin && pin.type !== Type.starType) {
+            if (pin.type !== Type.starType) {
                 type = pin.type;
             }
             return true;
@@ -2696,7 +2694,7 @@ export class FunctionchartEditor {
                     drag = new NonWireDrag([pointerHitInfo.item], 'copyPalette', 'Create new element or functionchart');
                 }
                 else if (this.canvasController.shiftKeyDown) {
-                    drag = new NonWireDrag(context.selectedAllElements(), 'moveCopySelection', 'Move copy of selection');
+                    drag = new NonWireDrag(context.selectedElements(), 'moveCopySelection', 'Move copy of selection');
                 }
                 else {
                     if (pointerHitInfo instanceof FunctionchartHitResult) {
@@ -2707,11 +2705,11 @@ export class FunctionchartEditor {
                             drag = new NonWireDrag([pointerHitInfo.item], 'instantiateFunctionchart', 'Create new instance of functionchart');
                         }
                         else {
-                            drag = new NonWireDrag(context.selectedAllElements(), 'moveSelection', 'Move selection');
+                            drag = new NonWireDrag(context.selectedElements(), 'moveSelection', 'Move selection');
                         }
                     }
                     else {
-                        drag = new NonWireDrag(context.selectedAllElements(), 'moveSelection', 'Move selection');
+                        drag = new NonWireDrag(context.selectedElements(), 'moveSelection', 'Move selection');
                     }
                 }
             }
@@ -2916,10 +2914,10 @@ export class FunctionchartEditor {
                     context.selectInteriorWires();
                     context.reduceSelection();
                     context.beginTransaction('group items into functionchart');
-                    const theme = this.theme, bounds = this.renderer.getBounds(context.selectedNonWires()), contents = context.selectionContents();
+                    const theme = this.theme, bounds = this.renderer.getBounds(context.selectedNonWires()), contents = context.selectedAllTypes();
                     let parent = context.getContainingFunctionchart(contents);
                     expandRect(bounds, theme.radius, theme.radius);
-                    context.group(context.selectionContents(), parent, bounds);
+                    context.group(context.selectedAllTypes(), parent, bounds);
                     context.endTransaction();
                 }
                 case 69: { // 'e'
@@ -2943,20 +2941,20 @@ export class FunctionchartEditor {
                     }
                     ;
                     context.beginTransaction('complete elements');
-                    context.completeElements(context.selectedAllElements(), inputToPoint, outputToPoint);
+                    context.completeElements(context.selectedElements(), inputToPoint, outputToPoint);
                     renderer.end();
                     context.endTransaction();
                     return true;
                 }
                 case 75: { // 'k'
                     context.beginTransaction('export elements');
-                    context.exportElements(context.selectedElements());
+                    context.exportElements(context.selectedTrueElements());
                     context.endTransaction();
                     return true;
                 }
                 case 76: // 'l'
                     context.beginTransaction('open elements');
-                    context.importElements(context.selectedElements());
+                    context.importElements(context.selectedTrueElements());
                     context.endTransaction();
                     return true;
                 case 78: { // ctrl 'n'   // Can't intercept cmd n.

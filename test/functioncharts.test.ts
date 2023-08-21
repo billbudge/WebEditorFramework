@@ -414,6 +414,50 @@ describe('FunctionchartContext', () => {
     expect(elem1.inWires[1]).toBeUndefined();
     expect(elem1.outWires[0].length).toBe(0);
   });
+  test('disconnectSelection', () => {
+    const context = new FC.FunctionchartContext(),
+          functionchart = context.root,
+          elem1 = addElement(functionchart, 'binop'),
+          input = addPseudoelement(functionchart, 'input'),
+          output1 = addPseudoelement(functionchart, 'output'),
+          output2 = addPseudoelement(functionchart, 'output'),
+          wire1 = addWire(functionchart, input, 0, elem1, 1),
+          wire2 = addWire(functionchart, elem1, 0, output1, 0),
+          wire3 = addWire(functionchart, elem1, 0, output2, 0);
+    expect(functionchart.wires.length).toBe(3);
+    expect(elem1.inWires[0]).toBeUndefined();
+    expect(elem1.inWires[1]).toBe(wire1);
+    expect(elem1.outWires[0].length).toBe(2);
+    context.disconnectSelection();
+    expect(functionchart.wires.length).toBe(3);
+    expect(elem1.inWires[0]).toBeUndefined();
+    expect(elem1.inWires[1]).toBe(wire1);
+    expect(elem1.outWires[0].length).toBe(2);
+    context.selection.add(elem1);
+    context.disconnectSelection();
+    expect(functionchart.wires.length).toBe(0);
+    expect(elem1.inWires[1]).toBeUndefined();
+    expect(elem1.outWires[0].length).toBe(0);
+  });
+  test('extendSelectionToWires', () => {
+    const context = new FC.FunctionchartContext(),
+          functionchart = context.root,
+          elem1 = addElement(functionchart, 'binop'),
+          input = addPseudoelement(functionchart, 'input'),
+          output1 = addPseudoelement(functionchart, 'output'),
+          output2 = addPseudoelement(functionchart, 'output'),
+          wire1 = addWire(functionchart, input, 0, elem1, 1),
+          wire2 = addWire(functionchart, elem1, 0, output1, 0),
+          wire3 = addWire(functionchart, elem1, 0, output2, 0);
+    context.selection.add(elem1);
+    expect(context.selection.length()).toBe(1);
+    context.extendSelectionToWires();
+    expect(context.selection.length()).toBe(1);
+    context.selection.add(input);
+    context.extendSelectionToWires();
+    expect(context.selection.length()).toBe(3);
+    expect(context.selection.has(wire1)).toBe(true);
+  });
   test('changeType', () => {
     const context = new FC.FunctionchartContext(),
           functionchart = context.root,

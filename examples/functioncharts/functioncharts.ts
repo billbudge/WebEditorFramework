@@ -1009,7 +1009,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.selectedElements().forEach(element => self.disconnectElement(element));
   }
 
-  selectInteriorWires() {
+  extendSelectionToWires() {
     const self = this,
           graphInfo = this.getSubgraphInfo(this.selectedElements());
     graphInfo.interiorWires.forEach(wire => self.selection.add(wire));
@@ -1083,7 +1083,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           selection = this.selection;
 
     selection.set(this.selectedNonWires());
-    this.selectInteriorWires();
+    this.extendSelectionToWires();
     this.reduceSelection();
 
     const selected = selection.contents(),
@@ -3482,7 +3482,7 @@ export class FunctionchartEditor implements CanvasLayer {
         }
         case 71 : { // 'g'
           context.selection.set(context.selectedNonWires());
-          context.selectInteriorWires();
+          context.extendSelectionToWires();
           context.reduceSelection();
           context.beginTransaction('group items into functionchart');
           const theme = this.theme,

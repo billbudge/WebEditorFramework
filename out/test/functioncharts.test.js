@@ -21,6 +21,9 @@ function addFunctionchart(parent) {
     context.addItem(functionchart, parent);
     return functionchart;
 }
+function pinPosition(element, pin) {
+    return { x: 0, y: 0, nx: 0, ny: 0 };
+}
 // function setEquals(set1: Set<any>, set2: Array<any>) {
 //   expect(set1.size).toBe(set2.length);
 //   for (const item of set2) {
@@ -299,6 +302,17 @@ describe('FunctionchartContext', () => {
         expect(wire2.src).toBe(elem2);
         expect(wire2.dst).toBe(output);
     });
+    test('disconnectElement', () => {
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
+        expect(functionchart.wires.length).toBe(3);
+        expect(elem1.inWires[0]).toBeUndefined();
+        expect(elem1.inWires[1]).toBe(wire1);
+        expect(elem1.outWires[0].length).toBe(2);
+        context.disconnectElement(elem1);
+        expect(functionchart.wires.length).toBe(0);
+        expect(elem1.inWires[1]).toBeUndefined();
+        expect(elem1.outWires[0].length).toBe(0);
+    });
     test('changeType', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
         elem1.typeString = '[v,v]';
@@ -383,22 +397,39 @@ describe('FunctionchartContext', () => {
         expect(pins.has(elem2, 2)).toBe(true);
         expect(pins.has(input, 0)).toBe(true);
     });
-    // test('getFunctionchartTypeInfo', () => {
-    //   const context = new FC.FunctionchartContext(),
-    //         functionchart = context.root,
-    //         elem1 = addElement(functionchart, 'cond'),
-    //         elem2 = addElement(functionchart, 'cond');
-    //   let typeInfo = context.getFunctionchartTypeInfo(functionchart);
-    //   // No wires, all inputs and outputs become pins.
-    //   expect(typeInfo.typeString).toBe('[v**v**,**]');
-    //   expect(typeInfo.passThroughs.length).toBe(2);
-    //   arrayEquals(typeInfo.passThroughs[0], [1, 2, 6]);
-    //   arrayEquals(typeInfo.passThroughs[1], [4, 5, 7]);
-    //   const wire1 = addWire(functionchart, elem1, 0, elem2, 2);
-    //   typeInfo = context.getFunctionchartTypeInfo(functionchart);
-    //   expect(typeInfo.typeString).toBe('[v**v*,*]');
-    //   expect(typeInfo.passThroughs.length).toBe(1);
-    //   arrayEquals(typeInfo.passThroughs[0], [1, 2, 4, 5]);
-    // });
+    test('reduceSelection', () => {
+        const context = new FC.FunctionchartContext(), functionchart = context.root, functionchart1 = addFunctionchart(functionchart), elem1 = addElement(functionchart1, 'element'), elem2 = addElement(functionchart1, 'element'), elem3 = addElement(functionchart, 'element');
+        context.reduceSelection();
+        expect(context.selectedTrueElements().length).toBe(0);
+        expect(context.selectedElements().length).toBe(0);
+        expect(context.selectedNonWires().length).toBe(0);
+        context.selection.add(elem1);
+        context.reduceSelection();
+        expect(context.selectedTrueElements().length).toBe(1);
+        expect(context.selectedElements().length).toBe(1);
+        expect(context.selectedNonWires().length).toBe(1);
+        context.selection.add(functionchart1);
+        expect(context.selectedTrueElements().length).toBe(1);
+        expect(context.selectedElements().length).toBe(1);
+        expect(context.selectedNonWires().length).toBe(2);
+        context.reduceSelection();
+        expect(context.selectedTrueElements().length).toBe(0);
+        expect(context.selectedElements().length).toBe(0);
+        expect(context.selectedNonWires().length).toBe(1);
+        expect(context.selectedNonWires()[0]).toBe(functionchart1);
+    });
+    test('getFunctionchartTypeInfo', () => {
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'cond'), elem2 = addElement(functionchart, 'cond');
+        let typeInfo = context.getFunctionchartTypeInfo(functionchart);
+        // No inputs or outputs.
+        expect(typeInfo.typeString).toBe('[,]');
+        expect(typeInfo.passThroughs.length).toBe(0);
+        const wire1 = addWire(functionchart, elem1, 0, elem2, 2);
+        context.completeElements([elem1, elem2], pinPosition, pinPosition);
+        typeInfo = context.getFunctionchartTypeInfo(functionchart);
+        expect(typeInfo.typeString).toBe('[v**v*,*]');
+        expect(typeInfo.passThroughs.length).toBe(1);
+        arrayEquals(typeInfo.passThroughs[0], [1, 2, 4, 5]);
+    });
 });
 //# sourceMappingURL=functioncharts.test.js.map
