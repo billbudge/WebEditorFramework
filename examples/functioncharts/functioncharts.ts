@@ -534,7 +534,8 @@ export class FunctionInstance extends ElementBase implements DataContextObject, 
   }
 }
 
-export type ElementTypes = Element | Pseudoelement | FunctionInstance;
+export type TrueElement = Element | FunctionInstance;
+export type ElementTypes = TrueElement | Pseudoelement;
 export type NonWireTypes = ElementTypes | Functionchart;
 export type AllTypes = NonWireTypes | Wire;
 
@@ -949,11 +950,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.selection.add(item);
   }
 
-  selectionContents() : AllTypes[] {
+  selectedAllTypes() : AllTypes[] {
     return this.selection.contents();
   }
 
-  selectedElements() : (Element | FunctionInstance)[] {
+  selectedTrueElements() : (Element | FunctionInstance)[] {
     const result = new Array<Element | FunctionInstance>();
     this.selection.forEach(item => {
       if (item instanceof Element || item instanceof FunctionInstance)
@@ -962,7 +963,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
-  selectedAllElements() : ElementTypes[] {
+  selectedElements() : ElementTypes[] {
     const result = new Array<ElementTypes>();
     this.selection.forEach(item => {
       if (item instanceof ElementBase)
@@ -1005,17 +1006,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
   disconnectSelection() {
     const self = this;
-    this.selectedAllElements().forEach(element => self.disconnectElement(element));
+    this.selectedElements().forEach(element => self.disconnectElement(element));
   }
 
   selectInteriorWires() {
     const self = this,
-          graphInfo = this.getSubgraphInfo(this.selectedAllElements());
+          graphInfo = this.getSubgraphInfo(this.selectedElements());
     graphInfo.interiorWires.forEach(wire => self.selection.add(wire));
   }
 
   selectConnectedElements(upstream: WireFilter, downstream: WireFilter) {
-    const selectedElements = this.selectedAllElements(),
+    const selectedElements = this.selectedElements(),
           connectedElements = this.getConnectedElements(selectedElements, upstream, downstream);
     this.selection.set(Array.from(connectedElements));
   }
@@ -3232,7 +3233,7 @@ export class FunctionchartEditor implements CanvasLayer {
         if (this.clickInPalette) {
           drag = new NonWireDrag([pointerHitInfo.item], 'copyPalette', 'Create new element or functionchart');
         } else if (this.canvasController.shiftKeyDown) {
-          drag = new NonWireDrag(context.selectedAllElements(), 'moveCopySelection', 'Move copy of selection');
+          drag = new NonWireDrag(context.selectedElements(), 'moveCopySelection', 'Move copy of selection');
         } else {
           if (pointerHitInfo instanceof FunctionchartHitResult) {
             if (pointerHitInfo.inner.border) {
@@ -3240,10 +3241,10 @@ export class FunctionchartEditor implements CanvasLayer {
             } else if (pointerHitInfo.instancer) {
               drag = new NonWireDrag([pointerHitInfo.item], 'instantiateFunctionchart', 'Create new instance of functionchart');
             } else {
-              drag = new NonWireDrag(context.selectedAllElements(), 'moveSelection', 'Move selection');
+              drag = new NonWireDrag(context.selectedElements(), 'moveSelection', 'Move selection');
             }
           } else {
-            drag = new NonWireDrag(context.selectedAllElements(), 'moveSelection', 'Move selection');
+            drag = new NonWireDrag(context.selectedElements(), 'moveSelection', 'Move selection');
           }
         }
       }
@@ -3486,10 +3487,10 @@ export class FunctionchartEditor implements CanvasLayer {
           context.beginTransaction('group items into functionchart');
           const theme = this.theme,
                 bounds = this.renderer.getBounds(context.selectedNonWires()),
-                contents = context.selectionContents();
+                contents = context.selectedAllTypes();
           let parent = context.getContainingFunctionchart(contents);
           expandRect(bounds, theme.radius, theme.radius);
-          context.group(context.selectionContents(), parent, bounds);
+          context.group(context.selectedAllTypes(), parent, bounds);
           context.endTransaction();
         }
         case 69: { // 'e'
@@ -3511,20 +3512,20 @@ export class FunctionchartEditor implements CanvasLayer {
             return renderer.pinToPoint(element, pin, false);
           };
           context.beginTransaction('complete elements');
-          context.completeElements(context.selectedAllElements(), inputToPoint, outputToPoint);
+          context.completeElements(context.selectedElements(), inputToPoint, outputToPoint);
           renderer.end();
           context.endTransaction();
           return true;
         }
         case 75: { // 'k'
           context.beginTransaction('export elements');
-          context.exportElements(context.selectedElements());
+          context.exportElements(context.selectedTrueElements());
           context.endTransaction();
           return true;
         }
         case 76: // 'l'
           context.beginTransaction('open elements');
-          context.importElements(context.selectedElements());
+          context.importElements(context.selectedTrueElements());
           context.endTransaction();
           return true;
         case 78: { // ctrl 'n'   // Can't intercept cmd n.

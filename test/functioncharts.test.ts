@@ -515,21 +515,21 @@ describe('FunctionchartContext', () => {
           elem2 = addElement(functionchart1, 'element'),
           elem3 = addElement(functionchart, 'element');
     context.reduceSelection();
+    expect(context.selectedTrueElements().length).toBe(0);
     expect(context.selectedElements().length).toBe(0);
-    expect(context.selectedAllElements().length).toBe(0);
     expect(context.selectedNonWires().length).toBe(0);
     context.selection.add(elem1);
     context.reduceSelection();
+    expect(context.selectedTrueElements().length).toBe(1);
     expect(context.selectedElements().length).toBe(1);
-    expect(context.selectedAllElements().length).toBe(1);
     expect(context.selectedNonWires().length).toBe(1);
     context.selection.add(functionchart1);
+    expect(context.selectedTrueElements().length).toBe(1);
     expect(context.selectedElements().length).toBe(1);
-    expect(context.selectedAllElements().length).toBe(1);
     expect(context.selectedNonWires().length).toBe(2);
     context.reduceSelection();
+    expect(context.selectedTrueElements().length).toBe(0);
     expect(context.selectedElements().length).toBe(0);
-    expect(context.selectedAllElements().length).toBe(0);
     expect(context.selectedNonWires().length).toBe(1);
     expect(context.selectedNonWires()[0]).toBe(functionchart1);
   });
