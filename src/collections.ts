@@ -202,7 +202,7 @@ export class SelectionSet<T> {
     return this.length_ === 0;
   }
 
-  length() : number {
+  get length() : number {
     return this.length_;
   }
 

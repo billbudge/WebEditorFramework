@@ -450,12 +450,12 @@ describe('FunctionchartContext', () => {
           wire2 = addWire(functionchart, elem1, 0, output1, 0),
           wire3 = addWire(functionchart, elem1, 0, output2, 0);
     context.selection.add(elem1);
-    expect(context.selection.length()).toBe(1);
+    expect(context.selection.length).toBe(1);
     context.extendSelectionToWires();
-    expect(context.selection.length()).toBe(1);
+    expect(context.selection.length).toBe(1);
     context.selection.add(input);
     context.extendSelectionToWires();
-    expect(context.selection.length()).toBe(3);
+    expect(context.selection.length).toBe(3);
     expect(context.selection.has(wire1)).toBe(true);
   });
   test('changeType', () => {

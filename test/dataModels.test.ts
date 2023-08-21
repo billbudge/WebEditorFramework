@@ -490,7 +490,7 @@ describe('HistoryManager', () => {
     transactionManager.endTransaction();
 
     expect(transaction.ops.length).toBe(3);  // Two appends and a SelectionOp.
-    expect(selectionSet.length()).toBe(2);
+    expect(selectionSet.length).toBe(2);
     expect(selectionSet.has(child1)).toBe(true);
     expect(selectionSet.has(child2)).toBe(true);
     expect(selectionSet.lastSelected).toBe(child2);
@@ -502,13 +502,13 @@ describe('HistoryManager', () => {
     expect(historyManager.getUndo()).toBeUndefined();
     expect(historyManager.getRedo()).toBeDefined();
 
-    expect(selectionSet.length()).toBe(1);
+    expect(selectionSet.length).toBe(1);
     expect(selectionSet.has(item)).toBe(true);
 
     historyManager.redo();
     expect(historyManager.getUndo()).toBeDefined();
     expect(historyManager.getRedo()).toBeUndefined();
-    expect(selectionSet.length()).toBe(2);
+    expect(selectionSet.length).toBe(2);
     expect(selectionSet.has(child1)).toBe(true);
     expect(selectionSet.has(child2)).toBe(true);
     expect(selectionSet.lastSelected).toBe(child2);
@@ -527,7 +527,7 @@ describe('HistoryManager', () => {
     const transaction = transactionManager.beginTransaction('test');
     item.x = 1;
     transactionManager.endTransaction();
-    expect(selectionSet.length()).toBe(1);
+    expect(selectionSet.length).toBe(1);
     expect(selectionSet.lastSelected).toBe(item);
   });
 });
