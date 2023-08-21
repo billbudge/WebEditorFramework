@@ -458,6 +458,34 @@ describe('FunctionchartContext', () => {
     expect(context.selection.length).toBe(3);
     expect(context.selection.has(wire1)).toBe(true);
   });
+  test('getConnectedElements', () => {
+    const context = new FC.FunctionchartContext(),
+          functionchart = context.root,
+          elem1 = addElement(functionchart, 'binop'),
+          input = addPseudoelement(functionchart, 'input'),
+          output1 = addPseudoelement(functionchart, 'output'),
+          output2 = addPseudoelement(functionchart, 'output'),
+          wire1 = addWire(functionchart, input, 0, elem1, 1),
+          wire2 = addWire(functionchart, elem1, 0, output1, 0),
+          wire3 = addWire(functionchart, elem1, 0, output2, 0);
+    context.selection.add(elem1);
+    expect(context.selection.length).toBe(1);
+    let connected = context.getConnectedElements([elem1], () => true, () => false);
+    expect(connected.size).toBe(2);
+    expect(connected.has(elem1)).toBe(true);
+    expect(connected.has(input)).toBe(true);
+    connected = context.getConnectedElements([elem1], () => false, () => true);
+    expect(connected.size).toBe(3);
+    expect(connected.has(elem1)).toBe(true);
+    expect(connected.has(output1)).toBe(true);
+    expect(connected.has(output2)).toBe(true);
+    connected = context.getConnectedElements([elem1], () => true, () => true);
+    expect(connected.size).toBe(4);
+    expect(connected.has(elem1)).toBe(true);
+    expect(connected.has(input)).toBe(true);
+    expect(connected.has(output1)).toBe(true);
+    expect(connected.has(output2)).toBe(true);
+  });
   test('changeType', () => {
     const context = new FC.FunctionchartContext(),
           functionchart = context.root,
