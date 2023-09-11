@@ -34,6 +34,9 @@ class DataList {
     indexOf(element) {
         return this.array.indexOf(element);
     }
+    includes(element) {
+        return this.indexOf(element) >= 0;
+    }
     removeAt(index) {
         if (this.array.length <= index)
             throw new RangeError('Index out of range: ' + index);

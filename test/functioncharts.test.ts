@@ -319,6 +319,31 @@ describe('FunctionchartContext', () => {
     testIterator(inputFn, elem2, [wire1, wire3]);
     testIterator(outputFn, elem2, [wire4, wire5]);
   });
+  test('resolveReference', () => {
+    const context = new FC.FunctionchartContext(),
+          functionchart = context.root,
+          elem1 = addElement(functionchart, 'element'),
+          elem2 = addElement(functionchart, 'element'),
+          wire = addWire(functionchart, elem1, 0, elem2, 0);
+    expect(context.resolveReference(wire, wire.template.src)).toBe(elem1);
+    expect(context.resolveReference(wire, wire.template.dst)).toBe(elem2);
+  });
+  test('construct', () => {
+    const context = new FC.FunctionchartContext();
+    let element;
+    element = context.construct('literal');
+    expect(element instanceof FC.Element).toBe(true);
+    expect(element.template.typeName).toBe('literal');
+    element = context.construct('binop');
+    expect(element instanceof FC.Element).toBe(true);
+    expect(element.template.typeName).toBe('binop');
+    element = context.construct('unop');
+    expect(element instanceof FC.Element).toBe(true);
+    expect(element.template.typeName).toBe('unop');
+    element = context.construct('cond');
+    expect(element instanceof FC.Element).toBe(true);
+    expect(element.template.typeName).toBe('cond');
+  });
   test('isValidWire', () => {
     const context = new FC.FunctionchartContext(),
           functionchart = context.root,
@@ -486,7 +511,7 @@ describe('FunctionchartContext', () => {
     expect(connected.has(output1)).toBe(true);
     expect(connected.has(output2)).toBe(true);
   });
-  test('changeType', () => {
+  test('updateType', () => {
     const context = new FC.FunctionchartContext(),
           functionchart = context.root,
           elem1 = addElement(functionchart, 'element'),

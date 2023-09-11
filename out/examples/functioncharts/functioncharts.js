@@ -441,6 +441,7 @@ export class FunctionchartContext extends EventBase {
                 self.transactionManager.cancelTransaction();
             }
             update();
+            self.verifyInternal();
         }
         this.transactionManager.addHandler('transactionEnding', validateAndUpdate);
         this.transactionManager.addHandler('didUndo', update);
@@ -818,7 +819,7 @@ export class FunctionchartContext extends EventBase {
         const self = this;
         this.selectedElements().forEach(element => self.disconnectElement(element));
     }
-    selectInteriorWires() {
+    extendSelectionToWires() {
         const self = this, graphInfo = this.getSubgraphInfo(this.selectedElements());
         graphInfo.interiorWires.forEach(wire => self.selection.add(wire));
     }
@@ -881,7 +882,7 @@ export class FunctionchartContext extends EventBase {
     copy() {
         const Functionchart = this.functionchart, selection = this.selection;
         selection.set(this.selectedNonWires());
-        this.selectInteriorWires();
+        this.extendSelectionToWires();
         this.reduceSelection();
         const selected = selection.contents(), map = new Map(), copies = copyItems(selected, this, map);
         selected.forEach(item => {
@@ -1036,6 +1037,46 @@ export class FunctionchartContext extends EventBase {
         if (!this.sorted)
             this.sorted = this.topologicalSort();
         return this.sorted.length === this.elements.size;
+    }
+    verifyInternal() {
+        const invalidWires = new Set(), invalidElements = new Set(), graphInfo = this.getGraphInfo();
+        // Check wires.
+        graphInfo.wires.forEach(wire => {
+            const src = wire.src, srcPin = wire.srcPin, dst = wire.dst, dstPin = wire.dstPin;
+            if (src && srcPin >= 0 && srcPin < src.type.outputs.length) {
+                if (src.outWires[srcPin].indexOf(wire) < 0)
+                    invalidWires.add(wire);
+            }
+            if (dst && dstPin >= 0 && dstPin < dst.type.inputs.length) {
+                if (dst.inWires[dstPin] != wire)
+                    invalidWires.add(wire);
+            }
+            if (src && dst) {
+                const lca = getLowestCommonAncestor(src, dst);
+                if (!lca || !lca.wires.includes(wire)) {
+                    invalidWires.add(wire);
+                }
+            }
+        });
+        // Check elements.
+        graphInfo.elements.forEach(element => {
+            element.inWires.forEach((wire) => {
+                if (wire && !graphInfo.wires.has(wire))
+                    invalidElements.add(element);
+            });
+            element.outWires.forEach((wires) => {
+                wires.forEach((wire) => {
+                    if (!graphInfo.wires.has(wire))
+                        invalidElements.add(element);
+                });
+            });
+        });
+        if (invalidWires.size !== 0 || invalidElements.size !== 0) {
+            console.log('invalid wires', invalidWires);
+            console.log('invalid elements', invalidElements);
+            return false;
+        }
+        return true;
     }
     makeConsistent() {
         const self = this;
@@ -1378,6 +1419,7 @@ export class FunctionchartContext extends EventBase {
     // Update the derived 'type' property. Delete any wires that are no longer compatible with
     // the type.
     updateType(element, typeString) {
+        var _a;
         // Make sure type and inWires and outWires arrays are consistent.
         // TODO split into two functions.
         const newType = typeString ? parseTypeString(typeString) : Type.emptyType, inputs = newType.inputs.length, outputs = newType.outputs.length, inWires = element.inWires, outWires = element.outWires;
@@ -1388,17 +1430,17 @@ export class FunctionchartContext extends EventBase {
                     this.deleteItem(wire);
                 }
                 else {
-                    const src = wire.src, srcType = src.type.outputs[wire.srcPin].type;
-                    if (!srcType.canConnectTo(newType.inputs[i].type)) { // incompatible types.
+                    const srcType = (_a = wire.src) === null || _a === void 0 ? void 0 : _a.type.outputs[wire.srcPin].type;
+                    if (!srcType || !srcType.canConnectTo(newType.inputs[i].type)) { // incompatible types.
                         this.deleteItem(wire);
                     }
                 }
             }
         }
         if (inputs > inWires.length) {
-            for (let i = inWires.length; i < inputs; i++) {
-                inWires[i] = undefined;
-            }
+            // for (let i = inWires.length; i < inputs; i++) {
+            //   inWires[i] = undefined;
+            // }
         }
         inWires.length = inputs;
         // outWires.length >= outputs.
@@ -1407,12 +1449,13 @@ export class FunctionchartContext extends EventBase {
             if (wires.length === 0)
                 continue;
             wires.slice().forEach(wire => {
+                var _a;
                 if (i >= outputs || !this.isValidWire(wire)) { // no pin at this index.
                     this.deleteItem(wire);
                 }
                 else {
-                    const dst = wire.dst, dstType = dst.type.inputs[wire.dstPin].type;
-                    if (!newType.outputs[i].type.canConnectTo(dstType)) { // incompatible types.
+                    const dstType = (_a = wire.dst) === null || _a === void 0 ? void 0 : _a.type.inputs[wire.dstPin].type;
+                    if (!dstType || !newType.outputs[i].type.canConnectTo(dstType)) { // incompatible types.
                         this.deleteItem(wire);
                     }
                 }
@@ -1420,7 +1463,9 @@ export class FunctionchartContext extends EventBase {
         }
         if (outputs > outWires.length) {
             for (let i = outWires.length; i < outputs; i++) {
-                outWires[i] = new Array();
+                if (!outWires[i]) {
+                    outWires[i] = new Array();
+                }
             }
         }
         outWires.length = outputs;
@@ -1495,13 +1540,16 @@ export class FunctionchartContext extends EventBase {
         this.updateItem(wire);
         this.sorted = undefined;
         const src = wire.src, srcPin = wire.srcPin, dst = wire.dst, dstPin = wire.dstPin;
-        if (src && srcPin >= 0 && srcPin < src.type.outputs.length) {
-            // TODO how to deal with temporarily invalid wire?
-            const outputs = src.outWires[srcPin];
+        if (src && srcPin >= 0) {
+            let outputs = src.outWires[srcPin];
+            if (!outputs) {
+                outputs = new Array();
+                src.outWires[srcPin] = outputs;
+            }
             if (!outputs.includes(wire))
                 outputs.push(wire);
         }
-        if (dst && dstPin >= 0 && dstPin < dst.type.inputs.length) {
+        if (dst && dstPin >= 0) {
             dst.inWires[dstPin] = wire;
         }
     }
@@ -2365,7 +2413,6 @@ export class FunctionchartEditor {
         }
         else {
             const renderer = this.renderer;
-            renderer.begin(canvasController.getCtx());
             // Layout the palette items and their parent functionchart.
             renderer.begin(canvasController.getCtx());
             this.context.reverseVisitAll(this.palette, item => renderer.layout(item));
@@ -2911,7 +2958,7 @@ export class FunctionchartEditor {
                 }
                 case 71: { // 'g'
                     context.selection.set(context.selectedNonWires());
-                    context.selectInteriorWires();
+                    context.extendSelectionToWires();
                     context.reduceSelection();
                     context.beginTransaction('group items into functionchart');
                     const theme = this.theme, bounds = this.renderer.getBounds(context.selectedNonWires()), contents = context.selectedAllTypes();
@@ -2964,6 +3011,7 @@ export class FunctionchartEditor {
                     self.renderer.begin(self.canvasController.getCtx());
                     self.updateBounds();
                     self.canvasController.draw();
+                    self.renderer.end();
                     return true;
                 }
                 case 79: { // 'o'
@@ -2971,11 +3019,13 @@ export class FunctionchartEditor {
                         const raw = JSON.parse(text), context = new FunctionchartContext();
                         const functionchart = Deserialize(raw, context);
                         context.root = functionchart;
+                        context.verifyInternal();
                         self.initializeContext(context);
                         self.setContext(context);
                         self.renderer.begin(self.canvasController.getCtx());
                         self.updateBounds();
                         self.canvasController.draw();
+                        self.renderer.end();
                     }
                     this.fileController.openFile().then(result => parse(result));
                     return true;

@@ -63,6 +63,7 @@ export interface List<T = any> {
   append(element: T) : void;
   insert(element: T, index: number) : void;
   indexOf(element: T) : number;
+  includes(element: T) : boolean;
   remove(element: T) : number;
   removeAt(index: number) : T;
   asArray() : T[];
@@ -94,6 +95,9 @@ class DataList implements List {
   }
   indexOf(element: any) : number {
     return this.array.indexOf(element);
+  }
+  includes(element: any) : boolean {
+    return this.indexOf(element) >= 0;
   }
   removeAt(index: number) : any {
     if (this.array.length <= index)

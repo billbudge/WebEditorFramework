@@ -166,7 +166,7 @@ export class SelectionSet {
     empty() {
         return this.length_ === 0;
     }
-    length() {
+    get length() {
         return this.length_;
     }
     has(element) {

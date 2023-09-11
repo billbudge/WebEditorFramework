@@ -210,7 +210,7 @@ describe('PriorityQueue', () => {
 describe('SelectionSet', () => {
     test('constructor', () => {
         const selectionSet = new SelectionSet();
-        expect(selectionSet.length()).toBe(0);
+        expect(selectionSet.length).toBe(0);
         expect(selectionSet.empty());
         expect(selectionSet.lastSelected).toBe(undefined);
         expect(stringify(selectionSet)).toBe('');
@@ -222,12 +222,12 @@ describe('SelectionSet', () => {
         selectionSet.add('b');
         expect(selectionSet.has('a')).toBe(true);
         expect(selectionSet.has('b')).toBe(true);
-        expect(selectionSet.length()).toBe(2);
+        expect(selectionSet.length).toBe(2);
         expect(selectionSet.empty()).toBe(false);
         expect(selectionSet.lastSelected).toBe('b');
         expect(stringify(selectionSet)).toBe('ba');
         selectionSet.add('a');
-        expect(selectionSet.length()).toBe(2);
+        expect(selectionSet.length).toBe(2);
         expect(selectionSet.lastSelected).toBe('a');
         expect(stringify(selectionSet)).toBe('ab');
     });
@@ -236,39 +236,39 @@ describe('SelectionSet', () => {
         selectionSet.add('a');
         selectionSet.add('b');
         selectionSet.add('c');
-        expect(selectionSet.length()).toBe(3);
+        expect(selectionSet.length).toBe(3);
         expect(selectionSet.lastSelected).toBe('c');
         expect(stringify(selectionSet)).toBe('cba');
         selectionSet.delete('c');
-        expect(selectionSet.length()).toBe(2);
+        expect(selectionSet.length).toBe(2);
         expect(selectionSet.lastSelected).toBe('b');
         expect(stringify(selectionSet)).toBe('ba');
         selectionSet.delete('c');
         expect(stringify(selectionSet)).toBe('ba');
         selectionSet.delete('b');
-        expect(selectionSet.length()).toBe(1);
+        expect(selectionSet.length).toBe(1);
         expect(selectionSet.lastSelected).toBe('a');
         expect(stringify(selectionSet)).toBe('a');
     });
     test('toggle', () => {
         const selectionSet = new SelectionSet();
         selectionSet.toggle('a');
-        expect(selectionSet.length()).toBe(1);
+        expect(selectionSet.length).toBe(1);
         expect(selectionSet.lastSelected).toBe('a');
         expect(stringify(selectionSet)).toBe('a');
         selectionSet.toggle('a');
-        expect(selectionSet.length()).toBe(0);
+        expect(selectionSet.length).toBe(0);
         expect(selectionSet.lastSelected).toBe(undefined);
         expect(stringify(selectionSet)).toBe('');
     });
     test('set', () => {
         const selectionSet = new SelectionSet();
         selectionSet.set('a');
-        expect(selectionSet.length()).toBe(1);
+        expect(selectionSet.length).toBe(1);
         expect(selectionSet.lastSelected).toBe('a');
         expect(stringify(selectionSet)).toBe('a');
         selectionSet.set(['a', 'b', 'c']);
-        expect(selectionSet.length()).toBe(3);
+        expect(selectionSet.length).toBe(3);
         expect(selectionSet.lastSelected).toBe('c');
         expect(stringify(selectionSet)).toBe('cba');
     });
