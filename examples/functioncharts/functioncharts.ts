@@ -1711,6 +1711,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           inWires = element.inWires,
           outWires = element.outWires;
 
+    element.type = newType;
+
     for (let i = 0; i < inWires.length; i++) {
       const wire = inWires[i];
       if (wire) {
@@ -1753,8 +1755,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
     }
     outWires.length = outputs;
-
-    element.type = newType;
   }
 
   private updateItem(item: AllTypes) {
@@ -1770,6 +1770,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
       item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
       // Update all instances of the functionchart.
+      this.fcMap.forValues(item, instance => {
+        instance.type = item.type;
+      });
       this.fcMap.forValues(item, instance => {
         this.updateType(instance, typeString);
       });
