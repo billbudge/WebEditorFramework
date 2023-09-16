@@ -1702,16 +1702,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // Update the derived 'type' property. Delete any wires that are no longer compatible with
   // the type.
-  updateType(element: ElementTypes, typeString: string) {
+  updateType(element: ElementTypes, type: Type) {
     // Make sure type and inWires and outWires arrays are consistent.
     // TODO split into two functions.
-    const newType = typeString ? parseTypeString(typeString) : Type.emptyType,
-          inputs = newType.inputs.length,
-          outputs = newType.outputs.length,
+    const inputs = type.inputs.length,
+          outputs = type.outputs.length,
           inWires = element.inWires,
           outWires = element.outWires;
 
-    element.type = newType;
+    element.type = type;
 
     for (let i = 0; i < inWires.length; i++) {
       const wire = inWires[i];
@@ -1720,7 +1719,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           this.deleteItem(wire);
         } else {
           const srcType = wire.src?.type.outputs[wire.srcPin].type;
-          if (!srcType || !srcType.canConnectTo(newType.inputs[i].type)) {  // incompatible types.
+          if (!srcType || !srcType.canConnectTo(type.inputs[i].type)) {  // incompatible types.
             this.deleteItem(wire);
           }
         }
@@ -1741,7 +1740,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           this.deleteItem(wire);
         } else {
           const dstType = wire.dst?.type.inputs[wire.dstPin].type;
-          if (!dstType || !newType.outputs[i].type.canConnectTo(dstType)) {  // incompatible types.
+          if (!dstType || !type.outputs[i].type.canConnectTo(dstType)) {  // incompatible types.
             this.deleteItem(wire);
           }
         }
@@ -1764,25 +1763,24 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // Update 'type' property for functioncharts and their instances.
     if (item instanceof Functionchart) {
       const typeInfo = this.getFunctionchartTypeInfo(item),
-            typeString = typeInfo.typeString;
-      if (item.type.typeString !== typeString) {
-        item.type = parseTypeString(typeString);
-      }
+            typeString = typeInfo.typeString,
+            type = parseTypeString(typeString);
+      item.type = type;
       item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
       // Update all instances of the functionchart.
       this.fcMap.forValues(item, instance => {
-        instance.type = item.type;
+        instance.type = type;
       });
       this.fcMap.forValues(item, instance => {
-        this.updateType(instance, typeString);
+        this.updateType(instance, type);
       });
     } else if (item instanceof FunctionInstance) {
       const functionChart = item.functionchart;
       if (functionChart) {
-        this.updateType(item, functionChart.type.typeString);
+        this.updateType(item, functionChart.type);
       }
     } else {
-      this.updateType(item, item.typeString);
+      this.updateType(item, parseTypeString(item.typeString));
     }
 
     // Update child items with our current position.
@@ -1944,7 +1942,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     } else if (owner instanceof Element || owner instanceof Pseudoelement) {
       if (this.elements.has(owner)) {
         if (prop === typeStringProp) {
-          this.updateType(owner, owner.typeString);
+          const type = parseTypeString(owner.typeString);
+          owner.type = type;
+          this.updateType(owner, type);
         }
       }
     }
