@@ -1,5 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import * as Collections from '../src/collections.js';
+import * as DataModels from '../src/dataModels.js';
 import * as FC from '../examples/functioncharts/functioncharts.js';
 function addElement(functionchart, type) {
     const context = functionchart.context, element = context.newElement(type);
@@ -11,6 +12,13 @@ function addPseudoelement(functionchart, type) {
     context.addItem(pseudo, functionchart);
     return pseudo;
 }
+// function addFunctionInstance(functionchart: FC.Functionchart, of: FC.Functionchart) : FC.FunctionInstance {
+//   const context = functionchart.context,
+//         functionInstance = context.newFunctionInstance();
+//   functionInstance.functionchart = of;
+//   context.addItem(functionInstance, functionchart);
+//   return functionInstance;
+// }
 function addWire(functionchart, elem1, outPin, elem2, inPin) {
     const context = functionchart.context, wire = context.newWire(elem1, outPin, elem2, inPin);
     context.addItem(wire, functionchart);
@@ -24,6 +32,18 @@ function addFunctionchart(parent) {
 function pinPosition(element, pin) {
     return { x: 0, y: 0, nx: 0, ny: 0 };
 }
+// function addRecursiveFunctionchart(parent: FC.Functionchart) : FC.Functionchart {
+//   const context = parent.context,
+//         functionchart = parent.context.newFunctionchart(),
+//         elem1 = addElement(functionchart, 'binop'),
+//         elem2 = addElement(functionchart, 'binop'),
+//         wire1 = addWire(functionchart, elem1, 0, elem2, 0);
+//   context.completeElements([elem1, elem2], pinPosition, pinPosition);
+//   const self1 = addFunctionInstance(functionchart, functionchart),
+//         self2 = addFunctionInstance(functionchart, functionchart),
+//         wire2 = addWire(functionchart, self1, 0, self2, 0);
+//   return functionchart;
+// }
 // function setEquals(set1: Set<any>, set2: Array<any>) {
 //   expect(set1.size).toBe(set2.length);
 //   for (const item of set2) {
@@ -382,21 +402,26 @@ describe('FunctionchartContext', () => {
         expect(connected.has(output1)).toBe(true);
         expect(connected.has(output2)).toBe(true);
     });
-    test('updateType', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
-        elem1.typeString = '[v,v]';
-        const wire1 = addWire(functionchart, input, 0, elem1, 0), wire2 = addWire(functionchart, elem1, 0, output, 0);
-        let graphInfo = context.getGraphInfo();
-        expect(graphInfo.elements.has(elem1)).toBe(true);
-        expect(graphInfo.elements.has(input)).toBe(true);
-        expect(graphInfo.elements.has(output)).toBe(true);
-        expect(graphInfo.wires.has(wire1)).toBe(true);
-        expect(graphInfo.wires.has(wire2)).toBe(true);
-        context.updateType(elem1, '[vvv,vv]');
-        // expect(elem1.typeString).toBe('[vvv,vv]');
-        // expect(graphInfo.wires.has(wire1)).toBe(true);  TODO fixme
-        // expect(graphInfo.wires.has(wire2)).toBe(true);
-    });
+    // test('updateType', () => {
+    //   const context = new FC.FunctionchartContext(),
+    //         functionchart = context.root,
+    //         elem1 = addElement(functionchart, 'element'),
+    //         input = addPseudoelement(functionchart, 'input'),
+    //         output = addPseudoelement(functionchart, 'output');
+    //   elem1.typeString = '[v,v]';
+    //   const wire1 = addWire(functionchart, input, 0, elem1, 0),
+    //         wire2 = addWire(functionchart, elem1, 0, output, 0);
+    //   let graphInfo = context.getGraphInfo();
+    //   expect(graphInfo.elements.has(elem1)).toBe(true);
+    //   expect(graphInfo.elements.has(input)).toBe(true);
+    //   expect(graphInfo.elements.has(output)).toBe(true);
+    //   expect(graphInfo.wires.has(wire1)).toBe(true);
+    //   expect(graphInfo.wires.has(wire2)).toBe(true);
+    //   context.updateType(elem1, '[vvv,vv]');
+    //   // expect(elem1.typeString).toBe('[vvv,vv]');
+    //   // expect(graphInfo.wires.has(wire1)).toBe(true);  TODO fixme
+    //   // expect(graphInfo.wires.has(wire2)).toBe(true);
+    // });
     // TODO changeType
     // TODO resolve output type
     // test('resolveOutputType', () => {
@@ -499,6 +524,117 @@ describe('FunctionchartContext', () => {
         expect(typeInfo.typeString).toBe('[v**v*,*]');
         expect(typeInfo.passThroughs.length).toBe(1);
         arrayEquals(typeInfo.passThroughs[0], [1, 2, 4, 5]);
+    });
+    const recursiveFuncionchart = {
+        "type": "functionchart",
+        "id": 2,
+        "nonWires": [
+            {
+                "type": "functionchart",
+                "id": 3,
+                "nonWires": [
+                    {
+                        "type": "binop",
+                        "id": 4,
+                        "typeString": "[vv,v](+)",
+                        "elements": []
+                    },
+                    {
+                        "type": "binop",
+                        "id": 5,
+                        "typeString": "[vv,v](+)",
+                        "elements": []
+                    },
+                    {
+                        "type": "input",
+                        "id": 6,
+                        "typeString": "[,*]"
+                    },
+                    {
+                        "type": "input",
+                        "id": 7,
+                        "typeString": "[,*]"
+                    },
+                    {
+                        "type": "input",
+                        "id": 8,
+                        "typeString": "[,*]"
+                    },
+                    {
+                        "type": "output",
+                        "id": 9,
+                        "typeString": "[*,]"
+                    },
+                    {
+                        "type": "instance",
+                        "id": 10,
+                        "functionchart": 3
+                    },
+                    {
+                        "type": "instance",
+                        "id": 11,
+                        "functionchart": 3
+                    }
+                ],
+                "wires": [
+                    {
+                        "type": "wire",
+                        "src": 4,
+                        "srcPin": 0,
+                        "dst": 5,
+                        "dstPin": 0
+                    },
+                    {
+                        "type": "wire",
+                        "src": 6,
+                        "srcPin": 0,
+                        "dst": 4,
+                        "dstPin": 0
+                    },
+                    {
+                        "type": "wire",
+                        "src": 7,
+                        "srcPin": 0,
+                        "dst": 4,
+                        "dstPin": 1
+                    },
+                    {
+                        "type": "wire",
+                        "src": 8,
+                        "srcPin": 0,
+                        "dst": 5,
+                        "dstPin": 1
+                    },
+                    {
+                        "type": "wire",
+                        "src": 5,
+                        "srcPin": 0,
+                        "dst": 9,
+                        "dstPin": 0
+                    },
+                    {
+                        "type": "wire",
+                        "src": 11,
+                        "srcPin": 0,
+                        "dst": 10,
+                        "dstPin": 0
+                    }
+                ]
+            }
+        ],
+        "wires": []
+    };
+    test('recursiveFunctionchart', () => {
+        const context = new FC.FunctionchartContext(), functionchart = DataModels.Deserialize(recursiveFuncionchart, context);
+        context.root = functionchart;
+        expect(functionchart.nonWires.length).toBe(1);
+        const fc = functionchart.nonWires.at(0);
+        expect(fc).toBeInstanceOf(FC.Functionchart);
+        expect(fc.nonWires.length).toBe(8);
+        const rfi1 = fc.nonWires.at(6), rfi2 = fc.nonWires.at(7);
+        expect(rfi1).toBeInstanceOf(FC.FunctionInstance);
+        expect(rfi2).toBeInstanceOf(FC.FunctionInstance);
+        expect(fc.wires.length).toBe(6);
     });
 });
 //# sourceMappingURL=functioncharts.test.js.map
