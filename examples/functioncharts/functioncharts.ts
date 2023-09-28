@@ -1514,12 +1514,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
     } else {
       const wires = element.outWires[index - firstOutput];
-      for (let i = 0; i < wires.length; i++) {
-        const wire = wires[i];
-        if (wire) {
-          const dst = wire.dst!,
-                dstPin = wire.dstPin;
-          this.visitPin(dst, dstPin, visitor, visited);
+      if (wires) {  // |wires| may be undefined if the instance doesn't has its type yet.
+        for (let i = 0; i < wires.length; i++) {
+          const wire = wires[i];
+          if (wire) {
+            const dst = wire.dst!,
+                  dstPin = wire.dstPin;
+            this.visitPin(dst, dstPin, visitor, visited);
+          }
         }
       }
     }
@@ -1533,7 +1535,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     let type: Type | undefined;
     function visit(element: ElementTypes, index: number) : boolean {
       const pin = element.getPin(index);
-      if (pin.type !== Type.starType) {
+      // |pin| may be undefined if the instance doesn't has its type yet.
+      if (pin && pin.type !== Type.starType) {
         type = pin.type;
       }
       return true;

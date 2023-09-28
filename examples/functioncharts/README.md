@@ -44,6 +44,12 @@ Since functioncharts can contain instances of themselves, we can define a recurs
   <img src="./resources/factorial.svg"  alt="" title="Recursive definition of factorial function N!.">
 </figure>
 
+We can abstract this a bit by replacing the multiplication element with an abstract binary op. That makes this functionchart look like the classic 'fold' functor.
+
+<figure>
+  <img src="./resources/fold.svg"  alt="" title="Factorial function defined using the fold functor.">
+</figure>
+
 Similarly, we can define a Fibonacci function. We define a helper which takes 3 parameters, and then "call" it with n, 1, 1, to start the iteration.
 
 <figure>
