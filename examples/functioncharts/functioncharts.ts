@@ -1782,7 +1782,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (functionChart) {
         this.updateType(item, functionChart.type);
       }
-    } else {
+    } else if (item.typeString) {
       this.updateType(item, parseTypeString(item.typeString));
     }
 

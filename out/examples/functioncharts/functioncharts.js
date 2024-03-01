@@ -1252,12 +1252,14 @@ export class FunctionchartContext extends EventBase {
             }
         }
         else {
-            const wires = element.outWires[index - firstOutput] || [];
-            for (let i = 0; i < wires.length; i++) {
-                const wire = wires[i];
-                if (wire) {
-                    const dst = wire.dst, dstPin = wire.dstPin;
-                    this.visitPin(dst, dstPin, visitor, visited);
+            const wires = element.outWires[index - firstOutput];
+            if (wires) { // |wires| may be undefined if the instance doesn't has its type yet.
+                for (let i = 0; i < wires.length; i++) {
+                    const wire = wires[i];
+                    if (wire) {
+                        const dst = wire.dst, dstPin = wire.dstPin;
+                        this.visitPin(dst, dstPin, visitor, visited);
+                    }
                 }
             }
         }
@@ -1269,6 +1271,7 @@ export class FunctionchartContext extends EventBase {
         let type;
         function visit(element, index) {
             const pin = element.getPin(index);
+            // |pin| may be undefined if the instance doesn't has its type yet.
             if (pin && pin.type !== Type.starType) {
                 type = pin.type;
             }
@@ -1493,7 +1496,7 @@ export class FunctionchartContext extends EventBase {
                 this.updateType(item, functionChart.type);
             }
         }
-        else {
+        else if (item.typeString) {
             this.updateType(item, parseTypeString(item.typeString));
         }
         // Update child items with our current position.
