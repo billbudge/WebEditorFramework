@@ -21,6 +21,8 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
 
 //------------------------------------------------------------------------------
 
+// TODO Distinguish between fully defined and partially defined function charts.
+
 // Value and Function type descriptions.
 
 export class Pin {
@@ -1771,6 +1773,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       item.type = type;
       item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
       // Update all instances of the functionchart.
+      // TODO store the typestring on instances, and use that instead.
       this.fcMap.forValues(item, instance => {
         instance.type = type;
       });
