@@ -524,6 +524,7 @@ describe('FunctionchartContext', () => {
         expect(typeInfo.typeString).toBe('[v**v*,*]');
         expect(typeInfo.passThroughs.length).toBe(1);
         arrayEquals(typeInfo.passThroughs[0], [1, 2, 4, 5]);
+        expect(typeInfo.closure).toBe(false);
     });
     const recursiveFuncionchart = {
         "type": "functionchart",

@@ -1606,11 +1606,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     //   });
     // }
 
-    // Evaluate context.
-    // if (subgraphInfo.inWires) {
-
-    // }
-
     // Sort pins in increasing y-order. This lets users arrange the pins of the
     // new type in an intuitive way.
     function compareYs(p1: PinInfo, p2: PinInfo) {
@@ -1702,7 +1697,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (name)
       typeString += '(' + name + ')';
 
-    return { typeString, passThroughs };
+    const partial = !!(subgraphInfo.inWires.size > 0);
+
+    return { typeString, passThroughs, partial };
   }
 
   // Update the derived 'type' property. Delete any wires that are no longer compatible with

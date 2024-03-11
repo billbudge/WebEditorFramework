@@ -652,7 +652,7 @@ describe('FunctionchartContext', () => {
     expect(context.selectedNonWires().length).toBe(1);
     expect(context.selectedNonWires()[0]).toBe(functionchart1);
   });
-  test('getFunctionchartTypeInfo', () => {
+  test('getFunctionchartTypeInfo-passthroughs,closed', () => {
     const context = new FC.FunctionchartContext(),
           functionchart = context.root,
           elem1 = addElement(functionchart, 'cond'),
@@ -667,6 +667,31 @@ describe('FunctionchartContext', () => {
     expect(typeInfo.typeString).toBe('[v**v*,*]');
     expect(typeInfo.passThroughs.length).toBe(1);
     arrayEquals(typeInfo.passThroughs[0], [1, 2, 4, 5]);
+    expect(typeInfo.partial).toBe(false);
+  });
+  test('getFunctionchartTypeInfo-open', () => {
+    const context = new FC.FunctionchartContext(),
+          functionchart = context.root,
+          functionchart1 = addFunctionchart(functionchart),
+          elem = addElement(functionchart1, 'binop'),
+          input1 = addPseudoelement(functionchart1, 'input'),
+          output = addPseudoelement(functionchart1, 'output');
+    let typeInfo = context.getFunctionchartTypeInfo(functionchart1);
+    // No inputs or outputs.
+    expect(typeInfo.typeString).toBe('[*,*]');
+    expect(typeInfo.passThroughs.length).toBe(0);
+    const wire1 = addWire(functionchart1, input1, 0, elem, 0),
+          wire2 = addWire(functionchart1, elem, 0, output, 0);
+    typeInfo = context.getFunctionchartTypeInfo(functionchart1);
+    expect(typeInfo.typeString).toBe('[v,v]');
+    expect(typeInfo.passThroughs.length).toBe(0);
+    expect(typeInfo.partial).toBe(false);
+    const input2 = addPseudoelement(functionchart, 'input'),
+          wire3 = addWire(functionchart1, input2, 0, elem, 1);
+          typeInfo = context.getFunctionchartTypeInfo(functionchart1);
+    expect(typeInfo.typeString).toBe('[v,v]');
+    expect(typeInfo.passThroughs.length).toBe(0);
+    expect(typeInfo.partial).toBe(true);
   });
   const recursiveFuncionchart = {
     "type": "functionchart",

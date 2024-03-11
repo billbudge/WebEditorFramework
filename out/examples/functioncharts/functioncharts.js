@@ -4,6 +4,7 @@ import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 //------------------------------------------------------------------------------
+// TODO Distinguish between fully defined and partially defined function charts.
 // Value and Function type descriptions.
 export class Pin {
     get typeString() { return this.toString(); }
@@ -1334,9 +1335,6 @@ export class FunctionchartContext extends EventBase {
         //     });
         //   });
         // }
-        // Evaluate context.
-        // if (subgraphInfo.inWires) {
-        // }
         // Sort pins in increasing y-order. This lets users arrange the pins of the
         // new type in an intuitive way.
         function compareYs(p1, p2) {
@@ -1417,7 +1415,8 @@ export class FunctionchartContext extends EventBase {
         typeString += ']';
         if (name)
             typeString += '(' + name + ')';
-        return { typeString, passThroughs };
+        const closure = !!(subgraphInfo.inWires.size > 0);
+        return { typeString, passThroughs, closure };
     }
     // Update the derived 'type' property. Delete any wires that are no longer compatible with
     // the type.
@@ -1483,6 +1482,7 @@ export class FunctionchartContext extends EventBase {
             item.type = type;
             item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
             // Update all instances of the functionchart.
+            // TODO store the typestring on instances, and use that instead.
             this.fcMap.forValues(item, instance => {
                 instance.type = type;
             });
