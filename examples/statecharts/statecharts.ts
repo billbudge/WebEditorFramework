@@ -851,9 +851,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
         return;
       }
       // Make sure transitions belong to lowest common statechart.
-      const srcParent = src.parent!,
-            dstParent = dst.parent!,
-            lca: Statechart = getLowestCommonAncestor<AllTypes>(srcParent, dstParent) as Statechart;
+      const lca: Statechart = getLowestCommonAncestor<AllTypes>(src, dst) as Statechart;
       if (transition.parent !== lca) {
         self.deleteItem(transition);
         self.addItem(transition, lca);

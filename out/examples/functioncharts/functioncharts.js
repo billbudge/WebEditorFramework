@@ -1415,8 +1415,8 @@ export class FunctionchartContext extends EventBase {
         typeString += ']';
         if (name)
             typeString += '(' + name + ')';
-        const closure = !!(subgraphInfo.inWires.size > 0);
-        return { typeString, passThroughs, closure };
+        const partial = !!(subgraphInfo.inWires.size > 0);
+        return { typeString, passThroughs, partial };
     }
     // Update the derived 'type' property. Delete any wires that are no longer compatible with
     // the type.
