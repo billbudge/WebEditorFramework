@@ -438,12 +438,12 @@ export class StatechartContext extends EventBase {
     }
     // Returns a value indicating if the item can be added to the state
     // without violating statechart constraints.
-    canAddState(state, statechart) {
+    canAddItem(item, statechart) {
         // The only constraint is that there can't be two start states in a statechart.
-        if (!(state instanceof Pseudostate) || state.template.typeName !== 'start')
+        if (!(item instanceof Pseudostate) || item.template.typeName !== 'start')
             return true;
         for (let child of statechart.states.asArray()) {
-            if (child !== state && child instanceof Pseudostate && child.template.typeName === 'start')
+            if (child !== item && child instanceof Pseudostate && child.template.typeName === 'start')
                 return false;
         }
         return true;
@@ -476,21 +476,27 @@ export class StatechartContext extends EventBase {
             return src === this.getGrandParent(dst);
         return lca instanceof Statechart;
     }
-    findChildStatechart(superState, child) {
-        for (let statechart of superState.statecharts.asArray()) {
-            if (child instanceof Transition || this.canAddState(child, statechart)) {
-                return statechart;
+    findOrCreateTargetForDrop(items, originalTarget) {
+        const self = this;
+        let target;
+        if (originalTarget instanceof Statechart) {
+            target = originalTarget;
+            // Check that the items can be added. The root statechart is an exception that we don't check.
+            // For non-root statecharts, we must add another statechart to the parent superstate.
+            if (target.parent) {
+                const canDrop = items.every((item) => { return !(item instanceof StateBase) || self.canAddItem(item, target); });
+                if (!canDrop) {
+                    // Call this function on the parent state. This has the effect of adding a new empty statechart.
+                    target = this.findOrCreateTargetForDrop(items, target.parent);
+                }
             }
         }
-        return undefined;
-    }
-    findOrCreateChildStatechart(state, child) {
-        let statechart = this.findChildStatechart(state, child);
-        if (!statechart) {
-            statechart = this.newStatechart();
-            state.statecharts.append(statechart);
+        else {
+            // Add the first statechart to a new superstate. The items can be added.
+            target = this.newStatechart();
+            originalTarget.statecharts.append(target);
         }
-        return statechart;
+        return target;
     }
     beginTransaction(name) {
         this.transactionManager.beginTransaction(name);
@@ -563,20 +569,6 @@ export class StatechartContext extends EventBase {
             parent = this.statechart;
         if (oldParent === parent)
             return item;
-        if (parent instanceof State) {
-            parent = this.findOrCreateChildStatechart(parent, item);
-        }
-        else if (parent instanceof Statechart) {
-            if (!(item instanceof Transition)) {
-                // If adding a pseudostate to a non-root statechart, add a new statechart to hold it.
-                // We allow the exception for the root statechart so we can drag and drop between
-                // child statecharts.
-                if (!this.canAddState(item, parent) && parent !== this.statechart) {
-                    const superState = parent.parent;
-                    parent = this.findOrCreateChildStatechart(superState, item);
-                }
-            }
-        }
         // At this point we can add item to parent.
         if (item instanceof StateBase) {
             const translation = this.getToParent(item, parent);
@@ -678,9 +670,9 @@ export class StatechartContext extends EventBase {
         // parent.width = bounds.width;
         // parent.height = bounds.height;
         this.addItem(parent, grandparent);
-        items.forEach(item => {
-            this.addItem(item, parent);
-        });
+        const statechart = this.newStatechart();
+        parent.statecharts.append(statechart);
+        this.addItems(items, statechart);
     }
     makeConsistent() {
         const self = this, statechart = this.statechart, graphInfo = this.getGraphInfo();
@@ -2164,11 +2156,8 @@ export class StatechartEditor {
             if (hitInfo instanceof StatechartHitResult || hitInfo instanceof StateHitResult) {
                 parent = hitInfo.item;
             }
-            // Reparent items.
-            selection.contents().forEach(item => {
-                if (!(item instanceof Statechart))
-                    context.addItem(item, parent);
-            });
+            const items = selection.contents(), target = context.findOrCreateTargetForDrop(items, parent);
+            context.addItems(items, target);
         }
         transactionManager.endTransaction();
         this.setPropertyGrid();

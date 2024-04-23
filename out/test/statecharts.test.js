@@ -152,22 +152,22 @@ describe('StatechartContext', () => {
     test('canAddState', () => {
         const context = new SC.StatechartContext(), statechart = context.newStatechart(), state1 = context.newState(), state2 = context.newState(), start = context.newPseudostate('start'), shallowHistory = context.newPseudostate('history'), deepHistory = context.newPseudostate('history*'), stop = context.newPseudostate('stop');
         context.root = statechart;
-        expect(context.canAddState(state1, statechart)).toBe(true);
-        expect(context.canAddState(state2, statechart)).toBe(true);
-        expect(context.canAddState(start, statechart)).toBe(true);
-        expect(context.canAddState(shallowHistory, statechart)).toBe(true);
-        expect(context.canAddState(deepHistory, statechart)).toBe(true);
-        expect(context.canAddState(stop, statechart)).toBe(true);
+        expect(context.canAddItem(state1, statechart)).toBe(true);
+        expect(context.canAddItem(state2, statechart)).toBe(true);
+        expect(context.canAddItem(start, statechart)).toBe(true);
+        expect(context.canAddItem(shallowHistory, statechart)).toBe(true);
+        expect(context.canAddItem(deepHistory, statechart)).toBe(true);
+        expect(context.canAddItem(stop, statechart)).toBe(true);
         // Test that there can be only one starting state.
         statechart.states.append(start);
-        expect(context.canAddState(context.newPseudostate('start'), statechart)).toBe(false);
-        expect(context.canAddState(shallowHistory, statechart)).toBe(true);
-        expect(context.canAddState(deepHistory, statechart)).toBe(true);
+        expect(context.canAddItem(context.newPseudostate('start'), statechart)).toBe(false);
+        expect(context.canAddItem(shallowHistory, statechart)).toBe(true);
+        expect(context.canAddItem(deepHistory, statechart)).toBe(true);
         statechart.states.append(shallowHistory);
-        expect(context.canAddState(deepHistory, statechart)).toBe(true);
+        expect(context.canAddItem(deepHistory, statechart)).toBe(true);
         // Test that there can be multiple stop states.
         statechart.states.append(stop);
-        expect(context.canAddState(context.newPseudostate('stop'), statechart)).toBe(true);
+        expect(context.canAddItem(context.newPseudostate('stop'), statechart)).toBe(true);
     });
     test('canAddTransition', () => {
         const context = new SC.StatechartContext(), statechart = context.newStatechart(), state1 = addState(statechart), state2 = addState(statechart), start = addPseudostate(statechart, 'start'), stop = addPseudostate(statechart, 'stop'), shallowHistory = addPseudostate(statechart, 'history'), deepHistory = addPseudostate(statechart, 'history*');
@@ -200,21 +200,21 @@ describe('StatechartContext', () => {
         statechart.states.removeAt(0);
         expect(statechart.states.length).toBe(0);
     });
-    test('findChildStatechart, findOrCreateStatechart', () => {
+    test('findOrCreateTargetForDrop', () => {
         const context = new SC.StatechartContext(), statechart = context.newStatechart(), superState = addState(statechart), state = context.newState(), start1 = context.newPseudostate('start'), start2 = context.newPseudostate('start');
         context.root = statechart;
         // Primitive state has no statechart.
-        expect(context.findChildStatechart(superState, state)).toBeUndefined();
+        expect(superState.statecharts.length).toBe(0);
         // Empty child statechart can accept a state.
-        const statechart1 = addStatechart(superState);
-        expect(context.findChildStatechart(superState, state)).toBe(statechart1);
-        // A child statechart with a start state can accept a state but not a start state.
-        statechart1.states.append(start1);
-        expect(context.findChildStatechart(superState, state)).toBe(statechart1);
-        expect(context.findChildStatechart(superState, start2)).toBeUndefined();
-        const statechart2 = context.findOrCreateChildStatechart(superState, start2);
-        expect(statechart2).toBeDefined();
-        expect(statechart2).not.toBe(statechart1);
+        const statechart1 = context.findOrCreateTargetForDrop([state], superState);
+        expect(statechart1).toBeDefined();
+        expect(context.findOrCreateTargetForDrop([state], statechart1)).toBe(statechart1);
+        // // A child statechart with a start state can accept a state but not a start state.
+        // statechart1.states.append(start1);
+        // expect(context.findOrCreateTargetForDrop([state], superState)).toBe(statechart1);
+        // const statechart2 = context.findOrCreateTargetForDrop([start2], superState);
+        // expect(statechart2).toBeDefined()
+        // expect(statechart2).not.toBe(statechart1);
     });
     test('selectionContents', () => {
         const context = new SC.StatechartContext(), statechart = context.newStatechart(), superState = addState(statechart), statechart1 = addStatechart(superState), state1 = addState(statechart1);

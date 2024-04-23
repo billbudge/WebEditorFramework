@@ -562,12 +562,12 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
 
   // Returns a value indicating if the item can be added to the state
   // without violating statechart constraints.
-  canAddState(state: StateTypes, statechart: Statechart) : boolean {
+  canAddItem(item: StateTypes | Transition, statechart: Statechart) : boolean {
     // The only constraint is that there can't be two start states in a statechart.
-    if (!(state instanceof Pseudostate) || state.template.typeName !== 'start')
+    if (!(item instanceof Pseudostate) || item.template.typeName !== 'start')
       return true;
     for (let child of statechart.states.asArray()) {
-      if (child !== state && child instanceof Pseudostate && child.template.typeName === 'start')
+      if (child !== item && child instanceof Pseudostate && child.template.typeName === 'start')
         return false;
     }
     return true;
@@ -599,22 +599,27 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     return lca instanceof Statechart;
   }
 
-  findChildStatechart(superState: State, child: StateTypes | Transition) : Statechart | undefined {
-    for (let statechart of superState.statecharts.asArray()) {
-      if (child instanceof Transition || this.canAddState(child, statechart)) {
-        return statechart;
+  findOrCreateTargetForDrop(items: AllTypes[], originalTarget: State | Statechart) : Statechart {
+    const self = this;
+    let target: Statechart;
+    if (originalTarget instanceof Statechart) {
+      target = originalTarget;
+      // Check that the items can be added. The root statechart is an exception that we don't check.
+      // For non-root statecharts, we must add another statechart to the parent superstate.
+      if (target.parent) {
+        const canDrop = items.every(
+              (item) => { return !(item instanceof StateBase) || self.canAddItem(item, target); });
+        if (!canDrop) {
+          // Call this function on the parent state. This has the effect of adding a new empty statechart.
+          target = this.findOrCreateTargetForDrop(items, target.parent);
+        }
       }
+    } else {
+      // Add the first statechart to a new superstate. The items can be added.
+      target = this.newStatechart();
+      originalTarget.statecharts.append(target);
     }
-    return undefined;
-  }
-
-  findOrCreateChildStatechart(state: State, child: StateTypes | Transition) : Statechart {
-    let statechart = this.findChildStatechart(state, child);
-    if (!statechart) {
-      statechart = this.newStatechart();
-      state.statecharts.append(statechart);
-    }
-    return statechart;
+    return target;
   }
 
   beginTransaction(name: string) {
@@ -694,26 +699,12 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.selection.set(Array.from(connectedStates));
   }
 
-  addItem(item: StateTypes | Transition, parent: State | Statechart) : AllTypes {
+  addItem(item: StateTypes | Transition, parent: Statechart) : AllTypes {
     const oldParent = item.parent;
-
     if (!parent)
       parent = this.statechart;
     if (oldParent === parent)
       return item;
-    if (parent instanceof State) {
-      parent = this.findOrCreateChildStatechart(parent, item);
-    } else if (parent instanceof Statechart) {
-      if (!(item instanceof Transition)) {
-        // If adding a pseudostate to a non-root statechart, add a new statechart to hold it.
-        // We allow the exception for the root statechart so we can drag and drop between
-        // child statecharts.
-        if (!this.canAddState(item, parent) && parent !== this.statechart) {
-          const superState = parent.parent!;
-          parent = this.findOrCreateChildStatechart(superState, item);
-        }
-      }
-    }
     // At this point we can add item to parent.
     if (item instanceof StateBase) {
       const translation = this.getToParent(item, parent);
@@ -734,7 +725,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     return item;
   }
 
-  addItems(items: AllTypes[], parent: State | Statechart) {
+  addItems(items: AllTypes[], parent: Statechart) {
     // Add states first, then transitions, so the context can track transitions.
     for (let item of items) {
       if (item instanceof StateBase)
@@ -831,10 +822,10 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     // parent.width = bounds.width;
     // parent.height = bounds.height;
     this.addItem(parent, grandparent);
+    const statechart = this.newStatechart();
+    parent.statecharts.append(statechart);
 
-    items.forEach(item => {
-      this.addItem(item, parent);
-    });
+    this.addItems(items, statechart);
   }
 
   makeConsistent () {
@@ -2582,11 +2573,9 @@ export class StatechartEditor implements CanvasLayer {
       if (hitInfo instanceof StatechartHitResult || hitInfo instanceof StateHitResult) {
         parent = hitInfo.item;
       }
-      // Reparent items.
-      selection.contents().forEach(item => {
-        if (!(item instanceof Statechart))
-          context.addItem(item, parent);
-      });
+      const items = selection.contents(),
+            target = context.findOrCreateTargetForDrop(items, parent);
+      context.addItems(items, target);
     }
 
     transactionManager.endTransaction();
