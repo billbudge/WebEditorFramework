@@ -200,6 +200,27 @@ describe('StatechartContext', () => {
         statechart.states.removeAt(0);
         expect(statechart.states.length).toBe(0);
     });
+    test('canAddItem', () => {
+        const context = new SC.StatechartContext(), statechart = context.newStatechart(), superState = addState(statechart), state = context.newState(), start = context.newPseudostate('start'), stop = context.newPseudostate('stop');
+        context.root = statechart;
+        // Root statechart can hold states and multiple start states (during editing, though they're not valid).
+        expect(context.canAddItem(state, statechart)).toBe(true);
+        expect(context.canAddItem(start, statechart)).toBe(true);
+        expect(context.canAddItem(stop, statechart)).toBe(true);
+        addPseudostate(statechart, 'start');
+        expect(context.canAddItem(state, statechart)).toBe(true);
+        expect(context.canAddItem(start, statechart)).toBe(true);
+        expect(context.canAddItem(stop, statechart)).toBe(true);
+        // Empty child statechart can accept a state.
+        const statechart1 = addStatechart(superState);
+        expect(context.canAddItem(state, statechart1)).toBe(true);
+        expect(context.canAddItem(start, statechart1)).toBe(true);
+        expect(context.canAddItem(stop, statechart1)).toBe(true);
+        addPseudostate(statechart1, 'start');
+        expect(context.canAddItem(state, statechart1)).toBe(true);
+        expect(context.canAddItem(start, statechart1)).toBe(false);
+        expect(context.canAddItem(stop, statechart1)).toBe(true);
+    });
     test('findOrCreateTargetForDrop', () => {
         const context = new SC.StatechartContext(), statechart = context.newStatechart(), superState = addState(statechart), state = context.newState(), start1 = context.newPseudostate('start'), start2 = context.newPseudostate('start');
         context.root = statechart;
@@ -209,12 +230,14 @@ describe('StatechartContext', () => {
         const statechart1 = context.findOrCreateTargetForDrop([state], superState);
         expect(statechart1).toBeDefined();
         expect(context.findOrCreateTargetForDrop([state], statechart1)).toBe(statechart1);
-        // // A child statechart with a start state can accept a state but not a start state.
+        expect(context.findOrCreateTargetForDrop([start1], statechart1)).toBe(statechart1);
+        expect(context.findOrCreateTargetForDrop([start2], statechart1)).toBe(statechart1);
+        // A child statechart with a start state can accept a state but not a start state.
         // statechart1.states.append(start1);
-        // expect(context.findOrCreateTargetForDrop([state], superState)).toBe(statechart1);
+        // expect(context.findOrCreateTargetForDrop([state], superState)).toStrictEqual(statechart1);
         // const statechart2 = context.findOrCreateTargetForDrop([start2], superState);
-        // expect(statechart2).toBeDefined()
-        // expect(statechart2).not.toBe(statechart1);
+        // expect(statechart2).toBeDefined();
+        // expect(statechart2).not.toStrictEqual(statechart1);
     });
     test('selectionContents', () => {
         const context = new SC.StatechartContext(), statechart = context.newStatechart(), superState = addState(statechart), statechart1 = addStatechart(superState), state1 = addState(statechart1);

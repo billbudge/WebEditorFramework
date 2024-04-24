@@ -563,6 +563,9 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
   // Returns a value indicating if the item can be added to the state
   // without violating statechart constraints.
   canAddItem(item: StateTypes | Transition, statechart: Statechart) : boolean {
+    // The root statechart is exempt.
+    if (!statechart.parent)
+      return true;
     // The only constraint is that there can't be two start states in a statechart.
     if (!(item instanceof Pseudostate) || item.template.typeName !== 'start')
       return true;
