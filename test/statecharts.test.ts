@@ -277,6 +277,7 @@ describe('StatechartContext', () => {
           stop = context.newPseudostate('stop');
 
     context.root = statechart;
+
     // Root statechart can hold states and multiple start states (during editing, though they're not valid).
     expect(context.canAddItem(state, statechart)).toBe(true);
     expect(context.canAddItem(start, statechart)).toBe(true);

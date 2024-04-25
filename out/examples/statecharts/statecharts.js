@@ -436,9 +436,21 @@ export class StatechartContext extends EventBase {
             item = statechart.parent; // statechart.parent is not null
         }
     }
+    getLowestCommonStatechart(...items) {
+        const lca = getLowestCommonAncestor(...items);
+        let result;
+        if (!lca || lca instanceof Statechart)
+            result = lca;
+        else
+            result = lca.parent;
+        return result;
+    }
     // Returns a value indicating if the item can be added to the state
     // without violating statechart constraints.
     canAddItem(item, statechart) {
+        // The root statechart is exempt.
+        if (!statechart.parent)
+            return true;
         // The only constraint is that there can't be two start states in a statechart.
         if (!(item instanceof Pseudostate) || item.template.typeName !== 'start')
             return true;
@@ -685,10 +697,10 @@ export class StatechartContext extends EventBase {
                 return;
             }
             // Make sure transitions belong to lowest common statechart.
-            const lca = getLowestCommonAncestor(src, dst);
-            if (transition.parent !== lca) {
+            const lcs = this.getLowestCommonStatechart(src, dst);
+            if (lcs && transition.parent !== lcs) {
                 self.deleteItem(transition);
-                self.addItem(transition, lca);
+                self.addItem(transition, lcs);
             }
         });
         // Delete any empty statecharts (except for the root statechart).
@@ -2219,7 +2231,7 @@ export class StatechartEditor {
                     context.selection.set(context.selectedStates());
                     context.selectInteriorTransitions();
                     context.beginTransaction('group items into super state');
-                    const theme = this.theme, bounds = this.renderer.getBounds(context.selectedStates()), contents = context.selectionContents(), parent = getLowestCommonAncestor(...contents);
+                    const theme = this.theme, bounds = this.renderer.getBounds(context.selectedStates()), contents = context.selectionContents(), parent = context.getLowestCommonStatechart(...contents);
                     expandRect(bounds, theme.radius, theme.radius);
                     context.group(contents, parent, bounds);
                     context.endTransaction();

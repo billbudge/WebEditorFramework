@@ -560,6 +560,16 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
+  getLowestCommonStatechart(...items: Array<AllTypes>) : Statechart | undefined {
+    const lca = getLowestCommonAncestor<AllTypes>(...items);
+    let result : Statechart | undefined;
+    if (! lca || lca instanceof Statechart)
+      result = lca;
+    else
+      result = lca.parent;
+    return result;
+  }
+
   // Returns a value indicating if the item can be added to the state
   // without violating statechart constraints.
   canAddItem(item: StateTypes | Transition, statechart: Statechart) : boolean {
@@ -845,10 +855,10 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
         return;
       }
       // Make sure transitions belong to lowest common statechart.
-      const lca: Statechart = getLowestCommonAncestor<AllTypes>(src, dst) as Statechart;
-      if (transition.parent !== lca) {
+      const lcs = this.getLowestCommonStatechart(src, dst);
+      if (lcs && transition.parent !== lcs) {
         self.deleteItem(transition);
-        self.addItem(transition, lca);
+        self.addItem(transition, lcs);
       }
     });
     // Delete any empty statecharts (except for the root statechart).
@@ -2655,9 +2665,9 @@ export class StatechartEditor implements CanvasLayer {
           const theme = this.theme,
                 bounds = this.renderer.getBounds(context.selectedStates()),
                 contents = context.selectionContents() as Array<NonStatechartTypes>,
-                parent = getLowestCommonAncestor<AllTypes>(...contents) as Statechart;
+                parent = context.getLowestCommonStatechart(...contents);
           expandRect(bounds, theme.radius, theme.radius);
-          context.group(contents, parent, bounds);
+          context.group(contents, parent!, bounds);
           context.endTransaction();
         }
         case 69: { // 'e'
