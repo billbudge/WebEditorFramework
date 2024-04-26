@@ -828,7 +828,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.transactionManager.endTransaction();
   }
 
-  group(items: Array<NonStatechartTypes>, grandparent: Statechart, bounds: Rect) {
+  group(items: Array<NonStatechartTypes>, grandparent: Statechart, bounds: Rect) : State {
     const parent = this.newState();
     parent.x = bounds.x;
     parent.y = bounds.y;
@@ -839,6 +839,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     parent.statecharts.append(statechart);
 
     this.addItems(items, statechart);
+    return parent;
   }
 
   makeConsistent () {
@@ -2667,7 +2668,8 @@ export class StatechartEditor implements CanvasLayer {
                 contents = context.selectionContents() as Array<NonStatechartTypes>,
                 parent = context.getLowestCommonStatechart(...contents);
           expandRect(bounds, theme.radius, theme.radius);
-          context.group(contents, parent!, bounds);
+          const group = context.group(contents, parent!, bounds);
+          context.selection.set(group);
           context.endTransaction();
         }
         case 69: { // 'e'
@@ -2676,8 +2678,6 @@ export class StatechartEditor implements CanvasLayer {
           return true;
         }
         case 72: // 'h'
-          // editingModel.doTogglePalette();
-          // return true;
           return false;
         case 78: { // ctrl 'n'   // Can't intercept cmd n.
           const context = new StatechartContext();

@@ -685,6 +685,7 @@ export class StatechartContext extends EventBase {
         const statechart = this.newStatechart();
         parent.statecharts.append(statechart);
         this.addItems(items, statechart);
+        return parent;
     }
     makeConsistent() {
         const self = this, statechart = this.statechart, graphInfo = this.getGraphInfo();
@@ -2233,7 +2234,8 @@ export class StatechartEditor {
                     context.beginTransaction('group items into super state');
                     const theme = this.theme, bounds = this.renderer.getBounds(context.selectedStates()), contents = context.selectionContents(), parent = context.getLowestCommonStatechart(...contents);
                     expandRect(bounds, theme.radius, theme.radius);
-                    context.group(contents, parent, bounds);
+                    const group = context.group(contents, parent, bounds);
+                    context.selection.set(group);
                     context.endTransaction();
                 }
                 case 69: { // 'e'
@@ -2242,8 +2244,6 @@ export class StatechartEditor {
                     return true;
                 }
                 case 72: // 'h'
-                    // editingModel.doTogglePalette();
-                    // return true;
                     return false;
                 case 78: { // ctrl 'n'   // Can't intercept cmd n.
                     const context = new StatechartContext();
