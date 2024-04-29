@@ -1,7 +1,7 @@
 import { getDefaultTheme, CanvasController, PropertyGridController } from '../../src/diagrams.js';
 import { StatechartEditor } from '../../examples/statecharts/statecharts.js';
 (function () {
-    const body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette');
+    const body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette'), selectExample = document.getElementById('select-example');
     if (body && canvas && palette) {
         const theme = getDefaultTheme(), // or getBlueprintTheme
         canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette), propertyGridController = new PropertyGridController(body, theme), statechartEditor = new StatechartEditor(theme, canvasController, paletteController, propertyGridController);
@@ -27,6 +27,12 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js';
         });
         document.addEventListener('keyup', function (e) {
             canvasController.onKeyUp(e);
+        });
+        selectExample.addEventListener('change', event => {
+            const id = event.target.value, fileName = id + '.txt';
+            fetch(fileName)
+                .then(response => response.text())
+                .then(text => statechartEditor.createContext(text));
         });
     }
 })();

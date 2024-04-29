@@ -2180,8 +2180,17 @@ export class StatechartEditor {
         this.hotTrackInfo = undefined;
         this.canvasController.draw();
     }
+    createContext(text) {
+        const raw = JSON.parse(text), context = new StatechartContext();
+        const statechart = readRaw(raw, context);
+        this.initializeContext(context);
+        this.setContext(context);
+        this.renderer.begin(this.canvasController.getCtx());
+        this.updateBounds();
+        this.canvasController.draw();
+    }
     onKeyDown(e) {
-        const self = this, context = this.context, statechart = this.statechart, selection = context.selection, transactionManager = context.transactionManager, keyCode = e.keyCode, // TODO fix
+        const self = this, context = this.context, statechart = this.statechart, keyCode = e.keyCode, // TODO fix
         cmdKey = e.ctrlKey || e.metaKey, shiftKey = e.shiftKey;
         if (keyCode === 8) { // 'delete'
             context.deleteSelection();
@@ -2255,16 +2264,7 @@ export class StatechartEditor {
                     return true;
                 }
                 case 79: { // 'o'
-                    function parse(text) {
-                        const raw = JSON.parse(text), context = new StatechartContext();
-                        const statechart = readRaw(raw, context);
-                        self.initializeContext(context);
-                        self.setContext(context);
-                        self.renderer.begin(self.canvasController.getCtx());
-                        self.updateBounds();
-                        self.canvasController.draw();
-                    }
-                    this.fileController.openFile().then(result => parse(result));
+                    this.fileController.openFile().then(result => self.createContext(result));
                     return true;
                 }
                 case 83: { // 's'
