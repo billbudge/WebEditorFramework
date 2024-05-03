@@ -858,7 +858,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
       // Make sure transitions belong to lowest common statechart.
       const lcs = this.getLowestCommonStatechart(src, dst);
       if (lcs && transition.parent !== lcs) {
-        self.deleteItem(transition);
+        // self.deleteItem(transition);
         self.addItem(transition, lcs);
       }
     });
@@ -2604,12 +2604,21 @@ export class StatechartEditor implements CanvasLayer {
     this.canvasController.draw();
   }
 
+  createContext(text: string) {
+    const raw = JSON.parse(text),
+          context = new StatechartContext();
+    const statechart = readRaw(raw, context);
+    this.initializeContext(context);
+    this.setContext(context);
+    this.renderer.begin(this.canvasController.getCtx());
+    this.updateBounds();
+    this.canvasController.draw();
+  }
+
   onKeyDown(e: KeyboardEvent) {
     const self = this,
           context = this.context,
           statechart = this.statechart,
-          selection = context.selection,
-          transactionManager = context.transactionManager,
           keyCode = e.keyCode,  // TODO fix
           cmdKey = e.ctrlKey || e.metaKey,
           shiftKey = e.shiftKey;
@@ -2689,17 +2698,7 @@ export class StatechartEditor implements CanvasLayer {
           return true;
         }
         case 79: { // 'o'
-          function parse(text: string) {
-            const raw = JSON.parse(text),
-                  context = new StatechartContext();
-            const statechart = readRaw(raw, context);
-            self.initializeContext(context);
-            self.setContext(context);
-            self.renderer.begin(self.canvasController.getCtx());
-            self.updateBounds();
-            self.canvasController.draw();
-        }
-          this.fileController.openFile().then(result => parse(result));
+          this.fileController.openFile().then(result => self.createContext(result));
           return true;
         }
         case 83: { // 's'

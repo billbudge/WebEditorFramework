@@ -647,6 +647,8 @@ export class CanvasController {
   }
   onPointerDown(e: PointerEvent) {
     e.preventDefault();
+
+    this.canvas.focus({preventScroll: true});
     this.initialClientX = e.clientX;
     this.initialClientY = e.clientY;
     const self = this,
@@ -755,7 +757,7 @@ export class CanvasController {
   }
   onKeyDown(e: KeyboardEvent) {
     // Don't route key events to canvas layers if there is a focused control.
-    if (document.activeElement !== document.body)
+    if (document.activeElement !== this.canvas)
       return false;
 
     let self = this;

@@ -5,7 +5,8 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js'
 
   const body = document.getElementById('body'),
         canvas = document.getElementById('canvas'),
-        palette = document.getElementById('palette');
+        palette = document.getElementById('palette'),
+        selectExample = document.getElementById('select-example');
   if (body && canvas && palette) {
 
     const theme = getDefaultTheme(),  // or getBlueprintTheme
@@ -42,6 +43,14 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js'
 
     document.addEventListener('keyup', function(e) {
       canvasController.onKeyUp(e);
+    });
+
+    selectExample!.addEventListener('change', event => {
+      const id = (event.target! as HTMLSelectElement).value as string,
+            fileName = id + '.txt';
+      fetch(fileName)
+        .then(response => response.text())
+        .then(text => statechartEditor.createContext(text));
     });
   }
 })();
