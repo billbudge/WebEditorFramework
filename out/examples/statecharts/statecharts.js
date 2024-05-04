@@ -1057,8 +1057,10 @@ class Renderer {
                 width = Math.max(width, size.width);
             });
             statecharts.forEach(statechart => {
-                statechart.y = stateOffsetY;
-                statechart.width = width;
+                if (statechart.y !== stateOffsetY)
+                    statechart.y = stateOffsetY;
+                if (statechart.width !== width)
+                    statechart.width = width;
                 stateOffsetY += statechart.height;
             });
             height = Math.max(height, stateOffsetY);
@@ -1079,12 +1081,15 @@ class Renderer {
         height = Math.max(height, theme.stateMinHeight);
         width = Math.max(width, state.width);
         height = Math.max(height, state.height);
-        state.width = width;
-        state.height = height;
+        if (state.width !== width)
+            state.width = width;
+        if (state.height !== height)
+            state.height = height;
         if (statecharts.length > 0) {
             // Expand the last statechart to fill its parent state.
-            const lastStatechart = statecharts.at(statecharts.length - 1);
-            lastStatechart.height = lastStatechart.height + height - stateOffsetY;
+            const lastStatechart = statecharts.at(statecharts.length - 1), lastHeight = lastStatechart.height + height - stateOffsetY;
+            if (lastStatechart.height !== lastHeight)
+                lastStatechart.height = lastHeight;
         }
     }
     // Make sure a statechart is big enough to enclose its contents. Statecharts
