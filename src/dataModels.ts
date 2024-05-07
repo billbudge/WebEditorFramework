@@ -697,23 +697,24 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
       if (op instanceof ChangeOp) {
         if (op.change.type === 'valueChanged') {
           if (op.change.item === change.item && op.change.prop === change.prop) {
-            // Delete the old op and replace it with a new one.
+            // Delete the old op and replace it with a new one, since Change should be immutable.
             change.oldValue = op.change.oldValue;
             ops.splice(i, 1);
+            return;
           }
         } else if (op.change.type === 'elementInserted') {
           if (change.type === 'elementRemoved' &&
               op.change.item === change.item && op.change.prop === change.prop &&
-              op.change.index === change.index) {
-            // Remove after insert cancel out.
+              op.change.index === change.index && op.change.oldValue === change.oldValue) {
+            // Remove after insert cancels out.
             ops.splice(i, 1);
             return;
           }
         } else if (op.change.type === 'elementRemoved') {
           if (change.type === 'elementInserted' &&
               op.change.item === change.item && op.change.prop === change.prop &&
-              op.change.index === change.index) {
-            // Insert after remove cancel out.
+              op.change.index === change.index && op.change.oldValue === change.oldValue) {
+            // Insert after remove cancels out.
             ops.splice(i, 1);
             return;
           }

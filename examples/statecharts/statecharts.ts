@@ -1336,8 +1336,7 @@ class Renderer {
           transitions = statechart.transitions;
     // TODO bound transitions too.
     if (states.length) {
-      // Get extents of child states.
-
+      // Get extents of contents.
       const r = this.getBounds(states.asArray()),
             x = r.x - statechartX, // Get position in statechart coordinates.
             y = r.y - statechartY,
