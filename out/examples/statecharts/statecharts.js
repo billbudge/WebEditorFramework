@@ -579,14 +579,17 @@ export class StatechartContext extends EventBase {
         const oldParent = item.parent;
         if (!parent)
             parent = this.statechart;
+        // Adjust item's position to be inside statechart top/left.
+        if (item instanceof StateBase) {
+            const translation = this.getToParent(item, parent), x = Math.max(0, item.x + translation.x), y = Math.max(0, item.y + translation.y);
+            if (item.x != x)
+                item.x = x;
+            if (item.y != y)
+                item.y = y;
+        }
         if (oldParent === parent)
             return item;
-        // At this point we can add item to parent.
-        if (item instanceof StateBase) {
-            const translation = this.getToParent(item, parent);
-            item.x += translation.x;
-            item.y += translation.y;
-        }
+        // Add item to parent.
         if (oldParent)
             this.deleteItem(item);
         if (parent instanceof Statechart) {
@@ -1051,14 +1054,16 @@ class Renderer {
         let stateOffsetY = lineSpacing; // start at the bottom of the state label area.
         if (statecharts.length > 0) {
             // Layout the child statecharts vertically within the parent state.
-            // TODO handle horizontal flow.
+            // TODO allow horizontal flow of statecharts within a state.
             statecharts.forEach(statechart => {
                 const size = self.getSize(statechart);
                 width = Math.max(width, size.width);
             });
             statecharts.forEach(statechart => {
-                statechart.y = stateOffsetY;
-                statechart.width = width;
+                if (statechart.y !== stateOffsetY)
+                    statechart.y = stateOffsetY;
+                if (statechart.width !== width)
+                    statechart.width = width;
                 stateOffsetY += statechart.height;
             });
             height = Math.max(height, stateOffsetY);
@@ -1079,12 +1084,15 @@ class Renderer {
         height = Math.max(height, theme.stateMinHeight);
         width = Math.max(width, state.width);
         height = Math.max(height, state.height);
-        state.width = width;
-        state.height = height;
+        if (state.width !== width)
+            state.width = width;
+        if (state.height !== height)
+            state.height = height;
         if (statecharts.length > 0) {
             // Expand the last statechart to fill its parent state.
-            const lastStatechart = statecharts.at(statecharts.length - 1);
-            lastStatechart.height = lastStatechart.height + height - stateOffsetY;
+            const lastStatechart = statecharts.at(statecharts.length - 1), lastHeight = lastStatechart.height + height - stateOffsetY;
+            if (lastStatechart.height !== lastHeight)
+                lastStatechart.height = lastHeight;
         }
     }
     // Make sure a statechart is big enough to enclose its contents. Statecharts
@@ -1096,19 +1104,12 @@ class Renderer {
         if (states.length) {
             // Get extents of child states.
             const r = this.getBounds(states.asArray()), x = r.x - statechartX, // Get position in statechart coordinates.
-            y = r.y - statechartY;
-            let xMin = Math.min(0, x - padding), yMin = Math.min(0, y - padding), xMax = x + r.width + padding, yMax = y + r.height + padding;
-            if (xMin < 0) {
-                xMax -= xMin;
-                states.forEach(state => { state.x -= xMin; });
-            }
-            if (yMin < 0) {
-                yMax -= yMin;
-                states.forEach(state => { state.y -= yMin; });
-            }
-            // Statechart position is calculated by the parent state layout.
-            statechart.width = xMax - xMin;
-            statechart.height = yMax - yMin;
+            y = r.y - statechartY, xMin = Math.min(0, x - padding), yMin = Math.min(0, y - padding), xMax = x + r.width + padding, yMax = y + r.height + padding, width = xMax - xMin, height = yMax - yMin;
+            // Set width and height. Statechart x, y are calculated by the parent state layout.
+            if (statechart.width != width)
+                statechart.width = width;
+            if (statechart.height != height)
+                statechart.height = height;
         }
     }
     layoutTransition(transition) {

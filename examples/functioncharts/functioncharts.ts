@@ -2277,6 +2277,7 @@ class Renderer {
         width += type.width;
         height = Math.max(height, type.height + margin);
       }
+      // TODO check for value change before setting.
       functionchart.width = Math.max(width, functionchart.width);
       functionchart.height = Math.max(height, functionchart.height);
     }
