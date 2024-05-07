@@ -716,15 +716,21 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     const oldParent = item.parent;
     if (!parent)
       parent = this.statechart;
-    if (oldParent === parent)
-      return item;
-    // At this point we can add item to parent.
+    // Adjust item's position to be inside statechart top/left.
     if (item instanceof StateBase) {
-      const translation = this.getToParent(item, parent);
-      item.x += translation.x;
-      item.y += translation.y;
+      const translation = this.getToParent(item, parent),
+            x = Math.max(0, item.x + translation.x),
+            y = Math.max(0, item.y + translation.y);
+      if (item.x != x)
+        item.x = x;
+      if (item.y != y)
+        item.y = y;
     }
 
+    if (oldParent === parent)
+      return item;
+
+    // Add item to parent.
     if (oldParent)
       this.deleteItem(item);
 
@@ -1274,7 +1280,7 @@ class Renderer {
     let stateOffsetY = lineSpacing; // start at the bottom of the state label area.
     if (statecharts.length > 0) {
       // Layout the child statecharts vertically within the parent state.
-      // TODO handle horizontal flow.
+      // TODO allow horizontal flow of statecharts within a state.
       statecharts.forEach(statechart => {
         const size = self.getSize(statechart);
         width = Math.max(width, size.width);
@@ -1331,25 +1337,22 @@ class Renderer {
     // TODO bound transitions too.
     if (states.length) {
       // Get extents of child states.
+
       const r = this.getBounds(states.asArray()),
             x = r.x - statechartX, // Get position in statechart coordinates.
-            y = r.y - statechartY;
-      let xMin = Math.min(0, x - padding),
-          yMin = Math.min(0, y - padding),
-          xMax = x + r.width + padding,
-          yMax = y + r.height + padding;
-      if (xMin < 0) {
-        xMax -= xMin;
-        states.forEach(state => { state.x -= xMin; });
-      }
-      if (yMin < 0) {
-        yMax -= yMin;
-        states.forEach(state => { state.y -= yMin; });
-      }
-      // Statechart position is calculated by the parent state layout.
-      statechart.width = xMax - xMin;
-      statechart.height = yMax - yMin;
-    }
+            y = r.y - statechartY,
+            xMin = Math.min(0, x - padding),
+            yMin = Math.min(0, y - padding),
+            xMax = x + r.width + padding,
+            yMax = y + r.height + padding,
+            width = xMax - xMin,
+            height = yMax - yMin;
+      // Set width and height. Statechart x, y are calculated by the parent state layout.
+      if (statechart.width != width)
+        statechart.width = width;
+      if (statechart.height != height)
+        statechart.height = height;
+        }
   }
   layoutTransition(transition: Transition) {
     const self = this,
