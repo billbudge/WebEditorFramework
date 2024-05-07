@@ -1102,7 +1102,7 @@ class Renderer {
         const padding = this.theme.padding, global = statechart.globalPosition, statechartX = global.x, statechartY = global.y, states = statechart.states, transitions = statechart.transitions;
         // TODO bound transitions too.
         if (states.length) {
-            // Get extents of child states.
+            // Get extents of contents.
             const r = this.getBounds(states.asArray()), x = r.x - statechartX, // Get position in statechart coordinates.
             y = r.y - statechartY, xMin = Math.min(0, x - padding), yMin = Math.min(0, y - padding), xMax = x + r.width + padding, yMax = y + r.height + padding, width = xMax - xMin, height = yMax - yMin;
             // Set width and height. Statechart x, y are calculated by the parent state layout.
