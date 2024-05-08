@@ -170,6 +170,7 @@ export class StatechartContext extends EventBase {
         const self = this;
         this.transactionManager = new TransactionManager();
         this.addHandler('changed', this.transactionManager.onChanged.bind(this.transactionManager));
+        // TODO move this to endTransaction
         this.transactionManager.addHandler('transactionEnding', () => {
             self.makeConsistent();
             if (!self.isValidStatechart(self.statechart)) {

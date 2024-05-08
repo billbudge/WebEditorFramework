@@ -363,7 +363,6 @@ describe('TransactionManager', () => {
   });
   test('end or cancel only in transaction', () => {
     const context = new TestDataContext(),
-          item = new TestDataContextObject(context),
           transactionManager = new Data.TransactionManager();
     expect(() => transactionManager.endTransaction()).toThrow(Error);
     expect(() => transactionManager.cancelTransaction()).toThrow(Error);
@@ -373,10 +372,32 @@ describe('TransactionManager', () => {
           item = new TestDataContextObject(context),
           transactionManager = new Data.TransactionManager();
     context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
-    const transaction = transactionManager.beginTransaction('test');
+    transactionManager.beginTransaction('test');
     item.x = 1;
     transactionManager.cancelTransaction();
     expect(item.x).toBe(undefined);
+  });
+  test('No ending while canceling', () => {
+    const context = new TestDataContext(),
+          transactionManager = new Data.TransactionManager();
+    context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+    transactionManager.beginTransaction('test');
+    function end() {
+      transactionManager.endTransaction();
+    }
+    transactionManager.addHandler('transactionCanceled', end);
+    expect(() => transactionManager.cancelTransaction()).toThrow(Error);
+  });
+  test('No canceling while ending', () => {
+    const context = new TestDataContext(),
+          transactionManager = new Data.TransactionManager();
+    context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+    transactionManager.beginTransaction('test');
+    function cancel() {
+      transactionManager.cancelTransaction();
+    }
+    transactionManager.addHandler('transactionEnded', cancel);
+    expect(() => transactionManager.endTransaction()).toThrow(Error);
   });
   test('ChangeOp', () => {
     const context = new TestDataContext(),

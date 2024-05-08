@@ -459,10 +459,15 @@ export class CompoundOp {
 export class TransactionManager extends EventBase {
     constructor() {
         super(...arguments);
+        this.inEndOrCancel = false;
         this.snapshots = new Map();
     }
     // Notifies observers that a transaction has started.
     beginTransaction(name) {
+        if (this.transaction)
+            throw new Error('Transaction in progress');
+        if (this.inEndOrCancel)
+            throw new Error('Ending or Canceling');
         const transaction = new CompoundOp(name);
         this.transaction = transaction;
         this.snapshots = new Map();
@@ -470,28 +475,32 @@ export class TransactionManager extends EventBase {
         return transaction;
     }
     // Notifies observers that a transaction is ending. Observers should now
-    // do any adjustments to make data valid, or cancel the transaction if
-    // the data is in an invalid state.
+    // do any adjustments to make data valid. At this point the transaction can't
+    // be canceled.
     endTransaction() {
         const transaction = this.transaction;
         if (!transaction)
-            throw new Error('No transaction in progress.');
+            throw new Error('No transaction in progress');
+        this.transaction = undefined;
+        this.inEndOrCancel = true;
         super.onEvent('transactionEnding', transaction);
         this.snapshots.clear();
-        this.transaction = undefined;
         super.onEvent('transactionEnded', transaction);
+        this.inEndOrCancel = false;
         return transaction;
     }
     // Notifies observers that a transaction was canceled and its operations
-    // rolled back.
+    // rolled back. At this point the transaction can't be ended.
     cancelTransaction() {
         const transaction = this.transaction;
         if (!transaction)
-            throw new Error('No transaction in progress.');
+            throw new Error('No transaction in progress');
+        this.transaction = undefined;
+        this.inEndOrCancel = true;
         this.undo(transaction);
         this.snapshots.clear();
-        this.transaction = undefined;
         super.onEvent('transactionCancelled', transaction);
+        this.inEndOrCancel = false;
     }
     // Undoes the operations in the transaction.
     undo(transaction) {
@@ -528,25 +537,6 @@ export class TransactionManager extends EventBase {
                         // Delete the old op and replace it with a new one, since Change should be immutable.
                         change.oldValue = op.change.oldValue;
                         ops.splice(i, 1);
-                        return;
-                    }
-                }
-                else if (op.change.type === 'elementInserted') {
-                    if (change.type === 'elementRemoved' &&
-                        op.change.item === change.item && op.change.prop === change.prop &&
-                        op.change.index === change.index && op.change.oldValue === change.oldValue) {
-                        // Remove after insert cancels out.
-                        ops.splice(i, 1);
-                        return;
-                    }
-                }
-                else if (op.change.type === 'elementRemoved') {
-                    if (change.type === 'elementInserted' &&
-                        op.change.item === change.item && op.change.prop === change.prop &&
-                        op.change.index === change.index && op.change.oldValue === change.oldValue) {
-                        // Insert after remove cancels out.
-                        ops.splice(i, 1);
-                        return;
                     }
                 }
             }
