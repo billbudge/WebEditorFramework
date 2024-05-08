@@ -3270,7 +3270,8 @@ export class FunctionchartEditor implements CanvasLayer {
         newWire: Wire | undefined;
     // First check for a drag that creates a new wire.
     if ((pointerHitInfo instanceof ElementHitResult &&
-        (pointerHitInfo.input >= 0 || pointerHitInfo.output >= 0))) {
+        (pointerHitInfo.input >= 0 || pointerHitInfo.output >= 0)) &&
+        !this.clickInPalette) {
       const element = (dragItem as Element),
             cp0 = this.getCanvasPosition(canvasController, p0);
       if (pointerHitInfo.input >= 0) {

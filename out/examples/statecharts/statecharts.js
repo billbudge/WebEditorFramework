@@ -1996,7 +1996,7 @@ export class StatechartEditor {
         let drag, newTransition;
         // First check for a drag that creates a new transition.
         if ((pointerHitInfo instanceof StateHitResult || pointerHitInfo instanceof PseudostateHitResult) &&
-            pointerHitInfo.arrow) {
+            pointerHitInfo.arrow && !this.clickInPalette) {
             const state = dragItem, cp0 = this.getCanvasPosition(canvasController, p0);
             // Start the new transition as connecting the src state to itself.
             newTransition = context.newTransition(state, undefined);
