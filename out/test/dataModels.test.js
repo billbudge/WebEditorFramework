@@ -286,7 +286,7 @@ describe('TransactionManager', () => {
         function end() {
             transactionManager.endTransaction();
         }
-        transactionManager.addHandler('transactionCancelled', end);
+        transactionManager.addHandler('transactionCanceled', end);
         expect(() => transactionManager.cancelTransaction()).toThrow(Error);
     });
     test('No canceling while ending', () => {

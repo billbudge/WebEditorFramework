@@ -459,14 +459,14 @@ export class CompoundOp {
 export class TransactionManager extends EventBase {
     constructor() {
         super(...arguments);
-        this.inEndOrCancel = false;
+        this.endingOrCanceling = false;
         this.snapshots = new Map();
     }
     // Notifies observers that a transaction has started.
     beginTransaction(name) {
         if (this.transaction)
-            throw new Error('Transaction in progress');
-        if (this.inEndOrCancel)
+            throw new Error('Already in transaction');
+        if (this.endingOrCanceling)
             throw new Error('Ending or Canceling');
         const transaction = new CompoundOp(name);
         this.transaction = transaction;
@@ -480,13 +480,13 @@ export class TransactionManager extends EventBase {
     endTransaction() {
         const transaction = this.transaction;
         if (!transaction)
-            throw new Error('No transaction in progress');
+            throw new Error('Transaction ended or canceled');
         this.transaction = undefined;
-        this.inEndOrCancel = true;
+        this.endingOrCanceling = true;
         super.onEvent('transactionEnding', transaction);
         this.snapshots.clear();
         super.onEvent('transactionEnded', transaction);
-        this.inEndOrCancel = false;
+        this.endingOrCanceling = false;
         return transaction;
     }
     // Notifies observers that a transaction was canceled and its operations
@@ -494,13 +494,13 @@ export class TransactionManager extends EventBase {
     cancelTransaction() {
         const transaction = this.transaction;
         if (!transaction)
-            throw new Error('No transaction in progress');
+            throw new Error('Transaction ended or canceled');
         this.transaction = undefined;
-        this.inEndOrCancel = true;
+        this.endingOrCanceling = true;
         this.undo(transaction);
         this.snapshots.clear();
-        super.onEvent('transactionCancelled', transaction);
-        this.inEndOrCancel = false;
+        super.onEvent('transactionCanceled', transaction);
+        this.endingOrCanceling = false;
     }
     // Undoes the operations in the transaction.
     undo(transaction) {
@@ -641,7 +641,7 @@ export class HistoryManager {
         transactionManager.addHandler('transactionBegan', this.onTransactionBegan.bind(this));
         transactionManager.addHandler('transactionEnding', this.onTransactionEnding.bind(this));
         transactionManager.addHandler('transactionEnded', this.onTransactionEnded.bind(this));
-        transactionManager.addHandler('transactionCancelled', this.onTransactionCancelled.bind(this));
+        transactionManager.addHandler('transactionCanceled', this.onTransactionCancelled.bind(this));
     }
 }
 //# sourceMappingURL=dataModels.js.map
