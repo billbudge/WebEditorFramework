@@ -2720,7 +2720,8 @@ export class FunctionchartEditor {
         let drag, newWire;
         // First check for a drag that creates a new wire.
         if ((pointerHitInfo instanceof ElementHitResult &&
-            (pointerHitInfo.input >= 0 || pointerHitInfo.output >= 0))) {
+            (pointerHitInfo.input >= 0 || pointerHitInfo.output >= 0)) &&
+            !this.clickInPalette) {
             const element = dragItem, cp0 = this.getCanvasPosition(canvasController, p0);
             if (pointerHitInfo.input >= 0) {
                 newWire = context.newWire(undefined, -1, element, pointerHitInfo.input);
