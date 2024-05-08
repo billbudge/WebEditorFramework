@@ -1505,6 +1505,7 @@ function readRaw(raw, context) {
     }
     else {
         // old format.
+        // TODO eliminate this.
         const map = new Map();
         statechart = readStatechart(raw, context, map);
     }

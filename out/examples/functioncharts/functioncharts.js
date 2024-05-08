@@ -436,15 +436,7 @@ export class FunctionchartContext extends EventBase {
                 self.sorted = self.topologicalSort();
             self.makeConsistent();
         }
-        function validateAndUpdate() {
-            if (!self.isValidFunctionchart()) {
-                // TODO some kind of error message.
-                self.transactionManager.cancelTransaction();
-            }
-            update();
-            self.verifyInternal();
-        }
-        this.transactionManager.addHandler('transactionEnding', validateAndUpdate);
+        this.transactionManager.addHandler('transactionEnding', update);
         this.transactionManager.addHandler('didUndo', update);
         this.transactionManager.addHandler('didRedo', update);
         this.historyManager = new HistoryManager(this.transactionManager, this.selection);
@@ -740,7 +732,13 @@ export class FunctionchartContext extends EventBase {
         this.transactionManager.beginTransaction(name);
     }
     endTransaction() {
-        this.transactionManager.endTransaction();
+        if (!this.isValidFunctionchart()) {
+            // TODO some kind of error message.
+            this.transactionManager.cancelTransaction();
+        }
+        else {
+            this.transactionManager.endTransaction();
+        }
     }
     cancelTransaction(name) {
         this.transactionManager.cancelTransaction();
@@ -910,7 +908,7 @@ export class FunctionchartContext extends EventBase {
         const copies = copyItems(items, this);
         this.addItems(copies, this.functionchart);
         this.selection.set(copies);
-        this.transactionManager.endTransaction();
+        this.endTransaction();
         return copies;
     }
     deleteSelectionHelper() {
@@ -922,13 +920,13 @@ export class FunctionchartContext extends EventBase {
         this.transactionManager.beginTransaction('cut');
         const result = this.copy();
         this.deleteSelectionHelper();
-        this.transactionManager.endTransaction();
+        this.endTransaction();
         return result;
     }
     deleteSelection() {
         this.transactionManager.beginTransaction('delete');
         this.deleteSelectionHelper();
-        this.transactionManager.endTransaction();
+        this.endTransaction();
     }
     connectInput(element, pin, pinToPoint) {
         const elementParent = element.parent, p = pinToPoint(element, pin), junction = this.newPseudoelement('input');
@@ -1039,46 +1037,51 @@ export class FunctionchartContext extends EventBase {
             this.sorted = this.topologicalSort();
         return this.sorted.length === this.elements.size;
     }
-    verifyInternal() {
-        const invalidWires = new Set(), invalidElements = new Set(), graphInfo = this.getGraphInfo();
-        // Check wires.
-        graphInfo.wires.forEach(wire => {
-            const src = wire.src, srcPin = wire.srcPin, dst = wire.dst, dstPin = wire.dstPin;
-            if (src && srcPin >= 0 && srcPin < src.type.outputs.length) {
-                if (src.outWires[srcPin].indexOf(wire) < 0)
-                    invalidWires.add(wire);
-            }
-            if (dst && dstPin >= 0 && dstPin < dst.type.inputs.length) {
-                if (dst.inWires[dstPin] != wire)
-                    invalidWires.add(wire);
-            }
-            if (src && dst) {
-                const lca = getLowestCommonAncestor(src, dst);
-                if (!lca || !lca.wires.includes(wire)) {
-                    invalidWires.add(wire);
-                }
-            }
-        });
-        // Check elements.
-        graphInfo.elements.forEach(element => {
-            element.inWires.forEach((wire) => {
-                if (wire && !graphInfo.wires.has(wire))
-                    invalidElements.add(element);
-            });
-            element.outWires.forEach((wires) => {
-                wires.forEach((wire) => {
-                    if (!graphInfo.wires.has(wire))
-                        invalidElements.add(element);
-                });
-            });
-        });
-        if (invalidWires.size !== 0 || invalidElements.size !== 0) {
-            console.log('invalid wires', invalidWires);
-            console.log('invalid elements', invalidElements);
-            return false;
-        }
-        return true;
-    }
+    // verifyInternal() : boolean {
+    //   const invalidWires = new Set<Wire>(),
+    //         invalidElements = new Set<ElementTypes>(),
+    //         graphInfo = this.getGraphInfo();
+    //   // Check wires.
+    //   graphInfo.wires.forEach(wire => {
+    //     const src = wire.src,
+    //           srcPin = wire.srcPin,
+    //           dst = wire.dst,
+    //           dstPin = wire.dstPin;
+    //     if (src && srcPin >= 0 && srcPin < src.type.outputs.length) {
+    //       if (src.outWires[srcPin].indexOf(wire) < 0)
+    //         invalidWires.add(wire);
+    //     }
+    //     if (dst && dstPin >= 0 && dstPin < dst.type.inputs.length) {
+    //       if (dst.inWires[dstPin] != wire)
+    //         invalidWires.add(wire);
+    //     }
+    //     if (src && dst) {
+    //       const lca: Functionchart = getLowestCommonAncestor<AllTypes>(src, dst) as Functionchart;
+    //       if (!lca || !lca.wires.includes(wire)) {
+    //         invalidWires.add(wire);
+    //       }
+    //     }
+    //   });
+    //   // Check elements.
+    //   graphInfo.elements.forEach(element => {
+    //     element.inWires.forEach((wire) => {
+    //       if (wire && !graphInfo.wires.has(wire))
+    //         invalidElements.add(element);
+    //     });
+    //     element.outWires.forEach((wires) => {
+    //       wires.forEach((wire) => {
+    //         if (!graphInfo.wires.has(wire))
+    //           invalidElements.add(element);
+    //       });
+    //     });
+    //   });
+    //   if (invalidWires.size !== 0 || invalidElements.size !== 0) {
+    //     console.log('invalid wires', invalidWires);
+    //     console.log('invalid elements', invalidElements);
+    //     return false;
+    //   }
+    //   return true;
+    // }
     makeConsistent() {
         const self = this;
         // TODO use topological sort to traverse graph and make types consistent.
@@ -2916,6 +2919,16 @@ export class FunctionchartEditor {
         this.hotTrackInfo = undefined;
         this.canvasController.draw();
     }
+    createContext(text) {
+        const raw = JSON.parse(text), context = new FunctionchartContext();
+        const functionchart = Deserialize(raw, context);
+        context.root = functionchart;
+        this.initializeContext(context);
+        this.setContext(context);
+        this.renderer.begin(this.canvasController.getCtx());
+        this.updateBounds();
+        this.canvasController.draw();
+    }
     onKeyDown(e) {
         const self = this, context = this.context, functionchart = this.functionchart, selection = context.selection, keyCode = e.keyCode, // TODO fix me.
         cmdKey = e.ctrlKey || e.metaKey, shiftKey = e.shiftKey;
@@ -3022,19 +3035,7 @@ export class FunctionchartEditor {
                     return true;
                 }
                 case 79: { // 'o'
-                    function parse(text) {
-                        const raw = JSON.parse(text), context = new FunctionchartContext();
-                        const functionchart = Deserialize(raw, context);
-                        context.root = functionchart;
-                        context.verifyInternal();
-                        self.initializeContext(context);
-                        self.setContext(context);
-                        self.renderer.begin(self.canvasController.getCtx());
-                        self.updateBounds();
-                        self.canvasController.draw();
-                        self.renderer.end();
-                    }
-                    this.fileController.openFile().then(result => parse(result));
+                    this.fileController.openFile().then(result => self.createContext(result));
                     return true;
                 }
                 case 83: { // 's'

@@ -1802,6 +1802,7 @@ function readRaw(raw: any, context: StatechartContext) : void {
     statechart = Deserialize(raw, context) as Statechart;
   } else {
     // old format.
+    // TODO eliminate this.
     const map = new Map<number, StateTypes>();
     statechart = readStatechart(raw, context, map);
   }
