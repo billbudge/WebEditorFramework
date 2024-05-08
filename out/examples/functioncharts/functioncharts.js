@@ -830,14 +830,16 @@ export class FunctionchartContext extends EventBase {
         const oldParent = item.parent;
         if (!parent)
             parent = this.functionchart;
+        if (!(item instanceof Wire)) {
+            const translation = this.getToParent(item, parent), x = Math.max(0, item.x + translation.x), y = Math.max(0, item.y + translation.y);
+            if (item.x != x)
+                item.x = x;
+            if (item.y != y)
+                item.y = y;
+        }
         if (oldParent === parent)
             return item;
         // At this point we can add item to parent.
-        if (!(item instanceof Wire)) {
-            const translation = this.getToParent(item, parent);
-            item.x += translation.x;
-            item.y += translation.y;
-        }
         if (oldParent)
             this.deleteItem(item);
         if (item instanceof Wire) {
@@ -1915,9 +1917,12 @@ class Renderer {
                 width += type.width;
                 height = Math.max(height, type.height + margin);
             }
-            // TODO check for value change before setting.
-            functionchart.width = Math.max(width, functionchart.width);
-            functionchart.height = Math.max(height, functionchart.height);
+            width = Math.max(width, functionChart.width);
+            height = Math.max(height, functionChart.height);
+            if (width !== functionChart.width)
+                functionchart.width = width;
+            if (height !== functionChart.height)
+                functionchart.height = height;
         }
         // Visit in reverse order to correctly include sub-functionchart bounds.
         functionchart.context.reverseVisitAll(functionchart, item => {
