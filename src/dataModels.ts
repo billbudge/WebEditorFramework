@@ -620,15 +620,20 @@ export class CompoundOp implements Operation {
 }
 
 export type TransactionEvent =
-    'transactionBegan' | 'transactionEnding' | 'transactionEnded' | 'transactionCancelled' |
+    'transactionBegan' | 'transactionEnding' | 'transactionEnded' | 'transactionCanceled' |
     'didUndo' | 'didRedo';
 
 export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> {
   private transaction: CompoundOp | undefined;
+  private endingOrCanceling: boolean = false;
   private snapshots = new Map<DataContextObject, object>();
 
   // Notifies observers that a transaction has started.
   beginTransaction(name: string) : CompoundOp {
+    if (this.transaction)
+      throw new Error('Already in transaction');
+    if (this.endingOrCanceling)
+      throw new Error('Ending or Canceling');
     const transaction = new CompoundOp(name);
     this.transaction = transaction;
     this.snapshots = new Map<DataContextObject, object>();
@@ -637,29 +642,33 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
   }
 
   // Notifies observers that a transaction is ending. Observers should now
-  // do any adjustments to make data valid, or cancel the transaction if
-  // the data is in an invalid state.
+  // do any adjustments to make data valid. At this point the transaction can't
+  // be canceled.
   endTransaction() : CompoundOp {
     const transaction = this.transaction;
     if (!transaction)
-      throw new Error('No transaction in progress.');
+      throw new Error('Transaction ended or canceled');
+    this.transaction = undefined;
+    this.endingOrCanceling = true;
     super.onEvent('transactionEnding', transaction);
     this.snapshots.clear();
-    this.transaction = undefined;
     super.onEvent('transactionEnded', transaction);
+    this.endingOrCanceling = false;
     return transaction;
   }
 
   // Notifies observers that a transaction was canceled and its operations
-  // rolled back.
+  // rolled back. At this point the transaction can't be ended.
   cancelTransaction() {
     const transaction = this.transaction;
     if (!transaction)
-      throw new Error('No transaction in progress.');
+      throw new Error('Transaction ended or canceled');
+    this.transaction = undefined;
+    this.endingOrCanceling = true;
     this.undo(transaction);
     this.snapshots.clear();
-    this.transaction = undefined;
-    super.onEvent('transactionCancelled', transaction);
+    super.onEvent('transactionCanceled', transaction);
+    this.endingOrCanceling = false;
   }
 
   // Undoes the operations in the transaction.
@@ -827,6 +836,6 @@ export class HistoryManager {
     transactionManager.addHandler('transactionBegan', this.onTransactionBegan.bind(this));
     transactionManager.addHandler('transactionEnding', this.onTransactionEnding.bind(this));
     transactionManager.addHandler('transactionEnded', this.onTransactionEnded.bind(this));
-    transactionManager.addHandler('transactionCancelled', this.onTransactionCancelled.bind(this));
+    transactionManager.addHandler('transactionCanceled', this.onTransactionCancelled.bind(this));
   }
 }

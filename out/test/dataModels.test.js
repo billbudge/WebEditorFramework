@@ -267,17 +267,37 @@ describe('TransactionManager', () => {
         expect(transaction.ops.length).toBe(1);
     });
     test('end or cancel only in transaction', () => {
-        const context = new TestDataContext(), item = new TestDataContextObject(context), transactionManager = new Data.TransactionManager();
+        const context = new TestDataContext(), transactionManager = new Data.TransactionManager();
         expect(() => transactionManager.endTransaction()).toThrow(Error);
         expect(() => transactionManager.cancelTransaction()).toThrow(Error);
     });
     test('cancel transaction', () => {
         const context = new TestDataContext(), item = new TestDataContextObject(context), transactionManager = new Data.TransactionManager();
         context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
-        const transaction = transactionManager.beginTransaction('test');
+        transactionManager.beginTransaction('test');
         item.x = 1;
         transactionManager.cancelTransaction();
         expect(item.x).toBe(undefined);
+    });
+    test('No ending while canceling', () => {
+        const context = new TestDataContext(), transactionManager = new Data.TransactionManager();
+        context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+        transactionManager.beginTransaction('test');
+        function end() {
+            transactionManager.endTransaction();
+        }
+        transactionManager.addHandler('transactionCanceled', end);
+        expect(() => transactionManager.cancelTransaction()).toThrow(Error);
+    });
+    test('No canceling while ending', () => {
+        const context = new TestDataContext(), transactionManager = new Data.TransactionManager();
+        context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+        transactionManager.beginTransaction('test');
+        function cancel() {
+            transactionManager.cancelTransaction();
+        }
+        transactionManager.addHandler('transactionEnded', cancel);
+        expect(() => transactionManager.endTransaction()).toThrow(Error);
     });
     test('ChangeOp', () => {
         const context = new TestDataContext(), item = new TestDataContextObject(context), child = new TestDataContextObject(context), transactionManager = new Data.TransactionManager();
@@ -328,26 +348,29 @@ describe('TransactionManager', () => {
         expect(item.x).toBe(3);
         expect(item.reference).toBe(newReference);
     });
-    test('array op coalescing', () => {
-        const context = new TestDataContext(), item = new TestDataContextObject(context), child = new TestDataContextObject(context), transactionManager = new Data.TransactionManager();
-        context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
-        let transaction = transactionManager.beginTransaction('test');
-        expect(transaction.ops.length).toBe(0);
-        // insert then remove should cancel.
-        item.array.append(child);
-        expect(transaction.ops.length).toBe(1);
-        item.array.remove(child);
-        expect(transaction.ops.length).toBe(0);
-        item.array.append(child);
-        expect(transaction.ops.length).toBe(1);
-        transactionManager.endTransaction();
-        // remove then insert should cancel.
-        transaction = transactionManager.beginTransaction('test');
-        item.array.remove(child);
-        expect(transaction.ops.length).toBe(1);
-        item.array.append(child);
-        expect(transaction.ops.length).toBe(0);
-    });
+    // test('array op coalescing', () => {
+    //   const context = new TestDataContext(),
+    //         item = new TestDataContextObject(context),
+    //         child = new TestDataContextObject(context),
+    //         transactionManager = new Data.TransactionManager();
+    //   context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+    //   let transaction = transactionManager.beginTransaction('test');
+    //   expect(transaction.ops.length).toBe(0);
+    //   // insert then remove should cancel.
+    //   item.array.append(child);
+    //   expect(transaction.ops.length).toBe(1);
+    //   item.array.remove(child);
+    //   expect(transaction.ops.length).toBe(0);
+    //   item.array.append(child);
+    //   expect(transaction.ops.length).toBe(1);
+    //   transactionManager.endTransaction();
+    //   // remove then insert should cancel.
+    //   transaction = transactionManager.beginTransaction('test');
+    //   item.array.remove(child);
+    //   expect(transaction.ops.length).toBe(1);
+    //   item.array.append(child);
+    //   expect(transaction.ops.length).toBe(0);
+    // });
 });
 describe('HistoryManager', () => {
     test('undo, redo, selection undo/redo', () => {

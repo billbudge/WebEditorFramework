@@ -170,12 +170,6 @@ export class StatechartContext extends EventBase {
         const self = this;
         this.transactionManager = new TransactionManager();
         this.addHandler('changed', this.transactionManager.onChanged.bind(this.transactionManager));
-        this.transactionManager.addHandler('transactionEnding', () => {
-            self.makeConsistent();
-            if (!self.isValidStatechart(self.statechart)) {
-                self.transactionManager.cancelTransaction();
-            }
-        });
         this.historyManager = new HistoryManager(this.transactionManager, this.selection);
         this.statechart = new Statechart(this);
         this.insertStatechart(this.statechart, undefined);
@@ -514,7 +508,15 @@ export class StatechartContext extends EventBase {
         this.transactionManager.beginTransaction(name);
     }
     endTransaction() {
-        this.transactionManager.endTransaction();
+        // Make any adjustments needed to make the data consistent.
+        this.makeConsistent();
+        // Check validity and cancel before ending transaction.
+        if (!this.isValidStatechart(this.statechart)) {
+            this.transactionManager.cancelTransaction();
+        }
+        else {
+            this.transactionManager.endTransaction();
+        }
     }
     cancelTransaction() {
         this.transactionManager.cancelTransaction();
@@ -658,7 +660,7 @@ export class StatechartContext extends EventBase {
         const copies = copyItems(items, this); // TODO fix
         this.addItems(copies, this.statechart);
         this.selection.set(copies);
-        this.transactionManager.endTransaction();
+        this.endTransaction();
         return copies;
     }
     deleteSelectionHelper() {
@@ -670,13 +672,13 @@ export class StatechartContext extends EventBase {
         this.transactionManager.beginTransaction('cut');
         const result = this.copy();
         this.deleteSelectionHelper();
-        this.transactionManager.endTransaction();
+        this.endTransaction();
         return result;
     }
     deleteSelection() {
         this.transactionManager.beginTransaction('delete');
         this.deleteSelectionHelper();
-        this.transactionManager.endTransaction();
+        this.endTransaction();
     }
     group(items, grandparent, bounds) {
         const parent = this.newState();
@@ -1615,10 +1617,10 @@ export class StatechartEditor {
             if (item) {
                 const attr = getAttr(info);
                 if (attr) {
-                    const description = 'change ' + attr, transactionManager = self.context.transactionManager;
-                    transactionManager.beginTransaction(description);
+                    const description = 'change ' + attr;
+                    context.beginTransaction(description);
                     item[attr] = value;
-                    transactionManager.endTransaction();
+                    context.endTransaction();
                     canvasController.draw();
                 }
             }
@@ -2173,7 +2175,7 @@ export class StatechartEditor {
             const items = selection.contents(), target = context.findOrCreateTargetForDrop(items, parent);
             context.addItems(items, target);
         }
-        transactionManager.endTransaction();
+        context.endTransaction();
         this.setPropertyGrid();
         this.dragInfo = undefined;
         this.pointerHitInfo = undefined;
