@@ -2913,7 +2913,8 @@ export class FunctionchartEditor implements CanvasLayer {
 
     // Layout any items in the functionchart.
     renderer.begin(this.canvasController.getCtx());
-    context.reverseVisitAll(this.functionchart, item => renderer.layout(item));
+    context.reverseVisitNonWires(this.functionchart, item => renderer.layout(item));
+    context.visitWires(this.functionchart, item => renderer.layout(item));
     renderer.end();
   }
   initialize(canvasController: CanvasController) {
