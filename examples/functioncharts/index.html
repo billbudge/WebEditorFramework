@@ -7,7 +7,7 @@
 </head>
 <body id="body" z-index="0">
 
-  <p>
+  <p style="position: fixed; right: 0; z-index: 2;">
     <tr>
       <select name="examples" id="select-example">
         <option value="factorial">factorial</option>
@@ -19,7 +19,7 @@
     </tr>
   </p>
 
-<canvas id="palette" style="position:fixed; z-index:1; box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);"></canvas>
+<canvas id="palette" style="position: fixed; z-index: 1; box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);"></canvas>
 <canvas id="canvas" style="position: absolute; z-index: 0; outline: none" tabindex="0";></canvas>
 
 <script type="module" src="../../out/src/collections.js"></script>
