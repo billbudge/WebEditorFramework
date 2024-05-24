@@ -1986,19 +1986,30 @@ class Renderer {
         }
     }
     drawElement(element, mode) {
-        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing, rect = this.getItemRect(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height, right = x + w, bottom = y + h;
+        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing, diameter = theme.knobbyRadius * 2, rect = this.getItemRect(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height, right = x + w, bottom = y + h;
         if (element instanceof Pseudoelement) {
             switch (element.template.typeName) {
                 case 'input':
+                    ctx.lineWidth = 0.5;
                     inFlagPath(x, y, w, h, spacing, ctx);
                     break;
                 case 'output':
+                    ctx.lineWidth = 0.5;
                     outFlagPath(x, y, w, h, spacing, ctx);
                     break;
                 case 'apply':
-                case 'pass':
+                    ctx.lineWidth = 0.5;
                     ctx.beginPath();
                     ctx.rect(x, y, w, h);
+                    break;
+                case 'pass': {
+                    const mid = y + h / 2 + 2;
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(x + diameter, mid);
+                    ctx.lineTo(x + w - diameter, mid);
+                    break;
+                }
             }
         }
         else {
@@ -2012,7 +2023,6 @@ class Renderer {
                 ctx.fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
                 ctx.fill();
                 ctx.strokeStyle = theme.strokeColor;
-                ctx.lineWidth = 0.5;
                 ctx.stroke();
                 // const passThroughs = element.passThroughs;  // TODO pass rendering
                 // if (passThroughs) {
