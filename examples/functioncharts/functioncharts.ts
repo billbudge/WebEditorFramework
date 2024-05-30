@@ -373,6 +373,7 @@ abstract class ElementBase {
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
   type: Type = Type.emptyType;
+  innerType: Type = Type.emptyType;  // Only set for 'apply' pseudoelement.
   inWires = new Array<Wire | undefined>();   // one input per pin (no fan in).
   outWires = new Array<Array<Wire>>();       // multiple outputs per pin (fan out).
 
@@ -459,6 +460,10 @@ export class Pseudoelement extends ElementBase implements DataContextObject, Ref
         break;
       }
   }
+}
+
+function isApplyPseudoelement(element: ElementTypes) {
+  return element.template === applyTemplate;
 }
 
 export class Wire implements DataContextObject {
@@ -2191,9 +2196,9 @@ class Renderer {
     let height = 0, width = 0;
     if (name) {
       width = 2 * spacing + ctx.measureText(name).width;
-      height += textSize + spacing / 2;
+      height += textSize;// + spacing / 2;
     } else {
-      height += spacing / 2;
+      height += 0;//spacing / 2;
     }
 
     function layoutPins(pins: Pin[]) {
@@ -2204,7 +2209,7 @@ class Renderer {
         pin.y = y + spacing / 2;
         let name = pin.name, pw = pin.width, ph = pin.height! + spacing / 2;
         if (name) {
-          pin.baseline = y + textSize;
+          pin.baseline = y + spacing / 2 + textSize;
           if (textSize > ph) {
             pin.y += (textSize - ph) / 2;
             ph = textSize;
@@ -2296,7 +2301,7 @@ class Renderer {
     });
   }
 
-  drawType(type: Type, x: number, y: number, fillOutputs: boolean) {
+  drawType(type: Type, x: number, y: number) {
     const self = this, ctx = this.ctx, theme = this.theme,
           textSize = theme.fontSize, spacing = theme.spacing,
           name = type.name,
@@ -2311,7 +2316,7 @@ class Renderer {
     }
     type.inputs.forEach(function(pin: Pin, i: number) {
       const name = pin.name;
-      self.drawPin(pin, x, y + pin.y, false);
+      self.drawPin(pin, x, y + pin.y);
       if (name) {
         ctx.textAlign = 'left';
         ctx.fillText(name, x + pin.width + spacing, y + pin.baseline);
@@ -2320,7 +2325,7 @@ class Renderer {
     type.outputs.forEach(function(pin) {
       const name = pin.name,
             pinLeft = right - pin.width;
-      self.drawPin(pin, pinLeft, y + pin.y, fillOutputs);
+      self.drawPin(pin, pinLeft, y + pin.y);
       if (name) {
         ctx.textAlign = 'right';
         ctx.fillText(name, pinLeft - spacing, y + pin.baseline);
@@ -2328,7 +2333,7 @@ class Renderer {
     });
   }
 
-  drawPin(pin: Pin, x: number, y: number, fill: boolean) {
+  drawPin(pin: Pin, x: number, y: number) {
     const ctx = this.ctx,
           theme = this.theme;
     ctx.strokeStyle = theme.strokeColor;
@@ -2352,7 +2357,7 @@ class Renderer {
       //   ctx.fill();
       // }
       ctx.stroke();
-      this.drawType(type, x, y, false);
+      this.drawType(type, x, y);
     }
   }
 
@@ -2375,13 +2380,17 @@ class Renderer {
           ctx.lineWidth = 0.5;
           outFlagPath(x, y, w, h, spacing, ctx);
           break;
-        case 'apply':
+        case 'apply': {
           ctx.lineWidth = 0.5;
           ctx.beginPath();
+          const baseline = y + 2 * spacing - 2;
+          ctx.moveTo(x, baseline);
+          ctx.lineTo(x + w, baseline);
           ctx.rect(x, y, w, h);
           break;
+        }
         case 'pass': {
-          const mid = y + h / 2 + 2;
+          const mid = y + h / 2;
           ctx.lineWidth = 4;
           ctx.beginPath();
           ctx.moveTo(x + diameter, mid);
@@ -2406,7 +2415,7 @@ class Renderer {
         // if (passThroughs) {
 
         // }
-        this.drawType(element.type, x, y, false);
+        this.drawType(element.type, x, y);
         break;
       case RenderMode.Highlight:
         ctx.strokeStyle = theme.highlightColor;
@@ -2448,7 +2457,7 @@ class Renderer {
         ctx.lineWidth = 0.5;
         ctx.stroke();
         if (type !== Type.emptyType)
-          this.drawType(type, instanceRect.x, instanceRect.y, false);
+          this.drawType(type, instanceRect.x, instanceRect.y);
         break;
       case RenderMode.Highlight:
       case RenderMode.HotTrack:

@@ -316,6 +316,7 @@ class ElementBase {
     constructor(id) {
         this.globalPosition = defaultPoint;
         this.type = Type.emptyType;
+        this.innerType = Type.emptyType; // Only set for 'apply' pseudoelement.
         this.inWires = new Array(); // one input per pin (no fan in).
         this.outWires = new Array(); // multiple outputs per pin (fan out).
         this.id = id;
@@ -363,6 +364,9 @@ export class Pseudoelement extends ElementBase {
                 break;
         }
     }
+}
+function isApplyPseudoelement(element) {
+    return element.template === applyTemplate;
 }
 export class Wire {
     get src() { return this.template.src.get(this); }
@@ -1841,10 +1845,10 @@ class Renderer {
         let height = 0, width = 0;
         if (name) {
             width = 2 * spacing + ctx.measureText(name).width;
-            height += textSize + spacing / 2;
+            height += textSize; // + spacing / 2;
         }
         else {
-            height += spacing / 2;
+            height += 0; //spacing / 2;
         }
         function layoutPins(pins) {
             let y = height, w = 0;
@@ -1854,7 +1858,7 @@ class Renderer {
                 pin.y = y + spacing / 2;
                 let name = pin.name, pw = pin.width, ph = pin.height + spacing / 2;
                 if (name) {
-                    pin.baseline = y + textSize;
+                    pin.baseline = y + spacing / 2 + textSize;
                     if (textSize > ph) {
                         pin.y += (textSize - ph) / 2;
                         ph = textSize;
@@ -1932,7 +1936,7 @@ class Renderer {
                 layout(item);
         });
     }
-    drawType(type, x, y, fillOutputs) {
+    drawType(type, x, y) {
         const self = this, ctx = this.ctx, theme = this.theme, textSize = theme.fontSize, spacing = theme.spacing, name = type.name, w = type.width, h = type.height, right = x + w;
         ctx.lineWidth = 0.5;
         ctx.fillStyle = theme.textColor;
@@ -1943,7 +1947,7 @@ class Renderer {
         }
         type.inputs.forEach(function (pin, i) {
             const name = pin.name;
-            self.drawPin(pin, x, y + pin.y, false);
+            self.drawPin(pin, x, y + pin.y);
             if (name) {
                 ctx.textAlign = 'left';
                 ctx.fillText(name, x + pin.width + spacing, y + pin.baseline);
@@ -1951,14 +1955,14 @@ class Renderer {
         });
         type.outputs.forEach(function (pin) {
             const name = pin.name, pinLeft = right - pin.width;
-            self.drawPin(pin, pinLeft, y + pin.y, fillOutputs);
+            self.drawPin(pin, pinLeft, y + pin.y);
             if (name) {
                 ctx.textAlign = 'right';
                 ctx.fillText(name, pinLeft - spacing, y + pin.baseline);
             }
         });
     }
-    drawPin(pin, x, y, fill) {
+    drawPin(pin, x, y) {
         const ctx = this.ctx, theme = this.theme;
         ctx.strokeStyle = theme.strokeColor;
         if (pin.type === Type.valueType || pin.type === Type.starType) {
@@ -1982,7 +1986,7 @@ class Renderer {
             //   ctx.fill();
             // }
             ctx.stroke();
-            this.drawType(type, x, y, false);
+            this.drawType(type, x, y);
         }
     }
     drawElement(element, mode) {
@@ -1997,13 +2001,17 @@ class Renderer {
                     ctx.lineWidth = 0.5;
                     outFlagPath(x, y, w, h, spacing, ctx);
                     break;
-                case 'apply':
+                case 'apply': {
                     ctx.lineWidth = 0.5;
                     ctx.beginPath();
+                    const baseline = y + 2 * spacing - 2;
+                    ctx.moveTo(x, baseline);
+                    ctx.lineTo(x + w, baseline);
                     ctx.rect(x, y, w, h);
                     break;
+                }
                 case 'pass': {
-                    const mid = y + h / 2 + 2;
+                    const mid = y + h / 2;
                     ctx.lineWidth = 4;
                     ctx.beginPath();
                     ctx.moveTo(x + diameter, mid);
@@ -2027,7 +2035,7 @@ class Renderer {
                 // const passThroughs = element.passThroughs;  // TODO pass rendering
                 // if (passThroughs) {
                 // }
-                this.drawType(element.type, x, y, false);
+                this.drawType(element.type, x, y);
                 break;
             case RenderMode.Highlight:
                 ctx.strokeStyle = theme.highlightColor;
@@ -2062,7 +2070,7 @@ class Renderer {
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
                 if (type !== Type.emptyType)
-                    this.drawType(type, instanceRect.x, instanceRect.y, false);
+                    this.drawType(type, instanceRect.x, instanceRect.y);
                 break;
             case RenderMode.Highlight:
             case RenderMode.HotTrack:
