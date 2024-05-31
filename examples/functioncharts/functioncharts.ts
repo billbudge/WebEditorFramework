@@ -380,6 +380,7 @@ abstract class ElementBase {
   getPassThroughs() : Array<Array<number>> | undefined {
     if (this instanceof FunctionInstance)
       return this.functionchart?.passThroughs;
+
     if (this instanceof Element) {
       switch (this.template.typeName) {
         case 'cond':
@@ -391,6 +392,10 @@ abstract class ElementBase {
       switch (this.template.typeName) {
         case 'pass':
           return [[0, 1]];
+        case 'apply': {
+          const firstOutput = this.type.inputs.length;
+          return [[0, firstOutput]];
+        }
       }
     }
   }
@@ -1335,12 +1340,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (item instanceof Pseudoelement) {
         if (item.template.typeName === 'apply') {
           const type = self.resolvePinType(item, 0);
-          let typeString = '[*,]';
+          let typeString = '[*,*]';
           if (type) {
             const newType = type.copy();
             newType.inputs.splice(0, 0, new Pin(Type.starType));
-            newType.outputs.splice(0, 0, new Pin(Type.spacerType));
+            newType.outputs.splice(0, 0, new Pin(Type.starType));
             typeString = newType.typeString;
+            item.innerType = type;
           }
           item.typeString = typeString;
         }
@@ -2365,7 +2371,8 @@ class Renderer {
     const ctx = this.ctx,
           theme = this.theme,
           spacing = theme.spacing,
-          diameter = theme.knobbyRadius * 2,
+          r = theme.knobbyRadius,
+          d = r * 2,
           rect = this.getItemRect(element),
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
           right = x + w, bottom = y + h;
@@ -2381,20 +2388,26 @@ class Renderer {
           outFlagPath(x, y, w, h, spacing, ctx);
           break;
         case 'apply': {
-          ctx.lineWidth = 0.5;
+          const mid = y + spacing;
+          ctx.lineWidth = 2;
           ctx.beginPath();
-          const baseline = y + 2 * spacing - 2;
-          ctx.moveTo(x, baseline);
-          ctx.lineTo(x + w, baseline);
-          ctx.rect(x, y, w, h);
+          ctx.moveTo(x + d, mid);
+          ctx.lineTo(right - d, mid);
+          ctx.stroke();
+          ctx.lineWidth = 0.5;
+          const type = element.type;
+          this.drawPin(type.inputs[0], x, mid - theme.knobbyRadius);
+          this.drawPin(type.outputs[0], right - d, mid - theme.knobbyRadius);
+          ctx.beginPath();
+          ctx.rect(x, mid + spacing / 2, w, h - spacing - spacing / 2);
           break;
         }
         case 'pass': {
           const mid = y + h / 2;
-          ctx.lineWidth = 4;
+          ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.moveTo(x + diameter, mid);
-          ctx.lineTo(x + w - diameter, mid);
+          ctx.moveTo(x + d, mid);
+          ctx.lineTo(right - d, mid);
           break;
         }
       }
@@ -2411,11 +2424,15 @@ class Renderer {
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         ctx.stroke();
-        // const passThroughs = element.passThroughs;  // TODO pass rendering
+        // const passThroughs = element.passThroughs;  // TODO pass through rendering
         // if (passThroughs) {
 
         // }
-        this.drawType(element.type, x, y);
+        if (isApplyPseudoelement(element)) {
+          this.drawType(element.innerType, x, y + spacing + spacing / 2);
+        } else {
+          this.drawType(element.type, x, y);
+        }
         break;
       case RenderMode.Highlight:
         ctx.strokeStyle = theme.highlightColor;
@@ -2745,7 +2762,7 @@ export class FunctionchartEditor implements CanvasLayer {
     input.x = 8;  input.y = 8;
     output.x = 40; output.y = 8;
     apply.x = 68; apply.y = 8;
-    pass.x = 96; pass.y = 8;
+    pass.x = 104; pass.y = 8;
     literal.x = 8; literal.y = 32;
     binop.x = 40; binop.y = 32;
     binop.typeString = '[vv,v](+)';  // binary addition
