@@ -1,0 +1,164 @@
+{
+  "type": "functionchart",
+  "id": 2,
+  "width": 1030.77734375,
+  "height": 553.703125,
+  "nonWires": [
+    {
+      "type": "pass",
+      "id": 3,
+      "x": 634.69921875,
+      "y": 194.6015625,
+      "typeString": "[*,*]"
+    },
+    {
+      "type": "export",
+      "id": 4,
+      "x": 369.62109375,
+      "y": 322.125,
+      "typeString": "[,[vv,v](+)]",
+      "elements": [
+        {
+          "type": "binop",
+          "id": 5,
+          "x": 316.9140625,
+          "y": 183.8828125,
+          "typeString": "[vv,v](+)",
+          "elements": []
+        }
+      ]
+    },
+    {
+      "type": "apply",
+      "id": 6,
+      "x": 732.0546875,
+      "y": 97.28125,
+      "typeString": "[*vv,*v]"
+    },
+    {
+      "type": "apply",
+      "id": 7,
+      "x": 807.07421875,
+      "y": 148.0390625,
+      "typeString": "[*vv,*v]"
+    },
+    {
+      "type": "apply",
+      "id": 8,
+      "x": 783.7734375,
+      "y": 203.68359375,
+      "typeString": "[*vv,*v]"
+    },
+    {
+      "type": "apply",
+      "id": 9,
+      "x": 748.8515625,
+      "y": 255.3515625,
+      "typeString": "[*vv,*v]"
+    },
+    {
+      "type": "binop",
+      "id": 11,
+      "x": 917.21484375,
+      "y": 298.984375,
+      "typeString": "[vv,v](+)",
+      "elements": []
+    },
+    {
+      "type": "binop",
+      "id": 12,
+      "x": 913.94921875,
+      "y": 359.79296875,
+      "typeString": "[vv,v](+)",
+      "elements": []
+    },
+    {
+      "type": "binop",
+      "id": 13,
+      "x": 911.58203125,
+      "y": 427.2890625,
+      "typeString": "[vv,v](+)",
+      "elements": []
+    },
+    {
+      "type": "binop",
+      "id": 14,
+      "x": 910.4140625,
+      "y": 486.86328125,
+      "typeString": "[vv,v](+)",
+      "elements": []
+    },
+    {
+      "type": "pass",
+      "id": 15,
+      "x": 819.04296875,
+      "y": 372.1875,
+      "typeString": "[*,*]"
+    }
+  ],
+  "wires": [
+    {
+      "type": "wire",
+      "src": 4,
+      "srcPin": 0,
+      "dst": 3,
+      "dstPin": 0
+    },
+    {
+      "type": "wire",
+      "src": 3,
+      "srcPin": 0,
+      "dst": 6,
+      "dstPin": 0
+    },
+    {
+      "type": "wire",
+      "src": 3,
+      "srcPin": 0,
+      "dst": 7,
+      "dstPin": 0
+    },
+    {
+      "type": "wire",
+      "src": 3,
+      "srcPin": 0,
+      "dst": 8,
+      "dstPin": 0
+    },
+    {
+      "type": "wire",
+      "src": 3,
+      "srcPin": 0,
+      "dst": 9,
+      "dstPin": 0
+    },
+    {
+      "type": "wire",
+      "src": 15,
+      "srcPin": 0,
+      "dst": 11,
+      "dstPin": 0
+    },
+    {
+      "type": "wire",
+      "src": 15,
+      "srcPin": 0,
+      "dst": 12,
+      "dstPin": 0
+    },
+    {
+      "type": "wire",
+      "src": 15,
+      "srcPin": 0,
+      "dst": 13,
+      "dstPin": 0
+    },
+    {
+      "type": "wire",
+      "src": 15,
+      "srcPin": 0,
+      "dst": 14,
+      "dstPin": 0
+    }
+  ]
+}

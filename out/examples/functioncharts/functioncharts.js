@@ -1,5 +1,5 @@
 import { SelectionSet, Multimap } from '../../src/collections.js';
-import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, measureNameValuePairs, FileController } from '../../src/diagrams.js';
+import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, measureNameValuePairs, FileController } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
@@ -1995,46 +1995,9 @@ class Renderer {
         }
     }
     drawElement(element, mode) {
-        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing, r = theme.knobbyRadius, d = r * 2, rect = this.getItemRect(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height, right = x + w, bottom = y + h;
-        if (element instanceof Pseudoelement) {
-            switch (element.template.typeName) {
-                case 'input':
-                    ctx.lineWidth = 0.5;
-                    inFlagPath(x, y, w, h, spacing, ctx);
-                    break;
-                case 'output':
-                    ctx.lineWidth = 0.5;
-                    outFlagPath(x, y, w, h, spacing, ctx);
-                    break;
-                case 'apply': {
-                    const mid = y + spacing;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(x + d, mid);
-                    ctx.lineTo(right - d, mid);
-                    ctx.stroke();
-                    ctx.lineWidth = 0.5;
-                    const type = element.type;
-                    this.drawPin(type.inputs[0], x, mid - theme.knobbyRadius);
-                    this.drawPin(type.outputs[0], right - d, mid - theme.knobbyRadius);
-                    ctx.beginPath();
-                    ctx.rect(x, mid + spacing / 2, w, h - spacing - spacing / 2);
-                    break;
-                }
-                case 'pass': {
-                    const mid = y + h / 2;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(x + d, mid);
-                    ctx.lineTo(right - d, mid);
-                    break;
-                }
-            }
-        }
-        else {
-            ctx.beginPath();
-            ctx.rect(x, y, w, h);
-        }
+        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing, r = theme.knobbyRadius, d = r * 2, rect = this.getItemRect(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
+        ctx.beginPath();
+        ctx.rect(x, y, w, h);
         switch (mode) {
             case RenderMode.Normal:
             case RenderMode.Palette:
@@ -2046,12 +2009,7 @@ class Renderer {
                 // const passThroughs = element.passThroughs;  // TODO pass through rendering
                 // if (passThroughs) {
                 // }
-                if (isApplyPseudoelement(element)) {
-                    this.drawType(element.innerType, x, y + spacing + spacing / 2);
-                }
-                else {
-                    this.drawType(element.type, x, y);
-                }
+                this.drawType(element.type, x, y);
                 break;
             case RenderMode.Highlight:
                 ctx.strokeStyle = theme.highlightColor;
@@ -2063,6 +2021,71 @@ class Renderer {
                 ctx.lineWidth = 2;
                 ctx.stroke();
                 break;
+        }
+    }
+    drawPseudoElement(element, mode) {
+        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing, r = theme.knobbyRadius, d = r * 2, rect = this.getItemRect(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height, right = x + w, bottom = y + h;
+        ctx.beginPath();
+        if (mode === RenderMode.Highlight || mode === RenderMode.HotTrack) {
+            ctx.strokeStyle = mode === RenderMode.Highlight ? theme.highlightColor : theme.hotTrackColor;
+            ctx.lineWidth = 2;
+            ctx.rect(x, y, w, h);
+            ctx.stroke();
+        }
+        else {
+            switch (element.template.typeName) {
+                case 'input': {
+                    const right = x + w, midY = y + h / 2;
+                    ctx.lineWidth = 2;
+                    ctx.moveTo(right - d, y);
+                    ctx.lineTo(right, midY);
+                    ctx.lineTo(right - d, y + h);
+                    ctx.stroke();
+                    break;
+                }
+                case 'output': {
+                    const midY = y + h / 2;
+                    ctx.lineWidth = 2;
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + d, midY);
+                    ctx.lineTo(x, y + h);
+                    ctx.stroke();
+                    break;
+                }
+                case 'apply': {
+                    ctx.lineWidth = 2;
+                    ctx.moveTo(x + d, y + spacing);
+                    ctx.lineTo(right - d, y + spacing);
+                    ctx.strokeStyle = theme.strokeColor;
+                    ctx.stroke();
+                    const offset = spacing + spacing / 2;
+                    ctx.lineWidth = 0.5;
+                    ctx.beginPath();
+                    ctx.rect(x, y + offset, w, h - offset);
+                    ctx.stroke();
+                    break;
+                }
+                case 'pass': {
+                    const mid = y + h / 2;
+                    ctx.lineWidth = 2;
+                    ctx.moveTo(x + d, mid);
+                    ctx.lineTo(right - d, mid);
+                    ctx.strokeStyle = theme.strokeColor;
+                    ctx.stroke();
+                    break;
+                }
+            }
+            ctx.fillStyle = mode === RenderMode.Palette ? theme.altBgColor : theme.bgColor;
+            if (false) { //isApplyPseudoelement(element)) {
+                ctx.fill();
+                ctx.strokeStyle = theme.strokeColor;
+                ctx.stroke();
+                this.drawType(element.innerType, x, y + spacing + spacing / 2);
+            }
+            else {
+                ctx.strokeStyle = theme.strokeColor;
+                this.drawType(element.type, x, y);
+            }
         }
     }
     drawFunctionchart(functionchart, mode) {
@@ -2150,7 +2173,10 @@ class Renderer {
         }
     }
     draw(item, mode) {
-        if (item instanceof ElementBase) {
+        if (item instanceof Pseudoelement) {
+            this.drawPseudoElement(item, mode);
+        }
+        else if (item instanceof ElementBase) {
             this.drawElement(item, mode);
         }
         else if (item instanceof Wire) {
