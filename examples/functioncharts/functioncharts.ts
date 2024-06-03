@@ -2201,10 +2201,8 @@ class Renderer {
           outputs = type.outputs;
     let height = 0, width = 0;
     if (name) {
-      width = 2 * spacing + ctx.measureText(name).width;
-      height += textSize;// + spacing / 2;
-    } else {
-      height += 0;//spacing / 2;
+      width = spacing + ctx.measureText(name).width;
+      height += textSize;
     }
 
     function layoutPins(pins: Pin[]) {
@@ -2229,10 +2227,13 @@ class Renderer {
       }
       return [y, w];
     }
-    const [yIn, wIn] = layoutPins(inputs);
-    const [yOut, wOut] = layoutPins(outputs);
+    let [yIn, wIn] = layoutPins(inputs);
+    let [yOut, wOut] = layoutPins(outputs);
 
-    type.width = Math.round(Math.max(width, wIn + 2 * spacing + wOut, theme.minTypeWidth));
+    if (wIn > 0) wIn += spacing;
+    if (wOut > 0) wOut += spacing;
+
+    type.width = Math.round(Math.max(width, wIn + wOut, theme.minTypeWidth));
     type.height = Math.round(Math.max(yIn, yOut, theme.minTypeHeight) + spacing / 2);
   }
 
@@ -2358,10 +2359,6 @@ class Renderer {
             width = type.width, height = type.height;
       ctx.beginPath();
       ctx.rect(x, y, width, height);
-      // if (level == 1) {
-      //   ctx.fillStyle = theme.altBgColor;
-      //   ctx.fill();
-      // }
       ctx.stroke();
       this.drawType(type, x, y);
     }
@@ -2389,7 +2386,6 @@ class Renderer {
         ctx.stroke();
         // const passThroughs = element.passThroughs;  // TODO pass through rendering
         // if (passThroughs) {
-
         // }
         this.drawType(element.type, x, y);
         break;
@@ -2425,23 +2421,14 @@ class Renderer {
     } else {
       switch (element.template.typeName) {
         case 'input': {
-          const right = x + w,
-                midY = y + h / 2;
-
-          ctx.lineWidth = 2;
-          ctx.moveTo(right - d, y);
-          ctx.lineTo(right, midY);
-          ctx.lineTo(right - d, y + h);
+          inFlagPath(x, y, w, h, d, ctx);
+          ctx.lineWidth = 0.5;
           ctx.stroke();
           break;
         }
         case 'output': {
-          const midY = y + h / 2;
-
-          ctx.lineWidth = 2;
-          ctx.moveTo(x, y);
-          ctx.lineTo(x + d, midY);
-          ctx.lineTo(x, y + h);
+          outFlagPath(x, y, w, h, d, ctx);
+          ctx.lineWidth = 0.5;
           ctx.stroke();
           break;
         }

@@ -1,5 +1,5 @@
 import { SelectionSet, Multimap } from '../../src/collections.js';
-import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, measureNameValuePairs, FileController } from '../../src/diagrams.js';
+import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, measureNameValuePairs, FileController } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
@@ -1849,11 +1849,8 @@ class Renderer {
         const self = this, ctx = this.ctx, theme = this.theme, textSize = theme.fontSize, spacing = theme.spacing, name = type.name, inputs = type.inputs, outputs = type.outputs;
         let height = 0, width = 0;
         if (name) {
-            width = 2 * spacing + ctx.measureText(name).width;
-            height += textSize; // + spacing / 2;
-        }
-        else {
-            height += 0; //spacing / 2;
+            width = spacing + ctx.measureText(name).width;
+            height += textSize;
         }
         function layoutPins(pins) {
             let y = height, w = 0;
@@ -1878,9 +1875,13 @@ class Renderer {
             }
             return [y, w];
         }
-        const [yIn, wIn] = layoutPins(inputs);
-        const [yOut, wOut] = layoutPins(outputs);
-        type.width = Math.round(Math.max(width, wIn + 2 * spacing + wOut, theme.minTypeWidth));
+        let [yIn, wIn] = layoutPins(inputs);
+        let [yOut, wOut] = layoutPins(outputs);
+        if (wIn > 0)
+            wIn += spacing;
+        if (wOut > 0)
+            wOut += spacing;
+        type.width = Math.round(Math.max(width, wIn + wOut, theme.minTypeWidth));
         type.height = Math.round(Math.max(yIn, yOut, theme.minTypeHeight) + spacing / 2);
     }
     layoutPin(pin) {
@@ -1986,10 +1987,6 @@ class Renderer {
             const type = pin.type, width = type.width, height = type.height;
             ctx.beginPath();
             ctx.rect(x, y, width, height);
-            // if (level == 1) {
-            //   ctx.fillStyle = theme.altBgColor;
-            //   ctx.fill();
-            // }
             ctx.stroke();
             this.drawType(type, x, y);
         }
@@ -2035,20 +2032,14 @@ class Renderer {
         else {
             switch (element.template.typeName) {
                 case 'input': {
-                    const right = x + w, midY = y + h / 2;
-                    ctx.lineWidth = 2;
-                    ctx.moveTo(right - d, y);
-                    ctx.lineTo(right, midY);
-                    ctx.lineTo(right - d, y + h);
+                    inFlagPath(x, y, w, h, d, ctx);
+                    ctx.lineWidth = 0.5;
                     ctx.stroke();
                     break;
                 }
                 case 'output': {
-                    const midY = y + h / 2;
-                    ctx.lineWidth = 2;
-                    ctx.moveTo(x, y);
-                    ctx.lineTo(x + d, midY);
-                    ctx.lineTo(x, y + h);
+                    outFlagPath(x, y, w, h, d, ctx);
+                    ctx.lineWidth = 0.5;
                     ctx.stroke();
                     break;
                 }
