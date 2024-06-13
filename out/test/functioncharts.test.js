@@ -522,8 +522,22 @@ describe('FunctionchartContext', () => {
         context.completeElements([elem1, elem2], pinPosition, pinPosition);
         typeInfo = context.getFunctionchartTypeInfo(functionchart);
         expect(typeInfo.typeString).toBe('[v**v*,*]');
+        expect(typeInfo.abstract).toBe(false);
         expect(typeInfo.passThroughs.length).toBe(1);
         arrayEquals(typeInfo.passThroughs[0], [1, 2, 4, 5]);
+    });
+    test('getAbstractFunctionchartTypeInfo', () => {
+        const context = new FC.FunctionchartContext(), functionchart = context.root, input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
+        let typeInfo = context.getFunctionchartTypeInfo(functionchart);
+        expect(typeInfo.typeString).toBe('[*,*]');
+        expect(typeInfo.abstract).toBe(true);
+        expect(typeInfo.passThroughs.length).toBe(0);
+        const wire1 = addWire(functionchart, input, 0, output, 0);
+        typeInfo = context.getFunctionchartTypeInfo(functionchart);
+        expect(typeInfo.typeString).toBe('[*,*]');
+        expect(typeInfo.abstract).toBe(false);
+        expect(typeInfo.passThroughs.length).toBe(1);
+        arrayEquals(typeInfo.passThroughs[0], [0, 1]);
     });
     const recursiveFuncionchart = {
         "type": "functionchart",

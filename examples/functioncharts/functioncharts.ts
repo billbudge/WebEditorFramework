@@ -1207,18 +1207,18 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   isValidWire(wire: Wire) {
     if (wire.pSrc || wire.pDst)
-      return true;  // Dragging a new wire is temporarily invalid.
+      return true;  // Return valid for wires that are being dragged.
     const src = wire.src,
           dst = wire.dst;
     if (!src || !dst)
       return false;
     if (src === dst)
       return false;
-    // Wires must be within the functionchart or to/from an enclosing functionchart.
+    // Wires must be within the functionchart or from an enclosing functionchart. Wires from
+    // a functionchart to an enclosing one are considered valid, though that functionchart is not.
     const lca = getLowestCommonAncestor<AllTypes>(src, dst);
     if (!lca || !(lca === src.parent || lca === dst.parent))
       return false;
-    // TODO no wires to dst out of functionchart.
     const srcPin = wire.srcPin,
           dstPin = wire.dstPin;
     if (srcPin < 0 || srcPin >= src.type.outputs.length)
@@ -1270,9 +1270,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // Check wires.
     graphInfo.wires.forEach(wire => {
       if (!self.isValidWire(wire)) {
-        console.log(wire, self.isValidWire(wire));
+        // console.log(wire, self.isValidWire(wire));
         invalidWires.push(wire);
       }
+      // Wires can't have a destination at a shallower level than the source.
+      const sub = wire.src!.parent as Functionchart;
+      let parent  = wire.dst!.parent as Functionchart;
+      while (parent && parent !== sub) {
+        parent = parent.parent as Functionchart;
+      }
+      if (!parent)
+        invalidWires.push(wire);
     });
     if (invalidWires.length !== 0)
       return false;
@@ -1488,7 +1496,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // parent.height = bounds.height;
     this.addItem(parent, grandparent);
 
-    // TODO - make outputs from outgoing wires, then delete them.
     items.forEach(item => {
       self.addItem(item, parent);
       selection.add(item);
@@ -1568,11 +1575,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           name = functionchart.name;
 
     // Collect subgraph info.
-    const subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray());
+    const subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray()),
+          unwired = subgraphInfo.wires.size === 0,
+          closed = subgraphInfo.inWires.size == 0;
+    let abstract = unwired && closed;
 
     // Collect the functionchart's inputs and outputs.
     subgraphInfo.elements.forEach(item => {
-      if (item.parent !== functionchart)
+      if (item.parent !== functionchart)  // TODO remove this.
         return;
       if (item instanceof Pseudoelement) {
         if (item.template.typeName === 'input') {
@@ -1587,6 +1597,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           outputs.push(pinInfo);
         }
         // TODO 'pass' pseudoelement.
+      } else {  // instanceof ElementTypes
+        abstract = false;
       }
     });
     // // Now, implicit inputs and outputs.
@@ -1715,7 +1727,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (name)
       typeString += '(' + name + ')';
 
-    return { typeString, passThroughs };
+    return { typeString, closed, abstract, passThroughs };
   }
 
   // Update the derived 'type' property. Delete any wires that are no longer compatible with
@@ -3630,6 +3642,7 @@ export class FunctionchartEditor implements CanvasLayer {
           expandRect(bounds, theme.radius, theme.radius);
           context.group(context.selectedAllTypes(), parent, bounds);
           context.endTransaction();
+          return true;
         }
         case 69: { // 'e'
           context.selectConnectedElements((wire) => true, (wire) => true);  // TODO more nuanced connecting.
