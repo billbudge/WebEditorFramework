@@ -1272,15 +1272,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (!self.isValidWire(wire)) {
         // console.log(wire, self.isValidWire(wire));
         invalidWires.push(wire);
+      } else {
+        // Wires can't have a destination at a shallower level than the source.
+        const sub = wire.src!.parent as Functionchart;
+        let parent  = wire.dst!.parent as Functionchart;
+        while (parent && parent !== sub) {
+          parent = parent.parent as Functionchart;
+        }
+        if (!parent)
+          invalidWires.push(wire);
       }
-      // Wires can't have a destination at a shallower level than the source.
-      const sub = wire.src!.parent as Functionchart;
-      let parent  = wire.dst!.parent as Functionchart;
-      while (parent && parent !== sub) {
-        parent = parent.parent as Functionchart;
-      }
-      if (!parent)
-        invalidWires.push(wire);
     });
     if (invalidWires.length !== 0)
       return false;
@@ -2577,6 +2578,22 @@ class Renderer {
         break;
     }
     ctx.stroke();
+    // Draw the pin type for dragging wires where src or dst are not connected.
+    if (wire.dst === undefined) {
+      const pin = wire.src!.type.outputs[wire.srcPin],
+            pinPos = wire.pDst!,
+            pinX = pinPos.x,
+            pinY = pinPos.y - pin.type.height / 2;
+      ctx.lineWidth = 0.5;
+      this.drawPin(pin, pinX, pinY)
+    } else if (wire.src === undefined) {
+      const pin = wire.dst!.type.inputs[wire.dstPin],
+            pinPos = wire.pSrc!,
+            pinX = pinPos.x - pin.type.width,
+            pinY = pinPos.y - pin.type.height / 2;
+      ctx.lineWidth = 0.5;
+      this.drawPin(pin, pinX, pinY)
+    }
   }
 
   hitTestWire(wire: Wire, p: Point, tol: number, mode: RenderMode) : WireHitResult | undefined {
@@ -3492,7 +3509,6 @@ export class FunctionchartEditor implements CanvasLayer {
       switch (drag.kind) {
         case 'connectWireSrc': {
           const dst = wire.dst,
-                dstPin = wire.dstPin,
                 hitInfo = this.getFirstHit(hitList, isElementOutputPin) as ElementHitResult,
                 src = hitInfo ? hitInfo.item as ElementTypes : undefined;
           if (src && dst && src !== dst) {
@@ -3500,7 +3516,7 @@ export class FunctionchartEditor implements CanvasLayer {
             wire.srcPin = hitInfo.output;
           } else {
             wire.src = undefined;  // This notifies observers to update the layout.
-            wire.pSrc = { x: cp.x, y: cp.y, nx: 0, ny: 0 };
+            wire.pSrc = { x: cp.x, y: cp.y, nx: 1, ny: 0 };
           }
           break;
         }
@@ -3513,7 +3529,7 @@ export class FunctionchartEditor implements CanvasLayer {
             wire.dstPin = hitInfo.input;
           } else {
             wire.dst = undefined;  // This notifies observers to update the layout.
-            wire.pDst = { x: cp.x, y: cp.y, nx: 0, ny: 0 };
+            wire.pDst = { x: cp.x, y: cp.y, nx: -1, ny: 0 };
           }
           break;
         }

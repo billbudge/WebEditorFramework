@@ -1040,14 +1040,16 @@ export class FunctionchartContext extends EventBase {
                 // console.log(wire, self.isValidWire(wire));
                 invalidWires.push(wire);
             }
-            // Wires can't have a destination at a shallower level than the source.
-            const sub = wire.src.parent;
-            let parent = wire.dst.parent;
-            while (parent && parent !== sub) {
-                parent = parent.parent;
+            else {
+                // Wires can't have a destination at a shallower level than the source.
+                const sub = wire.src.parent;
+                let parent = wire.dst.parent;
+                while (parent && parent !== sub) {
+                    parent = parent.parent;
+                }
+                if (!parent)
+                    invalidWires.push(wire);
             }
-            if (!parent)
-                invalidWires.push(wire);
         });
         if (invalidWires.length !== 0)
             return false;
@@ -2166,6 +2168,17 @@ class Renderer {
                 break;
         }
         ctx.stroke();
+        // Draw the pin type for dragging wires where src or dst are not connected.
+        if (wire.dst === undefined) {
+            const pin = wire.src.type.outputs[wire.srcPin], pinPos = wire.pDst, pinX = pinPos.x, pinY = pinPos.y - pin.type.height / 2;
+            ctx.lineWidth = 0.5;
+            this.drawPin(pin, pinX, pinY);
+        }
+        else if (wire.src === undefined) {
+            const pin = wire.dst.type.inputs[wire.dstPin], pinPos = wire.pSrc, pinX = pinPos.x - pin.type.width, pinY = pinPos.y - pin.type.height / 2;
+            ctx.lineWidth = 0.5;
+            this.drawPin(pin, pinX, pinY);
+        }
     }
     hitTestWire(wire, p, tol, mode) {
         // TODO don't hit test new wire as it's dragged.
@@ -2927,14 +2940,14 @@ export class FunctionchartEditor {
             const wire = drag.wire;
             switch (drag.kind) {
                 case 'connectWireSrc': {
-                    const dst = wire.dst, dstPin = wire.dstPin, hitInfo = this.getFirstHit(hitList, isElementOutputPin), src = hitInfo ? hitInfo.item : undefined;
+                    const dst = wire.dst, hitInfo = this.getFirstHit(hitList, isElementOutputPin), src = hitInfo ? hitInfo.item : undefined;
                     if (src && dst && src !== dst) {
                         wire.src = src;
                         wire.srcPin = hitInfo.output;
                     }
                     else {
                         wire.src = undefined; // This notifies observers to update the layout.
-                        wire.pSrc = { x: cp.x, y: cp.y, nx: 0, ny: 0 };
+                        wire.pSrc = { x: cp.x, y: cp.y, nx: 1, ny: 0 };
                     }
                     break;
                 }
@@ -2946,7 +2959,7 @@ export class FunctionchartEditor {
                     }
                     else {
                         wire.dst = undefined; // This notifies observers to update the layout.
-                        wire.pDst = { x: cp.x, y: cp.y, nx: 0, ny: 0 };
+                        wire.pDst = { x: cp.x, y: cp.y, nx: -1, ny: 0 };
                     }
                     break;
                 }
