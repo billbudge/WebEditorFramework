@@ -2057,7 +2057,7 @@ class Renderer {
                     break;
                 }
                 case 'apply': {
-                    ctx.lineWidth = 2;
+                    ctx.lineWidth = 1;
                     ctx.moveTo(x + d, y + spacing);
                     ctx.lineTo(right - d, y + spacing);
                     ctx.strokeStyle = theme.strokeColor;
@@ -2071,7 +2071,7 @@ class Renderer {
                 }
                 case 'pass': {
                     const mid = y + h / 2;
-                    ctx.lineWidth = 2;
+                    ctx.lineWidth = 1;
                     ctx.moveTo(x + d, mid);
                     ctx.lineTo(right - d, mid);
                     ctx.strokeStyle = theme.strokeColor;
@@ -2080,16 +2080,15 @@ class Renderer {
                 }
             }
             ctx.fillStyle = mode === RenderMode.Palette ? theme.altBgColor : theme.bgColor;
-            if (false) { //isApplyPseudoelement(element)) {
-                ctx.fill();
-                ctx.strokeStyle = theme.strokeColor;
-                ctx.stroke();
-                this.drawType(element.innerType, x, y + spacing + spacing / 2);
-            }
-            else {
-                ctx.strokeStyle = theme.strokeColor;
-                this.drawType(element.type, x, y);
-            }
+            // if (isApplyPseudoelement(element)) {
+            //   ctx.fill();
+            //   ctx.strokeStyle = theme.strokeColor;
+            //   ctx.stroke();
+            //   this.drawType(element.innerType, x, y + spacing + spacing / 2);
+            // } else {
+            ctx.strokeStyle = theme.strokeColor;
+            this.drawType(element.type, x, y);
+            // }
         }
     }
     drawFunctionchart(functionchart, mode) {
