@@ -392,10 +392,10 @@ abstract class ElementBase {
       switch (this.template.typeName) {
         case 'pass':
           return [[0, 1]];
-        case 'apply': {
-          const firstOutput = this.type.inputs.length;
-          return [[0, firstOutput]];
-        }
+        // case 'apply': {
+        //   const firstOutput = this.type.inputs.length;
+        //   return [[0, firstOutput]];
+        // }
       }
     }
   }
@@ -458,7 +458,7 @@ export class Pseudoelement extends ElementBase implements DataContextObject, Ref
         this.typeString = '[*,]';
         break;
       case 'apply':
-        this.typeString = '[*,]';
+        this.typeString = '[*, ]';
         break;
       case 'pass':
         this.typeString = '[*,*]';
@@ -1349,11 +1349,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (item instanceof Pseudoelement) {
         if (item.template.typeName === 'apply') {
           const type = self.resolvePinType(item, 0);
-          let typeString = '[*,*]';
+          let typeString = '[*, ]';
           if (type) {
             const newType = type.copy();
             newType.inputs.splice(0, 0, new Pin(Type.starType));
-            newType.outputs.splice(0, 0, new Pin(Type.starType));
+            newType.outputs.splice(0, 0, new Pin(Type.spacerType));
             typeString = newType.typeString;
             item.innerType = type;
           }
@@ -2357,6 +2357,8 @@ class Renderer {
     const ctx = this.ctx,
           theme = this.theme;
     ctx.strokeStyle = theme.strokeColor;
+    if (pin.type === Type.spacerType)
+      return;
     if (pin.type === Type.valueType || pin.type === Type.starType) {
       const r = theme.knobbyRadius;
       ctx.beginPath();
@@ -2446,12 +2448,15 @@ class Renderer {
           break;
         }
         case 'apply': {
+          const offset = spacing + spacing / 2;
           ctx.lineWidth = 1;
-          ctx.moveTo(x + d, y + spacing);
-          ctx.lineTo(right - d, y + spacing);
+          ctx.arc(x + d, y + offset, r, -0.5 * Math.PI, 0, false);
+          // const mid = x + w / 2;
+          // ctx.moveTo(x + d, y + spacing);
+          // ctx.lineTo(mid, y + spacing);
+          // ctx.lineTo(mid, y + offset);
           ctx.strokeStyle = theme.strokeColor;
           ctx.stroke();
-          const offset = spacing + spacing / 2;
           ctx.lineWidth = 0.5;
           ctx.beginPath();
           ctx.rect(x, y + offset, w, h - offset);
