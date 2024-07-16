@@ -1850,6 +1850,10 @@ export class StatechartEditor {
             const ctx = this.paletteController.getCtx();
             renderer.begin(ctx);
             canvasController.applyTransform();
+            // Render white background, since palette canvas is floating over the main canvas.
+            const size = canvasController.getSize();
+            ctx.fillStyle = this.theme.bgColor;
+            ctx.fillRect(0, 0, size.width, size.height);
             context.visitAll(this.palette, item => {
                 renderer.draw(item, RenderMode.Print);
             });

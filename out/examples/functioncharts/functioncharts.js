@@ -2059,9 +2059,10 @@ class Renderer {
                     break;
                 }
                 case 'apply': {
-                    const mid = x + w / 2, offset = spacing + spacing / 2;
+                    const offset = spacing + spacing / 2;
                     ctx.lineWidth = 1;
                     ctx.arc(x + d, y + offset, r, -0.5 * Math.PI, 0, false);
+                    // const mid = x + w / 2;
                     // ctx.moveTo(x + d, y + spacing);
                     // ctx.lineTo(mid, y + spacing);
                     // ctx.lineTo(mid, y + offset);
@@ -2656,6 +2657,10 @@ export class FunctionchartEditor {
             const ctx = this.paletteController.getCtx();
             renderer.begin(ctx);
             canvasController.applyTransform();
+            // Render white background, since palette canvas is floating over the main canvas.
+            const size = canvasController.getSize();
+            ctx.fillStyle = this.theme.bgColor;
+            ctx.fillRect(0, 0, size.width, size.height);
             this.palette.nonWires.forEach(item => { renderer.draw(item, RenderMode.Palette); });
             // Draw any selected object in the palette. Translate object to palette coordinates.
             const offset = canvasController.offsetToOtherCanvas(this.canvasController);

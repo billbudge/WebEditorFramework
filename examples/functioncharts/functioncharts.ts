@@ -3189,6 +3189,11 @@ export class FunctionchartEditor implements CanvasLayer {
       const ctx = this.paletteController.getCtx();
       renderer.begin(ctx);
       canvasController.applyTransform();
+      // Render white background, since palette canvas is floating over the main canvas.
+      const size = canvasController.getSize();
+      ctx.fillStyle = this.theme.bgColor;
+      ctx.fillRect(0, 0, size.width, size.height);
+
       this.palette.nonWires.forEach(item => { renderer.draw(item, RenderMode.Palette); });
       // Draw any selected object in the palette. Translate object to palette coordinates.
       const offset = canvasController.offsetToOtherCanvas(this.canvasController);
