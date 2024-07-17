@@ -3133,11 +3133,11 @@ export class FunctionchartEditor implements CanvasLayer {
   draw(canvasController: CanvasController) {
     const renderer = this.renderer,
           functionchart = this.functionchart,
-          context = this.context;
+          context = this.context,
+          ctx = canvasController.getCtx(),
+          size = canvasController.getSize();
     if (canvasController === this.canvasController) {
       // Draw a dashed border around the canvas.
-      const ctx = canvasController.getCtx(),
-            size = canvasController.getSize();
       ctx.strokeStyle = this.theme.strokeColor;
       ctx.lineWidth = 0.5;
       ctx.setLineDash([6, 3]);
@@ -3186,11 +3186,9 @@ export class FunctionchartEditor implements CanvasLayer {
       // Palette drawing occurs during drag and drop. If the palette has the drag,
       // draw the canvas underneath so the new object will appear on the canvas.
       this.canvasController.draw();
-      const ctx = this.paletteController.getCtx();
       renderer.begin(ctx);
       canvasController.applyTransform();
       // Render white background, since palette canvas is floating over the main canvas.
-      const size = canvasController.getSize();
       ctx.fillStyle = this.theme.bgColor;
       ctx.fillRect(0, 0, size.width, size.height);
 
