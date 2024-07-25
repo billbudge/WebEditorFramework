@@ -284,7 +284,7 @@ class FunctionInstanceTemplate extends NonWireTemplate {
         this.properties = [this.id, this.x, this.y, this.functionchart];
     }
 }
-const literalTemplate = new ElementTemplate('literal'), binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), storeTemplate = new ElementTemplate('store'), importTemplate = new ElementTemplate('import'), exportTemplate = new ElementTemplate('export'), elementTemplate = new ElementTemplate('element'), inputTemplate = new PseudoelementTemplate('input'), outputTemplate = new PseudoelementTemplate('output'), applyTemplate = new PseudoelementTemplate('apply'), passTemplate = new PseudoelementTemplate('pass'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
+const literalTemplate = new ElementTemplate('literal'), binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), storeTemplate = new ElementTemplate('store'), importTemplate = new ElementTemplate('import'), exportTemplate = new ElementTemplate('export'), elementTemplate = new ElementTemplate('element'), inputTemplate = new PseudoelementTemplate('input'), outputTemplate = new PseudoelementTemplate('output'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
@@ -301,16 +301,6 @@ class ElementBase {
                     return [[1, 0]];
             }
         }
-        else if (this instanceof Pseudoelement) {
-            switch (this.template.typeName) {
-                case 'pass':
-                    return [[0, 1]];
-                // case 'apply': {
-                //   const firstOutput = this.type.inputs.length;
-                //   return [[0, firstOutput]];
-                // }
-            }
-        }
     }
     getPin(index) {
         const type = this.type, firstOutput = type.inputs.length, pin = index < firstOutput ? this.type.inputs[index] :
@@ -320,7 +310,6 @@ class ElementBase {
     constructor(id) {
         this.globalPosition = defaultPoint;
         this.type = Type.emptyType;
-        this.innerType = Type.emptyType; // Only set for 'apply' pseudoelement.
         this.inWires = new Array(); // one input per pin (no fan in).
         this.outWires = new Array(); // multiple outputs per pin (fan out).
         this.id = id;
@@ -360,17 +349,8 @@ export class Pseudoelement extends ElementBase {
             case 'output':
                 this.typeString = '[*,]';
                 break;
-            case 'apply':
-                this.typeString = '[*, ]';
-                break;
-            case 'pass':
-                this.typeString = '[*,*]';
-                break;
         }
     }
-}
-function isApplyPseudoelement(element) {
-    return element.template === applyTemplate;
 }
 export class Wire {
     get src() { return this.template.src.get(this); }
@@ -516,12 +496,6 @@ export class FunctionchartContext extends EventBase {
                 break;
             case 'output':
                 template = outputTemplate;
-                break;
-            case 'apply':
-                template = applyTemplate;
-                break;
-            case 'pass':
-                template = passTemplate;
                 break;
             default: throw new Error('Unknown pseudoelement type: ' + typeName);
         }
@@ -1109,21 +1083,7 @@ export class FunctionchartContext extends EventBase {
             this.sorted = this.topologicalSort();
         // Update functioncharts, and functioninstances.
         this.reverseVisitNonWires(this.functionchart, item => {
-            if (item instanceof Pseudoelement) {
-                if (item.template.typeName === 'apply') {
-                    const type = self.resolvePinType(item, 0);
-                    let typeString = '[*, ]';
-                    if (type) {
-                        const newType = type.copy();
-                        newType.inputs.splice(0, 0, new Pin(Type.starType));
-                        newType.outputs.splice(0, 0, new Pin(Type.spacerType));
-                        typeString = newType.typeString;
-                        item.innerType = type;
-                    }
-                    item.typeString = typeString;
-                }
-            }
-            else if (item instanceof Functionchart) {
+            if (item instanceof Functionchart) {
                 const typeInfo = self.getFunctionchartTypeInfo(item);
                 if (typeInfo.typeString !== item.type.typeString) {
                     this.updateItem(item);
@@ -1221,8 +1181,10 @@ export class FunctionchartContext extends EventBase {
         });
     }
     importElement(element) {
-        const result = this.newPseudoelement('input'), type = element.type, newType = type.copyUnlabeled();
-        result.typeString = '[,' + newType.toString() + ']';
+        const result = this.newElement('export'), type = element.type.copyUnlabeled(), inputs = type.inputs.slice();
+        inputs.push(new Pin(type));
+        const newType = new Type(inputs, type.outputs);
+        result.typeString = newType.toString();
         return result;
     }
     importElements(elements) {
@@ -1327,7 +1289,6 @@ export class FunctionchartContext extends EventBase {
                     const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
                     outputs.push(pinInfo);
                 }
-                // TODO 'pass' pseudoelement.
             }
             else { // instanceof ElementTypes
                 abstract = false;
@@ -1709,9 +1670,7 @@ export class FunctionchartContext extends EventBase {
             case 'store':
             case 'element': return this.newElement(typeName);
             case 'input':
-            case 'output':
-            case 'apply':
-            case 'pass': return this.newPseudoelement(typeName);
+            case 'output': return this.newPseudoelement(typeName);
             case 'wire': return this.newWire(undefined, -1, undefined, -1);
             case 'functionchart': return this.newFunctionchart();
             case 'instance': return this.newFunctionInstance();
@@ -2058,42 +2017,10 @@ class Renderer {
                     ctx.stroke();
                     break;
                 }
-                case 'apply': {
-                    const offset = spacing + spacing / 2;
-                    ctx.lineWidth = 1;
-                    ctx.arc(x + d, y + offset, r, -0.5 * Math.PI, 0, false);
-                    // const mid = x + w / 2;
-                    // ctx.moveTo(x + d, y + spacing);
-                    // ctx.lineTo(mid, y + spacing);
-                    // ctx.lineTo(mid, y + offset);
-                    ctx.strokeStyle = theme.strokeColor;
-                    ctx.stroke();
-                    ctx.lineWidth = 0.5;
-                    ctx.beginPath();
-                    ctx.rect(x, y + offset, w, h - offset);
-                    ctx.stroke();
-                    break;
-                }
-                case 'pass': {
-                    const mid = y + h / 2;
-                    ctx.lineWidth = 1;
-                    ctx.moveTo(x + d, mid);
-                    ctx.lineTo(right - d, mid);
-                    ctx.strokeStyle = theme.strokeColor;
-                    ctx.stroke();
-                    break;
-                }
             }
             ctx.fillStyle = mode === RenderMode.Palette ? theme.altBgColor : theme.bgColor;
-            // if (isApplyPseudoelement(element)) {
-            //   ctx.fill();
-            //   ctx.strokeStyle = theme.strokeColor;
-            //   ctx.stroke();
-            //   this.drawType(element.innerType, x, y + spacing + spacing / 2);
-            // } else {
             ctx.strokeStyle = theme.strokeColor;
             this.drawType(element.type, x, y);
-            // }
         }
     }
     drawFunctionchart(functionchart, mode) {
@@ -2309,16 +2236,12 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(), functionchart = context.newFunctionchart(), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), apply = context.newPseudoelement('apply'), pass = context.newPseudoelement('pass'), literal = context.newElement('literal'), binop = context.newElement('binop'), unop = context.newElement('unop'), cond = context.newElement('cond'), store = context.newElement('store'), newFunctionchart = context.newFunctionchart();
+        const context = new FunctionchartContext(), functionchart = context.newFunctionchart(), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newElement('literal'), binop = context.newElement('binop'), unop = context.newElement('unop'), cond = context.newElement('cond'), store = context.newElement('store'), newFunctionchart = context.newFunctionchart();
         context.root = functionchart;
         input.x = 8;
         input.y = 8;
         output.x = 40;
         output.y = 8;
-        apply.x = 68;
-        apply.y = 8;
-        pass.x = 104;
-        pass.y = 8;
         literal.x = 8;
         literal.y = 32;
         binop.x = 40;
@@ -2337,9 +2260,7 @@ export class FunctionchartEditor {
         newFunctionchart.height = this.theme.minFunctionchartHeight;
         functionchart.nonWires.append(input);
         functionchart.nonWires.append(output);
-        functionchart.nonWires.append(apply);
         functionchart.nonWires.append(store);
-        functionchart.nonWires.append(pass);
         functionchart.nonWires.append(literal);
         functionchart.nonWires.append(binop);
         functionchart.nonWires.append(unop);
