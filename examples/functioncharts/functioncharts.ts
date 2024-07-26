@@ -2356,16 +2356,40 @@ class Renderer {
     switch (mode) {
       case RenderMode.Normal:
       case RenderMode.Palette:
-      case RenderMode.Print:
+      case RenderMode.Print: {
         ctx.fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         ctx.stroke();
-        // const passThroughs = element.passThroughs;  // TODO pass through rendering
-        // if (passThroughs) {
-        // }
+        const passThroughs = element.getPassThroughs();
+        if (passThroughs) {
+          const firstOutput = element.type.inputs.length,
+                tanLength = element.type.width / 3;
+          for (let passThrough of passThroughs) {
+            let lastInput = 0;
+            for (; lastInput < passThrough.length; lastInput++) {
+              if (passThrough[lastInput] >= firstOutput)
+                break;
+            }
+            for (let i = 0; i < lastInput; i++) {
+              const srcIndex = passThrough[i];
+              for (let j = lastInput; j < passThrough.length; j++) {
+                const dstIndex = passThrough[j],
+                      p1 = this.pinToPoint(element, srcIndex, true),
+                      p2 = this.pinToPoint(element, dstIndex - firstOutput, false);
+                p1.x += d;
+                p2.x -= d;
+                ctx.moveTo(p1.x, p1.y);
+                ctx.bezierCurveTo(p1.x + tanLength, p1.y, p2.x - tanLength, p2.y, p2.x, p2.y);
+                ctx.stroke();
+              }
+            }
+          }
+        }
+
         this.drawType(element.type, x, y);
         break;
+      }
       case RenderMode.Highlight:
         ctx.strokeStyle = theme.highlightColor;
         ctx.lineWidth = 2;
@@ -2479,18 +2503,18 @@ class Renderer {
   }
   hitTestFunctionchart(
     functionchart: Functionchart, p: Point, tol: number, mode: RenderMode) : FunctionchartHitResult | undefined {
-  const theme = this.theme,
-        r = theme.radius,
-        rect = this.getItemRect(functionchart),
-        x = rect.x, y = rect.y, w = rect.width, h = rect.height,
-        inner = hitTestRect(x, y, w, h, p, tol);
-  if (inner) {
-    const instanceRect = this.getFunctionchartInstanceBounds(functionchart.type, rect),
-          instancer = hitTestRect(
-              instanceRect.x, instanceRect.y, instanceRect.width, instanceRect.height, p, tol) !== undefined;
-    return new FunctionchartHitResult(functionchart, inner, instancer);
+    const theme = this.theme,
+          r = theme.radius,
+          rect = this.getItemRect(functionchart),
+          x = rect.x, y = rect.y, w = rect.width, h = rect.height,
+          inner = hitTestRect(x, y, w, h, p, tol);
+    if (inner) {
+      const instanceRect = this.getFunctionchartInstanceBounds(functionchart.type, rect),
+            instancer = hitTestRect(
+                instanceRect.x, instanceRect.y, instanceRect.width, instanceRect.height, p, tol) !== undefined;
+      return new FunctionchartHitResult(functionchart, inner, instancer);
+    }
   }
-}
 
   drawWire(wire: Wire, mode: RenderMode) {
     const theme = this.theme,
