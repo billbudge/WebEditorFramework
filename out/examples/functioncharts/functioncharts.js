@@ -38,14 +38,7 @@ export class Pin {
     }
 }
 export class Type {
-    static initialize() {
-        Type.atomizedTypes.clear();
-        Type.atomizedTypes.set(Type.valueTypeString, Type.valueType);
-        Type.atomizedTypes.set(Type.starTypeString, Type.starType);
-        Type.atomizedTypes.set(Type.spacerTypeString, Type.spacerType);
-        Type.atomizedTypes.set(Type.emptyTypeString, Type.emptyType);
-    }
-    get typeString() { return this.toString(); }
+    get isPrimitive() { return this === Type.valueType || this === Type.starType; }
     get needsLayout() {
         return this.height === 0; // width may be 0 in the case of spacer type.
     }
@@ -126,15 +119,21 @@ export class Type {
         return Type.canConnect(this, dst);
     }
 }
+Type.emptyPins = [];
 Type.valueTypeString = 'v';
-Type.valueType = new Type([], []);
+Type.valueType = new Type(Type.emptyPins, Type.emptyPins);
 Type.starTypeString = '*';
-Type.starType = new Type([], []);
+Type.starType = new Type(Type.emptyPins, Type.emptyPins);
 Type.spacerTypeString = ' ';
-Type.spacerType = new Type([], []);
+Type.spacerType = new Type(Type.emptyPins, Type.emptyPins);
 Type.emptyTypeString = '[,]';
-Type.emptyType = new Type([], []);
-Type.atomizedTypes = new Map();
+Type.emptyType = new Type(Type.emptyPins, Type.emptyPins);
+Type.atomizedTypes = new Map([
+    [Type.valueTypeString, Type.valueType],
+    [Type.starTypeString, Type.starType],
+    [Type.spacerTypeString, Type.spacerType],
+    [Type.emptyTypeString, Type.emptyType],
+]);
 // export type TypeVisitor = (type: Type, parent: Type | undefined) => void;
 // export function forEachType(type: Type, callback: TypeVisitor) {
 //   callback(type, undefined);
@@ -1085,7 +1084,7 @@ export class FunctionchartContext extends EventBase {
         this.reverseVisitNonWires(this.functionchart, item => {
             if (item instanceof Functionchart) {
                 const typeInfo = self.getFunctionchartTypeInfo(item);
-                if (typeInfo.typeString !== item.type.typeString) {
+                if (typeInfo.typeString !== item.type.toString()) {
                     this.updateItem(item);
                 }
             }
@@ -1353,7 +1352,7 @@ export class FunctionchartContext extends EventBase {
             }
         }
         function getPinName(type, pin) {
-            let typeString = type.typeString;
+            let typeString = type.toString();
             if (pin.name)
                 typeString += '(' + pin.name + ')';
             return typeString;
@@ -1747,6 +1746,7 @@ var RenderMode;
     RenderMode[RenderMode["HotTrack"] = 3] = "HotTrack";
     RenderMode[RenderMode["Print"] = 4] = "Print";
 })(RenderMode || (RenderMode = {}));
+const shrink = 0.8, inv_shrink = 1 / shrink;
 class Renderer {
     constructor(theme) {
         this.theme = new FunctionchartTheme(theme);
@@ -1860,8 +1860,13 @@ class Renderer {
         const type = pin.type;
         if (type.needsLayout)
             this.layoutType(type);
-        pin.width = type.width;
-        pin.height = type.height;
+        let width = type.width, height = type.height;
+        if (!type.isPrimitive) {
+            width *= shrink;
+            height *= shrink;
+        }
+        pin.width = width;
+        pin.height = height;
     }
     layoutElement(element) {
         const type = element.type;
@@ -1958,11 +1963,13 @@ class Renderer {
             ctx.stroke();
         }
         else if (pin.type) {
-            const type = pin.type, width = type.width, height = type.height;
+            const type = pin.type, width = type.width, height = type.height, sx = x * inv_shrink, sy = y * inv_shrink;
+            this.ctx.scale(shrink, shrink);
             ctx.beginPath();
-            ctx.rect(x, y, width, height);
+            ctx.rect(sx, sy, width, height);
             ctx.stroke();
-            this.drawType(type, x, y);
+            this.drawType(type, sx, sy);
+            this.ctx.scale(inv_shrink, inv_shrink);
         }
     }
     drawElement(element, mode) {

@@ -62,26 +62,22 @@ export class Pin {
 }
 
 export class Type {
+  static readonly emptyPins = [];
   static readonly valueTypeString = 'v';
-  static readonly valueType = new Type([], []);
+  static readonly valueType = new Type(Type.emptyPins, Type.emptyPins);
   static readonly starTypeString = '*';
-  static readonly starType = new Type([], []);
+  static readonly starType = new Type(Type.emptyPins, Type.emptyPins);
   static readonly spacerTypeString = ' ';
-  static readonly spacerType = new Type([], []);
+  static readonly spacerType = new Type(Type.emptyPins, Type.emptyPins);
   static readonly emptyTypeString = '[,]';
-  static readonly emptyType = new Type([], []);
+  static readonly emptyType = new Type(Type.emptyPins, Type.emptyPins);
 
-  static readonly atomizedTypes = new Map<string, Type>();
-
-  static initialize() {
-    Type.atomizedTypes.clear();
-    Type.atomizedTypes.set(Type.valueTypeString, Type.valueType);
-    Type.atomizedTypes.set(Type.starTypeString, Type.starType);
-    Type.atomizedTypes.set(Type.spacerTypeString, Type.spacerType);
-    Type.atomizedTypes.set(Type.emptyTypeString, Type.emptyType);
-  }
-
-  get typeString() : string { return this.toString(); }
+  static readonly atomizedTypes = new Map<string, Type>([
+    [Type.valueTypeString, Type.valueType],
+    [Type.starTypeString, Type.starType],
+    [Type.spacerTypeString, Type.spacerType],
+    [Type.emptyTypeString, Type.emptyType],
+  ]);
 
   readonly inputs: Pin[];
   readonly outputs: Pin[];
@@ -90,6 +86,8 @@ export class Type {
   y = 0;
   width = 0;
   height = 0;
+
+  get isPrimitive() : boolean { return this === Type.valueType || this === Type.starType; }
 
   get needsLayout() {
     return this.height === 0;  // width may be 0 in the case of spacer type.
@@ -1324,7 +1322,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.reverseVisitNonWires(this.functionchart, item => {
       if (item instanceof Functionchart) {
         const typeInfo = self.getFunctionchartTypeInfo(item);
-        if (typeInfo.typeString !== item.type.typeString) {
+        if (typeInfo.typeString !== item.type.toString()) {
           this.updateItem(item);
         }
       } else if (item instanceof FunctionInstance) {
@@ -1634,7 +1632,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
     }
     function getPinName(type: Type, pin: Pin) : string {
-      let typeString = type.typeString;
+      let typeString = type.toString();
       if (pin.name)
         typeString += '(' + pin.name + ')';
       return typeString;
@@ -2082,6 +2080,9 @@ enum RenderMode {
   Print
 }
 
+const shrink = 0.8,
+      inv_shrink = 1 / shrink;
+
 class Renderer {
   private theme: FunctionchartTheme;
   private ctx: CanvasRenderingContext2D;
@@ -2216,8 +2217,13 @@ class Renderer {
     const type = pin.type;
     if (type.needsLayout)
       this.layoutType(type);
-    pin.width = type.width;
-    pin.height = type.height;
+    let width = type.width, height = type.height;
+    if (!type.isPrimitive) {
+      width *= shrink;
+      height *= shrink;
+    }
+    pin.width = width;
+    pin.height = height;
   }
 
   layoutElement(element: ElementTypes) {
@@ -2333,11 +2339,15 @@ class Renderer {
       ctx.stroke();
     } else if (pin.type) {
       const type = pin.type,
-            width = type.width, height = type.height;
+            width = type.width, height = type.height,
+            sx = x * inv_shrink, sy = y * inv_shrink;
+
+      this.ctx.scale(shrink, shrink);
       ctx.beginPath();
-      ctx.rect(x, y, width, height);
+      ctx.rect(sx, sy, width, height);
       ctx.stroke();
-      this.drawType(type, x, y);
+      this.drawType(type,sx, sy);
+      this.ctx.scale(inv_shrink, inv_shrink);
     }
   }
 

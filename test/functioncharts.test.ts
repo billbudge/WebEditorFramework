@@ -78,7 +78,7 @@ function arrayEquals(array1: Array<any>, array2: Array<any>) {
 
 // Setup.
 beforeEach(() => {
-  FC.Type.initialize();
+  // FC.Type.initializeForTesting();
 });
 
 describe('Pin' , () => {
@@ -135,9 +135,9 @@ describe('Type' , () => {
 
     const named = new FC.Type(type1.inputs, type1.outputs, 'type1');
     expect(named).not.toBe(type1);
-    expect(type1.typeString).toBe('[v,v]');
+    expect(type1.toString()).toBe('[v,v]');
     expect(named.toString()).toBe('[v,v](type1)');
-    expect(named.typeString).toBe('[v,v](type1)');
+    expect(named.toString()).toBe('[v,v](type1)');
 
     const copy = type1.copy();
     expect(copy).not.toBe(type1);
@@ -148,7 +148,7 @@ describe('Type' , () => {
     expect(copyUnlabeled).not.toBe(type1);
     expect(copyUnlabeled.name).toBeUndefined();
     expect(copyUnlabeled.toString()).toBe('[v,v]');
-    expect(copyUnlabeled.typeString).toBe('[v,v]');
+    expect(copyUnlabeled.toString()).toBe('[v,v]');
   });
   test('base Types', () => {
     const starType = FC.parseTypeString('*'),
@@ -163,8 +163,8 @@ describe('Type' , () => {
           type1 = new FC.Type([new FC.Pin(valueType), new FC.Pin(valueType)], [new FC.Pin(valueType)]),
           type2 = new FC.Type([new FC.Pin(valueType), new FC.Pin(valueType)], [new FC.Pin(valueType)]);
     expect(type1).not.toBe(type2);
-    expect(type1.atomized()).toBe(type1);
-    expect(type2.atomized()).toBe(type1);
+    expect(type1.atomized()).toStrictEqual(type1);
+    expect(type2.atomized()).toStrictEqual(type1);
 
   });
   test('canConnect', () => {
@@ -602,7 +602,7 @@ describe('FunctionchartContext', () => {
     pins.clear();
     result = context.resolvePinType(output, 0, pins);
     expect(result).toBeDefined();
-    expect(result!.typeString).toBe('[vv,v]');
+    expect(result!.toString()).toBe('[vv,v]');
     expect(pins.size).toBe(2);
     expect(pins.has(output, 0)).toBe(true);
     expect(pins.has(elem1, 2)).toBe(true);

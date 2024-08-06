@@ -59,7 +59,7 @@ function arrayEquals(array1, array2) {
 //------------------------------------------------------------------------------
 // Setup.
 beforeEach(() => {
-    FC.Type.initialize();
+    // FC.Type.initializeForTesting();
 });
 describe('Pin', () => {
     test('Pin', () => {
@@ -106,9 +106,9 @@ describe('Type', () => {
         expect(type2.outputs[0].type).toBe(FC.Type.valueType);
         const named = new FC.Type(type1.inputs, type1.outputs, 'type1');
         expect(named).not.toBe(type1);
-        expect(type1.typeString).toBe('[v,v]');
+        expect(type1.toString()).toBe('[v,v]');
         expect(named.toString()).toBe('[v,v](type1)');
-        expect(named.typeString).toBe('[v,v](type1)');
+        expect(named.toString()).toBe('[v,v](type1)');
         const copy = type1.copy();
         expect(copy).not.toBe(type1);
         expect(copy.inputs[0]).not.toBe(type1.inputs[0]);
@@ -117,7 +117,7 @@ describe('Type', () => {
         expect(copyUnlabeled).not.toBe(type1);
         expect(copyUnlabeled.name).toBeUndefined();
         expect(copyUnlabeled.toString()).toBe('[v,v]');
-        expect(copyUnlabeled.typeString).toBe('[v,v]');
+        expect(copyUnlabeled.toString()).toBe('[v,v]');
     });
     test('base Types', () => {
         const starType = FC.parseTypeString('*'), valueType = FC.parseTypeString('v'), emptyType = FC.parseTypeString('[,]');
@@ -467,7 +467,7 @@ describe('FunctionchartContext', () => {
         pins.clear();
         result = context.resolvePinType(output, 0, pins);
         expect(result).toBeDefined();
-        expect(result.typeString).toBe('[vv,v]');
+        expect(result.toString()).toBe('[vv,v]');
         expect(pins.size).toBe(2);
         expect(pins.has(output, 0)).toBe(true);
         expect(pins.has(elem1, 2)).toBe(true);
