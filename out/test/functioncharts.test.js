@@ -128,8 +128,8 @@ describe('Type', () => {
     test('atomized', () => {
         const valueType = FC.Type.valueType, type1 = new FC.Type([new FC.Pin(valueType), new FC.Pin(valueType)], [new FC.Pin(valueType)]), type2 = new FC.Type([new FC.Pin(valueType), new FC.Pin(valueType)], [new FC.Pin(valueType)]);
         expect(type1).not.toBe(type2);
-        expect(type1.atomized()).toBe(type1);
-        expect(type2.atomized()).toBe(type1);
+        expect(type1.atomized()).toStrictEqual(type1);
+        expect(type2.atomized()).toStrictEqual(type1);
     });
     test('canConnect', () => {
         expect(FC.Type.starType.canConnectTo(FC.Type.valueType)).toBe(true);

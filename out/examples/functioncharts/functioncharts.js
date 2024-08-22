@@ -1746,7 +1746,7 @@ var RenderMode;
     RenderMode[RenderMode["HotTrack"] = 3] = "HotTrack";
     RenderMode[RenderMode["Print"] = 4] = "Print";
 })(RenderMode || (RenderMode = {}));
-const shrink = 0.8, inv_shrink = 1 / shrink;
+const shrink = 0.667, inv_shrink = 1 / shrink;
 class Renderer {
     constructor(theme) {
         this.theme = new FunctionchartTheme(theme);
@@ -2128,12 +2128,12 @@ class Renderer {
         ctx.stroke();
         // Draw the pin type for dragging wires where src or dst are not connected.
         if (wire.dst === undefined) {
-            const pin = wire.src.type.outputs[wire.srcPin], pinPos = wire.pDst, pinX = pinPos.x, pinY = pinPos.y - pin.type.height / 2;
+            const pin = wire.src.type.outputs[wire.srcPin], pinPos = wire.pDst, pinX = pinPos.x, pinY = pinPos.y - pin.height / 2;
             ctx.lineWidth = 0.5;
             this.drawPin(pin, pinX, pinY);
         }
         else if (wire.src === undefined) {
-            const pin = wire.dst.type.inputs[wire.dstPin], pinPos = wire.pSrc, pinX = pinPos.x - pin.type.width, pinY = pinPos.y - pin.type.height / 2;
+            const pin = wire.dst.type.inputs[wire.dstPin], pinPos = wire.pSrc, pinX = pinPos.x - pin.width, pinY = pinPos.y - pin.height / 2;
             ctx.lineWidth = 0.5;
             this.drawPin(pin, pinX, pinY);
         }
