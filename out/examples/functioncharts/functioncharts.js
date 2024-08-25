@@ -401,6 +401,12 @@ export class Functionchart {
         const global = this.globalPosition, x = global.x, y = global.y, width = this.width, height = this.height;
         return { x, y, width, height };
     }
+    get instanceBounds() {
+        const fcBounds = this.bounds, right = fcBounds.x + fcBounds.width, bottom = fcBounds.y + fcBounds.height, type = this.type, width = type.width, height = type.height;
+        return { x: right - width - Functionchart.radius,
+            y: bottom - height - Functionchart.radius,
+            width, height };
+    }
     constructor(context, id) {
         this.template = functionchartTemplate;
         this.globalPosition = defaultPoint;
@@ -409,6 +415,7 @@ export class Functionchart {
         this.id = id;
     }
 }
+Functionchart.radius = 8;
 export class FunctionInstance extends ElementBase {
     get x() { return this.template.x.get(this) || 0; }
     set x(value) { this.template.x.set(this, value); }
@@ -1730,7 +1737,7 @@ export class FunctionchartContext extends EventBase {
 }
 //------------------------------------------------------------------------------
 class FunctionchartTheme extends Theme {
-    constructor(theme, radius = 8) {
+    constructor(theme) {
         super();
         this.textIndent = 8;
         this.textLeading = 6;
@@ -1742,10 +1749,10 @@ class FunctionchartTheme extends Theme {
         this.minFunctionchartWidth = 64;
         this.minFunctionchartHeight = 32;
         Object.assign(this, theme);
-        this.radius = radius;
         // Layout the base types.
-        Type.valueType.width = Type.starType.width = radius;
-        Type.valueType.height = Type.starType.height = Type.spacerType.height = radius;
+        const pinSize = 2 * this.knobbyRadius;
+        Type.valueType.width = Type.starType.width = pinSize;
+        Type.valueType.height = Type.starType.height = Type.spacerType.height = pinSize;
     }
 }
 class ElementHitResult {
@@ -1789,12 +1796,6 @@ class Renderer {
     }
     end() {
         this.ctx.restore();
-    }
-    // Gets the bounding rect for the functionchart instancing element.
-    // TODO remove from Renderer
-    getFunctionchartInstanceBounds(type, bounds) {
-        const theme = this.theme, spacing = theme.spacing, width = type.width, height = type.height, x = bounds.x + bounds.width - width - spacing, y = bounds.y + bounds.height - height - spacing;
-        return { x, y, width, height };
     }
     // Compute sizes for an element type.
     layoutType(type) {
@@ -2031,7 +2032,7 @@ class Renderer {
         }
     }
     drawFunctionchart(functionchart, mode) {
-        const ctx = this.ctx, theme = this.theme, r = theme.radius, rect = functionchart.bounds, x = rect.x, y = rect.y, w = rect.width, h = rect.height, textSize = theme.fontSize;
+        const ctx = this.ctx, theme = this.theme, r = Functionchart.radius, rect = functionchart.bounds, x = rect.x, y = rect.y, w = rect.width, h = rect.height, textSize = theme.fontSize;
         roundRectPath(x, y, w, h, r, ctx);
         switch (mode) {
             case RenderMode.Normal:
@@ -2042,7 +2043,7 @@ class Renderer {
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
-                const type = functionchart.type, instanceRect = this.getFunctionchartInstanceBounds(type, rect);
+                const type = functionchart.type, instanceRect = functionchart.instanceBounds;
                 ctx.beginPath();
                 ctx.rect(instanceRect.x, instanceRect.y, instanceRect.width, instanceRect.height);
                 ctx.fillStyle = theme.altBgColor;
@@ -2080,9 +2081,9 @@ class Renderer {
         }
     }
     hitTestFunctionchart(functionchart, p, tol, mode) {
-        const theme = this.theme, r = theme.radius, rect = functionchart.bounds, x = rect.x, y = rect.y, w = rect.width, h = rect.height, inner = hitTestRect(x, y, w, h, p, tol);
+        const r = Functionchart.radius, rect = functionchart.bounds, x = rect.x, y = rect.y, w = rect.width, h = rect.height, inner = hitTestRect(x, y, w, h, p, tol);
         if (inner) {
-            const instanceRect = this.getFunctionchartInstanceBounds(functionchart.type, rect), instancer = hitTestRect(instanceRect.x, instanceRect.y, instanceRect.width, instanceRect.height, p, tol) !== undefined;
+            const instanceRect = functionchart.instanceBounds, instancer = hitTestRect(instanceRect.x, instanceRect.y, instanceRect.width, instanceRect.height, p, tol) !== undefined;
             return new FunctionchartHitResult(functionchart, inner, instancer);
         }
     }
@@ -2809,7 +2810,7 @@ export class FunctionchartEditor {
                 drag.items = copies;
             }
             else if (drag.kind === 'instantiateFunctionchart') {
-                const functionchart = drag.items[0], newInstance = context.newFunctionInstance(), renderer = this.renderer, bounds = functionchart.bounds, instancerBounds = this.renderer.getFunctionchartInstanceBounds(functionchart.type, bounds); // TODO simplify this
+                const functionchart = drag.items[0], newInstance = context.newFunctionInstance(), renderer = this.renderer, bounds = functionchart.bounds, instancerBounds = functionchart.instanceBounds;
                 newInstance.functionchart = functionchart;
                 newInstance.x = instancerBounds.x;
                 newInstance.y = instancerBounds.y;
@@ -3000,7 +3001,7 @@ export class FunctionchartEditor {
                     context.beginTransaction('group items into functionchart');
                     const theme = this.theme, bounds = getBounds(context.selectedNonWires()), contents = context.selectedAllTypes();
                     let parent = context.getContainingFunctionchart(contents);
-                    expandRect(bounds, theme.radius, theme.radius);
+                    expandRect(bounds, Functionchart.radius, Functionchart.radius);
                     context.group(context.selectedAllTypes(), parent, bounds);
                     context.endTransaction();
                     return true;

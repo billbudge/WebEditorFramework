@@ -510,6 +510,9 @@ export class Functionchart implements DataContextObject {
   readonly template = functionchartTemplate;
   readonly context: FunctionchartContext;
 
+  // Radius of rounded corners. This isn't themeable, as it's conceptually part of the notation.
+  static radius: number = 8;
+
   readonly id: number;
 
   get x() { return this.template.x.get(this) || 0; }
@@ -539,6 +542,18 @@ export class Functionchart implements DataContextObject {
           width = this.width,
           height = this.height;
     return { x, y, width, height };
+  }
+
+  get instanceBounds() : Rect {
+    const fcBounds = this.bounds,
+          right = fcBounds.x + fcBounds.width,
+          bottom = fcBounds.y + fcBounds.height,
+          type = this.type,
+          width = type.width,
+          height = type.height;
+    return { x: right - width - Functionchart.radius,
+             y: bottom - height - Functionchart.radius,
+             width, height };
   }
 
   constructor(context: FunctionchartContext, id: number) {
@@ -2072,7 +2087,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 //------------------------------------------------------------------------------
 
 class FunctionchartTheme extends Theme {
-  radius: number;
   textIndent = 8;
   textLeading = 6;
   knobbyRadius = 4;
@@ -2083,15 +2097,14 @@ class FunctionchartTheme extends Theme {
   minFunctionchartWidth = 64;
   minFunctionchartHeight = 32;
 
-  constructor(theme: Theme, radius = 8) {
+  constructor(theme: Theme) {
     super();
     Object.assign(this, theme);
 
-    this.radius = radius;
-
     // Layout the base types.
-    Type.valueType.width = Type.starType.width = radius;
-    Type.valueType.height = Type.starType.height = Type.spacerType.height = radius;
+    const pinSize = 2 * this.knobbyRadius;
+    Type.valueType.width = Type.starType.width = pinSize;
+    Type.valueType.height = Type.starType.height = Type.spacerType.height = pinSize;
   }
 }
 
@@ -2154,16 +2167,6 @@ class Renderer {
   }
   end() {
     this.ctx.restore();
-  }
-
-  // Gets the bounding rect for the functionchart instancing element.
-  // TODO remove from Renderer
-  getFunctionchartInstanceBounds(type: Type, bounds: Rect) : Rect {
-    const theme = this.theme, spacing = theme.spacing,
-          width = type.width, height = type.height,
-          x = bounds.x + bounds.width - width - spacing,
-          y = bounds.y + bounds.height - height - spacing;
-    return { x, y, width, height };
   }
 
   // Compute sizes for an element type.
@@ -2454,7 +2457,7 @@ class Renderer {
   drawFunctionchart(functionchart: Functionchart, mode: RenderMode) {
     const ctx = this.ctx,
           theme = this.theme,
-          r = theme.radius,
+          r = Functionchart.radius,
           rect = functionchart.bounds,
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
           textSize = theme.fontSize;
@@ -2469,7 +2472,7 @@ class Renderer {
         ctx.lineWidth = 0.5;
         ctx.stroke();
         const type = functionchart.type,
-              instanceRect = this.getFunctionchartInstanceBounds(type, rect);
+              instanceRect = functionchart.instanceBounds;
         ctx.beginPath();
         ctx.rect(instanceRect.x, instanceRect.y, instanceRect.width, instanceRect.height);
         ctx.fillStyle = theme.altBgColor;
@@ -2514,13 +2517,12 @@ class Renderer {
   }
   hitTestFunctionchart(
     functionchart: Functionchart, p: Point, tol: number, mode: RenderMode) : FunctionchartHitResult | undefined {
-    const theme = this.theme,
-          r = theme.radius,
+    const r = Functionchart.radius,
           rect = functionchart.bounds,
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
           inner = hitTestRect(x, y, w, h, p, tol);
     if (inner) {
-      const instanceRect = this.getFunctionchartInstanceBounds(functionchart.type, rect),
+      const instanceRect = functionchart.instanceBounds,
             instancer = hitTestRect(
                 instanceRect.x, instanceRect.y, instanceRect.width, instanceRect.height, p, tol) !== undefined;
       return new FunctionchartHitResult(functionchart, inner, instancer);
@@ -3396,8 +3398,7 @@ export class FunctionchartEditor implements CanvasLayer {
               newInstance = context.newFunctionInstance(),
               renderer = this.renderer,
               bounds = functionchart.bounds,
-              instancerBounds = this.renderer.getFunctionchartInstanceBounds(functionchart.type,
-                bounds);  // TODO simplify this
+              instancerBounds = functionchart.instanceBounds;
         newInstance.functionchart = functionchart;
         newInstance.x = instancerBounds.x;
         newInstance.y = instancerBounds.y;
@@ -3622,7 +3623,7 @@ export class FunctionchartEditor implements CanvasLayer {
                 bounds = getBounds(context.selectedNonWires()),
                 contents = context.selectedAllTypes();
           let parent = context.getContainingFunctionchart(contents);
-          expandRect(bounds, theme.radius, theme.radius);
+          expandRect(bounds, Functionchart.radius, Functionchart.radius);
           context.group(context.selectedAllTypes(), parent, bounds);
           context.endTransaction();
           return true;
