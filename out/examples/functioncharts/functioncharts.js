@@ -288,6 +288,10 @@ const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
 class ElementBase {
+    get bounds() {
+        const global = this.globalPosition, x = global.x, y = global.y, type = this.type, width = type.width, height = type.height;
+        return { x, y, width, height };
+    }
     getPassThroughs() {
         var _a;
         if (this instanceof FunctionInstance)
@@ -305,6 +309,14 @@ class ElementBase {
         const type = this.type, firstOutput = type.inputs.length, pin = index < firstOutput ? this.type.inputs[index] :
             this.type.outputs[index - firstOutput];
         return pin;
+    }
+    inputPinToPoint(index) {
+        const rect = this.bounds, type = this.type, pin = type.inputs[index];
+        return { x: rect.x, y: rect.y + pin.y + pin.height / 2, nx: -1, ny: 0 };
+    }
+    outputPinToPoint(index) {
+        const rect = this.bounds, w = rect.width, type = this.type, pin = type.outputs[index];
+        return { x: rect.x + w, y: rect.y + pin.y + pin.height / 2, nx: 1, ny: 0 };
     }
     constructor(id) {
         this.globalPosition = defaultPoint;
@@ -360,6 +372,10 @@ export class Wire {
     set dst(value) { this.template.dst.set(this, value); }
     get dstPin() { return this.template.dstPin.get(this); }
     set dstPin(value) { this.template.dstPin.set(this, value); }
+    get bounds() {
+        const extents = getExtents(this.bezier), x = extents.xmin, y = extents.ymin, width = extents.xmax - x, height = extents.ymax - y;
+        return { x, y, width, height };
+    }
     constructor(context) {
         this.template = wireTemplate;
         this.bezier = defaultBezierCurve;
@@ -381,6 +397,10 @@ export class Functionchart {
     set name(value) { this.template.name.set(this, value); }
     get nonWires() { return this.template.nonWires.get(this); }
     get wires() { return this.template.wires.get(this); }
+    get bounds() {
+        const global = this.globalPosition, x = global.x, y = global.y, width = this.width, height = this.height;
+        return { x, y, width, height };
+    }
     constructor(context, id) {
         this.template = functionchartTemplate;
         this.globalPosition = defaultPoint;
@@ -401,6 +421,17 @@ export class FunctionInstance extends ElementBase {
         this.template = functionInstanceTemplate;
         this.context = context;
     }
+}
+function getBounds(items) {
+    let xMin = Number.POSITIVE_INFINITY, yMin = Number.POSITIVE_INFINITY, xMax = -Number.POSITIVE_INFINITY, yMax = -Number.POSITIVE_INFINITY;
+    for (let item of items) {
+        const rect = item.bounds;
+        xMin = Math.min(xMin, rect.x);
+        yMin = Math.min(yMin, rect.y);
+        xMax = Math.max(xMax, rect.x + rect.width);
+        yMax = Math.max(yMax, rect.y + rect.height);
+    }
+    return { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
 }
 export class FunctionchartContext extends EventBase {
     constructor() {
@@ -911,35 +942,35 @@ export class FunctionchartContext extends EventBase {
         this.deleteSelectionHelper();
         this.endTransaction();
     }
-    connectInput(element, pin, pinToPoint) {
-        const elementParent = element.parent, p = pinToPoint(element, pin), junction = this.newPseudoelement('input');
-        junction.x = p.x - 32;
-        junction.y = p.y;
-        this.addItem(junction, elementParent);
-        const wire = this.newWire(junction, 0, element, pin);
+    connectInput(element, pin) {
+        const elementParent = element.parent, p = element.inputPinToPoint(pin), input = this.newPseudoelement('input'), offset = input.outputPinToPoint(0);
+        input.x = p.x - 32 - offset.x;
+        input.y = p.y - offset.y;
+        this.addItem(input, elementParent);
+        const wire = this.newWire(input, 0, element, pin);
         this.addItem(wire, elementParent);
-        return { junction, wire };
+        return { input, wire };
     }
-    connectOutput(element, pin, pinToPoint) {
-        const elementParent = element.parent, p = pinToPoint(element, pin), junction = this.newPseudoelement('output');
-        junction.x = p.x + 32;
-        junction.y = p.y;
-        this.addItem(junction, elementParent);
-        const wire = this.newWire(element, pin, junction, 0);
+    connectOutput(element, pin) {
+        const elementParent = element.parent, p = element.outputPinToPoint(pin), output = this.newPseudoelement('output'), offset = output.inputPinToPoint(0);
+        output.x = p.x + 32 - offset.x;
+        output.y = p.y - offset.y;
+        this.addItem(output, elementParent);
+        const wire = this.newWire(element, pin, output, 0);
         this.addItem(wire, elementParent);
-        return { junction, wire };
+        return { output, wire };
     }
-    completeElements(elements, inputToPoint, outputToPoint) {
+    completeElements(elements) {
         const self = this, selection = this.selection;
-        // Add junctions for disconnected pins on elements.
+        // Add input/output pseudoelements for disconnected pins on elements.
         elements.forEach(element => {
             const inputs = element.inWires, outputs = element.outWires;
             for (let pin = 0; pin < inputs.length; pin++) {
                 if (element.type.inputs[pin].type === Type.spacerType)
                     continue;
                 if (inputs[pin] === undefined) {
-                    const { junction, wire } = self.connectInput(element, pin, inputToPoint);
-                    selection.add(junction);
+                    const { input, wire } = self.connectInput(element, pin);
+                    selection.add(input);
                     selection.add(wire);
                 }
             }
@@ -947,8 +978,8 @@ export class FunctionchartContext extends EventBase {
                 if (element.type.outputs[pin].type === Type.spacerType)
                     continue;
                 if (outputs[pin].length === 0) {
-                    const { junction, wire } = self.connectOutput(element, pin, outputToPoint);
-                    selection.add(junction);
+                    const { output, wire } = self.connectOutput(element, pin);
+                    selection.add(output);
                     selection.add(wire);
                 }
             }
@@ -1759,62 +1790,11 @@ class Renderer {
     end() {
         this.ctx.restore();
     }
-    getItemRect(item) {
-        let x, y, width, height;
-        if (item instanceof Wire) {
-            const extents = getExtents(item.bezier);
-            x = extents.xmin;
-            y = extents.ymin;
-            width = extents.xmax - x;
-            height = extents.ymax - y;
-        }
-        else {
-            const global = item.globalPosition;
-            x = global.x,
-                y = global.y;
-            if (item instanceof Functionchart) {
-                width = item.width;
-                height = item.height;
-            }
-            else {
-                // Element, Pseudoelement, FunctionInstance.
-                const type = item.type;
-                width = type.width;
-                height = type.height;
-            }
-        }
-        return { x, y, width, height };
-    }
-    getBounds(items) {
-        let xMin = Number.POSITIVE_INFINITY, yMin = Number.POSITIVE_INFINITY, xMax = -Number.POSITIVE_INFINITY, yMax = -Number.POSITIVE_INFINITY;
-        for (let item of items) {
-            const rect = this.getItemRect(item);
-            xMin = Math.min(xMin, rect.x);
-            yMin = Math.min(yMin, rect.y);
-            xMax = Math.max(xMax, rect.x + rect.width);
-            yMax = Math.max(yMax, rect.y + rect.height);
-        }
-        return { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
-    }
     // Gets the bounding rect for the functionchart instancing element.
+    // TODO remove from Renderer
     getFunctionchartInstanceBounds(type, bounds) {
         const theme = this.theme, spacing = theme.spacing, width = type.width, height = type.height, x = bounds.x + bounds.width - width - spacing, y = bounds.y + bounds.height - height - spacing;
         return { x, y, width, height };
-    }
-    pinToPoint(element, index, isInput) {
-        const rect = this.getItemRect(element), w = rect.width, h = rect.height, type = element.type;
-        let x = rect.x, y = rect.y, pin, nx;
-        if (isInput) {
-            pin = type.inputs[index];
-            nx = -1;
-        }
-        else {
-            pin = type.outputs[index];
-            nx = 1;
-            x += w;
-        }
-        y += pin.y + pin.height / 2;
-        return { x: x, y: y, nx: nx, ny: 0 };
     }
     // Compute sizes for an element type.
     layoutType(type) {
@@ -1878,10 +1858,10 @@ class Renderer {
         // Since we intercept change events and not transactions, wires may be in
         // an inconsistent state, so check before creating the path.
         if (src && wire.srcPin >= 0) {
-            p1 = this.pinToPoint(src, wire.srcPin, false);
+            p1 = src.outputPinToPoint(wire.srcPin);
         }
         if (dst && wire.dstPin >= 0) {
-            p2 = this.pinToPoint(dst, wire.dstPin, true);
+            p2 = dst.inputPinToPoint(wire.dstPin);
         }
         if (p1 && p2) {
             wire.bezier = getEdgeBezier(p1, p2, 24);
@@ -1900,7 +1880,7 @@ class Renderer {
                 height = self.theme.minFunctionchartHeight;
             }
             else {
-                const extents = self.getBounds(nonWires.asArray()), global = functionChart.globalPosition, x = global.x, y = global.y, margin = 2 * spacing;
+                const extents = getBounds(nonWires.asArray()), global = functionChart.globalPosition, x = global.x, y = global.y, margin = 2 * spacing;
                 width = extents.x + extents.width - x + margin;
                 height = extents.y + extents.height - y + margin;
                 width += type.width;
@@ -1973,7 +1953,7 @@ class Renderer {
         }
     }
     drawElement(element, mode) {
-        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing, r = theme.knobbyRadius, d = r * 2, rect = this.getItemRect(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
+        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing, r = theme.knobbyRadius, d = r * 2, rect = element.bounds, x = rect.x, y = rect.y, w = rect.width, h = rect.height;
         ctx.beginPath();
         ctx.rect(x, y, w, h);
         switch (mode) {
@@ -1996,7 +1976,7 @@ class Renderer {
                         for (let i = 0; i < lastInput; i++) {
                             const srcIndex = passThrough[i];
                             for (let j = lastInput; j < passThrough.length; j++) {
-                                const dstIndex = passThrough[j], p1 = this.pinToPoint(element, srcIndex, true), p2 = this.pinToPoint(element, dstIndex - firstOutput, false);
+                                const dstIndex = passThrough[j], p1 = element.inputPinToPoint(srcIndex), p2 = element.outputPinToPoint(dstIndex - firstOutput);
                                 p1.x += d;
                                 p2.x -= d;
                                 ctx.moveTo(p1.x, p1.y);
@@ -2022,7 +2002,7 @@ class Renderer {
         }
     }
     drawPseudoElement(element, mode) {
-        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing, r = theme.knobbyRadius, d = r * 2, rect = this.getItemRect(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height, right = x + w, bottom = y + h;
+        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing, r = theme.knobbyRadius, d = r * 2, rect = element.bounds, x = rect.x, y = rect.y, w = rect.width, h = rect.height, right = x + w, bottom = y + h;
         ctx.beginPath();
         if (mode === RenderMode.Highlight || mode === RenderMode.HotTrack) {
             ctx.strokeStyle = mode === RenderMode.Highlight ? theme.highlightColor : theme.hotTrackColor;
@@ -2051,7 +2031,7 @@ class Renderer {
         }
     }
     drawFunctionchart(functionchart, mode) {
-        const ctx = this.ctx, theme = this.theme, r = theme.radius, rect = this.getItemRect(functionchart), x = rect.x, y = rect.y, w = rect.width, h = rect.height, textSize = theme.fontSize;
+        const ctx = this.ctx, theme = this.theme, r = theme.radius, rect = functionchart.bounds, x = rect.x, y = rect.y, w = rect.width, h = rect.height, textSize = theme.fontSize;
         roundRectPath(x, y, w, h, r, ctx);
         switch (mode) {
             case RenderMode.Normal:
@@ -2083,7 +2063,7 @@ class Renderer {
         }
     }
     hitTestElement(element, p, tol, mode) {
-        const rect = this.getItemRect(element), x = rect.x, y = rect.y, width = rect.width, height = rect.height, hitInfo = hitTestRect(x, y, width, height, p, tol);
+        const rect = element.bounds, x = rect.x, y = rect.y, width = rect.width, height = rect.height, hitInfo = hitTestRect(x, y, width, height, p, tol);
         if (hitInfo) {
             const result = new ElementHitResult(element, hitInfo), type = element.type;
             type.inputs.forEach(function (input, i) {
@@ -2100,7 +2080,7 @@ class Renderer {
         }
     }
     hitTestFunctionchart(functionchart, p, tol, mode) {
-        const theme = this.theme, r = theme.radius, rect = this.getItemRect(functionchart), x = rect.x, y = rect.y, w = rect.width, h = rect.height, inner = hitTestRect(x, y, w, h, p, tol);
+        const theme = this.theme, r = theme.radius, rect = functionchart.bounds, x = rect.x, y = rect.y, w = rect.width, h = rect.height, inner = hitTestRect(x, y, w, h, p, tol);
         if (inner) {
             const instanceRect = this.getFunctionchartInstanceBounds(functionchart.type, rect), instancer = hitTestRect(instanceRect.x, instanceRect.y, instanceRect.width, instanceRect.height, p, tol) !== undefined;
             return new FunctionchartHitResult(functionchart, inner, instancer);
@@ -2632,7 +2612,7 @@ export class FunctionchartEditor {
         // in the bounds of the elements.
         const items = new Array();
         functionchart.nonWires.forEach(item => items.push(item));
-        const bounds = renderer.getBounds(items);
+        const bounds = getBounds(items);
         // Adjust all edges 1 pixel out.
         const ctx = new window.C2S(bounds.width + 2, bounds.height + 2);
         ctx.translate(-bounds.x + 1, -bounds.y + 1);
@@ -2829,7 +2809,7 @@ export class FunctionchartEditor {
                 drag.items = copies;
             }
             else if (drag.kind === 'instantiateFunctionchart') {
-                const functionchart = drag.items[0], newInstance = context.newFunctionInstance(), renderer = this.renderer, bounds = renderer.getItemRect(functionchart), instancerBounds = this.renderer.getFunctionchartInstanceBounds(functionchart.type, bounds); // TODO simplify this
+                const functionchart = drag.items[0], newInstance = context.newFunctionInstance(), renderer = this.renderer, bounds = functionchart.bounds, instancerBounds = this.renderer.getFunctionchartInstanceBounds(functionchart.type, bounds); // TODO simplify this
                 newInstance.functionchart = functionchart;
                 newInstance.x = instancerBounds.x;
                 newInstance.y = instancerBounds.y;
@@ -3018,7 +2998,7 @@ export class FunctionchartEditor {
                     context.extendSelectionToWires();
                     context.reduceSelection();
                     context.beginTransaction('group items into functionchart');
-                    const theme = this.theme, bounds = this.renderer.getBounds(context.selectedNonWires()), contents = context.selectedAllTypes();
+                    const theme = this.theme, bounds = getBounds(context.selectedNonWires()), contents = context.selectedAllTypes();
                     let parent = context.getContainingFunctionchart(contents);
                     expandRect(bounds, theme.radius, theme.radius);
                     context.group(context.selectedAllTypes(), parent, bounds);
@@ -3037,16 +3017,8 @@ export class FunctionchartEditor {
                 case 74: { // 'j'
                     const renderer = this.renderer;
                     renderer.begin(this.canvasController.getCtx());
-                    function inputToPoint(element, pin) {
-                        return renderer.pinToPoint(element, pin, true);
-                    }
-                    ;
-                    function outputToPoint(element, pin) {
-                        return renderer.pinToPoint(element, pin, false);
-                    }
-                    ;
                     context.beginTransaction('complete elements');
-                    context.completeElements(context.selectedElements(), inputToPoint, outputToPoint);
+                    context.completeElements(context.selectedElements());
                     renderer.end();
                     context.endTransaction();
                     return true;

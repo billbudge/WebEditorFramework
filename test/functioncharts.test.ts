@@ -43,10 +43,6 @@ function addFunctionchart(parent: FC.Functionchart) : FC.Functionchart {
   return functionchart;
 }
 
-function pinPosition(element: FC.ElementTypes, pin: number) : PointWithNormal {
-  return { x: 0, y: 0, nx: 0, ny: 0};
-}
-
 // function addRecursiveFunctionchart(parent: FC.Functionchart) : FC.Functionchart {
 //   const context = parent.context,
 //         functionchart = parent.context.newFunctionchart(),
@@ -662,7 +658,7 @@ describe('FunctionchartContext', () => {
     expect(typeInfo.typeString).toBe('[,]');
     expect(typeInfo.passThroughs.length).toBe(0);
     const wire1 = addWire(functionchart, elem1, 0, elem2, 2);
-    context.completeElements([elem1, elem2], pinPosition, pinPosition);
+    context.completeElements([elem1, elem2]);
     typeInfo = context.getFunctionchartTypeInfo(functionchart);
     expect(typeInfo.typeString).toBe('[v**v*,*]');
     expect(typeInfo.abstract).toBe(false);

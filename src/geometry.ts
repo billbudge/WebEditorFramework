@@ -12,23 +12,25 @@ export interface Rect {
   height: number;
 }
 
-
 export interface Normal {
   nx: number;
   ny: number;
 }
+
+export type PointWithNormal  = Point & Normal;
+
 export interface ParameterizedPoint {
   x: number;
   y: number;
   t: number;
 }
+
 export interface ParameterizedIntersection {
   x: number;
   y: number;
   s: number;
   t: number;
 }
-export type PointWithNormal  = Point & Normal;
 
 export function matMulPt(v: Point, m: number[]) : Point {
   const x = v.x, y = v.y;

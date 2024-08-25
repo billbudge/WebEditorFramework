@@ -372,6 +372,16 @@ abstract class ElementBase {
   inWires = new Array<Wire | undefined>();   // one input per pin (no fan in).
   outWires = new Array<Array<Wire>>();       // multiple outputs per pin (fan out).
 
+  get bounds() : Rect {
+    const global = this.globalPosition,
+          x = global.x,
+          y = global.y,
+          type = this.type,
+          width = type.width,
+          height = type.height;
+    return { x, y, width, height };
+  }
+
   getPassThroughs() : Array<Array<number>> | undefined {
     if (this instanceof FunctionInstance)
       return this.functionchart?.passThroughs;
@@ -391,6 +401,20 @@ abstract class ElementBase {
           pin = index < firstOutput ? this.type.inputs[index] :
                                       this.type.outputs[index - firstOutput];
     return pin;
+  }
+
+  inputPinToPoint(index: number) : PointWithNormal {
+    const rect: Rect = this.bounds,
+          type = this.type,
+          pin = type.inputs[index];
+    return { x: rect.x, y: rect.y + pin.y + pin.height / 2, nx: -1, ny: 0 }
+  }
+  outputPinToPoint(index: number) : PointWithNormal {
+    const rect: Rect = this.bounds,
+          w = rect.width,
+          type = this.type,
+          pin = type.outputs[index];
+    return { x: rect.x + w, y: rect.y + pin.y + pin.height / 2, nx: 1, ny: 0 }
   }
 
   constructor(id: number) {
@@ -466,6 +490,15 @@ export class Wire implements DataContextObject {
   pDst: PointWithNormal | undefined;
   bezier: BezierCurve = defaultBezierCurve;
 
+  get bounds() : Rect {
+    const extents = getExtents(this.bezier),
+          x = extents.xmin,
+          y = extents.ymin,
+          width = extents.xmax - x,
+          height = extents.ymax - y;
+    return { x, y, width, height };
+  }
+
   constructor(context: FunctionchartContext) {
     this.context = context;
     this.srcPin = -1;
@@ -498,6 +531,15 @@ export class Functionchart implements DataContextObject {
   globalPosition = defaultPoint;
   type: Type = Type.emptyType;
   passThroughs: Array<Array<number>> | undefined;
+
+  get bounds() : Rect {
+    const global = this.globalPosition,
+          x = global.x,
+          y = global.y,
+          width = this.width,
+          height = this.height;
+    return { x, y, width, height };
+  }
 
   constructor(context: FunctionchartContext, id: number) {
     this.context = context;
@@ -533,6 +575,19 @@ export type WireVisitor = (wire: Wire) => void;
 export type WireFilter = (wire: Wire) => boolean;
 
 export type PinPositionFunction = (element: ElementTypes, pin: number) => PointWithNormal;
+
+function getBounds(items: AllTypes[]) : Rect {
+  let xMin = Number.POSITIVE_INFINITY, yMin = Number.POSITIVE_INFINITY,
+      xMax = -Number.POSITIVE_INFINITY, yMax = -Number.POSITIVE_INFINITY;
+  for (let item of items) {
+    const rect = item.bounds;
+    xMin = Math.min(xMin, rect.x);
+    yMin = Math.min(yMin, rect.y);
+    xMax = Math.max(xMax, rect.x + rect.width);
+    yMax = Math.max(yMax, rect.y + rect.height);
+  }
+  return { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
+}
 
 export type PinRefSet = Multimap<ElementTypes, number>;
 
@@ -1128,51 +1183,52 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.endTransaction();
   }
 
-  connectInput(element: ElementTypes, pin: number, pinToPoint: PinPositionFunction) {
+  connectInput(element: ElementTypes, pin: number) {
     const elementParent = element.parent!,
-          p = pinToPoint(element, pin),
-          junction = this.newPseudoelement('input');
-    junction.x = p.x - 32;
-    junction.y = p.y;
-    this.addItem(junction, elementParent);
-    const wire = this.newWire(junction, 0, element, pin);
+          p = element.inputPinToPoint(pin),
+          input = this.newPseudoelement('input'),
+          offset = input.outputPinToPoint(0);
+    input.x = p.x - 32 - offset.x;
+    input.y = p.y - offset.y;
+    this.addItem(input, elementParent);
+    const wire = this.newWire(input, 0, element, pin);
     this.addItem(wire, elementParent);
-    return { junction, wire };
+    return { input, wire };
   }
 
-  connectOutput(element: ElementTypes, pin: number, pinToPoint: PinPositionFunction) {
+  connectOutput(element: ElementTypes, pin: number) {
     const elementParent = element.parent!,
-          p = pinToPoint(element, pin),
-          junction = this.newPseudoelement('output');
-    junction.x = p.x + 32;
-    junction.y = p.y;
-    this.addItem(junction, elementParent);
-    const wire = this.newWire(element, pin, junction, 0);
+          p = element.outputPinToPoint(pin),
+          output = this.newPseudoelement('output'),
+          offset = output.inputPinToPoint(0);
+    output.x = p.x + 32 - offset.x;
+    output.y = p.y - offset.y;
+    this.addItem(output, elementParent);
+    const wire = this.newWire(element, pin, output, 0);
     this.addItem(wire, elementParent);
-    return { junction, wire };
+    return { output, wire };
   }
 
-  completeElements(
-      elements: ElementTypes[], inputToPoint: PinPositionFunction, outputToPoint: PinPositionFunction) {
+  completeElements(elements: ElementTypes[]) {
     const self = this,
           selection = this.selection;
-    // Add junctions for disconnected pins on elements.
+    // Add input/output pseudoelements for disconnected pins on elements.
     elements.forEach(element => {
       const inputs = element.inWires,
             outputs = element.outWires;
       for (let pin = 0; pin < inputs.length; pin++) {
         if (element.type.inputs[pin].type === Type.spacerType) continue;
         if (inputs[pin] === undefined) {
-          const { junction, wire } = self.connectInput(element, pin, inputToPoint);
-          selection.add(junction);
+          const { input, wire } = self.connectInput(element, pin);
+          selection.add(input);
           selection.add(wire);
         }
       }
       for (let pin = 0; pin < outputs.length; pin++) {
         if (element.type.outputs[pin].type === Type.spacerType) continue;
         if (outputs[pin].length === 0) {
-          const { junction, wire } = self.connectOutput(element, pin, outputToPoint);
-          selection.add(junction);
+          const { output, wire } = self.connectOutput(element, pin);
+          selection.add(output);
           selection.add(wire);
         }
       }
@@ -2100,69 +2156,14 @@ class Renderer {
     this.ctx.restore();
   }
 
-  getItemRect(item: AllTypes) : Rect {
-    let x, y, width, height;
-    if (item instanceof Wire) {
-      const extents = getExtents(item.bezier);
-      x = extents.xmin;
-      y = extents.ymin;
-      width = extents.xmax - x;
-      height = extents.ymax - y;
-    } else {
-      const global = item.globalPosition;
-      x = global.x,
-      y = global.y;
-      if (item instanceof Functionchart) {
-        width = item.width;
-        height = item.height;
-      } else {
-        // Element, Pseudoelement, FunctionInstance.
-        const type = item.type;
-        width = type.width;
-        height = type.height;
-      }
-    }
-    return { x, y, width, height };
-  }
-
-  getBounds(items: AllTypes[]) : Rect {
-    let xMin = Number.POSITIVE_INFINITY, yMin = Number.POSITIVE_INFINITY,
-        xMax = -Number.POSITIVE_INFINITY, yMax = -Number.POSITIVE_INFINITY;
-    for (let item of items) {
-      const rect = this.getItemRect(item);
-      xMin = Math.min(xMin, rect.x);
-      yMin = Math.min(yMin, rect.y);
-      xMax = Math.max(xMax, rect.x + rect.width);
-      yMax = Math.max(yMax, rect.y + rect.height);
-    }
-    return { x: xMin, y: yMin, width: xMax - xMin, height: yMax - yMin };
-  }
-
-    // Gets the bounding rect for the functionchart instancing element.
+  // Gets the bounding rect for the functionchart instancing element.
+  // TODO remove from Renderer
   getFunctionchartInstanceBounds(type: Type, bounds: Rect) : Rect {
     const theme = this.theme, spacing = theme.spacing,
           width = type.width, height = type.height,
           x = bounds.x + bounds.width - width - spacing,
           y = bounds.y + bounds.height - height - spacing;
     return { x, y, width, height };
-  }
-
-  pinToPoint(element: ElementTypes, index: number, isInput: boolean) : PointWithNormal {
-    const rect: Rect = this.getItemRect(element),
-          w = rect.width, h = rect.height,
-          type = element.type;
-    let x = rect.x, y = rect.y,
-        pin, nx;
-    if (isInput) {
-      pin = type.inputs[index];
-      nx = -1;
-    } else {
-      pin = type.outputs[index];
-      nx = 1;
-      x += w;
-    }
-    y += pin.y + pin.height / 2;
-    return { x: x, y: y, nx: nx, ny: 0 }
   }
 
   // Compute sizes for an element type.
@@ -2240,10 +2241,10 @@ class Renderer {
     // Since we intercept change events and not transactions, wires may be in
     // an inconsistent state, so check before creating the path.
     if (src && wire.srcPin >= 0) {
-      p1 = this.pinToPoint(src, wire.srcPin, false);
+      p1 = src.outputPinToPoint(wire.srcPin);
     }
     if (dst && wire.dstPin >= 0) {
-      p2 = this.pinToPoint(dst, wire.dstPin, true);
+      p2 = dst.inputPinToPoint(wire.dstPin);
     }
     if (p1 && p2) {
       wire.bezier = getEdgeBezier(p1, p2, 24);
@@ -2265,7 +2266,7 @@ class Renderer {
         width = self.theme.minFunctionchartWidth;
         height = self.theme.minFunctionchartHeight;
       } else {
-        const extents = self.getBounds(nonWires.asArray()),
+        const extents = getBounds(nonWires.asArray()),
               global = functionChart.globalPosition,
               x = global.x,
               y = global.y,
@@ -2357,7 +2358,7 @@ class Renderer {
           spacing = theme.spacing,
           r = theme.knobbyRadius,
           d = r * 2,
-          rect = this.getItemRect(element),
+          rect = element.bounds,
           x = rect.x, y = rect.y, w = rect.width, h = rect.height;
 
     ctx.beginPath();
@@ -2385,8 +2386,8 @@ class Renderer {
               const srcIndex = passThrough[i];
               for (let j = lastInput; j < passThrough.length; j++) {
                 const dstIndex = passThrough[j],
-                      p1 = this.pinToPoint(element, srcIndex, true),
-                      p2 = this.pinToPoint(element, dstIndex - firstOutput, false);
+                      p1 = element.inputPinToPoint(srcIndex),
+                      p2 = element.outputPinToPoint(dstIndex - firstOutput);
                 p1.x += d;
                 p2.x -= d;
                 ctx.moveTo(p1.x, p1.y);
@@ -2419,7 +2420,7 @@ class Renderer {
           spacing = theme.spacing,
           r = theme.knobbyRadius,
           d = r * 2,
-          rect = this.getItemRect(element),
+          rect = element.bounds,
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
           right = x + w, bottom = y + h;
 
@@ -2454,7 +2455,7 @@ class Renderer {
     const ctx = this.ctx,
           theme = this.theme,
           r = theme.radius,
-          rect = this.getItemRect(functionchart),
+          rect = functionchart.bounds,
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
           textSize = theme.fontSize;
     roundRectPath(x, y, w, h, r, ctx);
@@ -2491,7 +2492,7 @@ class Renderer {
 
   hitTestElement(element: ElementTypes, p: Point, tol: number, mode: RenderMode) :
                  ElementHitResult | undefined {
-    const rect = this.getItemRect(element),
+    const rect = element.bounds,
           x = rect.x, y = rect.y, width = rect.width, height = rect.height,
           hitInfo = hitTestRect(x, y, width, height, p, tol);
     if (hitInfo) {
@@ -2515,7 +2516,7 @@ class Renderer {
     functionchart: Functionchart, p: Point, tol: number, mode: RenderMode) : FunctionchartHitResult | undefined {
     const theme = this.theme,
           r = theme.radius,
-          rect = this.getItemRect(functionchart),
+          rect = functionchart.bounds,
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
           inner = hitTestRect(x, y, w, h, p, tol);
     if (inner) {
@@ -3180,7 +3181,7 @@ export class FunctionchartEditor implements CanvasLayer {
     const items: AllTypes[] = new Array();
     functionchart.nonWires.forEach(item => items.push(item));
 
-    const bounds = renderer.getBounds(items);
+    const bounds = getBounds(items);
     // Adjust all edges 1 pixel out.
     const ctx = new (window as any).C2S(bounds.width + 2, bounds.height + 2);
     ctx.translate(-bounds.x + 1, -bounds.y + 1);
@@ -3394,7 +3395,7 @@ export class FunctionchartEditor implements CanvasLayer {
         const functionchart = drag.items[0] as Functionchart,
               newInstance = context.newFunctionInstance(),
               renderer = this.renderer,
-              bounds = renderer.getItemRect(functionchart),
+              bounds = functionchart.bounds,
               instancerBounds = this.renderer.getFunctionchartInstanceBounds(functionchart.type,
                 bounds);  // TODO simplify this
         newInstance.functionchart = functionchart;
@@ -3618,7 +3619,7 @@ export class FunctionchartEditor implements CanvasLayer {
           context.reduceSelection();
           context.beginTransaction('group items into functionchart');
           const theme = this.theme,
-                bounds = this.renderer.getBounds(context.selectedNonWires()),
+                bounds = getBounds(context.selectedNonWires()),
                 contents = context.selectedAllTypes();
           let parent = context.getContainingFunctionchart(contents);
           expandRect(bounds, theme.radius, theme.radius);
@@ -3638,14 +3639,8 @@ export class FunctionchartEditor implements CanvasLayer {
         case 74: { // 'j'
           const renderer = this.renderer;
           renderer.begin(this.canvasController.getCtx());
-          function inputToPoint(element: Element, pin: number) {
-            return renderer.pinToPoint(element, pin, true);
-          };
-          function outputToPoint(element: Element, pin: number) {
-            return renderer.pinToPoint(element, pin, false);
-          };
           context.beginTransaction('complete elements');
-          context.completeElements(context.selectedElements(), inputToPoint, outputToPoint);
+          context.completeElements(context.selectedElements());
           renderer.end();
           context.endTransaction();
           return true;
