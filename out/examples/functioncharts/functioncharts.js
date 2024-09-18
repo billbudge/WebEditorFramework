@@ -372,6 +372,15 @@ export class Wire {
     set dst(value) { this.template.dst.set(this, value); }
     get dstPin() { return this.template.dstPin.get(this); }
     set dstPin(value) { this.template.dstPin.set(this, value); }
+    get type() {
+        if (this.src) {
+            return this.src.type.outputs[this.srcPin].type;
+        }
+        if (this.dst) {
+            return this.dst.type.inputs[this.dstPin].type;
+        }
+        return Type.valueType;
+    }
     get bounds() {
         const extents = getExtents(this.bezier), x = extents.xmin, y = extents.ymin, width = extents.xmax - x, height = extents.ymax - y;
         return { x, y, width, height };
@@ -415,6 +424,7 @@ export class Functionchart {
         this.id = id;
     }
 }
+// Radius of rounded corners. This isn't themeable, as it's conceptually part of the notation.
 Functionchart.radius = 8;
 export class FunctionInstance extends ElementBase {
     get x() { return this.template.x.get(this) || 0; }
@@ -2164,6 +2174,34 @@ class Renderer {
             this.layoutFunctionchart(item);
         }
     }
+    drawHoverInfo(info, p) {
+        const theme = this.theme, ctx = this.ctx, x = p.x, y = p.y;
+        let type = Type.emptyType; // When no type is available.
+        if (info instanceof ElementHitResult) {
+            type = info.item.type;
+            if (info.input >= 0) {
+                type = type.inputs[info.input].type;
+            }
+            else if (info.output >= 0) {
+                type = type.outputs[info.output].type;
+            }
+            if (type.isPrimitive) {
+                // TODO draw primitive type 'number' or 'string' etc.
+            }
+        }
+        else if (info instanceof WireHitResult) {
+            type = info.item.type; // Wire type is src or dst pin type.
+        }
+        const w = type.width, h = type.height;
+        ctx.beginPath();
+        ctx.rect(x, y, w, h);
+        ctx.fillStyle = theme.hoverColor;
+        ctx.fill();
+        ctx.strokeStyle = theme.strokeColor;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        this.drawType(type, x, y);
+    }
     drawHoverText(item, p, nameValuePairs) {
         const self = this, ctx = this.ctx, theme = this.theme, textSize = theme.fontSize, gap = 16, border = 4, height = textSize * nameValuePairs.length + 2 * border, maxWidth = measureNameValuePairs(nameValuePairs, gap, ctx) + 2 * border;
         let x = p.x, y = p.y;
@@ -2565,16 +2603,20 @@ export class FunctionchartEditor {
                 renderer.draw(this.hotTrackInfo.item, RenderMode.HotTrack);
             const hoverHitInfo = this.hoverHitInfo;
             if (hoverHitInfo) {
-                const item = hoverHitInfo.item, propertyInfo = this.propertyInfo.get(item.template.typeName), nameValuePairs = [];
-                if (propertyInfo) {
-                    for (let info of propertyInfo) {
-                        const name = info.label, value = info.getter(info, item);
-                        if (value !== undefined) {
-                            nameValuePairs.push({ name, value });
-                        }
-                    }
-                    renderer.drawHoverText(hoverHitInfo.item, this.hoverPoint, nameValuePairs);
-                }
+                renderer.drawHoverInfo(hoverHitInfo, this.hoverPoint);
+                // const item = hoverHitInfo.item,
+                //       propertyInfo = this.propertyInfo.get(item.template.typeName),
+                //       nameValuePairs = [];
+                // if (propertyInfo) {
+                //   for (let info of propertyInfo) {
+                //     const name = info.label,
+                //           value = info.getter(info, item);
+                //     if (value !== undefined) {
+                //       nameValuePairs.push({ name, value });
+                //     }
+                //   }
+                //   renderer.drawHoverText(hoverHitInfo.item, this.hoverPoint, nameValuePairs);
+                // }
             }
             renderer.end();
         }

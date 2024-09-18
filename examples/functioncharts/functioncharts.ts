@@ -490,6 +490,16 @@ export class Wire implements DataContextObject {
   pDst: PointWithNormal | undefined;
   bezier: BezierCurve = defaultBezierCurve;
 
+  get type() : Type {
+    if (this.src) {
+      return this.src.type.outputs[this.srcPin].type;
+    }
+    if (this.dst) {
+      return this.dst.type.inputs[this.dstPin].type;
+    }
+    return Type.valueType;
+  }
+
   get bounds() : Rect {
     const extents = getExtents(this.bezier),
           x = extents.xmin,
@@ -2610,44 +2620,36 @@ class Renderer {
     }
   }
 
-  drawHoverText(item: AllTypes, p: Point, nameValuePairs: { name: string, value: any }[]) {
-    const self = this,
+  drawHoverInfo(info: HitResultTypes, p: Point) {
+    const theme = this.theme,
           ctx = this.ctx,
-          theme = this.theme,
-          textSize = theme.fontSize,
-          gap = 16,
-          border = 4,
-          height = textSize * nameValuePairs.length + 2 * border,
-          maxWidth = measureNameValuePairs(nameValuePairs, gap, ctx) + 2 * border;
-    let x = p.x, y = p.y;
-    ctx.fillStyle = theme.hoverColor;
-    ctx.fillRect(x, y, maxWidth, height);
-    ctx.fillStyle = theme.hoverTextColor;
-    nameValuePairs.forEach(function (pair) {
-      ctx.textAlign = 'left';
-      ctx.fillText(pair.name, x + border, y + textSize);
-      ctx.textAlign = 'right';
-      ctx.fillText(pair.value, x + maxWidth - border, y + textSize);
-      y += textSize;
-    });
-  }
+          x = p.x, y = p.y;
+    let type = Type.emptyType;  // When no type is available.
+    if (info instanceof ElementHitResult) {
+      type = info.item.type;
+      if (info.input >= 0) {
+        type = type.inputs[info.input].type;
+      } else if (info.output >= 0) {
+        type = type.outputs[info.output].type;
+      }
+      if (type.isPrimitive) {
+        // TODO draw primitive type 'number' or 'string' etc.
+      }
+    } else if (info instanceof WireHitResult) {
+      type = info.item.type;  // Wire type is src or dst pin type.
+    }
+    // TODO function charts, inputs, and outputs.
+    const w = type.width, h = type.height;
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
 
-  // drawHoverInfo(item, p) {
-  //   const self = this, theme = this.theme, ctx = this.ctx,
-  //         x = p.x, y = p.y;
-  //   ctx.fillStyle = theme.hoverColor;
-  //   if (isGroupInstance(item)) {
-  //     const groupItems = getDefinition(item);
-  //     let r = this.getBounds(groupItems);
-  //     ctx.translate(x - r.x, y - r.y);
-  //     let border = 4;
-  //     ctx.fillRect(r.x - border, r.y - border, r.w + 2 * border, r.h + 2 * border);
-  //     ctx.fillStyle = theme.hoverTextColor;
-  //     visitItems(groupItems, item => self.draw(item, normalMode), isElementOrGroup);
-  //     visitItems(groupItems, wire => self.draw(wire, normalMode), isWire);
-  //   } else {
-  //   }
-  // }
+    ctx.fillStyle = theme.hoverColor;
+    ctx.fill();
+    ctx.strokeStyle = theme.strokeColor;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    this.drawType(type, x, y);
+  }
 }
 
 // --------------------------------------------------------------------------------------------
@@ -3128,19 +3130,7 @@ export class FunctionchartEditor implements CanvasLayer {
 
       const hoverHitInfo = this.hoverHitInfo;
       if (hoverHitInfo) {
-        const item = hoverHitInfo.item,
-              propertyInfo = this.propertyInfo.get(item.template.typeName),
-              nameValuePairs = [];
-        if (propertyInfo) {
-          for (let info of propertyInfo) {
-            const name = info.label,
-                  value = info.getter(info, item);
-            if (value !== undefined) {
-              nameValuePairs.push({ name, value });
-            }
-          }
-          renderer.drawHoverText(hoverHitInfo.item, this.hoverPoint, nameValuePairs);
-        }
+        renderer.drawHoverInfo(hoverHitInfo, this.hoverPoint);
       }
       renderer.end();
     } else if (canvasController === this.paletteController) {
