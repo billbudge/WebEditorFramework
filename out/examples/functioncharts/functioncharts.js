@@ -1,5 +1,5 @@
 import { SelectionSet, Multimap } from '../../src/collections.js';
-import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, measureNameValuePairs, FileController } from '../../src/diagrams.js';
+import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, FileController } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
@@ -47,6 +47,8 @@ export class Type {
         this.y = 0;
         this.width = 0;
         this.height = 0;
+        this.smallWidth = 0;
+        this.smallHeight = 0;
         this.inputs = inputs;
         this.outputs = outputs;
         this.name = name;
@@ -1794,7 +1796,6 @@ var RenderMode;
     RenderMode[RenderMode["HotTrack"] = 3] = "HotTrack";
     RenderMode[RenderMode["Print"] = 4] = "Print";
 })(RenderMode || (RenderMode = {}));
-const shrink = 0.667, inv_shrink = 1 / shrink;
 class Renderer {
     constructor(theme) {
         this.theme = new FunctionchartTheme(theme);
@@ -1818,10 +1819,10 @@ class Renderer {
         function layoutPins(pins) {
             let y = height, w = 0;
             for (let i = 0; i < pins.length; i++) {
-                let pin = pins[i];
+                const pin = pins[i], name = pin.name;
                 self.layoutPin(pin);
                 pin.y = y + spacing / 2;
-                let name = pin.name, pw = pin.width, ph = pin.height + spacing / 2;
+                let pw = pin.width, ph = pin.height + spacing / 2;
                 if (name) {
                     pin.baseline = y + spacing / 2 + textSize;
                     if (textSize > ph) {
@@ -1852,10 +1853,6 @@ class Renderer {
         if (type.needsLayout)
             this.layoutType(type);
         let width = type.width, height = type.height;
-        if (!type.isPrimitive) {
-            width *= shrink;
-            height *= shrink;
-        }
         pin.width = width;
         pin.height = height;
     }
@@ -1954,13 +1951,11 @@ class Renderer {
             ctx.stroke();
         }
         else if (pin.type) {
-            const type = pin.type, width = type.width, height = type.height, sx = x * inv_shrink, sy = y * inv_shrink;
-            this.ctx.scale(shrink, shrink);
+            const type = pin.type, width = type.width, height = type.height;
             ctx.beginPath();
-            ctx.rect(sx, sy, width, height);
+            ctx.rect(x, y, width, height);
             ctx.stroke();
-            this.drawType(type, sx, sy);
-            this.ctx.scale(inv_shrink, inv_shrink);
+            this.drawType(type, x, y);
         }
     }
     drawElement(element, mode) {
@@ -2192,6 +2187,7 @@ class Renderer {
         else if (info instanceof WireHitResult) {
             type = info.item.type; // Wire type is src or dst pin type.
         }
+        // TODO function charts, inputs, and outputs.
         const w = type.width, h = type.height;
         ctx.beginPath();
         ctx.rect(x, y, w, h);
@@ -2201,20 +2197,6 @@ class Renderer {
         ctx.lineWidth = 0.5;
         ctx.stroke();
         this.drawType(type, x, y);
-    }
-    drawHoverText(item, p, nameValuePairs) {
-        const self = this, ctx = this.ctx, theme = this.theme, textSize = theme.fontSize, gap = 16, border = 4, height = textSize * nameValuePairs.length + 2 * border, maxWidth = measureNameValuePairs(nameValuePairs, gap, ctx) + 2 * border;
-        let x = p.x, y = p.y;
-        ctx.fillStyle = theme.hoverColor;
-        ctx.fillRect(x, y, maxWidth, height);
-        ctx.fillStyle = theme.hoverTextColor;
-        nameValuePairs.forEach(function (pair) {
-            ctx.textAlign = 'left';
-            ctx.fillText(pair.name, x + border, y + textSize);
-            ctx.textAlign = 'right';
-            ctx.fillText(pair.value, x + maxWidth - border, y + textSize);
-            y += textSize;
-        });
     }
 }
 // --------------------------------------------------------------------------------------------
@@ -2604,19 +2586,6 @@ export class FunctionchartEditor {
             const hoverHitInfo = this.hoverHitInfo;
             if (hoverHitInfo) {
                 renderer.drawHoverInfo(hoverHitInfo, this.hoverPoint);
-                // const item = hoverHitInfo.item,
-                //       propertyInfo = this.propertyInfo.get(item.template.typeName),
-                //       nameValuePairs = [];
-                // if (propertyInfo) {
-                //   for (let info of propertyInfo) {
-                //     const name = info.label,
-                //           value = info.getter(info, item);
-                //     if (value !== undefined) {
-                //       nameValuePairs.push({ name, value });
-                //     }
-                //   }
-                //   renderer.drawHoverText(hoverHitInfo.item, this.hoverPoint, nameValuePairs);
-                // }
             }
             renderer.end();
         }

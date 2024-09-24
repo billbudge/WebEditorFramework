@@ -86,6 +86,8 @@ export class Type {
   y = 0;
   width = 0;
   height = 0;
+  smallWidth = 0;
+  smallHeight = 0;
 
   get isPrimitive() : boolean { return this === Type.valueType || this === Type.starType; }
 
@@ -2159,9 +2161,6 @@ enum RenderMode {
   Print
 }
 
-const shrink = 0.667,
-      inv_shrink = 1 / shrink;
-
 class Renderer {
   private theme: FunctionchartTheme;
   private ctx: CanvasRenderingContext2D;
@@ -2198,10 +2197,11 @@ class Renderer {
     function layoutPins(pins: Pin[]) {
       let y = height, w = 0;
       for (let i = 0; i < pins.length; i++) {
-        let pin = pins[i];
+        const pin = pins[i],
+              name = pin.name;
         self.layoutPin(pin);
         pin.y = y + spacing / 2;
-        let name = pin.name, pw = pin.width, ph = pin.height! + spacing / 2;
+        let pw = pin.width, ph = pin.height + spacing / 2;
         if (name) {
           pin.baseline = y + spacing / 2 + textSize;
           if (textSize > ph) {
@@ -2232,10 +2232,6 @@ class Renderer {
     if (type.needsLayout)
       this.layoutType(type);
     let width = type.width, height = type.height;
-    if (!type.isPrimitive) {
-      width *= shrink;
-      height *= shrink;
-    }
     pin.width = width;
     pin.height = height;
   }
@@ -2353,15 +2349,12 @@ class Renderer {
       ctx.stroke();
     } else if (pin.type) {
       const type = pin.type,
-            width = type.width, height = type.height,
-            sx = x * inv_shrink, sy = y * inv_shrink;
+            width = type.width, height = type.height;
 
-      this.ctx.scale(shrink, shrink);
       ctx.beginPath();
-      ctx.rect(sx, sy, width, height);
+      ctx.rect(x, y, width, height);
       ctx.stroke();
-      this.drawType(type,sx, sy);
-      this.ctx.scale(inv_shrink, inv_shrink);
+      this.drawType(type, x, y);
     }
   }
 
