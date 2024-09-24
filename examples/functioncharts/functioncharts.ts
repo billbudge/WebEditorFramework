@@ -30,8 +30,6 @@ export class Pin {
   readonly name?: string;
   get typeString() { return this.toString(); }
   y = 0;
-  width = 0;
-  height = 0;
   baseline = 0;
 
   constructor(type: Type, name?: string) {
@@ -409,14 +407,14 @@ abstract class ElementBase {
     const rect: Rect = this.bounds,
           type = this.type,
           pin = type.inputs[index];
-    return { x: rect.x, y: rect.y + pin.y + pin.height / 2, nx: -1, ny: 0 }
+    return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 }
   }
   outputPinToPoint(index: number) : PointWithNormal {
     const rect: Rect = this.bounds,
           w = rect.width,
           type = this.type,
           pin = type.outputs[index];
-    return { x: rect.x + w, y: rect.y + pin.y + pin.height / 2, nx: 1, ny: 0 }
+    return { x: rect.x + w, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
   }
 
   constructor(id: number) {
@@ -2201,7 +2199,7 @@ class Renderer {
               name = pin.name;
         self.layoutPin(pin);
         pin.y = y + spacing / 2;
-        let pw = pin.width, ph = pin.height + spacing / 2;
+        let pw = pin.type.width, ph = pin.type.height + spacing / 2;
         if (name) {
           pin.baseline = y + spacing / 2 + textSize;
           if (textSize > ph) {
@@ -2231,9 +2229,6 @@ class Renderer {
     const type = pin.type;
     if (type.needsLayout)
       this.layoutType(type);
-    let width = type.width, height = type.height;
-    pin.width = width;
-    pin.height = height;
   }
 
   layoutElement(element: ElementTypes) {
@@ -2317,12 +2312,12 @@ class Renderer {
       self.drawPin(pin, x, y + pin.y);
       if (name) {
         ctx.textAlign = 'left';
-        ctx.fillText(name, x + pin.width + spacing, y + pin.baseline);
+        ctx.fillText(name, x + pin.type.width + spacing, y + pin.baseline);
       }
     });
     type.outputs.forEach(function(pin) {
       const name = pin.name,
-            pinLeft = right - pin.width;
+            pinLeft = right - pin.type.width;
       self.drawPin(pin, pinLeft, y + pin.y);
       if (name) {
         ctx.textAlign = 'right';
@@ -2505,14 +2500,15 @@ class Renderer {
     if (hitInfo) {
       const result = new ElementHitResult(element, hitInfo),
             type = element.type;
-      type.inputs.forEach(function(input, i) {
-        if (hitTestRect(x, y + input.y, input.width, input.height, p, 0)) {
+      type.inputs.forEach(function(pin: Pin, i: number) {
+        const pw = pin.type.width, ph = pin.type.height;
+        if (hitTestRect(x, y + pin.y, pw, ph, p, 0)) {
           result.input = i;
         }
       });
-      type.outputs.forEach(function(output, i) {
-        if (hitTestRect(x + width - output.width, y + output.y,
-                        output.width, output.height, p, 0)) {
+      type.outputs.forEach(function(pin: Pin, i: number) {
+        const pw = pin.type.width, ph = pin.type.height;
+        if (hitTestRect(x + width - pw, y + pin.y, pw, ph, p, 0)) {
           result.output = i;
         }
       });
@@ -2559,14 +2555,14 @@ class Renderer {
       const pin = wire.src!.type.outputs[wire.srcPin],
             pinPos = wire.pDst!,
             pinX = pinPos.x,
-            pinY = pinPos.y - pin.height / 2;
+            pinY = pinPos.y - pin.type.height / 2;
       ctx.lineWidth = 0.5;
       this.drawPin(pin, pinX, pinY)
     } else if (wire.src === undefined) {
       const pin = wire.dst!.type.inputs[wire.dstPin],
             pinPos = wire.pSrc!,
-            pinX = pinPos.x - pin.width,
-            pinY = pinPos.y - pin.height / 2;
+            pinX = pinPos.x - pin.type.width,
+            pinY = pinPos.y - pin.type.height / 2;
       ctx.lineWidth = 0.5;
       this.drawPin(pin, pinX, pinY)
     }
