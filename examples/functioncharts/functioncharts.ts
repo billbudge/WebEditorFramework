@@ -2408,12 +2408,9 @@ class Renderer {
         break;
       }
       case RenderMode.Highlight:
-        ctx.strokeStyle = theme.highlightColor;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        break;
       case RenderMode.HotTrack:
-        ctx.strokeStyle = theme.hotTrackColor;
+        ctx.strokeStyle = (mode === RenderMode.Highlight) ? theme.highlightColor : theme.hotTrackColor;
+        ctx.strokeStyle = theme.highlightColor;
         ctx.lineWidth = 2;
         ctx.stroke();
         break;
@@ -2423,37 +2420,42 @@ class Renderer {
   drawPseudoElement(element: ElementTypes, mode: RenderMode) {
     const ctx = this.ctx,
           theme = this.theme,
-          spacing = theme.spacing,
           r = theme.knobbyRadius,
           d = r * 2,
           rect = element.bounds,
-          x = rect.x, y = rect.y, w = rect.width, h = rect.height,
-          right = x + w, bottom = y + h;
+          x = rect.x, y = rect.y, w = rect.width, h = rect.height;
 
-    ctx.beginPath();
-    if (mode === RenderMode.Highlight || mode === RenderMode.HotTrack) {
-      ctx.strokeStyle = mode === RenderMode.Highlight ? theme.highlightColor : theme.hotTrackColor;
-      ctx.lineWidth = 2;
-      ctx.rect(x, y, w, h);
-      ctx.stroke();
-    } else {
-      switch (element.template.typeName) {
-        case 'input': {
-          inFlagPath(x, y, w, h, d, ctx);
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
-          break;
+    switch (mode) {
+      case RenderMode.Normal:
+      case RenderMode.Palette:
+      case RenderMode.Print: {
+        switch (element.template.typeName) {
+          case 'input': {
+            inFlagPath(x, y, w, h, d, ctx);
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+            break;
+          }
+          case 'output': {
+            outFlagPath(x, y, w, h, d, ctx);
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+            break;
+          }
         }
-        case 'output': {
-          outFlagPath(x, y, w, h, d, ctx);
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
-          break;
-        }
+        ctx.fillStyle = mode === RenderMode.Palette ? theme.altBgColor : theme.bgColor;
+        ctx.strokeStyle = theme.strokeColor;
+        this.drawType(element.type, x, y);
+        break;
       }
-      ctx.fillStyle = mode === RenderMode.Palette ? theme.altBgColor : theme.bgColor;
-      ctx.strokeStyle = theme.strokeColor;
-      this.drawType(element.type, x, y);
+      case RenderMode.Highlight:
+      case RenderMode.HotTrack:
+        ctx.beginPath();
+        ctx.strokeStyle = mode === RenderMode.Highlight ? theme.highlightColor : theme.hotTrackColor;
+        ctx.lineWidth = 2;
+        ctx.rect(x, y, w, h);
+        ctx.stroke();
+        break;
     }
   }
 
@@ -2488,8 +2490,7 @@ class Renderer {
         break;
       case RenderMode.Highlight:
       case RenderMode.HotTrack:
-        roundRectPath(x, y, w, h, r, ctx);
-        ctx.strokeStyle = mode === RenderMode.Highlight ? theme.highlightColor : theme.hotTrackColor;
+        ctx.strokeStyle = (mode === RenderMode.Highlight) ? theme.highlightColor : theme.hotTrackColor;
         ctx.lineWidth = 2;
         ctx.stroke();
         break;
