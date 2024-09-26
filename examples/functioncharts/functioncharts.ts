@@ -16,6 +16,7 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          getLowestCommonAncestor, ancestorInSet, reduceToRoots,
          List, TransactionManager, TransactionEvent, HistoryManager, ScalarPropertyTypes,
          ArrayPropertyTypes } from '../../src/dataModels.js'
+import { types } from '@babel/core';
 
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
@@ -84,8 +85,6 @@ export class Type {
   y = 0;
   width = 0;
   height = 0;
-  smallWidth = 0;
-  smallHeight = 0;
 
   get isPrimitive() : boolean { return this === Type.valueType || this === Type.starType; }
 
@@ -123,6 +122,29 @@ export class Type {
     if (this.name)
       s += '(' + this.name + ')';
     return s;
+  }
+  static fromString(typeString: string) : Type {
+    const type = parseTypeString(typeString);
+    return type.atomized();
+  }
+  toFlatType(): Type {
+    let typeString = '[';
+    this.inputs.forEach((pin: Pin) => {
+      typeString += 'v';
+      if (pin.name)
+        typeString += '(' + pin.name + ')';
+    });
+    typeString += ',';
+    this.outputs.forEach((pin: Pin) => {
+      typeString += 'v';
+      if (pin.name)
+        typeString += '(' + pin.name + ')';
+    });
+    typeString += ']';
+    if (this.name) {
+      typeString += '(' + this.name + ')';
+    }
+    return Type.fromString(typeString);
   }
   atomized() : Type {
     let s = this.toString();
@@ -368,7 +390,15 @@ abstract class ElementBase {
   // Derived properties, managed by the FunctionchartContext.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
-  type: Type = Type.emptyType;
+  private _type: Type = Type.emptyType;
+  get type() { return this._type; }
+  set type(type: Type) {
+    this._type = type;
+    this._flatType = type.toFlatType();
+  }
+  // Flat type is derived from type, except that all pins are value types.
+  private _flatType: Type = Type.emptyType;
+  get flatType() { return this._flatType; }
   inWires = new Array<Wire | undefined>();   // one input per pin (no fan in).
   outWires = new Array<Array<Wire>>();       // multiple outputs per pin (fan out).
 
@@ -376,7 +406,7 @@ abstract class ElementBase {
     const global = this.globalPosition,
           x = global.x,
           y = global.y,
-          type = this.type,
+          type = this.flatType,  // draw flat type
           width = type.width,
           height = type.height;
     return { x, y, width, height };
@@ -395,24 +425,26 @@ abstract class ElementBase {
       }
     }
   }
+  // Get the pin for the element type.
   getPin(index: number) : Pin {
     const type = this.type,
           firstOutput = type.inputs.length,
-          pin = index < firstOutput ? this.type.inputs[index] :
-                                      this.type.outputs[index - firstOutput];
+          pin = index < firstOutput ? type.inputs[index] :
+                                      type.outputs[index - firstOutput];
     return pin;
   }
 
+  // Convert pins for the flat type to positions.
   inputPinToPoint(index: number) : PointWithNormal {
     const rect: Rect = this.bounds,
-          type = this.type,
+          type = this.flatType,
           pin = type.inputs[index];
     return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 }
   }
   outputPinToPoint(index: number) : PointWithNormal {
     const rect: Rect = this.bounds,
           w = rect.width,
-          type = this.type,
+          type = this.flatType,
           pin = type.outputs[index];
     return { x: rect.x + w, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
   }
@@ -542,7 +574,15 @@ export class Functionchart implements DataContextObject {
   // Derived properties.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
-  type: Type = Type.emptyType;
+  private _type: Type = Type.emptyType;
+  get type() { return this._type; }
+  set type(type: Type) {
+    this._type = type;
+    this._flatType = type.toFlatType();
+  }
+  // Flat type is derived from type, except that all pins are value types.
+  private _flatType: Type = Type.emptyType;
+  get flatType() { return this._flatType; }
   passThroughs: Array<Array<number>> | undefined;
 
   get bounds() : Rect {
@@ -2233,8 +2273,10 @@ class Renderer {
 
   layoutElement(element: ElementTypes) {
     const type = element.type;
-    if (type.needsLayout)
+    if (type.needsLayout) {
       this.layoutType(type);
+      this.layoutType(element.flatType);
+    }
   }
 
   layoutWire(wire: Wire) {
@@ -2262,8 +2304,10 @@ class Renderer {
     function layout(functionChart: Functionchart) {
       const type = functionchart.type,
             nonWires = functionChart.nonWires;
-      if (type.needsLayout)
+      if (type.needsLayout) {
         self.layoutType(type);
+        self.layoutType(functionChart.flatType);
+      }
 
       let width, height;
       if (nonWires.length === 0) {
@@ -2399,7 +2443,7 @@ class Renderer {
           }
         }
 
-        this.drawType(element.type, x, y);
+        this.drawType(element.flatType, x, y);
         break;
       }
       case RenderMode.Highlight:
@@ -2440,7 +2484,7 @@ class Renderer {
         }
         ctx.fillStyle = mode === RenderMode.Palette ? theme.altBgColor : theme.bgColor;
         ctx.strokeStyle = theme.strokeColor;
-        this.drawType(element.type, x, y);
+        this.drawType(element.flatType, x, y);
         break;
       }
       case RenderMode.Highlight:
@@ -2471,7 +2515,7 @@ class Renderer {
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
         ctx.stroke();
-        const type = functionchart.type,
+        const type = functionchart.flatType,
               instanceRect = functionchart.instanceBounds;
         ctx.beginPath();
         ctx.rect(instanceRect.x, instanceRect.y, instanceRect.width, instanceRect.height);

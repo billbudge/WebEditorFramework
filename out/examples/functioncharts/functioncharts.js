@@ -45,8 +45,6 @@ export class Type {
         this.y = 0;
         this.width = 0;
         this.height = 0;
-        this.smallWidth = 0;
-        this.smallHeight = 0;
         this.inputs = inputs;
         this.outputs = outputs;
         this.name = name;
@@ -72,6 +70,29 @@ export class Type {
         if (this.name)
             s += '(' + this.name + ')';
         return s;
+    }
+    static fromString(typeString) {
+        const type = parseTypeString(typeString);
+        return type.atomized();
+    }
+    toFlatType() {
+        let typeString = '[';
+        this.inputs.forEach((pin) => {
+            typeString += 'v';
+            if (pin.name)
+                typeString += '(' + pin.name + ')';
+        });
+        typeString += ',';
+        this.outputs.forEach((pin) => {
+            typeString += 'v';
+            if (pin.name)
+                typeString += '(' + pin.name + ')';
+        });
+        typeString += ']';
+        if (this.name) {
+            typeString += '(' + this.name + ')';
+        }
+        return Type.fromString(typeString);
     }
     atomized() {
         let s = this.toString();
@@ -288,8 +309,15 @@ const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
 class ElementBase {
+    get type() { return this._type; }
+    set type(type) {
+        this._type = type;
+        this._flatType = type.toFlatType();
+    }
+    get flatType() { return this._flatType; }
     get bounds() {
-        const global = this.globalPosition, x = global.x, y = global.y, type = this.type, width = type.width, height = type.height;
+        const global = this.globalPosition, x = global.x, y = global.y, type = this.flatType, // draw flat type
+        width = type.width, height = type.height;
         return { x, y, width, height };
     }
     getPassThroughs() {
@@ -305,22 +333,26 @@ class ElementBase {
             }
         }
     }
+    // Get the pin for the element type.
     getPin(index) {
-        const type = this.type, firstOutput = type.inputs.length, pin = index < firstOutput ? this.type.inputs[index] :
-            this.type.outputs[index - firstOutput];
+        const type = this.type, firstOutput = type.inputs.length, pin = index < firstOutput ? type.inputs[index] :
+            type.outputs[index - firstOutput];
         return pin;
     }
+    // Convert pins for the flat type to positions.
     inputPinToPoint(index) {
-        const rect = this.bounds, type = this.type, pin = type.inputs[index];
+        const rect = this.bounds, type = this.flatType, pin = type.inputs[index];
         return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 };
     }
     outputPinToPoint(index) {
-        const rect = this.bounds, w = rect.width, type = this.type, pin = type.outputs[index];
+        const rect = this.bounds, w = rect.width, type = this.flatType, pin = type.outputs[index];
         return { x: rect.x + w, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 };
     }
     constructor(id) {
         this.globalPosition = defaultPoint;
-        this.type = Type.emptyType;
+        this._type = Type.emptyType;
+        // Flat type is derived from type, except that all pins are value types.
+        this._flatType = Type.emptyType;
         this.inWires = new Array(); // one input per pin (no fan in).
         this.outWires = new Array(); // multiple outputs per pin (fan out).
         this.id = id;
@@ -406,6 +438,12 @@ export class Functionchart {
     set name(value) { this.template.name.set(this, value); }
     get nonWires() { return this.template.nonWires.get(this); }
     get wires() { return this.template.wires.get(this); }
+    get type() { return this._type; }
+    set type(type) {
+        this._type = type;
+        this._flatType = type.toFlatType();
+    }
+    get flatType() { return this._flatType; }
     get bounds() {
         const global = this.globalPosition, x = global.x, y = global.y, width = this.width, height = this.height;
         return { x, y, width, height };
@@ -419,7 +457,9 @@ export class Functionchart {
     constructor(context, id) {
         this.template = functionchartTemplate;
         this.globalPosition = defaultPoint;
-        this.type = Type.emptyType;
+        this._type = Type.emptyType;
+        // Flat type is derived from type, except that all pins are value types.
+        this._flatType = Type.emptyType;
         this.context = context;
         this.id = id;
     }
@@ -1853,8 +1893,10 @@ class Renderer {
     }
     layoutElement(element) {
         const type = element.type;
-        if (type.needsLayout)
+        if (type.needsLayout) {
             this.layoutType(type);
+            this.layoutType(element.flatType);
+        }
     }
     layoutWire(wire) {
         let src = wire.src, dst = wire.dst, p1 = wire.pSrc, p2 = wire.pDst;
@@ -1875,8 +1917,10 @@ class Renderer {
         const self = this, spacing = this.theme.spacing;
         function layout(functionChart) {
             const type = functionchart.type, nonWires = functionChart.nonWires;
-            if (type.needsLayout)
+            if (type.needsLayout) {
                 self.layoutType(type);
+                self.layoutType(functionChart.flatType);
+            }
             let width, height;
             if (nonWires.length === 0) {
                 width = self.theme.minFunctionchartWidth;
@@ -1987,7 +2031,7 @@ class Renderer {
                         }
                     }
                 }
-                this.drawType(element.type, x, y);
+                this.drawType(element.flatType, x, y);
                 break;
             }
             case RenderMode.Highlight:
@@ -2021,7 +2065,7 @@ class Renderer {
                 }
                 ctx.fillStyle = mode === RenderMode.Palette ? theme.altBgColor : theme.bgColor;
                 ctx.strokeStyle = theme.strokeColor;
-                this.drawType(element.type, x, y);
+                this.drawType(element.flatType, x, y);
                 break;
             }
             case RenderMode.Highlight:
@@ -2046,7 +2090,7 @@ class Renderer {
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
-                const type = functionchart.type, instanceRect = functionchart.instanceBounds;
+                const type = functionchart.flatType, instanceRect = functionchart.instanceBounds;
                 ctx.beginPath();
                 ctx.rect(instanceRect.x, instanceRect.y, instanceRect.width, instanceRect.height);
                 ctx.fillStyle = theme.altBgColor;
