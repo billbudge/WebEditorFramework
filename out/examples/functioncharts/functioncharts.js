@@ -449,7 +449,7 @@ export class Functionchart {
         return { x, y, width, height };
     }
     get instanceBounds() {
-        const fcBounds = this.bounds, right = fcBounds.x + fcBounds.width, bottom = fcBounds.y + fcBounds.height, type = this.type, width = type.width, height = type.height;
+        const fcBounds = this.bounds, right = fcBounds.x + fcBounds.width, bottom = fcBounds.y + fcBounds.height, type = this.flatType, width = type.width, height = type.height;
         return { x: right - width - Functionchart.radius,
             y: bottom - height - Functionchart.radius,
             width, height };
@@ -2230,7 +2230,11 @@ class Renderer {
         else if (info instanceof WireHitResult) {
             type = info.item.type; // Wire type is src or dst pin type.
         }
-        // TODO function charts, inputs, and outputs.
+        else if (info instanceof FunctionchartHitResult) {
+            if (info.instancer) {
+                type = info.item.type;
+            }
+        }
         const w = type.width, h = type.height;
         ctx.beginPath();
         ctx.rect(x, y, w, h);

@@ -598,7 +598,7 @@ export class Functionchart implements DataContextObject {
     const fcBounds = this.bounds,
           right = fcBounds.x + fcBounds.width,
           bottom = fcBounds.y + fcBounds.height,
-          type = this.type,
+          type = this.flatType,
           width = type.width,
           height = type.height;
     return { x: right - width - Functionchart.radius,
@@ -2671,8 +2671,11 @@ class Renderer {
       }
     } else if (info instanceof WireHitResult) {
       type = info.item.type;  // Wire type is src or dst pin type.
+    } else if (info instanceof FunctionchartHitResult) {
+      if (info.instancer) {
+        type = info.item.type;
+      }
     }
-    // TODO function charts, inputs, and outputs.
     const w = type.width, h = type.height;
     ctx.beginPath();
     ctx.rect(x, y, w, h);
