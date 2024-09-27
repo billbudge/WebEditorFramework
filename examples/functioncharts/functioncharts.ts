@@ -41,15 +41,11 @@ export class Pin {
   copy() : Pin {
     if (this.type === Type.valueType)
       return new Pin(Type.valueType, this.name);
-    else if (this.type === Type.starType)
-      return new Pin(Type.starType, this.name);
     return new Pin(this.type.copy(), this.name);
   }
   copyUnlabeled() : Pin {
     if (this.type === Type.valueType)
       return new Pin(Type.valueType);
-    else if (this.type === Type.starType)
-      return new Pin(Type.starType);
     return new Pin(this.type.copyUnlabeled());
   }
   toString() : string {
@@ -64,8 +60,6 @@ export class Type {
   static readonly emptyPins = [];
   static readonly valueTypeString = 'v';
   static readonly valueType = new Type(Type.emptyPins, Type.emptyPins);
-  static readonly starTypeString = '*';
-  static readonly starType = new Type(Type.emptyPins, Type.emptyPins);
   static readonly spacerTypeString = ' ';
   static readonly spacerType = new Type(Type.emptyPins, Type.emptyPins);
   static readonly emptyTypeString = '[,]';
@@ -73,7 +67,6 @@ export class Type {
 
   static readonly atomizedTypes = new Map<string, Type>([
     [Type.valueTypeString, Type.valueType],
-    [Type.starTypeString, Type.starType],
     [Type.spacerTypeString, Type.spacerType],
     [Type.emptyTypeString, Type.emptyType],
   ]);
@@ -85,8 +78,6 @@ export class Type {
   y = 0;
   width = 0;
   height = 0;
-
-  get isPrimitive() : boolean { return this === Type.valueType || this === Type.starType; }
 
   get needsLayout() {
     return this.height === 0;  // width may be 0 in the case of spacer type.
@@ -110,8 +101,6 @@ export class Type {
   toString() : string {
     if (this === Type.valueType)
       return Type.valueTypeString;
-    if (this === Type.starType)
-      return Type.starTypeString;
     if (this === Type.spacerType)
       return Type.spacerTypeString;
     let s = '[';
@@ -172,23 +161,9 @@ export class Type {
   //   return Type.equals(this, dst);
   // }
   private static canConnect(src: Type, dst: Type) : boolean {
-    if (src === dst)
-      return true;
-    if (src === Type.starType || dst === Type.starType)
-      return true;
     if (src === Type.spacerType || dst === Type.spacerType)
       return false;
-    if (dst === Type.valueType)
-      return src === Type.valueType;
-
-    return src.inputs.length >= dst.inputs.length &&
-           src.outputs.length >= dst.outputs.length &&
-           dst.inputs.every((input, i) => {
-              return Type.canConnect(src.inputs[i].type, input.type );
-           }) &&
-           dst.outputs.every((output, i) => {
-             return Type.canConnect(src.outputs[i].type, output.type);
-           });
+    return true;
   }
   canConnectTo(dst: Type) : boolean {
     return Type.canConnect(this, dst);
@@ -222,14 +197,9 @@ export function parseTypeString(s: string) : Type {
   function parsePin() : Pin {
     let i = j;
     // value type
-    if (s[j] === Type.valueTypeString) {
+    if (s[j] === Type.valueTypeString || s[j] === '*') {  // TODO remove when files converted
       j++;
       return new Pin(Type.valueType, parseName());
-    }
-    // wildcard type
-    if (s[j] === Type.starTypeString) {
-      j++;
-      return new Pin(Type.starType, parseName());
     }
     // Layout spacer type.
     if (s[j] === Type.spacerTypeString) {
@@ -245,10 +215,8 @@ export function parseTypeString(s: string) : Type {
   }
   function parseFunction() : Type {
     let i = j;
-    if (s[j] === Type.valueTypeString) {
+    if (s[j] === Type.valueTypeString || s[j] === '*') {  // TODO remove when files converted
       return Type.valueType;
-    } else if(s[j] === Type.starTypeString) {
-      return Type.starType;
     } else if(s[j] === Type.spacerTypeString) {
       return Type.spacerType;
     } else if (s[j] === '[') {
@@ -412,19 +380,6 @@ abstract class ElementBase {
     return { x, y, width, height };
   }
 
-  getPassThroughs() : Array<Array<number>> | undefined {
-    if (this instanceof FunctionInstance)
-      return this.functionchart?.passThroughs;
-
-    if (this instanceof Element) {
-      switch (this.template.typeName) {
-        case 'cond':
-          return [[1, 2, 3]];  // '0' is the condition input, of valueType.
-        case 'store':
-          return [[1, 0]];
-      }
-    }
-  }
   // Get the pin for the element type.
   getPin(index: number) : Pin {
     const type = this.type,
@@ -494,10 +449,10 @@ export class Pseudoelement extends ElementBase implements DataContextObject, Ref
 
     switch (this.template.typeName) {
       case 'input':
-        this.typeString = '[,*]';
+        this.typeString = '[,v]';
         break;
       case 'output':
-        this.typeString = '[*,]';
+        this.typeString = '[v,]';
         break;
       }
   }
@@ -583,7 +538,6 @@ export class Functionchart implements DataContextObject {
   // Flat type is derived from type, except that all pins are value types.
   private _flatType: Type = Type.emptyType;
   get flatType() { return this._flatType; }
-  passThroughs: Array<Array<number>> | undefined;
 
   get bounds() : Rect {
     const global = this.globalPosition,
@@ -750,11 +704,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         break;
       case 'cond':
         template = condTemplate;
-        typeString = '[v**,*](?)';
+        typeString = '[vvv,v](?)';
         break;
       case 'store':
         template = storeTemplate;
-        typeString = '[v*,*](:=)';
+        typeString = '[vv,v](:=)';
         break;
       case 'import':
         template = importTemplate;
@@ -1529,7 +1483,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   exportElement(element: Element | FunctionInstance) : Element {
     const result = this.newElement('export'),
-          newType = new Type([], [new Pin(element.type)]);
+          newType = new Type([], [new Pin(element.type.copyUnlabeled(), element.type.name)]);
     result.typeString = newType.toString();
     return result;
   }
@@ -1587,22 +1541,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  // Visit pins along the first pass-through containing the given pin.
-  visitPassthroughs(element: ElementTypes, index: number, visitor: PinVisitor, visited: PinRefSet) {
-    const passThroughs = element.getPassThroughs();
-    if (passThroughs) {
-      for (let passThrough of passThroughs) {
-        if (passThrough.includes(index)) {
-          for (let i of passThrough) {
-            this.visitPin(element, i, visitor, visited);
-          }
-          break;
-        }
-      }
-    }
-  }
-
-  // Visit the given pin, then follow wires and pass-throughs.
+  // Visit the given pin, then follow wires from the parent element.
   visitPin(element: ElementTypes, index: number, visitor: PinVisitor, visited: PinRefSet) {
     if (visited.has(element, index))
       return;
@@ -1632,18 +1571,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         }
       }
     }
-    this.visitPassthroughs(element, index, visitor, visited);
   }
 
-  // Visits the pin, all pins wired to it, and all pass-throughs containing it, and returns
-  // the type of the first non-star pin it finds.
-  resolvePinType(element: ElementTypes, index: number,
-                 visited = new Multimap<ElementTypes, number>()) : Type | undefined {
-    let type: Type | undefined;
+  // Visits the pin, all pins wired to it, and returns the type of the first non-value
+  // pin it finds.
+  inferPinType(element: ElementTypes, index: number,
+                 visited = new Multimap<ElementTypes, number>()) : Type {
+    let type: Type = Type.valueType;
     function visit(element: ElementTypes, index: number) : boolean {
       const pin = element.getPin(index);
       // |pin| may be undefined if the instance doesn't has its type yet.
-      if (pin && pin.type !== Type.starType) {
+      if (pin && pin.type !== Type.valueType) {
         type = pin.type;
       }
       return true;
@@ -1672,12 +1610,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (item instanceof Pseudoelement) {
         if (item.template.typeName === 'input') {
           const connected = new Multimap<ElementTypes, number>();
-          const type = self.resolvePinType(item, 0, connected) || Type.starType;
+          const type = self.inferPinType(item, 0, connected);
           const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
           inputs.push(pinInfo);
         } else if(item.template.typeName === 'output') {
           const connected = new Multimap<ElementTypes, number>();
-          const type = self.resolvePinType(item, 0, connected) || Type.starType;
+          const type = self.inferPinType(item, 0, connected);
           const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
           outputs.push(pinInfo);
         }
@@ -1759,59 +1697,19 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       return typeString;
     }
 
-    const passThroughs = new Array<Array<number>>(),
-          inPassthrough = new Multimap<ElementTypes, number>();
     let typeString = '[';
     inputs.forEach(input => {
-      // For unresolved pin types, compute the pass-throughs.
-      if (input.type === Type.starType) {
-        if (!inPassthrough.has(input.element, input.index)) {
-          const pinClique = input.connected,
-                connected = new Array<PinInfo>();
-          pinClique.forAll((e, i) => {
-            if (!inPassthrough.has(e, i)) {
-              inPassthrough.add(e, i);
-              const pinInfo = getPinInfo(e, i);
-              if (pinInfo)
-                connected.push(pinInfo);
-            }
-          });
-          if (connected.length > 1) {
-            connected.sort(compareIndices);
-            passThroughs.push(connected.map(info => info.fcIndex));
-          }
-        }
-      }
       typeString += getPinName(input.type, input.element.getPin(input.index));
     });
     typeString += ',';
     outputs.forEach(output => {
-      // For unresolved pin types, compute the pass-throughs.
-      if (output.type === Type.starType) {
-        if (!inPassthrough.has(output.element, output.index)) {
-          const pinClique = output.connected,
-                connected = new Array<PinInfo>();
-          pinClique.forAll((e, i) => {
-            if (!inPassthrough.has(e, i)) {
-              inPassthrough.add(e, i);
-              const pinInfo = getPinInfo(e, i);
-              if (pinInfo)
-                connected.push(pinInfo);
-            }
-          });
-          if (connected.length > 1) {
-            connected.sort(compareIndices);
-            passThroughs.push(connected.map(info => info.fcIndex));
-          }
-        }
-      }
       typeString += getPinName(output.type, output.element.getPin(output.index));
     });
     typeString += ']';
     if (name)
       typeString += '(' + name + ')';
 
-    return { typeString, closed, abstract, passThroughs };
+    return { typeString, closed, abstract };
   }
 
   // Update the derived 'type' property. Delete any wires that are no longer compatible with
@@ -1880,7 +1778,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
             typeString = typeInfo.typeString,
             type = parseTypeString(typeString);
       item.type = type;
-      item.passThroughs = typeInfo.passThroughs.length > 0 ? typeInfo.passThroughs : undefined;
       // Update all instances of the functionchart.
       // TODO store the typestring on instances, and use that instead.
       this.fcMap.forValues(item, instance => {
@@ -2153,8 +2050,8 @@ class FunctionchartTheme extends Theme {
 
     // Layout the base types.
     const pinSize = 2 * this.knobbyRadius;
-    Type.valueType.width = Type.starType.width = pinSize;
-    Type.valueType.height = Type.starType.height = Type.spacerType.height = pinSize;
+    Type.valueType.width = pinSize;
+    Type.valueType.height = Type.spacerType.height = pinSize;
   }
 }
 
@@ -2376,7 +2273,7 @@ class Renderer {
     ctx.strokeStyle = theme.strokeColor;
     if (pin.type === Type.spacerType)
       return;
-    if (pin.type === Type.valueType || pin.type === Type.starType) {
+    if (pin.type === Type.valueType) {
       const r = theme.knobbyRadius;
       ctx.beginPath();
       if (pin.type === Type.valueType) {
@@ -2417,32 +2314,6 @@ class Renderer {
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         ctx.stroke();
-        const passThroughs = element.getPassThroughs();
-        if (passThroughs) {
-          const firstOutput = element.type.inputs.length,
-                tanLength = element.type.width / 3;
-          for (let passThrough of passThroughs) {
-            let lastInput = 0;
-            for (; lastInput < passThrough.length; lastInput++) {
-              if (passThrough[lastInput] >= firstOutput)
-                break;
-            }
-            for (let i = 0; i < lastInput; i++) {
-              const srcIndex = passThrough[i];
-              for (let j = lastInput; j < passThrough.length; j++) {
-                const dstIndex = passThrough[j],
-                      p1 = element.inputPinToPoint(srcIndex),
-                      p2 = element.outputPinToPoint(dstIndex - firstOutput);
-                p1.x += d;
-                p2.x -= d;
-                ctx.moveTo(p1.x, p1.y);
-                ctx.bezierCurveTo(p1.x + tanLength, p1.y, p2.x - tanLength, p2.y, p2.x, p2.y);
-                ctx.stroke();
-              }
-            }
-          }
-        }
-
         this.drawType(element.flatType, x, y);
         break;
       }
@@ -2543,7 +2414,7 @@ class Renderer {
           hitInfo = hitTestRect(x, y, width, height, p, tol);
     if (hitInfo) {
       const result = new ElementHitResult(element, hitInfo),
-            type = element.type;
+            type = element.flatType;
       type.inputs.forEach(function(pin: Pin, i: number) {
         const pw = pin.type.width, ph = pin.type.height;
         if (hitTestRect(x, y + pin.y, pw, ph, p, 0)) {
@@ -2666,7 +2537,7 @@ class Renderer {
       } else if (info.output >= 0) {
         type = type.outputs[info.output].type;
       }
-      if (type.isPrimitive) {
+      if (type === Type.valueType) {
         // TODO draw primitive type 'number' or 'string' etc.
       }
     } else if (info instanceof WireHitResult) {
@@ -2882,10 +2753,10 @@ export class FunctionchartEditor implements CanvasLayer {
       let newValue;
       switch (item.template.typeName) {
         case 'input':       // [,v(label)]
-          newValue = '[,*' + labelPart + ']';
+          newValue = '[,v' + labelPart + ']';
           break;
         case 'output':      // [v(label),]
-          newValue = '[*' + labelPart + ',]';
+          newValue = '[v' + labelPart + ',]';
           break;
         case 'literal':     // [,v(label)]
           newValue = '[,v' + labelPart + ']';
