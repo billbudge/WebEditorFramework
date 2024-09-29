@@ -273,7 +273,7 @@ const idProp = new IdProp('id'),
       nonWiresProp = new ChildArrayProp('nonWires'),
       wiresProp = new ChildArrayProp('wires'),
       functionchartProp = new ReferenceProp('functionchart'),
-      elementsProp = new ChildArrayProp('elements');
+      elementProp = new ScalarProp('element');
 
 abstract class NonWireTemplate {
   readonly id = idProp;
@@ -287,8 +287,8 @@ class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
   readonly name = nameProp;
   readonly typeString = typeStringProp;
-  readonly elements = elementsProp;
-  readonly properties = [this.id, this.x, this.y, this.name, this.typeString, this.elements];
+  readonly element = elementProp;  // Currently only used by 'export' element. Maybe change name to 'functionref'?
+  readonly properties = [this.id, this.x, this.y, this.name, this.typeString, this.element];
   constructor(typeName: ElementType) {
     super();
     this.typeName = typeName;
@@ -364,7 +364,7 @@ abstract class ElementBase {
     this._type = type;
     this._flatType = type.toFlatType();
   }
-  // Flat type is derived from type, except that all pins are value types.
+  // Flat type has the same arity as type, but all pins are value type.
   private _flatType: Type = Type.emptyType;
   get flatType() { return this._flatType; }
   inWires = new Array<Wire | undefined>();   // one input per pin (no fan in).
@@ -419,7 +419,8 @@ export class Element extends ElementBase implements DataContextObject, Reference
   set y(value: number) { this.template.y.set(this, value); }
   get typeString() { return this.template.typeString.get(this); }
   set typeString(value: string) { this.template.typeString.set(this, value); }
-  get elements() { return this.template.elements.get(this) as List<ElementTypes>; }
+  get element() { return this.template.element.get(this) as Element; }
+  set element(value: ElementBase) { this.template.element.set(this, value); }
 
   constructor(context: FunctionchartContext, template: ElementTemplate, id: number) {
     super(id);
@@ -1497,7 +1498,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       selection.delete(element);
       const newElement = self.exportElement(element);
       self.replaceElement(element, newElement);
-      newElement.elements.append(element);  // newElement owns the base element.
+      newElement.element = element;  // newElement owns the base element.
       selection.add(newElement);
     });
   }

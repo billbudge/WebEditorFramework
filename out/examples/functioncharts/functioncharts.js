@@ -216,7 +216,7 @@ export function parseTypeString(s) {
 //------------------------------------------------------------------------------
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), functionchartProp = new ReferenceProp('functionchart'), elementsProp = new ChildArrayProp('elements');
+const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), functionchartProp = new ReferenceProp('functionchart'), elementProp = new ScalarProp('elements'); // TODO change name after fixing files
 class NonWireTemplate {
     constructor() {
         this.id = idProp;
@@ -229,8 +229,8 @@ class ElementTemplate extends NonWireTemplate {
         super();
         this.name = nameProp;
         this.typeString = typeStringProp;
-        this.elements = elementsProp;
-        this.properties = [this.id, this.x, this.y, this.name, this.typeString, this.elements];
+        this.element = elementProp;
+        this.properties = [this.id, this.x, this.y, this.name, this.typeString, this.element];
         this.typeName = typeName;
     }
 }
@@ -321,7 +321,8 @@ export class Element extends ElementBase {
     set y(value) { this.template.y.set(this, value); }
     get typeString() { return this.template.typeString.get(this); }
     set typeString(value) { this.template.typeString.set(this, value); }
-    get elements() { return this.template.elements.get(this); }
+    get element() { return this.template.element.get(this); }
+    set element(value) { this.template.element.set(this, value); }
     constructor(context, template, id) {
         super(id);
         this.context = context;
@@ -1219,7 +1220,7 @@ export class FunctionchartContext extends EventBase {
             selection.delete(element);
             const newElement = self.exportElement(element);
             self.replaceElement(element, newElement);
-            newElement.elements.append(element); // newElement owns the base element.
+            newElement.element = element; // newElement owns the base element.
             selection.add(newElement);
         });
     }

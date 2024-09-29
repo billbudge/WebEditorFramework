@@ -69,6 +69,16 @@ class DataList {
         this.prop = prop;
     }
 }
+export class ChildProp {
+    get(owner) {
+        return owner[this.cacheKey];
+    }
+    constructor(name) {
+        this.name = name;
+        this.internalName = '_' + name;
+        this.cacheKey = Symbol.for(name);
+    }
+}
 export class ChildArrayProp {
     get(owner) {
         let list = owner[this.cacheKey];

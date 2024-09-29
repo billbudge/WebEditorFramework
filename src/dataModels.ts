@@ -15,7 +15,7 @@ export interface DataContext {
   construct(typeName: string) : DataContextObject;
 }
 
-export interface DataContextObject {
+export interface DataContextObject<T = any> {
   readonly template: DataObjectTemplate;
   readonly context: DataContext;
 }
@@ -128,6 +128,21 @@ class DataList implements List {
   constructor(owner: DataContextObject, prop: ChildArrayProp) {
     this.owner = owner;
     this.prop = prop;
+  }
+}
+
+export class ChildProp<T extends DataContextObject = DataContextObject> {
+  readonly name: string;
+  readonly internalName: string;
+  readonly cacheKey: symbol;
+
+  get(owner: DataContextObject) : DataContextObject {
+    return (owner as any)[this.cacheKey];
+  }
+  constructor(name: string) {
+    this.name = name;
+    this.internalName = '_' + name;
+    this.cacheKey = Symbol.for(name);
   }
 }
 
