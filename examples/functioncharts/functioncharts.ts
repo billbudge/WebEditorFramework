@@ -256,8 +256,7 @@ export function parseTypeString(s: string) : Type {
 
 //------------------------------------------------------------------------------
 
-// Implement type-safe interfaces as well as a raw data interface for
-// cloning, serialization, etc.
+// Properties and templates for the raw data interface for cloning, serialization, etc.
 
 const idProp = new IdProp('id'),
       xProp = new ScalarProp('x'),
@@ -287,11 +286,20 @@ class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
   readonly name = nameProp;
   readonly typeString = typeStringProp;
-  readonly element = elementProp;  // Currently only used by 'export' element. Maybe change name to 'functionref'?
-  readonly properties = [this.id, this.x, this.y, this.name, this.typeString, this.element];
+  readonly properties = [this.id, this.x, this.y, this.name, this.typeString];
   constructor(typeName: ElementType) {
     super();
     this.typeName = typeName;
+  }
+}
+
+// An element that is derived from another element, which becomes the child of this element.
+// Currently used only for the 'export' element.
+class DerivedElementTemplate extends ElementTemplate {
+  readonly element = elementProp;
+  readonly properties = [this.id, this.x, this.y, this.name, this.typeString, this.element];
+  constructor() {
+    super('export');
   }
 }
 
@@ -339,7 +347,7 @@ const literalTemplate = new ElementTemplate('literal'),
       condTemplate = new ElementTemplate('cond'),
       storeTemplate = new ElementTemplate('store'),
       importTemplate = new ElementTemplate('import'),
-      exportTemplate = new ElementTemplate('export'),
+      exportTemplate = new DerivedElementTemplate(),
       elementTemplate = new ElementTemplate('element'),
       inputTemplate = new PseudoelementTemplate('input'),
       outputTemplate = new PseudoelementTemplate('output'),
@@ -352,7 +360,12 @@ const defaultPoint = { x: 0, y: 0 },
       defaultBezierCurve: BezierCurve = [
           defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal];
 
-abstract class ElementBase {
+// Type safe interfaces over the raw templated data.
+
+// Base element class to implement type fields, and incoming/outgoing wire arrays.
+abstract class ElementBase<T extends NonWireTemplate> {
+  readonly template: T;
+  readonly context: FunctionchartContext;
   readonly id: number;
 
   // Derived properties, managed by the FunctionchartContext.
@@ -370,6 +383,8 @@ abstract class ElementBase {
   inWires = new Array<Wire | undefined>();   // one input per pin (no fan in).
   outWires = new Array<Array<Wire>>();       // multiple outputs per pin (fan out).
 
+  // These methods work for all element types except DerivedElement, where they are shadowed by
+  // its different implementations.
   get bounds() : Rect {
     const global = this.globalPosition,
           x = global.x,
@@ -404,35 +419,44 @@ abstract class ElementBase {
     return { x: rect.x + w, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
   }
 
-  constructor(id: number) {
+  constructor(template: T, context: FunctionchartContext, id: number) {
+    this.template = template;
+    this.context = context;
     this.id = id;
   }
 }
 
-export class Element extends ElementBase implements DataContextObject, ReferencedObject {
-  readonly template: ElementTemplate;
-  readonly context: FunctionchartContext;
-
+export class Element extends ElementBase<ElementTemplate> implements DataContextObject, ReferencedObject {
   get x() { return this.template.x.get(this) || 0; }
   set x(value: number) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
   set y(value: number) { this.template.y.set(this, value); }
   get typeString() { return this.template.typeString.get(this); }
   set typeString(value: string) { this.template.typeString.set(this, value); }
-  get element() { return this.template.element.get(this) as Element; }
-  set element(value: ElementBase) { this.template.element.set(this, value); }
 
-  constructor(context: FunctionchartContext, template: ElementTemplate, id: number) {
-    super(id);
-    this.context = context;
-    this.template = template;
+  constructor(template: ElementTemplate, context: FunctionchartContext, id: number) {
+    super(template, context,  id);
   }
 }
 
-export class Pseudoelement extends ElementBase implements DataContextObject, ReferencedObject {
-  readonly template: PseudoelementTemplate;
-  readonly context: FunctionchartContext;
+export class DerivedElement extends ElementBase<DerivedElementTemplate> {
+  get x() { return this.template.x.get(this) || 0; }
+  set x(value: number) { this.template.x.set(this, value); }
+  get y() { return this.template.y.get(this) || 0; }
+  set y(value: number) { this.template.y.set(this, value); }
+  get typeString() { return this.template.typeString.get(this); }
+  set typeString(value: string) { this.template.typeString.set(this, value); }
 
+  get element() { return this.template.element.get(this) as Element; }
+  set element(value: ElementTypes) { this.template.element.set(this, value); }
+
+  // TODO 'override' the base class methods.
+  constructor(template: DerivedElementTemplate, context: FunctionchartContext, id: number) {
+    super(template, context, id);
+  }
+}
+
+export class Pseudoelement extends ElementBase<PseudoelementTemplate> implements DataContextObject, ReferencedObject {
   get x() { return this.template.x.get(this) || 0; }
   set x(value: number) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
@@ -444,9 +468,7 @@ export class Pseudoelement extends ElementBase implements DataContextObject, Ref
   // index: number = -1;
 
   constructor(context: FunctionchartContext, template: PseudoelementTemplate, id: number) {
-    super(id);
-    this.context = context;
-    this.template = template;
+    super(template, context, id);
 
     switch (this.template.typeName) {
       case 'input':
@@ -567,10 +589,7 @@ export class Functionchart implements DataContextObject {
   }
 }
 
-export class FunctionInstance extends ElementBase implements DataContextObject, ReferencedObject {
-  readonly template = functionInstanceTemplate;
-  readonly context: FunctionchartContext;
-
+export class FunctionInstance extends ElementBase<FunctionInstanceTemplate> implements DataContextObject, ReferencedObject {
   get x() { return this.template.x.get(this) || 0; }
   set x(value: number) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
@@ -579,8 +598,7 @@ export class FunctionInstance extends ElementBase implements DataContextObject, 
   set functionchart(value: Functionchart) { this.template.functionchart.set(this, value); }
 
   constructor(context: FunctionchartContext, id: number) {
-    super(id);
-    this.context = context;
+    super(functionInstanceTemplate, context, id);
   }
 }
 
@@ -715,10 +733,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         template = importTemplate;
         typeString = Type.emptyTypeString;
         break;
-      case 'export':
-        template = exportTemplate;
-        typeString = Type.emptyTypeString;
-        break;
       case 'element':
         template = elementTemplate;
         typeString = Type.emptyTypeString;
@@ -726,7 +740,25 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       default: throw new Error('Unknown element type: ' + typeName);
     }
 
-    const result: Element = new Element(this, template, nextId);
+    const result = new Element(template, this, nextId);
+    result.typeString = typeString;
+    this.referentMap.set(nextId, result);
+    return result;
+  }
+  newDerivedElement(typeName: ElementType) : DerivedElement {
+    const nextId = ++this.highestId;
+    let template: DerivedElementTemplate,
+        typeString: string;
+    switch (typeName) {
+      case 'export': {
+        template = exportTemplate;
+        typeString = Type.emptyTypeString;
+        break;
+      }
+      default: throw new Error('Unknown derived element type: ' + typeName);
+    }
+
+    const result = new DerivedElement(template, this, nextId);
     result.typeString = typeString;
     this.referentMap.set(nextId, result);
     return result;
@@ -1048,7 +1080,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     selection.set(roots.reverse());
   }
 
-  disconnectElement(element: ElementBase) {
+  disconnectElement(element: ElementTypes) {
     const self = this;
     element.inWires.forEach(wire => {
       if (wire)
@@ -1482,14 +1514,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.deleteItem(element);
   }
 
-  exportElement(element: Element | FunctionInstance) : Element {
-    const result = this.newElement('export'),
+  exportElement(element: Element | FunctionInstance) : DerivedElement {
+    const result = this.newDerivedElement('export'),
           newType = new Type([], [new Pin(element.type.copyUnlabeled(), element.type.name)]);
     result.typeString = newType.toString();
     return result;
   }
 
-  exportElements(elements: (Element | FunctionInstance)[]) {
+  exportElements(elements: (Element | DerivedElement | FunctionInstance)[]) {
     const self = this,
           selection = this.selection;
 
@@ -1987,9 +2019,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'unop':
       case 'cond':
       case 'import':
-      case 'export':
       case 'store':
       case 'element': return this.newElement(typeName);
+
+      case 'export': return this.newDerivedElement(typeName);
 
       case 'input':
       case 'output': return this.newPseudoelement(typeName);

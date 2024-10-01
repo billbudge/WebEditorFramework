@@ -214,9 +214,8 @@ export function parseTypeString(s) {
     return type;
 }
 //------------------------------------------------------------------------------
-// Implement type-safe interfaces as well as a raw data interface for
-// cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), functionchartProp = new ReferenceProp('functionchart'), elementProp = new ScalarProp('elements'); // TODO change name after fixing files
+// Properties and templates for the raw data interface for cloning, serialization, etc.
+const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), functionchartProp = new ReferenceProp('functionchart'), elementProp = new ScalarProp('element');
 class NonWireTemplate {
     constructor() {
         this.id = idProp;
@@ -229,9 +228,17 @@ class ElementTemplate extends NonWireTemplate {
         super();
         this.name = nameProp;
         this.typeString = typeStringProp;
+        this.properties = [this.id, this.x, this.y, this.name, this.typeString];
+        this.typeName = typeName;
+    }
+}
+// An element that is derived from another element, which becomes the child of this element.
+// Currently used only for the 'export' element.
+class DerivedElementTemplate extends ElementTemplate {
+    constructor() {
+        super('export');
         this.element = elementProp;
         this.properties = [this.id, this.x, this.y, this.name, this.typeString, this.element];
-        this.typeName = typeName;
     }
 }
 class PseudoelementTemplate extends NonWireTemplate {
@@ -273,10 +280,12 @@ class FunctionInstanceTemplate extends NonWireTemplate {
         this.properties = [this.id, this.x, this.y, this.functionchart];
     }
 }
-const literalTemplate = new ElementTemplate('literal'), binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), storeTemplate = new ElementTemplate('store'), importTemplate = new ElementTemplate('import'), exportTemplate = new ElementTemplate('export'), elementTemplate = new ElementTemplate('element'), inputTemplate = new PseudoelementTemplate('input'), outputTemplate = new PseudoelementTemplate('output'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
+const literalTemplate = new ElementTemplate('literal'), binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), storeTemplate = new ElementTemplate('store'), importTemplate = new ElementTemplate('import'), exportTemplate = new DerivedElementTemplate(), elementTemplate = new ElementTemplate('element'), inputTemplate = new PseudoelementTemplate('input'), outputTemplate = new PseudoelementTemplate('output'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
+// Type safe interfaces over the raw templated data.
+// Base element class to implement type fields, and incoming/outgoing wire arrays.
 class ElementBase {
     get type() { return this._type; }
     set type(type) {
@@ -284,6 +293,8 @@ class ElementBase {
         this._flatType = type.toFlatType();
     }
     get flatType() { return this._flatType; }
+    // These methods work for all element types except DerivedElement, where they are shadowed by
+    // its different implementations.
     get bounds() {
         const global = this.globalPosition, x = global.x, y = global.y, type = this.flatType, // draw flat type
         width = type.width, height = type.height;
@@ -304,13 +315,15 @@ class ElementBase {
         const rect = this.bounds, w = rect.width, type = this.flatType, pin = type.outputs[index];
         return { x: rect.x + w, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 };
     }
-    constructor(id) {
+    constructor(template, context, id) {
         this.globalPosition = defaultPoint;
         this._type = Type.emptyType;
-        // Flat type is derived from type, except that all pins are value types.
+        // Flat type has the same arity as type, but all pins are value type.
         this._flatType = Type.emptyType;
         this.inWires = new Array(); // one input per pin (no fan in).
         this.outWires = new Array(); // multiple outputs per pin (fan out).
+        this.template = template;
+        this.context = context;
         this.id = id;
     }
 }
@@ -321,12 +334,22 @@ export class Element extends ElementBase {
     set y(value) { this.template.y.set(this, value); }
     get typeString() { return this.template.typeString.get(this); }
     set typeString(value) { this.template.typeString.set(this, value); }
+    constructor(template, context, id) {
+        super(template, context, id);
+    }
+}
+export class DerivedElement extends ElementBase {
+    get x() { return this.template.x.get(this) || 0; }
+    set x(value) { this.template.x.set(this, value); }
+    get y() { return this.template.y.get(this) || 0; }
+    set y(value) { this.template.y.set(this, value); }
+    get typeString() { return this.template.typeString.get(this); }
+    set typeString(value) { this.template.typeString.set(this, value); }
     get element() { return this.template.element.get(this); }
     set element(value) { this.template.element.set(this, value); }
-    constructor(context, template, id) {
-        super(id);
-        this.context = context;
-        this.template = template;
+    // TODO 'override' the base class methods.
+    constructor(template, context, id) {
+        super(template, context, id);
     }
 }
 export class Pseudoelement extends ElementBase {
@@ -339,9 +362,7 @@ export class Pseudoelement extends ElementBase {
     // Derived properties.
     // index: number = -1;
     constructor(context, template, id) {
-        super(id);
-        this.context = context;
-        this.template = template;
+        super(template, context, id);
         switch (this.template.typeName) {
             case 'input':
                 this.typeString = '[,v]';
@@ -431,9 +452,7 @@ export class FunctionInstance extends ElementBase {
     get functionchart() { return this.template.functionchart.get(this); }
     set functionchart(value) { this.template.functionchart.set(this, value); }
     constructor(context, id) {
-        super(id);
-        this.template = functionInstanceTemplate;
-        this.context = context;
+        super(functionInstanceTemplate, context, id);
     }
 }
 function getBounds(items) {
@@ -516,17 +535,29 @@ export class FunctionchartContext extends EventBase {
                 template = importTemplate;
                 typeString = Type.emptyTypeString;
                 break;
-            case 'export':
-                template = exportTemplate;
-                typeString = Type.emptyTypeString;
-                break;
             case 'element':
                 template = elementTemplate;
                 typeString = Type.emptyTypeString;
                 break;
             default: throw new Error('Unknown element type: ' + typeName);
         }
-        const result = new Element(this, template, nextId);
+        const result = new Element(template, this, nextId);
+        result.typeString = typeString;
+        this.referentMap.set(nextId, result);
+        return result;
+    }
+    newDerivedElement(typeName) {
+        const nextId = ++this.highestId;
+        let template, typeString;
+        switch (typeName) {
+            case 'export': {
+                template = exportTemplate;
+                typeString = Type.emptyTypeString;
+                break;
+            }
+            default: throw new Error('Unknown derived element type: ' + typeName);
+        }
+        const result = new DerivedElement(template, this, nextId);
         result.typeString = typeString;
         this.referentMap.set(nextId, result);
         return result;
@@ -1209,7 +1240,7 @@ export class FunctionchartContext extends EventBase {
         this.deleteItem(element);
     }
     exportElement(element) {
-        const result = this.newElement('export'), newType = new Type([], [new Pin(element.type.copyUnlabeled(), element.type.name)]);
+        const result = this.newDerivedElement('export'), newType = new Type([], [new Pin(element.type.copyUnlabeled(), element.type.name)]);
         result.typeString = newType.toString();
         return result;
     }
@@ -1657,9 +1688,9 @@ export class FunctionchartContext extends EventBase {
             case 'unop':
             case 'cond':
             case 'import':
-            case 'export':
             case 'store':
             case 'element': return this.newElement(typeName);
+            case 'export': return this.newDerivedElement(typeName);
             case 'input':
             case 'output': return this.newPseudoelement(typeName);
             case 'wire': return this.newWire(undefined, -1, undefined, -1);
