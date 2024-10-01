@@ -1200,7 +1200,7 @@ export class FunctionchartContext extends EventBase {
         this.deleteItem(element);
     }
     exportElement(element) {
-        const result = this.newDerivedElement('export'), newType = new Type([], [new Pin(element.type.copyUnlabeled(), element.type.name)]);
+        const result = this.newDerivedElement('export'), newType = new Type([], [new Pin(element.type.copyUnlabeled())]);
         result.typeString = newType.toString();
         return result;
     }
@@ -1759,6 +1759,11 @@ class Renderer {
                 width = item.width;
                 height = item.height;
             }
+            else if (item instanceof DerivedElement) {
+                const type = item.flatType, innerType = item.element.flatType, spacing = this.theme.spacing;
+                width = innerType.width + 2 * spacing + type.width;
+                height = Math.max(innerType.height + 2 * spacing, type.height);
+            }
             else {
                 // Element, DerivedElement, Pseudoelement, FunctionInstance.
                 const type = item.flatType;
@@ -1957,7 +1962,16 @@ class Renderer {
                 ctx.fill();
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.stroke();
-                this.drawType(element.flatType, x, y);
+                if (element instanceof DerivedElement) {
+                    const innerType = element.element.flatType;
+                    ctx.rect(x + spacing, y + spacing, innerType.width, innerType.height);
+                    ctx.stroke();
+                    this.drawType(innerType, x + spacing, y + spacing);
+                    this.drawType(element.flatType, x + innerType.width + 2 * spacing, y);
+                }
+                else {
+                    this.drawType(element.flatType, x, y);
+                }
                 break;
             }
             case RenderMode.Highlight:
