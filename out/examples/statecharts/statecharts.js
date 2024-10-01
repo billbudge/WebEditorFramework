@@ -899,7 +899,7 @@ export class StatechartContext extends EventBase {
 }
 //------------------------------------------------------------------------------
 class StatechartTheme extends Theme {
-    constructor(theme, radius = 8) {
+    constructor(theme = new Theme(), radius = 8) {
         super();
         this.textIndent = 8;
         this.textLeading = 6;
@@ -949,8 +949,8 @@ var RenderMode;
     RenderMode[RenderMode["Print"] = 3] = "Print";
 })(RenderMode || (RenderMode = {}));
 class Renderer {
-    constructor(theme) {
-        this.theme = new StatechartTheme(theme);
+    constructor(theme = new StatechartTheme()) {
+        this.theme = theme;
     }
     begin(ctx) {
         this.ctx = ctx;
@@ -971,7 +971,7 @@ class Renderer {
         }
         return { width: width, height: height };
     }
-    getItemRect(item) {
+    getBounds(item) {
         let x, y, width, height;
         if (item instanceof Transition) {
             const extents = getExtents(item.bezier);
@@ -998,10 +998,10 @@ class Renderer {
         }
         return { x, y, width, height };
     }
-    getBounds(items) {
+    sumBounds(items) {
         let first = true, xmin = 0, ymin = 0, xmax = 0, ymax = 0;
         for (let item of items) {
-            const rect = this.getItemRect(item);
+            const rect = this.getBounds(item);
             if (first) {
                 xmin = rect.x;
                 xmax = rect.x + rect.width;
@@ -1019,13 +1019,13 @@ class Renderer {
         return { x: xmin, y: ymin, width: xmax - xmin, height: ymax - ymin };
     }
     statePointToParam(state, p) {
-        const r = this.theme.radius, rect = this.getItemRect(state);
+        const r = this.theme.radius, rect = this.getBounds(state);
         if (state instanceof State)
             return rectPointToParam(rect.x, rect.y, rect.width, rect.height, p);
         return circlePointToParam(rect.x + r, rect.y + r, p);
     }
     stateParamToPoint(state, t) {
-        const r = this.theme.radius, rect = this.getItemRect(state);
+        const r = this.theme.radius, rect = this.getBounds(state);
         if (state instanceof State)
             return roundRectParamToPoint(rect.x, rect.y, rect.width, rect.height, r, t);
         return circleParamToPoint(rect.x + r, rect.y + r, r, t);
@@ -1105,7 +1105,7 @@ class Renderer {
         // TODO bound transitions too.
         if (states.length) {
             // Get extents of contents.
-            const r = this.getBounds(states.asArray()), x = r.x - statechartX, // Get position in statechart coordinates.
+            const r = this.sumBounds(states.asArray()), x = r.x - statechartX, // Get position in statechart coordinates.
             y = r.y - statechartY, xMin = Math.min(0, x - padding), yMin = Math.min(0, y - padding), xMax = x + r.width + padding, yMax = y + r.height + padding, width = xMax - xMin, height = yMax - yMin;
             // Set width and height. Statechart x, y are calculated by the parent state layout.
             if (statechart.width != width)
@@ -1120,7 +1120,7 @@ class Renderer {
         if (!p1 || !p2)
             return;
         function getCenter(state) {
-            const bbox = self.getItemRect(state);
+            const bbox = self.getBounds(state);
             return {
                 x: bbox.x + bbox.width * 0.5,
                 y: bbox.y + bbox.height * 0.5,
@@ -1189,7 +1189,7 @@ class Renderer {
         return hitTestRect(x - r, y - r, d, d, p, tol);
     }
     drawState(state, mode) {
-        const ctx = this.ctx, theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y, w = rect.width, h = rect.height, textSize = theme.fontSize, lineBase = y + textSize + theme.textLeading;
+        const ctx = this.ctx, theme = this.theme, r = theme.radius, rect = this.getBounds(state), x = rect.x, y = rect.y, w = rect.width, h = rect.height, textSize = theme.fontSize, lineBase = y + textSize + theme.textLeading;
         roundRectPath(x, y, w, h, r, ctx);
         switch (mode) {
             case RenderMode.Normal:
@@ -1246,7 +1246,7 @@ class Renderer {
         }
     }
     hitTestState(state, p, tol, mode) {
-        const theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y, w = rect.width, h = rect.height, inner = hitTestRect(x, y, w, h, p, tol); // TODO hitTestRoundRect
+        const theme = this.theme, r = theme.radius, rect = this.getBounds(state), x = rect.x, y = rect.y, w = rect.width, h = rect.height, inner = hitTestRect(x, y, w, h, p, tol); // TODO hitTestRoundRect
         if (inner) {
             const lineBase = y + theme.fontSize + theme.textLeading, result = new StateHitResult(state, inner);
             if (mode !== RenderMode.Print && this.hitTestArrow(x + w + theme.arrowSize, lineBase, p, tol))
@@ -1255,7 +1255,7 @@ class Renderer {
         }
     }
     drawPseudoState(pseudostate, mode) {
-        const ctx = this.ctx, theme = this.theme, r = theme.radius, rect = this.getItemRect(pseudostate), x = rect.x, y = rect.y, cx = x + r, cy = y + r;
+        const ctx = this.ctx, theme = this.theme, r = theme.radius, rect = this.getBounds(pseudostate), x = rect.x, y = rect.y, cx = x + r, cy = y + r;
         function drawGlyph(glyph, cx, cy) {
             for (let i = 0; i < glyph.length; i += 4) {
                 ctx.moveTo(cx + glyph[i], cy + glyph[i + 1]);
@@ -1320,7 +1320,7 @@ class Renderer {
         }
     }
     hitTestPseudoState(state, p, tol, mode) {
-        const theme = this.theme, r = theme.radius, rect = this.getItemRect(state), x = rect.x, y = rect.y, inner = hitTestDisk(x + r, y + r, r, p, tol);
+        const theme = this.theme, r = theme.radius, rect = this.getBounds(state), x = rect.x, y = rect.y, inner = hitTestDisk(x + r, y + r, r, p, tol);
         if (inner) {
             const result = new PseudostateHitResult(state, inner);
             if (mode !== RenderMode.Print && state.template.typeName !== 'stop' &&
@@ -1331,7 +1331,7 @@ class Renderer {
         }
     }
     drawStatechart(statechart, mode) {
-        const ctx = this.ctx, theme = this.theme, r = theme.radius, textSize = theme.fontSize, rect = this.getItemRect(statechart), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
+        const ctx = this.ctx, theme = this.theme, r = theme.radius, textSize = theme.fontSize, rect = this.getBounds(statechart), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
         switch (mode) {
             case RenderMode.Normal:
             case RenderMode.Print:
@@ -1350,7 +1350,7 @@ class Renderer {
         }
     }
     hitTestStatechart(statechart, p, tol, mode) {
-        const theme = this.theme, r = theme.radius, rect = this.getItemRect(statechart), x = rect.x, y = rect.y, w = rect.width, h = rect.height, inner = hitTestRect(x, y, w, h, p, tol);
+        const theme = this.theme, r = theme.radius, rect = this.getBounds(statechart), x = rect.x, y = rect.y, w = rect.width, h = rect.height, inner = hitTestRect(x, y, w, h, p, tol);
         if (inner) {
             return new StatechartHitResult(statechart, inner);
         }
@@ -1547,13 +1547,13 @@ class TransitionDrag {
     }
 }
 export class StatechartEditor {
-    constructor(theme, canvasController, paletteController, propertyGridController) {
+    constructor(baseTheme, canvasController, paletteController, propertyGridController) {
         this.scrap = [];
         this.clickInPalette = false;
         this.moveCopy = false;
         this.propertyInfo = new Map();
         const self = this;
-        this.theme = new StatechartTheme(theme);
+        this.theme = new StatechartTheme(baseTheme);
         this.canvasController = canvasController;
         this.paletteController = paletteController;
         this.propertyGridController = propertyGridController;
@@ -1564,7 +1564,7 @@ export class StatechartEditor {
         this.changedItems = new Set();
         // Changed top level states that must be laid out after transactions and undo/redo.
         this.changedTopLevelStates = new Set();
-        const renderer = new Renderer(theme);
+        const renderer = new Renderer(this.theme);
         this.renderer = renderer;
         // Embed the palette items in a statechart so the renderer can do layout and drawing.
         const context = new StatechartContext(), statechart = context.newStatechart(), start = context.newPseudostate('start'), stop = context.newPseudostate('stop'), history = context.newPseudostate('history'), historyDeep = context.newPseudostate('history*'), newState = context.newState();
@@ -1871,7 +1871,7 @@ export class StatechartEditor {
         context.visitAll(statechart, function (item) {
             items.push(item);
         });
-        const bounds = renderer.getBounds(items);
+        const bounds = renderer.sumBounds(items);
         // Adjust all edges 1 pixel out.
         const ctx = new window.C2S(bounds.width + 2, bounds.height + 2);
         ctx.translate(-bounds.x + 1, -bounds.y + 1);
@@ -2246,7 +2246,7 @@ export class StatechartEditor {
                     context.selection.set(context.selectedStates());
                     context.selectInteriorTransitions();
                     context.beginTransaction('group items into super state');
-                    const theme = this.theme, bounds = this.renderer.getBounds(context.selectedStates()), contents = context.selectionContents(), parent = context.getLowestCommonStatechart(...contents);
+                    const theme = this.theme, bounds = this.renderer.sumBounds(context.selectedStates()), contents = context.selectionContents(), parent = context.getLowestCommonStatechart(...contents);
                     expandRect(bounds, theme.radius, theme.radius);
                     const group = context.group(contents, parent, bounds);
                     context.selection.set(group);
