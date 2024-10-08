@@ -131,20 +131,22 @@ class DataList implements List {
   }
 }
 
-export class ChildProp<T extends DataContextObject = DataContextObject> {
-  readonly name: string;
-  readonly internalName: string;
-  readonly cacheKey: symbol;
+// TODO Implement child element properties. This requires changing the element
+// inserted/removed events.
+// export class ChildProp<T extends DataContextObject = DataContextObject> {
+//   readonly name: string;
+//   readonly internalName: string;
+//   readonly cacheKey: symbol;
 
-  get(owner: DataContextObject) : DataContextObject {
-    return (owner as any)[this.cacheKey];
-  }
-  constructor(name: string) {
-    this.name = name;
-    this.internalName = '_' + name;
-    this.cacheKey = Symbol.for(name);
-  }
-}
+//   get(owner: DataContextObject) : DataContextObject {
+//     return (owner as any)[this.cacheKey];
+//   }
+//   constructor(name: string) {
+//     this.name = name;
+//     this.internalName = '_' + name;
+//     this.cacheKey = Symbol.for(name);
+//   }
+// }
 
 export class ChildArrayProp<T extends DataContextObject = DataContextObject> {
   readonly name: string;

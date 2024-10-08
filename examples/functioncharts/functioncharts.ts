@@ -272,7 +272,7 @@ const idProp = new IdProp('id'),
       nonWiresProp = new ChildArrayProp('nonWires'),
       wiresProp = new ChildArrayProp('wires'),
       functionchartProp = new ReferenceProp('functionchart'),
-      elementProp = new ScalarProp('element');
+      elementsProp = new ChildArrayProp('elements');  // Currently used for base element of DerivedElements.
 
 abstract class NonWireTemplate {
   readonly id = idProp;
@@ -286,7 +286,7 @@ class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
   readonly name = nameProp;
   readonly typeString = typeStringProp;
-  readonly properties = [this.id, this.x, this.y, this.name, this.typeString];
+  readonly properties: PropertyTypes[] = [this.id, this.x, this.y, this.name, this.typeString];
   constructor(typeName: ElementType) {
     super();
     this.typeName = typeName;
@@ -296,10 +296,10 @@ class ElementTemplate extends NonWireTemplate {
 // An element that is derived from another element, which becomes the child of this element.
 // Currently used only for the 'export' element.
 class DerivedElementTemplate extends ElementTemplate {
-  readonly element = elementProp;
-  readonly properties = [this.id, this.x, this.y, this.name, this.typeString, this.element];
-  constructor() {
-    super('export');
+  readonly elements = elementsProp;
+  readonly properties = [this.id, this.x, this.y, this.name, this.typeString, this.elements];
+  constructor(typeName: ElementType) {
+    super(typeName);
   }
 }
 
@@ -346,8 +346,8 @@ const literalTemplate = new ElementTemplate('literal'),
       unopTemplate = new ElementTemplate('unop'),
       condTemplate = new ElementTemplate('cond'),
       storeTemplate = new ElementTemplate('store'),
-      importTemplate = new ElementTemplate('import'),
-      exportTemplate = new DerivedElementTemplate(),
+      importTemplate = new DerivedElementTemplate('import'),
+      exportTemplate = new DerivedElementTemplate('export'),
       elementTemplate = new ElementTemplate('element'),
       inputTemplate = new PseudoelementTemplate('input'),
       outputTemplate = new PseudoelementTemplate('output'),
@@ -420,8 +420,8 @@ export class DerivedElement extends ElementBase<DerivedElementTemplate> {
   get typeString() { return this.template.typeString.get(this); }
   set typeString(value: string) { this.template.typeString.set(this, value); }
 
-  get element() { return this.template.element.get(this) as Element; }
-  set element(value: ElementTypes) { this.template.element.set(this, value); }
+  get elements() { return this.template.elements.get(this) as List<ElementTypes>; }
+  get element() { return this.elements.at(0); }
 
   // TODO 'override' the base class methods.
   constructor(template: DerivedElementTemplate, context: FunctionchartContext, id: number) {
@@ -559,7 +559,7 @@ interface ILayoutEngine {
   // Get bounding box for elements, functioncharts, and wires.
   getBounds(items: AllTypes) : Rect;
 
-  // Get position of element input/output pins.
+  // Get wire attachment point for element input/output pins.
   inputPinToPoint(item: NonWireTypes, index: number) : PointWithNormal;
   outputPinToPoint(item: NonWireTypes, index: number) : PointWithNormal;
 }
@@ -669,9 +669,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         typeString = '[vv,v](:=)';
         break;
       case 'import':
-        template = importTemplate;
-        typeString = Type.emptyTypeString;
-        break;
+        return new DerivedElement(importTemplate, this, nextId);
+      case 'export':
+        return new DerivedElement(exportTemplate, this, nextId);
       case 'element':
         template = elementTemplate;
         typeString = Type.emptyTypeString;
@@ -689,11 +689,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     let template: DerivedElementTemplate,
         typeString: string;
     switch (typeName) {
-      case 'export': {
+      case 'import':
+        template = importTemplate;
+        typeString = Type.emptyTypeString;
+        break;
+      case 'export':
         template = exportTemplate;
         typeString = Type.emptyTypeString;
         break;
-      }
       default: throw new Error('Unknown derived element type: ' + typeName);
     }
 
@@ -1460,6 +1463,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
+  importElement(element: Element | FunctionInstance) : DerivedElement {
+    const result = this.newDerivedElement('import'),
+          type = element.type.copyUnlabeled(),
+          inputs = type.inputs.slice();
+    inputs.push(new Pin(type));
+    const newType = new Type(inputs, type.outputs);
+    result.typeString = newType.toString();
+    return result;
+  }
+
   exportElements(elements: (Element | DerivedElement | FunctionInstance)[]) {
     const self = this,
           selection = this.selection;
@@ -1469,19 +1482,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       selection.delete(element);
       const newElement = self.exportElement(element);
       self.replaceElement(element, newElement);
-      newElement.element = element;  // newElement owns the base element.
+      newElement.elements.append(element);  // newElement owns the base element.
       selection.add(newElement);
     });
-  }
-
-  importElement(element: Element | FunctionInstance) : Element {
-    const result = this.newElement('export'),
-          type = element.type.copyUnlabeled(),
-          inputs = type.inputs.slice();
-    inputs.push(new Pin(type));
-    const newType = new Type(inputs, type.outputs);
-    result.typeString = newType.toString();
-    return result;
   }
 
   importElements(elements: (Element | FunctionInstance)[]) {
@@ -1493,6 +1496,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       selection.delete(element);
       const newElement = self.importElement(element);
       self.replaceElement(element, newElement);
+      newElement.elements.append(element);  // newElement owns the base element.
       selection.add(newElement);
     });
   }
@@ -2103,11 +2107,11 @@ class Renderer implements ILayoutEngine {
         width = item.width;
         height = item.height;
       } else if (item instanceof DerivedElement) {
-        const type = item.flatType,
-              innerType = item.element.flatType,
+        const layout = this.derivedElementLayout(item),
+              type = item.flatType,
               spacing = this.theme.spacing;
-        width = innerType.width + 2 * spacing + type.width;
-        height = Math.max(innerType.height + 2 * spacing, type.height);
+        width = layout.innerWidth + layout.inWidth + layout.outWidth;
+        height = Math.max(layout.innerHeight + 2 * spacing, type.height);
       } else {
         // Element, DerivedElement, Pseudoelement, FunctionInstance.
         const type = item.flatType;
@@ -2117,19 +2121,56 @@ class Renderer implements ILayoutEngine {
     }
     return { x, y, width, height };
   }
-  // Get position of element input/output pins.
+  // Get wire attachment point for element input/output pins.
   inputPinToPoint(element: ElementTypes, index: number) : PointWithNormal {
     const rect: Rect = this.getBounds(element),
           type = element.flatType,
           pin = type.inputs[index];
+    if (element instanceof DerivedElement && element.template === importTemplate) {
+      const spacing = this.theme.spacing;
+      if (index === type.inputs.length - 1) {  // The last input pin is on the derived element.
+        return { x: rect.x, y: rect.y + rect.height - spacing, nx: -1, ny: 0 };
+      } else {
+        // All other input pins are on the inner element.
+        const pin = element.element.type.inputs[index];  // TODO flatType?
+        return { x: rect.x + 2 * spacing, y: rect.y + spacing + pin.y + pin.type.height / 2, nx: -1, ny: 0 }
+      }
+    }
     return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 }
   }
   outputPinToPoint(element: ElementTypes, index: number) : PointWithNormal {
     const rect: Rect = this.getBounds(element),
-          w = rect.width,
           type = element.flatType,
           pin = type.outputs[index];
-    return { x: rect.x + w, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
+    if (element instanceof DerivedElement) {
+      // Export element has a single output pin.
+      if (element.template === exportTemplate && index === 0) {
+        return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
+      } else if (element.template === importTemplate) {
+        // Import element has outputs for the inner type.
+        const pin = element.element.type.outputs[index],
+              spacing = this.theme.spacing;
+        return { x: rect.x + rect.width - spacing, y: rect.y + spacing + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
+      }
+    }
+    return { x: rect.x + rect.width, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
+  }
+
+  derivedElementLayout(element: DerivedElement) {
+    const innerType = element.element.flatType,
+          innerWidth = innerType.width,
+          innerHeight = innerType.height,
+          spacing = this.theme.spacing;
+    // Derived elements are the size of their inner type, plus width to hold any input / output pins.
+    let inWidth = spacing, outWidth = spacing,
+        inPinY, outPinY;
+    if (element.template === importTemplate) {
+      inWidth += spacing;
+    } else if (element.template === exportTemplate) {
+      outWidth += spacing;
+    }
+
+    return { inWidth, inPinY, outWidth, outPinY, innerWidth, innerHeight };
   }
 
   instancerBounds(functionchart: Functionchart) : Rect {
@@ -2358,14 +2399,23 @@ class Renderer implements ILayoutEngine {
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         ctx.stroke();
-        if (element instanceof DerivedElement) {
-          const innerType = element.element.flatType;
-          ctx.rect(x + spacing, y + spacing, innerType.width, innerType.height);
-          ctx.stroke();
-          this.drawType(innerType, x + spacing, y + spacing);
-          this.drawType(element.flatType, x + innerType.width + 2 * spacing, y);
-        } else {
+        if (!(element instanceof DerivedElement)) {
           this.drawType(element.flatType, x, y);
+        } else {
+          const innerType = element.element.flatType,
+                layout = this.derivedElementLayout(element),
+                innerX  = x + layout.inWidth,
+                innerY = y + spacing;
+          ctx.rect(innerX, innerY, layout.innerWidth, layout.innerHeight);
+          ctx.stroke();
+          this.drawType(innerType, innerX, innerY);
+          if (element.template === importTemplate) {
+            const pin = element.flatType.inputs[2];
+            this.drawPin(pin, x, y + h - spacing - r);
+          } else if (element.template === exportTemplate) {
+            const pin = element.flatType.outputs[0];
+            this.drawPin(pin, x + w - d, y + h / 2 - r);
+          }
         }
         break;
       }
@@ -2465,20 +2515,23 @@ class Renderer implements ILayoutEngine {
           x = rect.x, y = rect.y, width = rect.width, height = rect.height,
           hitInfo = hitTestRect(x, y, width, height, p, tol);
     if (hitInfo) {
-      const result = new ElementHitResult(element, hitInfo),
+      const self = this,
+            spacing = this.theme.spacing,
+            halfSpacing = spacing / 2,
+            result = new ElementHitResult(element, hitInfo),
             type = element.flatType;
-      type.inputs.forEach(function(pin: Pin, i: number) {
-        const pw = pin.type.width, ph = pin.type.height;
-        if (hitTestRect(x, y + pin.y, pw, ph, p, 0)) {
+      for (let i = 0; i < type.inputs.length; i++) {
+        const pinPt = self.inputPinToPoint(element, i);
+        if (hitTestRect(pinPt.x, pinPt.y - halfSpacing, spacing, spacing, p, 0)) {
           result.input = i;
         }
-      });
-      type.outputs.forEach(function(pin: Pin, i: number) {
-        const pw = pin.type.width, ph = pin.type.height;
-        if (hitTestRect(x + width - pw, y + pin.y, pw, ph, p, 0)) {
+      }
+      for (let i = 0; i < type.outputs.length; i++) {
+        const pinPt = self.outputPinToPoint(element, i);
+        if (hitTestRect(pinPt.x - spacing, pinPt.y - halfSpacing, spacing, spacing, p, 0)) {
           result.output = i;
         }
-      });
+      }
       return result;
     }
   }
