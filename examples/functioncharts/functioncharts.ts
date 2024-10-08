@@ -2441,22 +2441,24 @@ class Renderer implements ILayoutEngine {
       case RenderMode.Normal:
       case RenderMode.Palette:
       case RenderMode.Print: {
+        ctx.fillStyle = mode === RenderMode.Palette ? theme.altBgColor : theme.bgColor;
+        ctx.strokeStyle = theme.strokeColor;
         switch (element.template.typeName) {
           case 'input': {
             inFlagPath(x, y, w, h, d, ctx);
+            ctx.fill();
             ctx.lineWidth = 0.5;
             ctx.stroke();
             break;
           }
           case 'output': {
             outFlagPath(x, y, w, h, d, ctx);
+            ctx.fill();
             ctx.lineWidth = 0.5;
             ctx.stroke();
             break;
           }
         }
-        ctx.fillStyle = mode === RenderMode.Palette ? theme.altBgColor : theme.bgColor;
-        ctx.strokeStyle = theme.strokeColor;
         this.drawType(element.flatType, x, y);
         break;
       }
