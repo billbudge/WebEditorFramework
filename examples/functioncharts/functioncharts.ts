@@ -2103,11 +2103,16 @@ class Renderer implements ILayoutEngine {
   inputPinToPoint(element: ElementTypes, index: number) : PointWithNormal {
     const rect: Rect = this.getBounds(element),
           type = element.flatType,
-          inputs = type.inputs,
-          lastInput = inputs.length - 1,
           pin = type.inputs[index];
-    if (element.template === importTemplate && index === lastInput) {
-      return { x: rect.x + pin.type.width / 2, y: rect.y + pin.y + pin.type.height, nx: 0, ny: 1 };
+    // Handle special case of 'import' element's last input.
+    if (element.template === importTemplate) {
+      const inputs = type.inputs,
+            lastInput = inputs.length - 1;
+      if (index === lastInput) {
+        const mid = rect.x + rect.width / 2,
+              bottom = rect.y + rect.height;
+        return { x: mid, y: bottom, nx: 0, ny: 1 };
+      }
     }
     return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 };
   }
@@ -2115,8 +2120,8 @@ class Renderer implements ILayoutEngine {
     const rect: Rect = this.getBounds(element),
           type = element.flatType,
           pin = type.outputs[index];
+    // Handle special case of 'export' element's output.
     if (element instanceof DerivedElement && element.template === exportTemplate) {
-      // Export element has a single output pin 0.
       return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
     }
     return { x: rect.x + rect.width, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
@@ -2268,7 +2273,34 @@ class Renderer implements ILayoutEngine {
         layout(item);
     });
   }
-
+  private drawInputs(type: Type, x: number, y: number, limit: number) {
+    const ctx = this.ctx,
+          spacing = this.theme.spacing;
+    for (let i = 0; i < limit; i++) {
+      const pin = type.inputs[i],
+            name = pin.name;
+      this.drawPin(pin, x, y + pin.y);
+      if (name) {
+        ctx.textAlign = 'left';
+        ctx.fillText(name, x + pin.type.width + spacing, y + pin.baseline);
+      }
+    }
+  }
+  private drawOutputs(type: Type, x: number, y: number, limit: number) {
+    const ctx = this.ctx,
+          spacing = this.theme.spacing,
+          right = x + type.width;
+    for (let i = 0; i < limit; i++) {
+      const pin = type.outputs[i],
+            pinLeft = right - pin.type.width,
+            name = pin.name;
+      this.drawPin(pin, pinLeft, y + pin.y);
+      if (name) {
+        ctx.textAlign = 'right';
+        ctx.fillText(name, pinLeft - spacing, y + pin.baseline);
+      }
+          }
+  }
   drawType(type: Type, x: number, y: number) {
     const self = this, ctx = this.ctx, theme = this.theme,
           textSize = theme.fontSize, spacing = theme.spacing,
@@ -2282,23 +2314,8 @@ class Renderer implements ILayoutEngine {
       ctx.textAlign = 'center';
       ctx.fillText(name, x + w / 2, y + textSize + spacing / 2);
     }
-    type.inputs.forEach(function(pin: Pin, i: number) {
-      const name = pin.name;
-      self.drawPin(pin, x, y + pin.y);
-      if (name) {
-        ctx.textAlign = 'left';
-        ctx.fillText(name, x + pin.type.width + spacing, y + pin.baseline);
-      }
-    });
-    type.outputs.forEach(function(pin) {
-      const name = pin.name,
-            pinLeft = right - pin.type.width;
-      self.drawPin(pin, pinLeft, y + pin.y);
-      if (name) {
-        ctx.textAlign = 'right';
-        ctx.fillText(name, pinLeft - spacing, y + pin.baseline);
-      }
-    });
+    this.drawInputs(type, x, y, type.inputs.length);
+    this.drawOutputs(type, x, y, type.outputs.length);
   }
 
   drawPin(pin: Pin, x: number, y: number) {
@@ -2346,18 +2363,28 @@ class Renderer implements ILayoutEngine {
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         ctx.stroke();
-        if (!(element instanceof DerivedElement)) {
+        const type = element.flatType;
+        if (element instanceof DerivedElement) {
+          const innerType = element.element.flatType,
+                innerX = x + spacing,
+                innerY = y + spacing;
+          ctx.rect(innerX, innerY, innerType.width, innerType.height);
+          ctx.stroke();
+          this.drawType(innerType, innerX, innerY);
+          const pin = element.flatType.outputs[0];
+          this.drawPin(pin, x + w - d, y + h / 2 - r);
+        } else if (element.template === importTemplate) {
+          const lastInput = type.inputs.length - 1;
+          this.drawInputs(type, x, y, lastInput);
+          this.drawOutputs(type, x, y, type.outputs.length);
+          const pin = type.inputs[lastInput];
+          this.drawPin(pin, x + w / 2 - r, y + h - d);
+        } else {
           this.drawType(element.flatType, x, y);
+        }
+        if (!(element instanceof DerivedElement)) {
         } else {
           if (element.template === exportTemplate) {
-            const innerType = element.element.flatType,
-                  innerX = x + spacing,
-                  innerY = y + spacing;
-            ctx.rect(innerX, innerY, innerType.width, innerType.height);
-            ctx.stroke();
-            this.drawType(innerType, innerX, innerY);
-            const pin = element.flatType.outputs[0];
-            this.drawPin(pin, x + w - d, y + h / 2 - r);
           }
         }
         break;
