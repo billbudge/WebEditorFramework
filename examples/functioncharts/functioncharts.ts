@@ -60,14 +60,11 @@ export class Type {
   static readonly emptyPins = [];
   static readonly valueTypeString = 'v';
   static readonly valueType = new Type(Type.emptyPins, Type.emptyPins);
-  static readonly spacerTypeString = ' ';
-  static readonly spacerType = new Type(Type.emptyPins, Type.emptyPins);
   static readonly emptyTypeString = '[,]';
   static readonly emptyType = new Type(Type.emptyPins, Type.emptyPins);
 
   static readonly atomizedTypes = new Map<string, Type>([
     [Type.valueTypeString, Type.valueType],
-    [Type.spacerTypeString, Type.spacerType],
     [Type.emptyTypeString, Type.emptyType],
   ]);
 
@@ -101,8 +98,6 @@ export class Type {
   toString() : string {
     if (this === Type.valueType)
       return Type.valueTypeString;
-    if (this === Type.spacerType)
-      return Type.spacerTypeString;
     let s = '[';
     this.inputs.forEach(input => s += input.toString());
     s += ',';
@@ -161,8 +156,6 @@ export class Type {
   //   return Type.equals(this, dst);
   // }
   private static canConnect(src: Type, dst: Type) : boolean {
-    if (src === Type.spacerType || dst === Type.spacerType)
-      return false;
     return true;
   }
   canConnectTo(dst: Type) : boolean {
@@ -201,11 +194,6 @@ export function parseTypeString(s: string) : Type {
       j++;
       return new Pin(Type.valueType, parseName());
     }
-    // Layout spacer type.
-    if (s[j] === Type.spacerTypeString) {
-      j++;
-      return new Pin(Type.spacerType, parseName());
-    }
     // function types
     let type = parseFunction(),
         typeString = s.substring(i, j);
@@ -217,8 +205,6 @@ export function parseTypeString(s: string) : Type {
     let i = j;
     if (s[j] === Type.valueTypeString || s[j] === '*') {  // TODO remove when files converted
       return Type.valueType;
-    } else if(s[j] === Type.spacerTypeString) {
-      return Type.spacerType;
     } else if (s[j] === '[') {
       j++;
       let inputs = new Array<Pin>, outputs = new Array<Pin>;
@@ -346,7 +332,7 @@ const literalTemplate = new ElementTemplate('literal'),
       unopTemplate = new ElementTemplate('unop'),
       condTemplate = new ElementTemplate('cond'),
       storeTemplate = new ElementTemplate('store'),
-      importTemplate = new DerivedElementTemplate('import'),
+      importTemplate = new ElementTemplate('import'),
       exportTemplate = new DerivedElementTemplate('export'),
       elementTemplate = new ElementTemplate('element'),
       inputTemplate = new PseudoelementTemplate('input'),
@@ -669,7 +655,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         typeString = '[vv,v](:=)';
         break;
       case 'import':
-        return new DerivedElement(importTemplate, this, nextId);
+        template = importTemplate;
+        typeString = Type.emptyTypeString;
+        break;
       case 'export':
         return new DerivedElement(exportTemplate, this, nextId);
       case 'element':
@@ -689,10 +677,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     let template: DerivedElementTemplate,
         typeString: string;
     switch (typeName) {
-      case 'import':
-        template = importTemplate;
-        typeString = Type.emptyTypeString;
-        break;
       case 'export':
         template = exportTemplate;
         typeString = Type.emptyTypeString;
@@ -1211,7 +1195,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       const inputs = element.inWires,
             outputs = element.outWires;
       for (let pin = 0; pin < inputs.length; pin++) {
-        if (element.type.inputs[pin].type === Type.spacerType) continue;
         if (inputs[pin] === undefined) {
           const { input, wire } = self.connectInput(element, pin);
           selection.add(input);
@@ -1219,7 +1202,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         }
       }
       for (let pin = 0; pin < outputs.length; pin++) {
-        if (element.type.outputs[pin].type === Type.spacerType) continue;
         if (outputs[pin].length === 0) {
           const { output, wire } = self.connectOutput(element, pin);
           selection.add(output);
@@ -1463,8 +1445,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
-  importElement(element: Element | FunctionInstance) : DerivedElement {
-    const result = this.newDerivedElement('import'),
+  importElement(element: Element | FunctionInstance) : Element {
+    const result = this.newElement('import'),
           type = element.type.copyUnlabeled(),
           inputs = type.inputs.slice();
     inputs.push(new Pin(type));
@@ -1496,7 +1478,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       selection.delete(element);
       const newElement = self.importElement(element);
       self.replaceElement(element, newElement);
-      newElement.elements.append(element);  // newElement owns the base element.
       selection.add(newElement);
     });
   }
@@ -1609,7 +1590,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     //       if (wire === undefined) {
     //         const connected = new Multimap<ElementTypes, number>();
     //         const pin = element.type.inputs[index];
-    //         if (pin.type === Type.spacerType) return;
     //         const type = self.resolvePinType(element, index, connected) || Type.starType;
     //         const pinInfo = { element, index, type, connected, fcIndex: -1 };
     //         inputs.push(pinInfo);
@@ -1619,7 +1599,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     //       if (wires.length === 0) {
     //         const connected = new Multimap<ElementTypes, number>();
     //         const pin = element.type.outputs[index];
-    //         if (pin.type === Type.spacerType) return;
     //         const firstOutput = element.type.inputs.length;
     //         const type = self.resolvePinType(element, index + firstOutput, connected) || Type.starType;
     //         const pinInfo = { element, index: index + firstOutput, type, connected, fcIndex: -1 };
@@ -2028,7 +2007,7 @@ class FunctionchartTheme extends Theme {
     // Layout the base types.
     const pinSize = 2 * this.knobbyRadius;
     Type.valueType.width = pinSize;
-    Type.valueType.height = Type.spacerType.height = pinSize;
+    Type.valueType.height = pinSize;
   }
 }
 
@@ -2107,13 +2086,12 @@ class Renderer implements ILayoutEngine {
         width = item.width;
         height = item.height;
       } else if (item instanceof DerivedElement) {
-        const layout = this.derivedElementLayout(item),
-              type = item.flatType,
-              spacing = this.theme.spacing;
-        width = layout.innerWidth + layout.inWidth + layout.outWidth;
-        height = Math.max(layout.innerHeight + 2 * spacing, type.height);
+        const spacing = this.theme.spacing,
+              innerType = item.element.flatType;
+        width = innerType.width + 3 * spacing;  // border, plus room for single output pin.
+        height = innerType.height + 2 * spacing;
       } else {
-        // Element, DerivedElement, Pseudoelement, FunctionInstance.
+        // Element, Pseudoelement, FunctionInstance.
         const type = item.flatType;
         width = type.width;
         height = type.height;
@@ -2125,52 +2103,23 @@ class Renderer implements ILayoutEngine {
   inputPinToPoint(element: ElementTypes, index: number) : PointWithNormal {
     const rect: Rect = this.getBounds(element),
           type = element.flatType,
+          inputs = type.inputs,
+          lastInput = inputs.length - 1,
           pin = type.inputs[index];
-    if (element instanceof DerivedElement && element.template === importTemplate) {
-      const spacing = this.theme.spacing;
-      if (index === type.inputs.length - 1) {  // The last input pin is on the derived element.
-        return { x: rect.x, y: rect.y + rect.height - spacing, nx: -1, ny: 0 };
-      } else {
-        // All other input pins are on the inner element.
-        const pin = element.element.type.inputs[index];  // TODO flatType?
-        return { x: rect.x + 2 * spacing, y: rect.y + spacing + pin.y + pin.type.height / 2, nx: -1, ny: 0 }
-      }
+    if (element.template === importTemplate && index === lastInput) {
+      return { x: rect.x + pin.type.width / 2, y: rect.y + pin.y + pin.type.height, nx: 0, ny: 1 };
     }
-    return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 }
+    return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 };
   }
   outputPinToPoint(element: ElementTypes, index: number) : PointWithNormal {
     const rect: Rect = this.getBounds(element),
           type = element.flatType,
           pin = type.outputs[index];
-    if (element instanceof DerivedElement) {
-      // Export element has a single output pin.
-      if (element.template === exportTemplate && index === 0) {
-        return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
-      } else if (element.template === importTemplate) {
-        // Import element has outputs for the inner type.
-        const pin = element.element.type.outputs[index],
-              spacing = this.theme.spacing;
-        return { x: rect.x + rect.width - spacing, y: rect.y + spacing + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
-      }
+    if (element instanceof DerivedElement && element.template === exportTemplate) {
+      // Export element has a single output pin 0.
+      return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
     }
     return { x: rect.x + rect.width, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
-  }
-
-  derivedElementLayout(element: DerivedElement) {
-    const innerType = element.element.flatType,
-          innerWidth = innerType.width,
-          innerHeight = innerType.height,
-          spacing = this.theme.spacing;
-    // Derived elements are the size of their inner type, plus width to hold any input / output pins.
-    let inWidth = spacing, outWidth = spacing,
-        inPinY, outPinY;
-    if (element.template === importTemplate) {
-      inWidth += spacing;
-    } else if (element.template === exportTemplate) {
-      outWidth += spacing;
-    }
-
-    return { inWidth, inPinY, outWidth, outPinY, innerWidth, innerHeight };
   }
 
   instancerBounds(functionchart: Functionchart) : Rect {
@@ -2356,8 +2305,6 @@ class Renderer implements ILayoutEngine {
     const ctx = this.ctx,
           theme = this.theme;
     ctx.strokeStyle = theme.strokeColor;
-    if (pin.type === Type.spacerType)
-      return;
     if (pin.type === Type.valueType) {
       const r = theme.knobbyRadius;
       ctx.beginPath();
@@ -2402,17 +2349,13 @@ class Renderer implements ILayoutEngine {
         if (!(element instanceof DerivedElement)) {
           this.drawType(element.flatType, x, y);
         } else {
-          const innerType = element.element.flatType,
-                layout = this.derivedElementLayout(element),
-                innerX  = x + layout.inWidth,
-                innerY = y + spacing;
-          ctx.rect(innerX, innerY, layout.innerWidth, layout.innerHeight);
-          ctx.stroke();
-          this.drawType(innerType, innerX, innerY);
-          if (element.template === importTemplate) {
-            const pin = element.flatType.inputs[2];
-            this.drawPin(pin, x, y + h - spacing - r);
-          } else if (element.template === exportTemplate) {
+          if (element.template === exportTemplate) {
+            const innerType = element.element.flatType,
+                  innerX = x + spacing,
+                  innerY = y + spacing;
+            ctx.rect(innerX, innerY, innerType.width, innerType.height);
+            ctx.stroke();
+            this.drawType(innerType, innerX, innerY);
             const pin = element.flatType.outputs[0];
             this.drawPin(pin, x + w - d, y + h / 2 - r);
           }
@@ -2725,8 +2668,8 @@ class WireDrag {
   wire: Wire;
   kind: WireDragType;
   description: string;
-  constructor(transition: Wire, type: WireDragType, description: string) {
-    this.wire = transition;
+  constructor(wire: Wire, type: WireDragType, description: string) {
+    this.wire = wire;
     this.kind = type;
     this.description = description;
   }
