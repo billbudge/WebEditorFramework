@@ -2101,7 +2101,7 @@ class Renderer implements ILayoutEngine {
   }
   // Get wire attachment point for element input/output pins.
   inputPinToPoint(element: ElementTypes, index: number) : PointWithNormal {
-    const rect: Rect = this.getBounds(element),
+    const rect = this.getBounds(element),
           type = element.flatType,
           pin = type.inputs[index];
     // Handle special case of 'import' element's last input.
@@ -2117,7 +2117,7 @@ class Renderer implements ILayoutEngine {
     return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 };
   }
   outputPinToPoint(element: ElementTypes, index: number) : PointWithNormal {
-    const rect: Rect = this.getBounds(element),
+    const rect = this.getBounds(element),
           type = element.flatType,
           pin = type.outputs[index];
     // Handle special case of 'export' element's output.
@@ -2125,6 +2125,13 @@ class Renderer implements ILayoutEngine {
       return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
     }
     return { x: rect.x + rect.width, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
+  }
+  pinToRect(pin: Pin, pinPt: PointWithNormal) : Rect {
+    const width = pin.type.width,
+          height = pin.type.height,
+          x = pinPt.x - (pinPt.nx + 1) * width / 2,
+          y = pinPt.y - (pinPt.ny + 1) * height / 2;
+    return { x, y, width, height }
   }
 
   instancerBounds(functionchart: Functionchart) : Rect {
@@ -2493,14 +2500,16 @@ class Renderer implements ILayoutEngine {
             result = new ElementHitResult(element, hitInfo),
             type = element.flatType;
       for (let i = 0; i < type.inputs.length; i++) {
-        const pinPt = self.inputPinToPoint(element, i);
-        if (hitTestRect(pinPt.x, pinPt.y - halfSpacing, spacing, spacing, p, 0)) {
+        const pinPt = self.inputPinToPoint(element, i),
+              rect = self.pinToRect(type.inputs[i], pinPt);
+        if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
           result.input = i;
         }
       }
       for (let i = 0; i < type.outputs.length; i++) {
-        const pinPt = self.outputPinToPoint(element, i);
-        if (hitTestRect(pinPt.x - spacing, pinPt.y - halfSpacing, spacing, spacing, p, 0)) {
+        const pinPt = self.outputPinToPoint(element, i),
+              rect = self.pinToRect(type.outputs[i], pinPt);
+        if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
           result.output = i;
         }
       }

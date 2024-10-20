@@ -1774,6 +1774,10 @@ class Renderer {
         }
         return { x: rect.x + rect.width, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 };
     }
+    pinPointToRect(pin, pinPt) {
+        const width = pin.type.width, height = pin.type.height, x = pinPt.x - (pinPt.nx + 1) * width / 2, y = pinPt.y - (pinPt.ny + 1) * height / 2;
+        return { x, y, width, height };
+    }
     instancerBounds(functionchart) {
         const rect = this.getBounds(functionchart), right = rect.x + rect.width, bottom = rect.y + rect.height, type = functionchart.flatType, width = type.width, height = type.height;
         return { x: right - width - Functionchart.radius,
@@ -2069,14 +2073,14 @@ class Renderer {
         if (hitInfo) {
             const self = this, spacing = this.theme.spacing, halfSpacing = spacing / 2, result = new ElementHitResult(element, hitInfo), type = element.flatType;
             for (let i = 0; i < type.inputs.length; i++) {
-                const pinPt = self.inputPinToPoint(element, i);
-                if (hitTestRect(pinPt.x, pinPt.y - halfSpacing, spacing, spacing, p, 0)) {
+                const pinPt = self.inputPinToPoint(element, i), rect = self.pinPointToRect(type.inputs[i], pinPt);
+                if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
                     result.input = i;
                 }
             }
             for (let i = 0; i < type.outputs.length; i++) {
-                const pinPt = self.outputPinToPoint(element, i);
-                if (hitTestRect(pinPt.x - spacing, pinPt.y - halfSpacing, spacing, spacing, p, 0)) {
+                const pinPt = self.outputPinToPoint(element, i), rect = self.pinPointToRect(type.outputs[i], pinPt);
+                if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
                     result.output = i;
                 }
             }
