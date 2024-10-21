@@ -1,24 +1,29 @@
 # Functioncharts: A Graphical Representation for Functional Programs
-Functioncharts is an experimental graphical programming language and editor. It uses a "node and wire" representation for programs, with values flowing along wires, into elements that perform computations and pass results out along outgoing wires. With appropriate wires and elements we can compute any function.
+Functioncharts are an experimental graphical programming language. They are a "node and wire" representation for programs, with values flowing along wires, into elements that perform computation and pass results out along outgoing wires. This example defines an editor for building functioncharts. There is no support for executing and debugging these programs (yet).
 
-The two principal innovations are:
+"Node and wire" programming systems are nothing new. The two principal innovations that Functioncharts have are:
 
-1. Wires aren't limited to passing pure data types like numbers and strings, but may also pass functions. This gives the language much greater expressive power, like a conventional (textual) functional programming language.
+1. Wires aren't limited to passing simple data types like numbers and strings, but may also pass functions. This gives the diagrams much greater expressive power, similar to a conventional functional programming language. Other programming paradigms like OOP can be expressed by higher order functional programs.
 
-2. Elements aren't limited to a fixed set of primitives like binary addition and multiplication, but may be defined by the user using sub-functioncharts which allow "live grouping" of subcircuits. The sub-functionchart is an editable representation of the new element, allowing us to use a function inside its own definition (the mechanism for iteration and recursion). Functioncharts may be nested to multiple levels, allowing powerful functional idioms such as currying and closures.
+2. Elements aren't limited to a fixed set of primitives like binary addition and multiplication, but may be defined by the user using sub-functioncharts which allow "live grouping" of subcircuits. The sub-functionchart is an editable representation of the new element, allowing us to use a function inside its own definition. This allows recursion, and when structured appropriately, iteration through tail call recursion. Functioncharts may define complete functions, or just partial functions, allowing us to express things like closures.
 
-Since functions can be created and instantiated, more complex programs can be built. This document shows how some classic program structures can be built and discusses the advantages of this approach.
+Since functions can be created and instantiated, more complex programs can be built. This document shows how some common small programs can be built and discusses the potential of this approach for different languages and larger programs.
+
+For our purposes here, we define a simple unitype language like Javascript. This simplifies our diagrams since there is then only one type of pin and wire for the connections.
 
 [Live Demo](https://billbudge.github.io/WebEditorFramework/examples/functioncharts/)
 
 ## Simple expressions
-Circuit elements for built-in operations can be provided by the language, and combined to form useful expressions. Elements have wire input and output pins, of either value, generic, or function type. Pseudoelements are used for various roles, but aren't true functions that calculate anything. They usually have
+Circuit elements for built-in operations can be provided by the language, and combined to form useful expressions. Elements have input and output pins that can be wired together. Input pins can only accept one wire at a time, while an output pin may fan out to multiple elements.
 
-Below is a simple example of an expression to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x === 0, or -1 if x < 0. We use the following built in elements:
+Pseudoelements are used for various roles, but aren't true functions that calculate anything. For now, we have input and output pseudoelements. These specify and potentially assign a name to the inputs and outputs when defining a new element in a functionchart.
 
-1) literal elements (0, 1, 2), which have no inputs and output the literal value.
-2) binary operators (<, >), which take two input values and output a boolean value.
-3) the conditional operator (?), which takes an input value and two generic inputs and outputs the first if the value is true, and the second if the value is false.
+Below is a simple example of an sub-functionchart to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x === 0, or -1 if x < 0. We use the following built in elements:
+
+1) Pseudoelements for the input, 'a', and the output, 'b'.
+3) literal elements (0, 1, -1), which have no inputs and output the literal value.
+3) binary operators (<, >), which take two input values and output a boolean value.
+4) the conditional operator (?), which takes an input value and two generic inputs and outputs the first if the value is true, and the second if the value is false.
 
 The input value x is represented by a pseudoelement, to feed the same value into several function elements. The literals and binary operations have values as inputs and outputs, while the conditional element is more generic, with a single (boolean) value input, and two generic inputs and an output, so it can operate on values or functions.
 
@@ -44,10 +49,10 @@ Since functioncharts can contain instances of themselves, we can define a recurs
   <img src="./resources/factorial.svg"  alt="" title="Recursive definition of factorial function N!.">
 </figure>
 
-We can abstract this a bit by replacing the multiplication element with an abstract binary op. That makes this functionchart look like the classic 'fold' functor.
+We can abstract this a bit by replacing the multiplication element with an abstract binary op. That makes this functionchart look like the a 'fold' or 'reduce' function.
 
 <figure>
-  <img src="./resources/fold.svg"  alt="" title="Factorial function defined using the fold functor.">
+  <img src="./resources/factorial2.svg"  alt="" title="Factorial function defined with fold or reduce function.">
 </figure>
 
 Similarly, we can define a Fibonacci function. We define a helper which takes 3 parameters, and then "call" it with n, 1, 1, to start the iteration.
