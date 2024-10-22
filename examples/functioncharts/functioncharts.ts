@@ -360,8 +360,8 @@ abstract class ElementBase<T extends NonWireTemplate> {
   private _type: Type = Type.emptyType;
   get type() { return this._type; }
   set type(type: Type) {
-    this._type = type;
-    this._flatType = type.toFlatType();
+    this._type = type.atomized();
+    this._flatType = type.toFlatType().atomized();
   }
   // Flat type has the same arity as type, but all pins are value type.
   private _flatType: Type = Type.emptyType;
@@ -505,8 +505,8 @@ export class Functionchart implements DataContextObject {
   private _type: Type = Type.emptyType;
   get type() { return this._type; }
   set type(type: Type) {
-    this._type = type;
-    this._flatType = type.toFlatType();
+    this._type = type.atomized();
+    this._flatType = type.toFlatType().atomized();
   }
   // Flat type is derived from type, except that all pins are value types.
   private _flatType: Type = Type.emptyType;

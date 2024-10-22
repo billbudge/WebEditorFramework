@@ -274,8 +274,8 @@ const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 
 class ElementBase {
     get type() { return this._type; }
     set type(type) {
-        this._type = type;
-        this._flatType = type.toFlatType();
+        this._type = type.atomized();
+        this._flatType = type.toFlatType().atomized();
     }
     get flatType() { return this._flatType; }
     // Get the pin for the element type.
@@ -383,8 +383,8 @@ export class Functionchart {
     get wires() { return this.template.wires.get(this); }
     get type() { return this._type; }
     set type(type) {
-        this._type = type;
-        this._flatType = type.toFlatType();
+        this._type = type.atomized();
+        this._flatType = type.toFlatType().atomized();
     }
     get flatType() { return this._flatType; }
     constructor(context, id) {
@@ -1774,12 +1774,13 @@ class Renderer {
         }
         return { x: rect.x + rect.width, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 };
     }
-    pinPointToRect(pin, pinPt) {
+    pinToRect(pin, pinPt) {
         const width = pin.type.width, height = pin.type.height, x = pinPt.x - (pinPt.nx + 1) * width / 2, y = pinPt.y - (pinPt.ny + 1) * height / 2;
         return { x, y, width, height };
     }
     instancerBounds(functionchart) {
-        const rect = this.getBounds(functionchart), right = rect.x + rect.width, bottom = rect.y + rect.height, type = functionchart.flatType, width = type.width, height = type.height;
+        const rect = this.getBounds(functionchart), right = rect.x + rect.width, bottom = rect.y + rect.height, type = functionchart.type, // Full type.
+        width = type.width, height = type.height;
         return { x: right - width - Functionchart.radius,
             y: bottom - height - Functionchart.radius,
             width, height };
@@ -2038,7 +2039,7 @@ class Renderer {
         }
     }
     drawFunctionchart(functionchart, mode) {
-        const ctx = this.ctx, theme = this.theme, r = Functionchart.radius, rect = this.getBounds(functionchart), x = rect.x, y = rect.y, w = rect.width, h = rect.height, textSize = theme.fontSize;
+        const ctx = this.ctx, theme = this.theme, r = Functionchart.radius, rect = this.getBounds(functionchart), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
         roundRectPath(x, y, w, h, r, ctx);
         switch (mode) {
             case RenderMode.Normal:
@@ -2049,7 +2050,8 @@ class Renderer {
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
-                const type = functionchart.flatType, instancerRect = this.instancerBounds(functionchart);
+                const type = functionchart.type, // Full type.
+                instancerRect = this.instancerBounds(functionchart);
                 ctx.beginPath();
                 ctx.rect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height);
                 ctx.fillStyle = theme.altBgColor;
@@ -2073,13 +2075,13 @@ class Renderer {
         if (hitInfo) {
             const self = this, spacing = this.theme.spacing, halfSpacing = spacing / 2, result = new ElementHitResult(element, hitInfo), type = element.flatType;
             for (let i = 0; i < type.inputs.length; i++) {
-                const pinPt = self.inputPinToPoint(element, i), rect = self.pinPointToRect(type.inputs[i], pinPt);
+                const pinPt = self.inputPinToPoint(element, i), rect = self.pinToRect(type.inputs[i], pinPt);
                 if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
                     result.input = i;
                 }
             }
             for (let i = 0; i < type.outputs.length; i++) {
-                const pinPt = self.outputPinToPoint(element, i), rect = self.pinPointToRect(type.outputs[i], pinPt);
+                const pinPt = self.outputPinToPoint(element, i), rect = self.pinToRect(type.outputs[i], pinPt);
                 if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
                     result.output = i;
                 }
