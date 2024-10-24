@@ -2264,7 +2264,7 @@ class Renderer implements ILayoutEngine {
               margin = 2 * spacing;
         width = extents.x + extents.width - x + margin;
         height = extents.y + extents.height - y + margin;
-        width += type.width;
+        width = Math.max(width, type.width + margin);
         height = Math.max(height, type.height + margin);
       }
       width = Math.max(width, functionChart.width);
@@ -3169,6 +3169,24 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nonWires.forEach(item => items.push(item));
 
     const bounds = renderer.sumBounds(items);
+    // If there is a last selected element, we also render its hover info.
+    const last = context.selection.lastSelected;
+    let hoverHitResult, p;
+    if (last) {
+      const hoverBounds = renderer.getBounds(last),
+            offset = this.theme.spacing * 2;  // offset from bottom right to avoid pins, hit instancer.
+      p = { x: hoverBounds.x + hoverBounds.width - offset,
+            y: hoverBounds.y + hoverBounds.height - offset};
+      hoverHitResult = renderer.hitTest(last, p, 1, RenderMode.Print);
+      if (hoverHitResult) {
+        // The biggest hover info is when we render the full type.
+        const hoverWidth = p.x + last.type.width - bounds.x,
+              hoverHeight = p.y + last.type.height - bounds.y;
+        bounds.width = Math.max(bounds.width, hoverWidth);
+        bounds.height = Math.max(bounds.width, hoverHeight);
+      }
+    }
+
     // Adjust all edges 1 pixel out.
     const ctx = new (window as any).C2S(bounds.width + 2, bounds.height + 2);
     ctx.translate(-bounds.x + 1, -bounds.y + 1);
@@ -3184,6 +3202,8 @@ export class FunctionchartEditor implements CanvasLayer {
     context.visitWires(functionchart, wire => {
       renderer.drawWire(wire, renderMode);
     });
+    if (hoverHitResult && p)
+      renderer.drawHoverInfo(hoverHitResult, p);
 
     renderer.end();
 

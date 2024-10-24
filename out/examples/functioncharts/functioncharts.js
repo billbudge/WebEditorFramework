@@ -1779,8 +1779,7 @@ class Renderer {
         return { x, y, width, height };
     }
     instancerBounds(functionchart) {
-        const rect = this.getBounds(functionchart), right = rect.x + rect.width, bottom = rect.y + rect.height, type = functionchart.type, // Full type.
-        width = type.width, height = type.height;
+        const rect = this.getBounds(functionchart), right = rect.x + rect.width, bottom = rect.y + rect.height, type = functionchart.flatType, width = type.width, height = type.height;
         return { x: right - width - Functionchart.radius,
             y: bottom - height - Functionchart.radius,
             width, height };
@@ -1880,7 +1879,7 @@ class Renderer {
                 const extents = self.sumBounds(nonWires.asArray()), global = functionChart.globalPosition, x = global.x, y = global.y, margin = 2 * spacing;
                 width = extents.x + extents.width - x + margin;
                 height = extents.y + extents.height - y + margin;
-                width += type.width;
+                width = Math.max(width, type.width + margin);
                 height = Math.max(height, type.height + margin);
             }
             width = Math.max(width, functionChart.width);
@@ -2039,7 +2038,7 @@ class Renderer {
         }
     }
     drawFunctionchart(functionchart, mode) {
-        const ctx = this.ctx, theme = this.theme, r = Functionchart.radius, rect = this.getBounds(functionchart), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
+        const ctx = this.ctx, theme = this.theme, r = Functionchart.radius, rect = this.getBounds(functionchart), x = rect.x, y = rect.y, w = rect.width, h = rect.height, textSize = theme.fontSize;
         roundRectPath(x, y, w, h, r, ctx);
         switch (mode) {
             case RenderMode.Normal:
@@ -2050,8 +2049,7 @@ class Renderer {
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
-                const type = functionchart.type, // Full type.
-                instancerRect = this.instancerBounds(functionchart);
+                const type = functionchart.flatType, instancerRect = this.instancerBounds(functionchart);
                 ctx.beginPath();
                 ctx.rect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height);
                 ctx.fillStyle = theme.altBgColor;
@@ -2633,6 +2631,21 @@ export class FunctionchartEditor {
         const items = new Array();
         functionchart.nonWires.forEach(item => items.push(item));
         const bounds = renderer.sumBounds(items);
+        // If there is a last selected element, we also render its hover info.
+        const last = context.selection.lastSelected;
+        let hoverHitResult, p;
+        if (last) {
+            const hoverBounds = renderer.getBounds(last), offset = this.theme.spacing * 2; // offset from bottom right to avoid pins, hit instancer.
+            p = { x: hoverBounds.x + hoverBounds.width - offset,
+                y: hoverBounds.y + hoverBounds.height - offset };
+            hoverHitResult = renderer.hitTest(last, p, 1, RenderMode.Print);
+            if (hoverHitResult) {
+                // The biggest hover info is when we render the full type.
+                const hoverWidth = p.x + last.type.width - bounds.x, hoverHeight = p.y + last.type.height - bounds.y;
+                bounds.width = Math.max(bounds.width, hoverWidth);
+                bounds.height = Math.max(bounds.width, hoverHeight);
+            }
+        }
         // Adjust all edges 1 pixel out.
         const ctx = new window.C2S(bounds.width + 2, bounds.height + 2);
         ctx.translate(-bounds.x + 1, -bounds.y + 1);
@@ -2646,6 +2659,8 @@ export class FunctionchartEditor {
         context.visitWires(functionchart, wire => {
             renderer.drawWire(wire, renderMode);
         });
+        if (hoverHitResult && p)
+            renderer.drawHoverInfo(hoverHitResult, p);
         renderer.end();
         // Write out the SVG file.
         const serializedSVG = ctx.getSerializedSvg();
