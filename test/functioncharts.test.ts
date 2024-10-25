@@ -18,13 +18,14 @@ function addPseudoelement(functionchart: FC.Functionchart, type: FC.Pseudoelemen
   return pseudo;
 }
 
-// function addFunctionInstance(functionchart: FC.Functionchart, of: FC.Functionchart) : FC.FunctionInstance {
-//   const context = functionchart.context,
-//         functionInstance = context.newFunctionInstance();
-//   functionInstance.functionchart = of;
-//   context.addItem(functionInstance, functionchart);
-//   return functionInstance;
-// }
+function addFunctionInstance(
+    functionchart: FC.Functionchart, definition: FC.Functionchart) : FC.FunctionInstance {
+  const context = functionchart.context,
+        functionInstance = context.newFunctionInstance();
+  functionInstance.functionchart = definition;
+  context.addItem(functionInstance, functionchart);
+  return functionInstance;
+}
 
 function addWire(
     functionchart: FC.Functionchart,
@@ -774,5 +775,193 @@ describe('FunctionchartContext', () => {
     expect(rfi1).toBeInstanceOf(FC.FunctionInstance);
     expect(rfi2).toBeInstanceOf(FC.FunctionInstance);
     expect(fc.wires.length).toBe(6);
+  });
+
+  const canAddFunctionchart = {
+    "type": "functionchart",
+    "id": 0,
+    "width": 853.3439201116562,
+    "height": 479.58752822875977,
+    "nonWires": [
+      {
+        "type": "functionchart",
+        "id": 15,
+        "x": 257.8312476873398,
+        "y": 207.09062957763672,
+        "width": 308.9689712524414,
+        "height": 256.49689865112305,
+        "nonWires": [
+          {
+            "type": "functionchart",
+            "id": 12,
+            "x": 49.49687576293945,
+            "y": 11.693740844726562,
+            "width": 234.31880569458008,
+            "height": 228.80315780639648,
+            "nonWires": [
+              {
+                "type": "functionchart",
+                "id": 6,
+                "x": 24.824970245361328,
+                "y": 29.593730926513672,
+                "width": 143.38131713867188,
+                "height": 71.89064025878906,
+                "nonWires": [
+                  {
+                    "type": "binop",
+                    "id": 2,
+                    "x": 56,
+                    "y": 11.1031494140625,
+                    "typeString": "[vv,v](+)"
+                  },
+                  {
+                    "type": "output",
+                    "id": 5,
+                    "x": 109.58438110351562,
+                    "y": 13.128143310546875,
+                    "typeString": "[v,]"
+                  },
+                  {
+                    "type": "input",
+                    "id": 4,
+                    "x": 8,
+                    "y": 37.1031494140625,
+                    "typeString": "[,v]"
+                  },
+                  {
+                    "type": "input",
+                    "id": 3,
+                    "x": 8.365631103515625,
+                    "y": 8,
+                    "typeString": "[,v]"
+                  }
+                ],
+                "wires": [
+                  {
+                    "type": "wire",
+                    "src": 2,
+                    "srcPin": 0,
+                    "dst": 5,
+                    "dstPin": 0
+                  },
+                  {
+                    "type": "wire",
+                    "src": 4,
+                    "srcPin": 0,
+                    "dst": 2,
+                    "dstPin": 1
+                  },
+                  {
+                    "type": "wire",
+                    "src": 3,
+                    "srcPin": 0,
+                    "dst": 2,
+                    "dstPin": 0
+                  }
+                ]
+              },
+              {
+                "type": "functionchart",
+                "id": 7,
+                "x": 44.60011672973633,
+                "y": 120.80938339233398,
+                "width": 143.20623779296875,
+                "height": 91.9937744140625,
+                "nonWires": [
+                  {
+                    "type": "binop",
+                    "id": 8,
+                    "x": 56,
+                    "y": 11.1031494140625,
+                    "typeString": "[vv,v](+)"
+                  },
+                  {
+                    "type": "output",
+                    "id": 9,
+                    "x": 111.20623779296875,
+                    "y": 15.55938720703125,
+                    "typeString": "[v,]"
+                  },
+                  {
+                    "type": "input",
+                    "id": 10,
+                    "x": 8,
+                    "y": 37.1031494140625,
+                    "typeString": "[,v]"
+                  }
+                ],
+                "wires": [
+                  {
+                    "type": "wire",
+                    "src": 8,
+                    "srcPin": 0,
+                    "dst": 9,
+                    "dstPin": 0
+                  },
+                  {
+                    "type": "wire",
+                    "src": 10,
+                    "srcPin": 0,
+                    "dst": 8,
+                    "dstPin": 1
+                  }
+                ]
+              },
+              {
+                "type": "input",
+                "id": 11,
+                "x": 16.878253936767578,
+                "y": 130.32810592651367,
+                "typeString": "[,v]"
+              }
+            ],
+            "wires": [
+              {
+                "type": "wire",
+                "src": 11,
+                "srcPin": 0,
+                "dst": 8,
+                "dstPin": 0
+              }
+            ]
+          }
+        ],
+        "wires": []
+      }
+    ],
+    "wires": []
+  }
+  test('canAddItem', () => {
+    const context = new FC.FunctionchartContext(),
+          functionchart = DataModels.Deserialize(canAddFunctionchart, context) as FC.Functionchart;
+    context.root = functionchart;
+    const greatGrandparent = functionchart.nonWires.at(0) as FC.Functionchart,
+          grandParent = greatGrandparent.nonWires.at(0) as FC.Functionchart,
+          fc1 = grandParent!.nonWires.at(0) as FC.Functionchart,
+          fc2 = grandParent!.nonWires.at(1) as FC.Functionchart;
+    expect(greatGrandparent).toBeInstanceOf(FC.Functionchart);
+    expect(grandParent).toBeInstanceOf(FC.Functionchart);
+    expect(fc1).toBeInstanceOf(FC.Functionchart);
+    expect(fc2).toBeInstanceOf(FC.Functionchart);
+
+    const inst1 = addFunctionInstance(fc1, fc1);  // closed, recursive instantiation.
+    expect(context.isValidFunctionInstance(inst1)).toBe(true);
+    const inst2 = addFunctionInstance(grandParent, fc1);  // closed, scope outside definition.
+    expect(context.isValidFunctionInstance(inst2)).toBe(true);
+    const inst3 = addFunctionInstance(greatGrandparent, fc1);  // closed, next scope out.
+    expect(context.isValidFunctionInstance(inst3)).toBe(true);
+    const inst4 = addFunctionInstance(functionchart, fc1);  // closed, outermost scope.
+    expect(context.isValidFunctionInstance(inst4)).toBe(true);
+
+    const inst5 = addFunctionInstance(fc2, fc2);  // open, recursive instantiation.
+    expect(context.isValidFunctionInstance(inst5)).toBe(true);
+    const inst6 = addFunctionInstance(grandParent, fc2);  // open, scope outside definition.
+    expect(context.isValidFunctionInstance(inst6)).toBe(true);
+    const inst7 = addFunctionInstance(greatGrandparent, fc2);  // open, next scope out, invalid.
+    expect(context.isValidFunctionInstance(inst7)).toBe(false);
+    const inst8 = addFunctionInstance(functionchart, fc2);  // open, outermost scope, invalid.
+    expect(context.isValidFunctionInstance(inst8)).toBe(false);
+    const inst9 = addFunctionInstance(fc1, fc2);  // open, sibling scope, valid.
+    expect(context.isValidFunctionInstance(inst9)).toBe(true);
   });
 });

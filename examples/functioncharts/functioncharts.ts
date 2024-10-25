@@ -511,6 +511,7 @@ export class Functionchart implements DataContextObject {
   // Flat type is derived from type, except that all pins are value types.
   private _flatType: Type = Type.emptyType;
   get flatType() { return this._flatType; }
+  closed: boolean = true;
 
   constructor(context: FunctionchartContext, id: number) {
     this.context = context;
@@ -1236,6 +1237,27 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return srcType.canConnectTo(dstType);
   }
 
+  canAddItem(item: AllTypes, parent: Functionchart) : boolean {
+    if (item instanceof FunctionInstance) {
+      const definition = item.functionchart;
+      // Closed functioncharts can be instantiated anywhere.
+      if (definition.closed)
+        return true;
+      const definitionScope = definition.parent;
+      // Top level functionchart, we can't currently instantiate it but it should be possible. TODO
+      if (!definitionScope)
+        return true;
+      // An open functionchart can only be instantiated in its defining functionchart or the next outer scope.
+      const scope = getLowestCommonAncestor<AllTypes>(item, definition);
+      return scope === definition ||  // recursive
+              scope === definitionScope;  // within scope of definition.
+      }
+    return true;
+  }
+  isValidFunctionInstance(instance: FunctionInstance) : boolean {
+    return this.canAddItem(instance, instance.parent!);
+  }
+
   // Topological sort of elements for update and validation. The circuit should form a DAG.
   // All wires should be valid.
   topologicalSort() : ElementTypes[] {
@@ -1354,6 +1376,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.reverseVisitNonWires(this.functionchart, item => {
       if (item instanceof Functionchart) {
         const typeInfo = self.getFunctionchartTypeInfo(item);
+        item.closed = typeInfo.closed;
         if (typeInfo.typeString !== item.type.toString()) {
           this.updateItem(item);
         }
@@ -2264,6 +2287,7 @@ class Renderer implements ILayoutEngine {
               margin = 2 * spacing;
         width = extents.x + extents.width - x + margin;
         height = extents.y + extents.height - y + margin;
+        // Make sure instancer fits. It may overlap with the contents at the bottom right.
         width = Math.max(width, type.width + margin);
         height = Math.max(height, type.height + margin);
       }
