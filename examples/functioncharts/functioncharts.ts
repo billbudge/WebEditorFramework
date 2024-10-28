@@ -2243,6 +2243,9 @@ class Renderer implements ILayoutEngine {
       this.layoutType(type);
       this.layoutType(element.flatType);
     }
+    if (element instanceof DerivedElement) {
+      this.layoutElement(element.element);
+    }
   }
 
   layoutWire(wire: Wire) {
@@ -2412,11 +2415,6 @@ class Renderer implements ILayoutEngine {
           this.drawPin(pin, x + w / 2 - r, y + h - d);
         } else {
           this.drawType(element.flatType, x, y);
-        }
-        if (!(element instanceof DerivedElement)) {
-        } else {
-          if (element.template === exportTemplate) {
-          }
         }
         break;
       }

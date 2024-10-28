@@ -1868,6 +1868,9 @@ class Renderer {
             this.layoutType(type);
             this.layoutType(element.flatType);
         }
+        if (element instanceof DerivedElement) {
+            this.layoutElement(element.element);
+        }
     }
     layoutWire(wire) {
         let src = wire.src, dst = wire.dst, p1 = wire.pSrc, p2 = wire.pDst;
@@ -2005,12 +2008,6 @@ class Renderer {
                 }
                 else {
                     this.drawType(element.flatType, x, y);
-                }
-                if (!(element instanceof DerivedElement)) {
-                }
-                else {
-                    if (element.template === exportTemplate) {
-                    }
                 }
                 break;
             }
