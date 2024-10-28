@@ -22,7 +22,6 @@ import { types } from '@babel/core';
 
 //------------------------------------------------------------------------------
 
-// TODO Distinguish between fully defined and partially defined function charts.
 // TODO Check validity of function instances during drag-n-drop.
 // TODO Undo should restore functionchart dimensions that grew during layout.
 
@@ -357,7 +356,7 @@ abstract class ElementBase<T extends NonWireTemplate> {
   readonly id: number;
 
   // Derived properties, managed by the FunctionchartContext.
-  parent: Functionchart | undefined;
+  parent: ElementOwnerTypes | undefined;
   globalPosition = defaultPoint;
   private _type: Type = Type.emptyType;
   get type() { return this._type; }
@@ -785,15 +784,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   getContainingFunctionchart(items: AllTypes[]) : Functionchart {
-    let parent = getLowestCommonAncestor<AllTypes>(...items);
-    if (!parent)
+    let owner = getLowestCommonAncestor<AllTypes>(...items);
+    if (!owner)
       return this.functionchart;  // |items| empty.
-    if (!(parent instanceof Functionchart)) {  // |items| is a single element.
-      parent = parent.parent;
+    while (owner instanceof DerivedElement) {
+      owner = owner.parent;
     }
-    if (!parent)
+    if (!owner)
       return this.functionchart;  // |items| not in the functionchart yet.
-    return parent;
+    return owner as Functionchart;
   }
 
   forInWires(element: AllElementTypes, visitor: WireVisitor) {
@@ -1089,11 +1088,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   private deleteItem(item: AllTypes) {
-    if (item.parent) {
+    const parent = item.parent;
+    if (parent instanceof Functionchart) {
       if (item instanceof Wire) {
-        item.parent.wires.remove(item);
+        parent.wires.remove(item);
       } else {
-        item.parent.nonWires.remove(item);
+        parent.nonWires.remove(item);
       }
     }
     this.selection.delete(item);
@@ -1166,28 +1166,28 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   connectInput(element: AllElementTypes, pin: number) {
-    const elementParent = element.parent!,
+    const parent = element.parent as Functionchart,
           p = this.layoutEngine.inputPinToPoint(element, pin),
           input = this.newPseudoelement('input'),
+          wire = this.newWire(input, 0, element, pin),
           offset = this.layoutEngine.outputPinToPoint(input, 0);
     input.x = p.x - 32 - offset.x;
     input.y = p.y - offset.y;
-    this.addItem(input, elementParent);
-    const wire = this.newWire(input, 0, element, pin);
-    this.addItem(wire, elementParent);
+    this.addItem(input, parent);
+    this.addItem(wire, parent);
     return { input, wire };
   }
 
   connectOutput(element: AllElementTypes, pin: number) {
-    const elementParent = element.parent!,
+    const parent = element.parent as Functionchart,
           p = this.layoutEngine.outputPinToPoint(element, pin),
           output = this.newPseudoelement('output'),
+          wire = this.newWire(element, pin, output, 0),
           offset = this.layoutEngine.inputPinToPoint(output, 0);
     output.x = p.x + 32 - offset.x;
     output.y = p.y - offset.y;
-    this.addItem(output, elementParent);
-    const wire = this.newWire(element, pin, output, 0);
-    this.addItem(wire, elementParent);
+    this.addItem(output, parent);
+    this.addItem(wire, parent);
     return { output, wire };
   }
 
@@ -1258,7 +1258,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return true;
   }
   isValidFunctionInstance(instance: FunctionInstance) : boolean {
-    return this.canAddItem(instance, instance.parent!);
+    const parent = instance.parent as Functionchart;
+    return parent && this.canAddItem(instance, parent);
   }
 
   // Topological sort of elements for update and validation. The circuit should form a DAG.
@@ -1425,14 +1426,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   replaceElement(element: AllElementTypes, newElement: AllElementTypes) {
     const type = element.type,
+          parent = element.parent,
           newType = newElement.type;
     // Add newElement right after element. Both should be present as we
     // rewire them.
-    if (element.parent !== newElement.parent) {
+    if (newElement.parent !== parent) {
       this.deleteItem(newElement);
     }
-    if (element.parent) {
-      this.addItem(newElement, element.parent!);
+    if (parent && parent instanceof Functionchart) {
+      this.addItem(newElement, parent);
     }
     newElement.x = element.x;
     newElement.y = element.y;
@@ -1791,7 +1793,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.visitNonWires(item, item => this.setGlobalPosition(item));
   }
 
-  private insertElement(element: AllElementTypes, parent: Functionchart) {
+  private insertElement(element: AllElementTypes, parent: ElementOwnerTypes) {
     this.elements.add(element);
     element.parent = parent;
     this.updateItem(element);
