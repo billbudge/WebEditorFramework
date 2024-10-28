@@ -5,7 +5,8 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 //------------------------------------------------------------------------------
 // TODO Distinguish between fully defined and partially defined function charts.
-// TODO Check validity of function instances in isValidFunctionchart, and during drag-n-drop.
+// TODO Check validity of function instances during drag-n-drop.
+// TODO Undo should restore functionchart dimensions that grew during layout.
 // Value and Function type descriptions.
 export class Pin {
     get typeString() { return this.toString(); }

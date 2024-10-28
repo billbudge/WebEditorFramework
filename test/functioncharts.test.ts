@@ -29,8 +29,8 @@ function addFunctionInstance(
 
 function addWire(
     functionchart: FC.Functionchart,
-    elem1: FC.ElementTypes | undefined, outPin: number,
-    elem2: FC.ElementTypes | undefined, inPin: number) {
+    elem1: FC.AllElementTypes | undefined, outPin: number,
+    elem2: FC.AllElementTypes | undefined, inPin: number) {
   const context = functionchart.context,
         wire = context.newWire(elem1, outPin, elem2, inPin);
   context.addItem(wire, functionchart);
@@ -284,8 +284,8 @@ describe('FunctionchartContext', () => {
   });
   test('iterators', () => {
     function testIterator(
-        fn: (elem: FC.ElementTypes, visitor: FC.WireVisitor) => void,
-        elem: FC.ElementTypes,
+        fn: (elem: FC.AllElementTypes, visitor: FC.WireVisitor) => void,
+        elem: FC.AllElementTypes,
         items: Array<FC.Wire>) {
       const iterated = new Array<FC.Wire>();
       fn(elem, t => iterated.push(t));
