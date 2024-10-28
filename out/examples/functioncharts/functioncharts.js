@@ -5,6 +5,7 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 //------------------------------------------------------------------------------
 // TODO Distinguish between fully defined and partially defined function charts.
+// TODO Check validity of function instances in isValidFunctionchart, and during drag-n-drop.
 // Value and Function type descriptions.
 export class Pin {
     get typeString() { return this.toString(); }
@@ -1045,7 +1046,7 @@ export class FunctionchartContext extends EventBase {
         return sorted;
     }
     isValidFunctionchart() {
-        const self = this, invalidWires = new Array(), graphInfo = this.getGraphInfo();
+        const self = this, invalidWires = new Array(), invalidInstances = new Array(), graphInfo = this.getGraphInfo();
         // Check wires.
         graphInfo.wires.forEach(wire => {
             if (!self.isValidWire(wire)) {
@@ -1064,6 +1065,15 @@ export class FunctionchartContext extends EventBase {
             }
         });
         if (invalidWires.length !== 0)
+            return false;
+        // Check function instances.
+        graphInfo.elements.forEach(element => {
+            if (element instanceof FunctionInstance) {
+                if (!self.isValidFunctionInstance(element))
+                    invalidInstances.push(element);
+            }
+        });
+        if (invalidInstances.length !== 0)
             return false;
         if (!this.sorted)
             this.sorted = this.topologicalSort();

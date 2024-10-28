@@ -23,6 +23,8 @@ import { types } from '@babel/core';
 //------------------------------------------------------------------------------
 
 // TODO Distinguish between fully defined and partially defined function charts.
+// TODO Check validity of function instances during drag-n-drop.
+// TODO Undo should restore functionchart dimensions that grew during layout.
 
 // Value and Function type descriptions.
 
@@ -1294,6 +1296,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   isValidFunctionchart() {
     const self = this,
           invalidWires = new Array<Wire>(),
+          invalidInstances = new Array<FunctionInstance>(),
           graphInfo = this.getGraphInfo();
     // Check wires.
     graphInfo.wires.forEach(wire => {
@@ -1312,6 +1315,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
     });
     if (invalidWires.length !== 0)
+      return false;
+
+    // Check function instances.
+    graphInfo.elements.forEach(element => {
+      if (element instanceof FunctionInstance) {
+        if (!self.isValidFunctionInstance(element))
+            invalidInstances.push(element);
+      }
+    });
+    if (invalidInstances.length !== 0)
       return false;
 
     if (!this.sorted)
