@@ -733,7 +733,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
 
     // Add item to parent.
     if (oldParent)
-      this.deleteItem(item);
+      this.unparent(item);
 
     if (parent instanceof Statechart) {
       if (item instanceof Transition) {
@@ -757,7 +757,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  private deleteItem(item: AllTypes) {
+  private unparent(item: AllTypes) {
     if (item.parent) {
       if (item instanceof Transition)
         item.parent.transitions.remove(item);
@@ -766,6 +766,9 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
       else
         item.parent.states.remove(item);
     }
+  }
+  private deleteItem(item: AllTypes) {
+    this.unparent(item);
     this.selection.delete(item);
   }
 
