@@ -496,9 +496,9 @@ export class TransactionManager extends EventBase {
         const transaction = this.transaction;
         if (!transaction)
             throw new Error('Transaction ended or canceled');
-        this.transaction = undefined;
         this.endingOrCanceling = true;
         super.onEvent('transactionEnding', transaction);
+        this.transaction = undefined;
         this.snapshots.clear();
         super.onEvent('transactionEnded', transaction);
         this.endingOrCanceling = false;
