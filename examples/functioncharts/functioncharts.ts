@@ -23,7 +23,6 @@ import { types } from '@babel/core';
 //------------------------------------------------------------------------------
 
 // TODO Check validity of function instances during drag-n-drop.
-// TODO Undo should restore functionchart dimensions that grew during layout.
 
 // Value and Function type descriptions.
 
@@ -2289,42 +2288,35 @@ class Renderer implements ILayoutEngine {
   layoutFunctionchart(functionchart: Functionchart) {
     const self = this,
           spacing = this.theme.spacing;
-    function layout(functionChart: Functionchart) {
-      const type = functionchart.type,
-            nonWires = functionChart.nonWires;
-      if (type.needsLayout) {
-        self.layoutType(type);
-        self.layoutType(functionChart.flatType);
-      }
-
-      let width, height;
-      if (nonWires.length === 0) {
-        width = self.theme.minFunctionchartWidth;
-        height = self.theme.minFunctionchartHeight;
-      } else {
-        const extents = self.sumBounds(nonWires.asArray()),
-              global = functionChart.globalPosition,
-              x = global.x,
-              y = global.y,
-              margin = 2 * spacing;
-        width = extents.x + extents.width - x + margin;
-        height = extents.y + extents.height - y + margin;
-        // Make sure instancer fits. It may overlap with the contents at the bottom right.
-        width = Math.max(width, type.width + margin);
-        height = Math.max(height, type.height + margin);
-      }
-      width = Math.max(width, functionChart.width);
-      height = Math.max(height, functionChart.height);
-      if (width !== functionChart.width)
-        functionchart.width = width;
-      if (height !== functionChart.height)
-        functionchart.height = height;
+          const type = functionchart.type,
+          nonWires = functionchart.nonWires;
+    if (type.needsLayout) {
+      self.layoutType(type);
+      self.layoutType(functionchart.flatType);
     }
-    // Visit in reverse order to correctly include sub-functionchart bounds.
-    functionchart.context.reverseVisitAll(functionchart, item => {
-      if (item instanceof Functionchart)
-        layout(item);
-    });
+
+    let width, height;
+    if (nonWires.length === 0) {
+      width = self.theme.minFunctionchartWidth;
+      height = self.theme.minFunctionchartHeight;
+    } else {
+      const extents = self.sumBounds(nonWires.asArray()),
+            global = functionchart.globalPosition,
+            x = global.x,
+            y = global.y,
+            margin = 2 * spacing;
+      width = extents.x + extents.width - x + margin;
+      height = extents.y + extents.height - y + margin;
+      // Make sure instancer fits. It may overlap with the contents at the bottom right.
+      width = Math.max(width, type.width + margin);
+      height = Math.max(height, type.height + margin);
+    }
+    width = Math.max(width, functionchart.width);
+    height = Math.max(height, functionchart.height);
+    if (width !== functionchart.width)
+      functionchart.width = width;
+    if (height !== functionchart.height)
+      functionchart.height = height;
   }
   private drawInputs(type: Type, x: number, y: number, limit: number) {
     const ctx = this.ctx,
@@ -3028,7 +3020,7 @@ export class FunctionchartEditor implements CanvasLayer {
   private onChanged(change: Change) {
     const functionchart = this.functionchart,
           context = this.context, changedItems = this.changedItems,
-          changedTopLevelStates = this.changedTopLevelFunctioncharts,
+          changedTopLevelFunctioncharts = this.changedTopLevelFunctioncharts,
           item: AllTypes = change.item as AllTypes, prop = change.prop;
 
     // Track all top level functioncharts which contain changes. On ending a transaction,
@@ -3041,12 +3033,12 @@ export class FunctionchartEditor implements CanvasLayer {
     } while (ancestor && ancestor !== functionchart);
 
     if (ancestor === functionchart && topLevel instanceof Functionchart) {
-      changedTopLevelStates.add(topLevel);
+      changedTopLevelFunctioncharts.add(topLevel);
     }
 
     function addItems(item: AllTypes) {
       if (item instanceof ElementBase) {
-        // Layout the state's incoming and outgoing transitions.
+        // Layout the element's incoming and outgoing transitions.
         context.forInWires(item, addItems);
         context.forOutWires(item, addItems);
       }
@@ -3107,7 +3099,7 @@ export class FunctionchartEditor implements CanvasLayer {
     renderer.begin(ctx);
     // Update any changed items first.
     this.updateLayout();
-    // Then update the bounds of super states, bottom up.
+    // Then update the bounds of functionchart contents, bottom up.
     changedTopLevelFunctioncharts.forEach(
       functionchart => context.reverseVisitAll(functionchart, item => {
         if (!context.contains(item))
