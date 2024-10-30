@@ -846,7 +846,7 @@ export class FunctionchartContext extends EventBase {
             return item;
         // At this point we can add item to parent.
         if (oldParent)
-            this.deleteItem(item);
+            this.unparent(item);
         if (item instanceof Wire) {
             parent.wires.append(item);
         }
@@ -870,7 +870,7 @@ export class FunctionchartContext extends EventBase {
                 this.addItem(item, parent);
         }
     }
-    deleteItem(item) {
+    unparent(item) {
         const parent = item.parent;
         if (parent instanceof Functionchart) {
             if (item instanceof Wire) {
@@ -880,6 +880,9 @@ export class FunctionchartContext extends EventBase {
                 parent.nonWires.remove(item);
             }
         }
+    }
+    deleteItem(item) {
+        this.unparent(item);
         this.selection.delete(item);
     }
     deleteItems(items) {
@@ -1156,7 +1159,6 @@ export class FunctionchartContext extends EventBase {
         Array.from(this.wires.values()).forEach(wire => {
             const src = wire.src, dst = wire.dst, srcParent = src.parent, dstParent = dst.parent, lca = getLowestCommonAncestor(srcParent, dstParent);
             if (wire.parent !== lca) {
-                self.deleteItem(wire);
                 self.addItem(wire, lca);
             }
         });
