@@ -1168,28 +1168,46 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.endTransaction();
   }
 
+  newInputForWire(wire: Wire, p: Point) {
+    const parent = wire.parent as Functionchart,
+          input = this.newPseudoelement('input'),
+          offset = this.layoutEngine.outputPinToPoint(input, 0);
+    input.x = p.x - offset.x;
+    input.y = p.y - offset.y;
+    wire.src = input;
+    wire.srcPin = 0;
+    this.addItem(input, parent);
+    return input;
+  }
+
   connectInput(element: AllElementTypes, pin: number) {
     const parent = element.parent as Functionchart,
           p = this.layoutEngine.inputPinToPoint(element, pin),
-          input = this.newPseudoelement('input'),
-          wire = this.newWire(input, 0, element, pin),
-          offset = this.layoutEngine.outputPinToPoint(input, 0);
-    input.x = p.x - 32 - offset.x;
-    input.y = p.y - offset.y;
-    this.addItem(input, parent);
+          wire = this.newWire(undefined, 0, element, pin);
+    p.x -= 32;
+    const input = this.newInputForWire(wire, p);
     this.addItem(wire, parent);
     return { input, wire };
+  }
+
+  newOutputForWire(wire: Wire, p: Point) {
+    const parent = wire.parent as Functionchart,
+          output = this.newPseudoelement('output'),
+          offset = this.layoutEngine.inputPinToPoint(output, 0);
+    output.x = p.x - offset.x;
+    output.y = p.y - offset.y;
+    wire.dst = output;
+    wire.dstPin = 0;
+    this.addItem(output, parent);
+    return output;
   }
 
   connectOutput(element: AllElementTypes, pin: number) {
     const parent = element.parent as Functionchart,
           p = this.layoutEngine.outputPinToPoint(element, pin),
-          output = this.newPseudoelement('output'),
-          wire = this.newWire(element, pin, output, 0),
-          offset = this.layoutEngine.inputPinToPoint(output, 0);
-    output.x = p.x + 32 - offset.x;
-    output.y = p.y - offset.y;
-    this.addItem(output, parent);
+          wire = this.newWire(element, pin, undefined, 0);
+    p.x += 32;
+    const output = this.newOutputForWire(wire, p);
     this.addItem(wire, parent);
     return { output, wire };
   }
@@ -1215,6 +1233,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           selection.add(wire);
         }
       }
+      selection.delete(element);
     });
   }
 
@@ -3551,6 +3570,13 @@ export class FunctionchartEditor implements CanvasLayer {
           p = canvasController.getCurrentPointerPosition(),
           cp = this.getCanvasPosition(canvasController, p);
     if (drag instanceof WireDrag) {
+      if (drag.wire.src === undefined) {
+        const input = context.newInputForWire(drag.wire, drag.wire.pSrc!);  // dst must be defined.
+        context.select(input)
+      } else if (drag.wire.dst === undefined) {
+        const output = context.newOutputForWire(drag.wire, drag.wire.pDst!);  // arc must be defined.
+        context.select(output);
+      }
       drag.wire.pSrc = drag.wire.pDst = undefined;
     } else if (drag instanceof NonWireDrag &&
               (drag.kind == 'copyPalette' || drag.kind === 'moveSelection' ||
