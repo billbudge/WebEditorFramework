@@ -85,6 +85,12 @@ export class Type {
         }
         return Type.fromString(typeString);
     }
+    toImportType() {
+        const inputs = this.inputs.slice();
+        inputs.push(new Pin(this));
+        const newType = new Type(inputs, this.outputs);
+        return newType;
+    }
     atomized() {
         let s = this.toString();
         let atomizedType = Type.atomizedTypes.get(s);
@@ -963,6 +969,17 @@ export class FunctionchartContext extends EventBase {
         this.addItem(output, parent);
         return output;
     }
+    newImportForWire(wire, p) {
+        const parent = wire.parent, element = this.newElement('import'), type = wire.src.type.outputs[wire.srcPin].type, newType = type.toImportType();
+        element.typeString = newType.toString();
+        const lastInput = newType.inputs.length - 1, offset = this.layoutEngine.inputPinToPoint(element, lastInput);
+        element.x = p.x - offset.x;
+        element.y = p.y - offset.y;
+        wire.dst = element;
+        wire.dstPin = lastInput;
+        this.addItem(element, parent);
+        return element;
+    }
     connectOutput(element, pin) {
         const parent = element.parent, p = this.layoutEngine.outputPinToPoint(element, pin), wire = this.newWire(element, pin, undefined, 0);
         p.x += 32;
@@ -1236,11 +1253,9 @@ export class FunctionchartContext extends EventBase {
         result.typeString = newType.toString();
         return result;
     }
-    importElement(element) {
-        const result = this.newElement('import'), type = element.type.copyUnlabeled(), inputs = type.inputs.slice();
-        inputs.push(new Pin(type));
-        const newType = new Type(inputs, type.outputs);
-        result.typeString = newType.toString();
+    importElement(type) {
+        const result = this.newElement('import'), importType = type.copyUnlabeled().toImportType();
+        result.typeString = importType.toString();
         return result;
     }
     exportElements(elements) {
@@ -1259,7 +1274,7 @@ export class FunctionchartContext extends EventBase {
         // Open each non-input/output element.
         elements.forEach(element => {
             selection.delete(element);
-            const newElement = self.importElement(element);
+            const newElement = self.importElement(element.type);
             self.replaceElement(element, newElement);
             selection.add(newElement);
         });
@@ -2982,15 +2997,26 @@ export class FunctionchartEditor {
             return;
         const context = this.context, functionchart = this.functionchart, selection = context.selection, p = canvasController.getCurrentPointerPosition(), cp = this.getCanvasPosition(canvasController, p);
         if (drag instanceof WireDrag) {
-            if (drag.wire.src === undefined) {
-                const input = context.newInputForWire(drag.wire, drag.wire.pSrc); // dst must be defined.
+            const wire = drag.wire, src = wire.src, dst = wire.dst;
+            // Auto-complete if wire has no src or destination. Inputs of all types and
+            // outputs of value type auto-complete to input/output pseudoelements. Outputs
+            // of function type auto-complete to an 'import' element of the src pin type.
+            if (src === undefined) {
+                const p = wire.pSrc, input = context.newInputForWire(wire, p);
                 context.select(input);
             }
-            else if (drag.wire.dst === undefined) {
-                const output = context.newOutputForWire(drag.wire, drag.wire.pDst); // arc must be defined.
+            else if (dst === undefined) {
+                const p = wire.pDst, pin = src.type.outputs[wire.srcPin];
+                let output;
+                if (pin.type === Type.valueType) {
+                    output = context.newOutputForWire(wire, p);
+                }
+                else {
+                    output = context.newImportForWire(wire, p);
+                }
                 context.select(output);
             }
-            drag.wire.pSrc = drag.wire.pDst = undefined;
+            wire.pSrc = wire.pDst = undefined;
         }
         else if (drag instanceof NonWireDrag &&
             (drag.kind == 'copyPalette' || drag.kind === 'moveSelection' ||
