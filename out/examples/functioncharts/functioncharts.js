@@ -290,6 +290,10 @@ class ElementBase {
             type.outputs[index - firstOutput];
         return pin;
     }
+    // Check if input pin is wired.
+    isInputConnected(pin) {
+        return this.inWires[pin] !== undefined;
+    }
     constructor(template, context, id) {
         this.globalPosition = defaultPoint;
         this._type = Type.emptyType;
@@ -2317,7 +2321,10 @@ export class FunctionchartEditor {
         this.paletteController = paletteController;
         this.propertyGridController = propertyGridController;
         this.fileController = new FileController();
-        this.hitTolerance = 8;
+        // This is finely tuned to allow picking in tight areas, such as input/output pins with
+        // wires attached, or near the borders of a functionchart, without making it too difficult
+        // to pick wires.
+        this.hitTolerance = 6;
         // Change tracking for layout.
         // Changed items that must be updated before drawing and hit testing.
         this.changedItems = new Set();
@@ -2483,7 +2490,7 @@ export class FunctionchartEditor {
     initializeContext(context) {
         const self = this;
         // On attribute changes and item insertions, dynamically layout affected items.
-        // This allows us to layout transitions as their src or dst elements are dragged.
+        // This allows us to layout wires as their src or dst elements are dragged.
         context.addHandler('changed', change => self.onChanged(change));
         // On ending transactions and undo/redo, layout the changed top level functioncharts.
         function update() {
@@ -2543,7 +2550,7 @@ export class FunctionchartEditor {
         }
         function addItems(item) {
             if (item instanceof ElementBase) {
-                // Layout the element's incoming and outgoing transitions.
+                // Layout the element's incoming and outgoing wires.
                 context.forInWires(item, addItems);
                 context.forOutWires(item, addItems);
             }
@@ -2551,7 +2558,7 @@ export class FunctionchartEditor {
         }
         switch (change.type) {
             case 'valueChanged': {
-                // For changes to x, y, width, height, or typeString, layout affected transitions.
+                // For changes to x, y, width, height, or typeString, layout affected wires.
                 if (prop === xProp || prop === yProp || prop === widthProp || prop === heightProp ||
                     prop === typeStringProp) {
                     // Visit item and sub-items to layout all affected wires.
@@ -2739,7 +2746,7 @@ export class FunctionchartEditor {
         renderer.begin(ctx);
         this.updateLayout();
         // TODO hit test selection first, in highlight, first.
-        // Hit test transitions first.
+        // Hit test wires first.
         context.reverseVisitWires(functionchart, (wire) => {
             pushInfo(renderer.hitTestWire(wire, cp, tol, RenderMode.Normal));
         });
@@ -2834,9 +2841,13 @@ export class FunctionchartEditor {
             !this.clickInPalette) {
             const element = dragItem, cp0 = this.getCanvasPosition(canvasController, p0);
             if (pointerHitInfo.input >= 0) {
-                newWire = context.newWire(undefined, -1, element, pointerHitInfo.input);
-                newWire.pSrc = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };
-                drag = new WireDrag(newWire, 'connectWireSrc', 'Add new wire');
+                const pin = pointerHitInfo.input;
+                // Check that the input isn't already connected.
+                if (!element.isInputConnected(pin)) {
+                    newWire = context.newWire(undefined, -1, element, pin);
+                    newWire.pSrc = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };
+                    drag = new WireDrag(newWire, 'connectWireSrc', 'Add new wire');
+                }
             }
             else if (pointerHitInfo.output >= 0) {
                 newWire = context.newWire(element, pointerHitInfo.output, undefined, -1);
@@ -2978,8 +2989,11 @@ export class FunctionchartEditor {
                 case 'connectWireDst': {
                     const src = wire.src, hitInfo = this.getFirstHit(hitList, isElementInputPin), dst = hitInfo ? hitInfo.item : undefined;
                     if (src && dst && src !== dst) {
-                        wire.dst = dst;
-                        wire.dstPin = hitInfo.input;
+                        const pin = hitInfo.input;
+                        if (!dst.isInputConnected(pin)) {
+                            wire.dst = dst;
+                            wire.dstPin = pin;
+                        }
                     }
                     else {
                         wire.dst = undefined; // This notifies observers to update the layout.
