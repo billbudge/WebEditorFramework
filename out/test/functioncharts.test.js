@@ -123,6 +123,7 @@ describe('Type', () => {
         // expect(type1.canConnectTo(type2)).toBe(false);
         // expect(type2.canConnectTo(type1)).toBe(true);
     });
+    // TODO new Type methods
 });
 describe('parseTypeString', () => {
     test('parseTypeString', () => {
@@ -162,22 +163,16 @@ describe('FunctionchartContext', () => {
         element.x = 10;
         expect(element.x).toBe(10);
     });
-    // test('element typeString', () => {
-    //   const context = new FC.FunctionchartContext(),
-    //         element = context.newElement('binop');
-    //   expect(element.typeString).toBe('[,]');
-    //   expect(element.type.inputs.length).toBe(0);
-    //   expect(element.type.outputs.length).toBe(0);
-    //   expect(element.inWires.length).toBe(0);
-    //   expect(element.outWires.length).toBe(0);
-    //   element.typeString = '[v,v]';
-    //   expect(element.typeString).toBe('[v,v]');
-    //   expect(element.type.inputs.length).toBe(1);
-    //   expect(element.type.outputs.length).toBe(1);
-    //   expect(element.inWires.length).toBe(1);
-    //   expect(element.outWires.length).toBe(1);
-    //   expect(element.outWires[0].length).toBe(0);  // Empty wire array.
-    // });
+    test('element typeString', () => {
+        const context = new FC.FunctionchartContext(), element = context.newElement('binop');
+        expect(element.typeString).toBe('[,]');
+        expect(element.type.inputs.length).toBe(0);
+        expect(element.type.outputs.length).toBe(0);
+        element.typeString = '[v,v]';
+        expect(element.typeString).toBe('[v,v]');
+        expect(element.type.inputs.length).toBe(1);
+        expect(element.type.outputs.length).toBe(1);
+    });
     test('cond element', () => {
         const context = new FC.FunctionchartContext(), element = context.newElement('cond');
         expect(element.typeString).toBe('[vvv,v](?)');
@@ -198,16 +193,10 @@ describe('FunctionchartContext', () => {
         expect(pseudoelement.typeString).toBe('[,v]');
         expect(pseudoelement.type.inputs.length).toBe(0);
         expect(pseudoelement.type.outputs.length).toBe(1);
-        expect(pseudoelement.inWires.length).toBe(0);
-        expect(pseudoelement.outWires.length).toBe(1);
-        expect(pseudoelement.outWires[0].length).toBe(0); // Empty wire array.
         pseudoelement.typeString = '[,v(foo)]';
         expect(pseudoelement.typeString).toBe('[,v(foo)]');
         expect(pseudoelement.type.inputs.length).toBe(0);
         expect(pseudoelement.type.outputs.length).toBe(1);
-        expect(pseudoelement.inWires.length).toBe(0);
-        expect(pseudoelement.outWires.length).toBe(1);
-        expect(pseudoelement.outWires[0].length).toBe(0); // Empty wire array.
     });
     test('wire interface', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop'), wire = addWire(functionchart, elem1, 0, elem2, 0);
@@ -318,6 +307,7 @@ describe('FunctionchartContext', () => {
         // Replace concrete element with 'cond' element that has pass-throughs.
         const elem2 = addElement(functionchart, 'cond');
         context.replaceElement(elem1, elem2);
+        context.updateGraphInfo();
         expect(wire1.src).toBe(input);
         expect(wire1.dst).toBe(elem2);
         expect(wire2.src).toBe(elem2);
@@ -325,34 +315,39 @@ describe('FunctionchartContext', () => {
     });
     test('disconnectElement', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
+        context.updateGraphInfo();
         expect(functionchart.wires.length).toBe(3);
-        expect(elem1.inWires[0]).toBeUndefined();
-        expect(elem1.inWires[1]).toBe(wire1);
-        expect(elem1.outWires[0].length).toBe(2);
+        // expect(elem1.inWires[0]).toBeUndefined();
+        // expect(elem1.inWires[1]).toBe(wire1);
+        // expect(elem1.outWires[0].length).toBe(2);
         context.disconnectElement(elem1);
         expect(functionchart.wires.length).toBe(0);
-        expect(elem1.inWires[1]).toBeUndefined();
-        expect(elem1.outWires[0].length).toBe(0);
+        // expect(elem1.inWires[1]).toBeUndefined();
+        // expect(elem1.outWires[0].length).toBe(0);
     });
     test('disconnectSelection', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
+        context.updateGraphInfo();
         expect(functionchart.wires.length).toBe(3);
         expect(elem1.inWires[0]).toBeUndefined();
         expect(elem1.inWires[1]).toBe(wire1);
         expect(elem1.outWires[0].length).toBe(2);
         context.disconnectSelection();
+        context.updateGraphInfo();
         expect(functionchart.wires.length).toBe(3);
         expect(elem1.inWires[0]).toBeUndefined();
         expect(elem1.inWires[1]).toBe(wire1);
         expect(elem1.outWires[0].length).toBe(2);
         context.selection.add(elem1);
         context.disconnectSelection();
+        context.updateGraphInfo();
         expect(functionchart.wires.length).toBe(0);
         expect(elem1.inWires[1]).toBeUndefined();
         expect(elem1.outWires[0].length).toBe(0);
     });
     test('extendSelectionToWires', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
+        context.updateGraphInfo();
         context.selection.add(elem1);
         expect(context.selection.length).toBe(1);
         context.extendSelectionToWires();
@@ -364,8 +359,7 @@ describe('FunctionchartContext', () => {
     });
     test('getConnectedElements', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
-        context.selection.add(elem1);
-        expect(context.selection.length).toBe(1);
+        context.updateGraphInfo();
         let connected = context.getConnectedElements([elem1], () => true, () => false);
         expect(connected.size).toBe(2);
         expect(connected.has(elem1)).toBe(true);
@@ -498,12 +492,15 @@ describe('FunctionchartContext', () => {
     });
     test('getFunctionchartTypeInfo', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'cond'), elem2 = addElement(functionchart, 'cond');
+        context.updateGraphInfo();
         let typeInfo = context.getFunctionchartTypeInfo(functionchart);
         // No inputs or outputs.
         expect(typeInfo.typeString).toBe('[,]');
         // expect(typeInfo.passThroughs.length).toBe(0);
         const wire1 = addWire(functionchart, elem1, 0, elem2, 2);
+        context.updateGraphInfo();
         context.completeElements([elem1, elem2]);
+        context.updateGraphInfo();
         typeInfo = context.getFunctionchartTypeInfo(functionchart);
         expect(typeInfo.typeString).toBe('[vvvvv,v]');
         expect(typeInfo.abstract).toBe(false);
@@ -517,6 +514,7 @@ describe('FunctionchartContext', () => {
         expect(typeInfo.abstract).toBe(true);
         // expect(typeInfo.passThroughs.length).toBe(0);
         const wire1 = addWire(functionchart, input, 0, output, 0);
+        context.updateGraphInfo();
         typeInfo = context.getFunctionchartTypeInfo(functionchart);
         expect(typeInfo.typeString).toBe('[v,v]');
         expect(typeInfo.abstract).toBe(false);

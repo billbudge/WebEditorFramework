@@ -16,6 +16,6 @@
   "scripts": {
     "build": "tsc",
     "build-watch": "tsc -w",
-    "test": "jest --coverage ./test"
+    "test": "jest --coverage --runInBand ./test"
   }
 }
