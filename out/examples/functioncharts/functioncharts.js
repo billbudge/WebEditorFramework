@@ -1112,17 +1112,21 @@ export class FunctionchartContext extends EventBase {
     }
     updateGraphInfo() {
         if (this.graphInfoNeedsUpdate) {
+            // Clear the update flag to avoid re-entering. This shouldn't happen as long as no mutating methods
+            // are called while we're here.
+            this.graphInfoNeedsUpdate = false;
             this.invalidWires = this.updateWireLists();
             this.sorted = this.topologicalSort();
-            this.graphInfoNeedsUpdate = false;
         }
     }
     isValidFunctionchart() {
         this.updateGraphInfo();
+        if (this.invalidWires.length !== 0 || this.sorted.length !== this.elements.size)
+            return false;
         const self = this, invalidWires = new Array(), invalidInstances = new Array(), graphInfo = this.getGraphInfo();
         // Check wires.
         graphInfo.wires.forEach(wire => {
-            if (!self.isValidWire(wire)) {
+            if (!self.isValidWire(wire)) { // TODO incorporate in update graph info?
                 // console.log(wire, self.isValidWire(wire));
                 invalidWires.push(wire);
             }
@@ -1146,10 +1150,7 @@ export class FunctionchartContext extends EventBase {
                     invalidInstances.push(element);
             }
         });
-        if (invalidInstances.length !== 0)
-            return false;
-        return this.sorted.length === this.elements.size &&
-            this.invalidWires.length === 0;
+        return invalidInstances.length === 0;
     }
     // TODO do we still need this?
     // verifyInternal() : boolean {

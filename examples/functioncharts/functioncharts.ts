@@ -1387,13 +1387,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   isValidFunctionchart() {
     this.updateGraphInfo();
 
+    if (this.invalidWires.length !== 0 || this.sorted.length !== this.elements.size)
+      return false;
+
     const self = this,
           invalidWires = new Array<Wire>(),
           invalidInstances = new Array<FunctionInstance>(),
           graphInfo = this.getGraphInfo();
     // Check wires.
     graphInfo.wires.forEach(wire => {
-      if (!self.isValidWire(wire)) {
+      if (!self.isValidWire(wire)) {  // TODO incorporate in update graph info?
         // console.log(wire, self.isValidWire(wire));
         invalidWires.push(wire);
       } else {
@@ -1417,11 +1420,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
             invalidInstances.push(element);
       }
     });
-    if (invalidInstances.length !== 0)
-      return false;
 
-    return this.sorted.length === this.elements.size &&
-           this.invalidWires.length === 0;
+    return invalidInstances.length === 0;
   }
 
   // TODO do we still need this?
