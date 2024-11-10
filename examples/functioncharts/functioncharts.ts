@@ -273,7 +273,7 @@ abstract class NonWireTemplate {
   readonly y = yProp;
 }
 
-export type ElementType = 'literal' | 'binop' | 'unop' | 'cond' | 'let' | 'import' | 'export' | 'element';
+export type ElementType = 'literal' | 'binop' | 'unop' | 'cond' | 'var' | 'import' | 'export' | 'element';
 
 class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
@@ -338,7 +338,7 @@ const literalTemplate = new ElementTemplate('literal'),
       binopTemplate = new ElementTemplate('binop'),
       unopTemplate = new ElementTemplate('unop'),
       condTemplate = new ElementTemplate('cond'),
-      letTemplate = new ElementTemplate('let'),
+      varTemplate = new ElementTemplate('var'),
       importTemplate = new ElementTemplate('import'),
       exportTemplate = new DerivedElementTemplate('export'),
       elementTemplate = new ElementTemplate('element'),
@@ -663,9 +663,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         template = condTemplate;
         typeString = '[vvv,v](?)';
         break;
-      case 'let':
-        template = letTemplate;
-        typeString = '[v,v[v,v]](let)';
+      case 'var':
+        template = varTemplate;
+        typeString = '[,v[v,v]](var)';
         break;
       case 'import':
         template = importTemplate;
@@ -2001,7 +2001,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'unop':
       case 'cond':
       case 'import':
-      case 'let':
+      case 'var':
       case 'element': return this.newElement(typeName);
 
       case 'export': return this.newDerivedElement(typeName);
@@ -2437,7 +2437,7 @@ class Renderer implements ILayoutEngine {
           this.drawType(innerType, innerX, innerY);
           const pin = element.flatType.outputs[0];
           this.drawPin(pin, x + w - d, y + h / 2 - r);
-        } else if (element.template === importTemplate || element.template === letTemplate) {
+        } else if (element.template === importTemplate) {
           const name = type.name
           if (name) {
             ctx.fillStyle = theme.textColor;
@@ -2835,7 +2835,7 @@ export class FunctionchartEditor implements CanvasLayer {
           binop = context.newElement('binop'),
           unop = context.newElement('unop'),
           cond = context.newElement('cond'),
-          letBinding = context.newElement('let'),
+          varBinding = context.newElement('var'),
           newFunctionchart = context.newFunctionchart();
 
     context.root = functionchart;
@@ -2848,7 +2848,7 @@ export class FunctionchartEditor implements CanvasLayer {
     unop.x = 80; unop.y = 32;
     unop.typeString = '[v,v](-)';    // unary negation
     cond.x = 118; cond.y = 32;     // conditional
-    letBinding.x = 156; letBinding.y = 32;
+    varBinding.x = 156; varBinding.y = 32;
 
     newFunctionchart.x = 8; newFunctionchart.y = 82;
     newFunctionchart.width = this.theme.minFunctionchartWidth;
@@ -2856,7 +2856,7 @@ export class FunctionchartEditor implements CanvasLayer {
 
     functionchart.nonWires.append(input);
     functionchart.nonWires.append(output);
-    functionchart.nonWires.append(letBinding);
+    functionchart.nonWires.append(varBinding);
     functionchart.nonWires.append(literal);
     functionchart.nonWires.append(binop);
     functionchart.nonWires.append(unop);
@@ -2958,7 +2958,7 @@ export class FunctionchartEditor implements CanvasLayer {
         prop: typeStringProp,
       },
     ]);
-    const unaryOps = ['!', '~', '-'];
+    const unaryOps = ['!', '~', '-', '√'];
     this.propertyInfo.set('unop', [
       {
         label: 'operator',

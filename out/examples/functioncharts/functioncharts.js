@@ -271,7 +271,7 @@ class FunctionInstanceTemplate extends NonWireTemplate {
         this.properties = [this.id, this.x, this.y, this.functionchart];
     }
 }
-const literalTemplate = new ElementTemplate('literal'), binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), letTemplate = new ElementTemplate('let'), importTemplate = new ElementTemplate('import'), exportTemplate = new DerivedElementTemplate('export'), elementTemplate = new ElementTemplate('element'), inputTemplate = new PseudoelementTemplate('input'), outputTemplate = new PseudoelementTemplate('output'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
+const literalTemplate = new ElementTemplate('literal'), binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), varTemplate = new ElementTemplate('var'), importTemplate = new ElementTemplate('import'), exportTemplate = new DerivedElementTemplate('export'), elementTemplate = new ElementTemplate('element'), inputTemplate = new PseudoelementTemplate('input'), outputTemplate = new PseudoelementTemplate('output'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate(), functionInstanceTemplate = new FunctionInstanceTemplate();
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
@@ -481,9 +481,9 @@ export class FunctionchartContext extends EventBase {
                 template = condTemplate;
                 typeString = '[vvv,v](?)';
                 break;
-            case 'let':
-                template = letTemplate;
-                typeString = '[v,v[v,v]](let)';
+            case 'var':
+                template = varTemplate;
+                typeString = '[,v[v,v]](var)';
                 break;
             case 'import':
                 template = importTemplate;
@@ -1670,7 +1670,7 @@ export class FunctionchartContext extends EventBase {
             case 'unop':
             case 'cond':
             case 'import':
-            case 'let':
+            case 'var':
             case 'element': return this.newElement(typeName);
             case 'export': return this.newDerivedElement(typeName);
             case 'input':
@@ -2013,7 +2013,7 @@ class Renderer {
                     const pin = element.flatType.outputs[0];
                     this.drawPin(pin, x + w - d, y + h / 2 - r);
                 }
-                else if (element.template === importTemplate || element.template === letTemplate) {
+                else if (element.template === importTemplate) {
                     const name = type.name;
                     if (name) {
                         ctx.fillStyle = theme.textColor;
@@ -2314,7 +2314,7 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart(), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newElement('literal'), binop = context.newElement('binop'), unop = context.newElement('unop'), cond = context.newElement('cond'), letBinding = context.newElement('let'), newFunctionchart = context.newFunctionchart();
+        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart(), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newElement('literal'), binop = context.newElement('binop'), unop = context.newElement('unop'), cond = context.newElement('cond'), varBinding = context.newElement('var'), newFunctionchart = context.newFunctionchart();
         context.root = functionchart;
         input.x = 8;
         input.y = 8;
@@ -2330,15 +2330,15 @@ export class FunctionchartEditor {
         unop.typeString = '[v,v](-)'; // unary negation
         cond.x = 118;
         cond.y = 32; // conditional
-        letBinding.x = 156;
-        letBinding.y = 32;
+        varBinding.x = 156;
+        varBinding.y = 32;
         newFunctionchart.x = 8;
         newFunctionchart.y = 82;
         newFunctionchart.width = this.theme.minFunctionchartWidth;
         newFunctionchart.height = this.theme.minFunctionchartHeight;
         functionchart.nonWires.append(input);
         functionchart.nonWires.append(output);
-        functionchart.nonWires.append(letBinding);
+        functionchart.nonWires.append(varBinding);
         functionchart.nonWires.append(literal);
         functionchart.nonWires.append(binop);
         functionchart.nonWires.append(unop);
@@ -2437,7 +2437,7 @@ export class FunctionchartEditor {
                 prop: typeStringProp,
             },
         ]);
-        const unaryOps = ['!', '~', '-'];
+        const unaryOps = ['!', '~', '-', '√'];
         this.propertyInfo.set('unop', [
             {
                 label: 'operator',
