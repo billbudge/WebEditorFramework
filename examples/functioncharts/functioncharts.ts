@@ -273,7 +273,7 @@ abstract class NonWireTemplate {
   readonly y = yProp;
 }
 
-export type ElementType = 'literal' | 'binop' | 'unop' | 'cond' | 'store' | 'import' | 'export' | 'element';
+export type ElementType = 'literal' | 'binop' | 'unop' | 'cond' | 'let' | 'import' | 'export' | 'element';
 
 class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
@@ -338,7 +338,7 @@ const literalTemplate = new ElementTemplate('literal'),
       binopTemplate = new ElementTemplate('binop'),
       unopTemplate = new ElementTemplate('unop'),
       condTemplate = new ElementTemplate('cond'),
-      storeTemplate = new ElementTemplate('store'),
+      letTemplate = new ElementTemplate('let'),
       importTemplate = new ElementTemplate('import'),
       exportTemplate = new DerivedElementTemplate('export'),
       elementTemplate = new ElementTemplate('element'),
@@ -663,9 +663,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         template = condTemplate;
         typeString = '[vvv,v](?)';
         break;
-      case 'store':
-        template = storeTemplate;
-        typeString = '[vv,v](:=)';
+      case 'let':
+        template = letTemplate;
+        typeString = '[v,v[v,v]](let)';
         break;
       case 'import':
         template = importTemplate;
@@ -2001,7 +2001,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'unop':
       case 'cond':
       case 'import':
-      case 'store':
+      case 'let':
       case 'element': return this.newElement(typeName);
 
       case 'export': return this.newDerivedElement(typeName);
@@ -2366,16 +2366,15 @@ class Renderer implements ILayoutEngine {
           }
   }
   drawType(type: Type, x: number, y: number) {
-    const self = this, ctx = this.ctx, theme = this.theme,
+    const ctx = this.ctx, theme = this.theme,
           textSize = theme.fontSize, spacing = theme.spacing,
           name = type.name,
-          w = type.width, h = type.height,
-          right = x + w;
+          w = type.width;
     ctx.lineWidth = 0.5;
     ctx.fillStyle = theme.textColor;
-    ctx.textBaseline = 'bottom';
     if (name) {
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
       ctx.fillText(name, x + w / 2, y + textSize + spacing / 2);
     }
     this.drawInputs(type, x, y, type.inputs.length);
@@ -2393,6 +2392,7 @@ class Renderer implements ILayoutEngine {
         const d = 2 * r;
         ctx.rect(x, y, d, d);
       } else {
+        // TODO remove
         ctx.arc(x + r, y + r, r, 0, Math.PI * 2, true);
       }
       ctx.stroke();
@@ -2437,7 +2437,14 @@ class Renderer implements ILayoutEngine {
           this.drawType(innerType, innerX, innerY);
           const pin = element.flatType.outputs[0];
           this.drawPin(pin, x + w - d, y + h / 2 - r);
-        } else if (element.template === importTemplate) {
+        } else if (element.template === importTemplate || element.template === letTemplate) {
+          const name = type.name
+          if (name) {
+            ctx.fillStyle = theme.textColor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(name, x + w / 2, y + this.theme.fontSize + spacing / 2);
+          }
           const lastInput = type.inputs.length - 1;
           this.drawInputs(type, x, y, lastInput);
           this.drawOutputs(type, x, y, type.outputs.length);
@@ -2828,7 +2835,7 @@ export class FunctionchartEditor implements CanvasLayer {
           binop = context.newElement('binop'),
           unop = context.newElement('unop'),
           cond = context.newElement('cond'),
-          store = context.newElement('store'),
+          letBinding = context.newElement('let'),
           newFunctionchart = context.newFunctionchart();
 
     context.root = functionchart;
@@ -2841,7 +2848,7 @@ export class FunctionchartEditor implements CanvasLayer {
     unop.x = 80; unop.y = 32;
     unop.typeString = '[v,v](-)';    // unary negation
     cond.x = 118; cond.y = 32;     // conditional
-    store.x = 156; store.y = 32;
+    letBinding.x = 156; letBinding.y = 32;
 
     newFunctionchart.x = 8; newFunctionchart.y = 82;
     newFunctionchart.width = this.theme.minFunctionchartWidth;
@@ -2849,7 +2856,7 @@ export class FunctionchartEditor implements CanvasLayer {
 
     functionchart.nonWires.append(input);
     functionchart.nonWires.append(output);
-    functionchart.nonWires.append(store);
+    functionchart.nonWires.append(letBinding);
     functionchart.nonWires.append(literal);
     functionchart.nonWires.append(binop);
     functionchart.nonWires.append(unop);
