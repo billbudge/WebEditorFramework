@@ -320,17 +320,17 @@ export class DerivedElement extends ElementBase {
     set y(value) { this.template.y.set(this, value); }
     get typeString() { return this.template.typeString.get(this); }
     set typeString(value) { this.template.typeString.set(this, value); }
-    // TODO create a non-list ChildProp with an underlying list.
-    get elements() { return this.template.elements.get(this); }
     get inner() {
-        if (this.elements.length)
-            return this.elements.at(0);
+        const list = this.template.elements.get(this);
+        if (list.length)
+            return list.at(0);
     }
     set inner(inner) {
-        while (this.elements.length)
-            this.elements.removeAt(0);
+        const list = this.template.elements.get(this);
+        if (list.length) // There can be at most one element in the backing array.
+            list.removeAt(0);
         if (inner)
-            this.elements.append(inner);
+            list.append(inner);
     }
     // TODO 'override' the base class methods.
     constructor(template, context, id) {
