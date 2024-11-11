@@ -320,8 +320,18 @@ export class DerivedElement extends ElementBase {
     set y(value) { this.template.y.set(this, value); }
     get typeString() { return this.template.typeString.get(this); }
     set typeString(value) { this.template.typeString.set(this, value); }
+    // TODO create a non-list ChildProp with an underlying list.
     get elements() { return this.template.elements.get(this); }
-    get element() { return this.elements.at(0); }
+    get inner() {
+        if (this.elements.length)
+            return this.elements.at(0);
+    }
+    set inner(inner) {
+        while (this.elements.length)
+            this.elements.removeAt(0);
+        if (inner)
+            this.elements.append(inner);
+    }
     // TODO 'override' the base class methods.
     constructor(template, context, id) {
         super(template, context, id);
@@ -1301,7 +1311,7 @@ export class FunctionchartContext extends EventBase {
             selection.delete(element);
             const newElement = self.exportElement(element);
             self.replaceElement(element, newElement);
-            newElement.elements.append(element); // newElement owns the base element.
+            newElement.inner = element; // newElement owns the base element.
             selection.add(newElement);
         });
     }
@@ -1781,8 +1791,8 @@ class Renderer {
                 width = item.width;
                 height = item.height;
             }
-            else if (item instanceof DerivedElement) {
-                const spacing = this.theme.spacing, innerType = item.element.flatType;
+            else if (item instanceof DerivedElement && item.inner) {
+                const spacing = this.theme.spacing, innerType = item.inner.flatType;
                 width = innerType.width + 3 * spacing; // border, plus room for single output pin.
                 height = innerType.height + 2 * spacing;
             }
@@ -1888,8 +1898,8 @@ class Renderer {
             this.layoutType(type);
             this.layoutType(element.flatType);
         }
-        if (element instanceof DerivedElement) {
-            this.layoutElement(element.element);
+        if (element instanceof DerivedElement && element.inner) {
+            this.layoutElement(element.inner);
         }
     }
     layoutWire(wire) {
@@ -2005,8 +2015,8 @@ class Renderer {
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.stroke();
                 const type = element.flatType;
-                if (element instanceof DerivedElement) {
-                    const innerType = element.element.flatType, innerX = x + spacing, innerY = y + spacing;
+                if (element instanceof DerivedElement && element.inner) {
+                    const innerType = element.inner.flatType, innerX = x + spacing, innerY = y + spacing;
                     ctx.rect(innerX, innerY, innerType.width, innerType.height);
                     ctx.stroke();
                     this.drawType(innerType, innerX, innerY);

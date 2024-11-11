@@ -413,8 +413,18 @@ export class DerivedElement extends ElementBase<DerivedElementTemplate> {
   get typeString() { return this.template.typeString.get(this); }
   set typeString(value: string) { this.template.typeString.set(this, value); }
 
+  // TODO create a non-list ChildProp with an underlying list.
   get elements() { return this.template.elements.get(this) as List<TrueElement>; }
-  get element() { return this.elements.at(0); }
+  get inner() {
+    if (this.elements.length)
+      return this.elements.at(0);
+  }
+  set inner(inner: TrueElement | undefined) {
+    while (this.elements.length)
+      this.elements.removeAt(0);
+    if (inner)
+      this.elements.append(inner);
+  }
 
   // TODO 'override' the base class methods.
   constructor(template: DerivedElementTemplate, context: FunctionchartContext, id: number) {
@@ -820,7 +830,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // Gets the translation to move an item from its current parent to
   // newParent.
-  getToParent(item: NonWireTypes, newParent: Functionchart | undefined) {
+  getToParent(item: NonWireTypes, newParent: ElementOwnerTypes | undefined) {
     const oldParent = item.parent;
     let dx = 0, dy = 0;
     if (oldParent) {
@@ -1588,7 +1598,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       selection.delete(element);
       const newElement = self.exportElement(element);
       self.replaceElement(element, newElement);
-      newElement.elements.append(element);  // newElement owns the base element.
+      newElement.inner = element;  // newElement owns the base element.
       selection.add(newElement);
     });
   }
@@ -2145,9 +2155,9 @@ class Renderer implements ILayoutEngine {
       if (item instanceof Functionchart) {
         width = item.width;
         height = item.height;
-      } else if (item instanceof DerivedElement) {
+      } else if (item instanceof DerivedElement && item.inner) {
         const spacing = this.theme.spacing,
-              innerType = item.element.flatType;
+              innerType = item.inner.flatType;
         width = innerType.width + 3 * spacing;  // border, plus room for single output pin.
         height = innerType.height + 2 * spacing;
       } else {
@@ -2280,8 +2290,8 @@ class Renderer implements ILayoutEngine {
       this.layoutType(type);
       this.layoutType(element.flatType);
     }
-    if (element instanceof DerivedElement) {
-      this.layoutElement(element.element);
+    if (element instanceof DerivedElement && element.inner) {
+      this.layoutElement(element.inner);
     }
   }
 
@@ -2428,8 +2438,8 @@ class Renderer implements ILayoutEngine {
         ctx.strokeStyle = theme.strokeColor;
         ctx.stroke();
         const type = element.flatType;
-        if (element instanceof DerivedElement) {
-          const innerType = element.element.flatType,
+        if (element instanceof DerivedElement && element.inner) {
+          const innerType = element.inner.flatType,
                 innerX = x + spacing,
                 innerY = y + spacing;
           ctx.rect(innerX, innerY, innerType.width, innerType.height);
