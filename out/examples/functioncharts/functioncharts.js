@@ -1542,9 +1542,6 @@ export class FunctionchartContext extends EventBase {
             // Update all instances of the functionchart.
             // TODO store the typestring on instances, and use that instead.
             this.fcMap.forValues(item, instance => {
-                instance.type = type;
-            });
-            this.fcMap.forValues(item, instance => {
                 this.updateType(instance, type);
             });
         }
@@ -1563,6 +1560,9 @@ export class FunctionchartContext extends EventBase {
     insertElement(element, parent) {
         this.elements.add(element);
         element.parent = parent;
+        if (element instanceof DerivedElement && element.inner) {
+            this.updateItem(element.inner);
+        }
         this.updateItem(element);
         this.graphInfoNeedsUpdate = true;
         // TODO do we need fcMap?
@@ -1645,7 +1645,7 @@ export class FunctionchartContext extends EventBase {
                 }
             }
         }
-        else if (owner instanceof Element || owner instanceof Pseudoelement) {
+        else if (owner instanceof ElementBase) {
             if (this.elements.has(owner)) {
                 if (prop === typeStringProp) {
                     const type = parseTypeString(owner.typeString);

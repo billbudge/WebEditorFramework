@@ -17,6 +17,7 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          List, TransactionManager, TransactionEvent, HistoryManager, ScalarPropertyTypes,
          ArrayPropertyTypes } from '../../src/dataModels.js'
 import { types } from '@babel/core';
+import { isElementAccessChain } from 'typescript';
 
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
@@ -1867,9 +1868,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       // Update all instances of the functionchart.
       // TODO store the typestring on instances, and use that instead.
       this.fcMap.forValues(item, instance => {
-        instance.type = type;
-      });
-      this.fcMap.forValues(item, instance => {
         this.updateType(instance, type);
       });
     } else if (item instanceof FunctionInstance) {
@@ -1888,6 +1886,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   private insertElement(element: AllElementTypes, parent: ElementOwnerTypes) {
     this.elements.add(element);
     element.parent = parent;
+    if (element instanceof DerivedElement && element.inner) {
+      this.updateItem(element.inner);
+    }
     this.updateItem(element);
     this.graphInfoNeedsUpdate = true;
     // TODO do we need fcMap?
@@ -1976,7 +1977,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           owner.type = owner.functionchart.type;
         }
       }
-    } else if (owner instanceof Element || owner instanceof Pseudoelement) {
+    } else if (owner instanceof ElementBase) {
       if (this.elements.has(owner)) {
         if (prop === typeStringProp) {
           const type = parseTypeString(owner.typeString);
