@@ -48,7 +48,7 @@ function addWire(
 
 function addFunctionchart(parent: FC.Functionchart) : FC.Functionchart {
   const context = parent.context,
-        functionchart = parent.context.newFunctionchart();
+        functionchart = parent.context.newFunctionchart('functionchart');
   mutate(context, () => context.addItem(functionchart, parent));
   return functionchart;
 }

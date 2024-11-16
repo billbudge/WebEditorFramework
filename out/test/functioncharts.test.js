@@ -31,7 +31,7 @@ function addWire(functionchart, elem1, outPin, elem2, inPin) {
     return wire;
 }
 function addFunctionchart(parent) {
-    const context = parent.context, functionchart = parent.context.newFunctionchart();
+    const context = parent.context, functionchart = parent.context.newFunctionchart('functionchart');
     mutate(context, () => context.addItem(functionchart, parent));
     return functionchart;
 }
