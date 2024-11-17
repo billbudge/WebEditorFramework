@@ -1377,36 +1377,33 @@ export class FunctionchartContext extends EventBase {
                 abstract = false;
             }
         });
-        // // Now, implicit inputs and outputs.
-        // if (!functionchart.explicit) {
-        //   // Add all disconnected inputs and outputs as pins.
-        //   subgraphInfo.elements.forEach(element => {
-        //     if (element instanceof FunctionInstance && element.functionchart === functionchart)
-        //       return;  // We don't expose a recursive instance of the functionchart.
-        //     element.inWires.forEach((wire, index) => {
-        //       if (wire === undefined) {
-        //         const connected = new Multimap<ElementTypes, number>();
-        //         const pin = element.type.inputs[index];
-        //         const type = self.resolvePinType(element, index, connected) || Type.starType;
-        //         const pinInfo = { element, index, type, connected, fcIndex: -1 };
-        //         inputs.push(pinInfo);
-        //       }
-        //     });
-        //     element.outWires.forEach((wires, index) => {
-        //       if (wires.length === 0) {
-        //         const connected = new Multimap<ElementTypes, number>();
-        //         const pin = element.type.outputs[index];
-        //         const firstOutput = element.type.inputs.length;
-        //         const type = self.resolvePinType(element, index + firstOutput, connected) || Type.starType;
-        //         const pinInfo = { element, index: index + firstOutput, type, connected, fcIndex: -1 };
-        //         outputs.push(pinInfo);
-        //       }
-        //     });
-        //   });
-        // }
-        // Evaluate context.
-        // if (subgraphInfo.inWires) {
-        // }
+        // For 'export' functioncharts, unwired inputs and outputs.
+        if (functionchart.template === exportTemplate) {
+            // Add all disconnected inputs and outputs as pins.
+            subgraphInfo.elements.forEach(element => {
+                if (element instanceof FunctionInstance && element.functionchart === functionchart)
+                    return; // We don't expose a recursive instance of the functionchart.
+                const firstOutput = element.inWires.length;
+                for (let i = 0; i < firstOutput; i++) {
+                    const wire = element.inWires[i];
+                    if (wire)
+                        continue;
+                    const connected = new Multimap();
+                    const pin = element.type.inputs[i], type = pin.type;
+                    const pinInfo = { element, index: i, type, connected, fcIndex: -1 };
+                    inputs.push(pinInfo);
+                }
+                for (let i = 0; i < element.outWires.length; i++) {
+                    const wires = element.outWires[i];
+                    if (wires.length !== 0)
+                        continue;
+                    const connected = new Multimap();
+                    const pin = element.type.outputs[i], type = pin.type;
+                    const pinInfo = { element, index: i + firstOutput, type, connected, fcIndex: -1 };
+                    outputs.push(pinInfo);
+                }
+            });
+        }
         // Sort pins in increasing y-order. This lets users arrange the pins of the
         // new type in an intuitive way.
         function compareYs(p1, p2) {
