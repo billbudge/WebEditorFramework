@@ -971,10 +971,9 @@ export class FunctionchartContext extends EventBase {
             return false;
         if (src === dst)
             return false;
-        // Wires must be within the functionchart or from an enclosing functionchart. Wires from
-        // a functionchart to an enclosing one are considered valid, though that functionchart is not.
+        // Wires must be within the functionchart or from a source in an enclosing functionchart.
         const lca = getLowestCommonAncestor(src, dst);
-        if (!lca || !(lca === src.parent || lca === dst.parent))
+        if (!lca || lca !== src.parent)
             return false;
         const srcPin = wire.srcPin, dstPin = wire.dstPin;
         if (srcPin < 0 || srcPin >= src.type.outputs.length)
@@ -1084,16 +1083,6 @@ export class FunctionchartContext extends EventBase {
             if (!self.isValidWire(wire)) { // TODO incorporate in update graph info?
                 // console.log(wire, self.isValidWire(wire));
                 invalidWires.push(wire);
-            }
-            else {
-                // // Wires can't have a destination at a shallower level than the source.
-                // const sub = wire.src!.parent as Functionchart;
-                // let parent  = wire.dst!.parent as Functionchart;
-                // while (parent && parent !== sub) {
-                //   parent = parent.parent as Functionchart;
-                // }
-                // if (!parent)
-                //   invalidWires.push(wire);
             }
         });
         if (invalidWires.length !== 0)
