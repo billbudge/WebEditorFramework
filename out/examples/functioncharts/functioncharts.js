@@ -372,7 +372,7 @@ export class Functionchart extends NodeBase {
         super(template, context, id);
         // Derived properties.
         this.closed = true;
-        this.outWires = new Array(); // multiple outputs per pin (fan out).
+        this.instances = new Set(); // TODO do we need this mapping to instances?
     }
 }
 // Radius of rounded corners. This isn't themeable, as it's conceptually part of the notation.
@@ -401,8 +401,6 @@ export class FunctionchartContext extends EventBase {
         // Topologically sorted elements. If a cycle is present, the size is less than the elements set.
         this.sorted = new Array();
         this.invalidWires = new Array(); // Wires that violate the fan-in constraint.
-        // Map from functionchart to its instances.
-        this.fcMap = new Multimap();
         this.selection = new SelectionSet();
         this.layoutEngine = layoutEngine;
         const self = this;
@@ -1002,7 +1000,9 @@ export class FunctionchartContext extends EventBase {
     }
     isValidFunctionInstance(instance) {
         const parent = instance.parent;
-        return parent && this.canAddItem(instance, parent);
+        if (!parent)
+            return false;
+        return this.canAddItem(instance, parent);
     }
     // Update wire lists. Returns true iff wires don't fan-in to any input pins.
     updateWireLists() {
@@ -1163,7 +1163,7 @@ export class FunctionchartContext extends EventBase {
         this.visitNonWires(this.functionchart, item => {
             if (item instanceof FunctionInstance) {
                 const functionchart = item.functionchart;
-                if (item.type !== functionchart.type) {
+                if (item.type !== functionchart.type) { // TODO we should replaceElement here.
                     item.type = functionchart.type;
                 }
             }
@@ -1469,6 +1469,7 @@ export class FunctionchartContext extends EventBase {
             this.graphInfoNeedsUpdate = true;
             return;
         }
+        const self = this;
         // Update 'type' property for functioncharts and their instances.
         if (item instanceof Functionchart) {
             const typeInfo = this.getFunctionchartTypeInfo(item), typeString = typeInfo.typeString;
@@ -1479,8 +1480,8 @@ export class FunctionchartContext extends EventBase {
             item.type = type;
             // Update all instances of the functionchart.
             if (item.template === functionchartTemplate) {
-                this.fcMap.forValues(item, instance => {
-                    this.updateType(instance, type);
+                item.instances.forEach(instance => {
+                    self.updateType(instance, type);
                 });
             }
         }
@@ -1501,10 +1502,9 @@ export class FunctionchartContext extends EventBase {
         element.parent = parent;
         this.updateItem(element);
         this.graphInfoNeedsUpdate = true;
-        // TODO do we need fcMap?
         if (element instanceof FunctionInstance) {
             const functionChart = element.functionchart;
-            this.fcMap.add(functionChart, element);
+            functionChart.instances.add(element);
         }
     }
     removeElement(element) {
@@ -1512,7 +1512,7 @@ export class FunctionchartContext extends EventBase {
         this.graphInfoNeedsUpdate = true;
         if (element instanceof FunctionInstance) {
             const functionChart = element.functionchart;
-            this.fcMap.delete(functionChart, element);
+            functionChart.instances.delete(element);
         }
     }
     // Parent can be undefined in the case of the root functionchart.

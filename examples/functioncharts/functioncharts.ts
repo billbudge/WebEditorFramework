@@ -487,8 +487,8 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> implements Da
   get wires() { return this.template.wires.get(this) as List<Wire>; }
 
   // Derived properties.
-  closed: boolean = true;
-  outWires = new Array<Array<Wire>>();       // multiple outputs per pin (fan out).
+  closed = true;
+  instances = new Set<FunctionInstance>();  // TODO do we need this mapping to instances?
 
   constructor(context: FunctionchartContext, template: FunctionchartTemplate, id: number) {
     super(template, context, id);
@@ -566,9 +566,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   // Topologically sorted elements. If a cycle is present, the size is less than the elements set.
   private sorted = new Array<NodeTypes>();
   private invalidWires = new Array<Wire>();  // Wires that violate the fan-in constraint.
-
-  // Map from functionchart to its instances.
-  private readonly fcMap = new Multimap<Functionchart, FunctionInstance>();
 
   private readonly transactionManager: TransactionManager;
   private readonly historyManager: HistoryManager;
@@ -1247,8 +1244,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return true;
   }
   isValidFunctionInstance(instance: FunctionInstance) : boolean {
-    const parent = instance.parent as Functionchart;
-    return parent && this.canAddItem(instance, parent);
+    const parent = instance.parent;
+    if (!parent)
+      return false;
+    return this.canAddItem(instance, parent);
   }
 
   // Update wire lists. Returns true iff wires don't fan-in to any input pins.
@@ -1427,7 +1426,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.visitNonWires(this.functionchart, item => {
       if (item instanceof FunctionInstance) {
         const functionchart = item.functionchart!;
-        if (item.type !== functionchart.type) {
+        if (item.type !== functionchart.type) {  // TODO we should replaceElement here.
           item.type = functionchart.type;
         }
       }
@@ -1776,6 +1775,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       return;
     }
 
+    const self = this;
     // Update 'type' property for functioncharts and their instances.
     if (item instanceof Functionchart) {
       const typeInfo = this.getFunctionchartTypeInfo(item),
@@ -1787,8 +1787,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       item.type = type;
       // Update all instances of the functionchart.
       if (item.template === functionchartTemplate) {
-        this.fcMap.forValues(item, instance => {
-          this.updateType(instance, type);
+        item.instances.forEach(instance => {
+          self.updateType(instance, type);
         });
       }
     } else if (item instanceof FunctionInstance) {
@@ -1809,10 +1809,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     element.parent = parent;
     this.updateItem(element);
     this.graphInfoNeedsUpdate = true;
-    // TODO do we need fcMap?
     if (element instanceof FunctionInstance) {
       const functionChart = element.functionchart;
-      this.fcMap.add(functionChart, element);
+      functionChart.instances.add(element);
     }
   }
 
@@ -1821,7 +1820,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.graphInfoNeedsUpdate = true;
     if (element instanceof FunctionInstance) {
       const functionChart = element.functionchart;
-      this.fcMap.delete(functionChart, element);
+      functionChart.instances.delete(element);
     }
   }
 

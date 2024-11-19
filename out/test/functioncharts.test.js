@@ -297,10 +297,10 @@ describe('FunctionchartContext', () => {
         expect(context.isValidWire(wire)).toBe(true); // wildcard match
         const fc1 = addFunctionchart(functionchart), fc2 = addFunctionchart(functionchart), elem3 = addElement(fc1, 'binop'), elem4 = addElement(fc2, 'binop'), wire2 = addWire(fc1, elem3, 0, elem4, 0); // straddle sibling functioncharts.
         expect(context.isValidWire(wire2)).toBe(false);
-        const wire3 = addWire(functionchart, elem1, 0, elem3, 0);
+        const wire3 = addWire(functionchart, elem1, 0, elem3, 0); // from parent fc to child fc.
         expect(context.isValidWire(wire3)).toBe(true);
-        const wire4 = addWire(functionchart, elem3, 0, elem1, 0);
-        expect(context.isValidWire(wire4)).toBe(true);
+        const wire4 = addWire(functionchart, elem3, 0, elem1, 0); // from child fc to parent fc.
+        expect(context.isValidWire(wire4)).toBe(false);
     });
     test('isValidFunctionchart', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop');
