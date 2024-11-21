@@ -485,7 +485,7 @@ export class FunctionchartContext extends EventBase {
             case 'export':
                 template = exportTemplate;
                 break;
-            default: throw new Error('Unknown pseudoelement type: ' + typeName);
+            default: throw new Error('Unknown functionchart type: ' + typeName);
         }
         const result = new Functionchart(this, template, nextId);
         this.referentMap.set(nextId, result);
@@ -1021,24 +1021,24 @@ export class FunctionchartContext extends EventBase {
     topologicalSort() {
         const visiting = new Set(), visited = new Set(), sorted = new Array();
         let cycle = false;
-        function visit(element) {
-            if (visited.has(element))
+        function visit(node) {
+            if (visited.has(node))
                 return;
-            if (visiting.has(element)) {
+            if (visiting.has(node)) {
                 cycle = true;
                 return;
             }
-            visiting.add(element);
-            element.outWires.forEach(wires => {
+            visiting.add(node);
+            node.outWires.forEach(wires => {
                 wires.forEach(wire => {
                     visit(wire.dst);
                 });
             });
             if (cycle)
                 return;
-            visiting.delete(element);
-            visited.add(element);
-            sorted.push(element);
+            visiting.delete(node);
+            visited.add(node);
+            sorted.push(node);
         }
         this.elements.forEach(element => {
             if (!visited.has(element) && !visiting.has(element))
@@ -1728,10 +1728,10 @@ class Renderer {
         return { x, y, width, height };
     }
     // Get wire attachment point for element input/output pins.
-    inputPinToPoint(element, index) {
-        const rect = this.getBounds(element), type = element.flatType, pin = type.inputs[index];
+    inputPinToPoint(node, index) {
+        const rect = this.getBounds(node), type = node.flatType, pin = type.inputs[index];
         // Handle special case of 'import' element's last input.
-        if (element.template === importTemplate) {
+        if (node.template === importTemplate) {
             const inputs = type.inputs, lastInput = inputs.length - 1;
             if (index === lastInput) {
                 const mid = rect.x + rect.width / 2, bottom = rect.y + rect.height;
@@ -1740,10 +1740,10 @@ class Renderer {
         }
         return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 };
     }
-    outputPinToPoint(element, index) {
-        const rect = this.getBounds(element), type = element.flatType, pin = type.outputs[index];
+    outputPinToPoint(node, index) {
+        const rect = this.getBounds(node), type = node.flatType, pin = type.outputs[index];
         // Handle special case of 'export' functionchart's output.
-        if (element.template === exportTemplate) {
+        if (node.template === exportTemplate) {
             return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
         }
         return { x: rect.x + rect.width, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 };
@@ -1902,14 +1902,9 @@ class Renderer {
         if (pin.type === Type.valueType) {
             const r = theme.knobbyRadius;
             ctx.beginPath();
-            if (pin.type === Type.valueType) {
-                const d = 2 * r;
-                ctx.rect(x, y, d, d);
-            }
-            else {
-                // TODO remove
-                ctx.arc(x + r, y + r, r, 0, Math.PI * 2, true);
-            }
+            const d = 2 * r;
+            ctx.rect(x, y, d, d);
+            // ctx.arc(x + r, y + r, r, 0, Math.PI * 2, true);
             ctx.stroke();
         }
         else if (pin.type) {
@@ -2110,40 +2105,46 @@ class Renderer {
         }
     }
     draw(item, mode) {
-        if (item instanceof Functionchart) {
-            this.drawFunctionchart(item, mode);
+        if (item instanceof NodeBase) {
+            if (item instanceof Functionchart) {
+                this.drawFunctionchart(item, mode);
+            }
+            else if (item instanceof Pseudoelement) {
+                this.drawPseudoElement(item, mode);
+            }
+            else {
+                this.drawElement(item, mode);
+            }
         }
-        else if (item instanceof Pseudoelement) {
-            this.drawPseudoElement(item, mode);
-        }
-        else if (item instanceof NodeBase) {
-            this.drawElement(item, mode);
-        }
-        else if (item instanceof Wire) {
+        else {
             this.drawWire(item, mode);
         }
     }
     hitTest(item, p, tol, mode) {
         let hitInfo;
-        if (item instanceof Functionchart) {
-            hitInfo = this.hitTestFunctionchart(item, p, tol, mode);
+        if (item instanceof NodeBase) {
+            if (item instanceof Functionchart) {
+                hitInfo = this.hitTestFunctionchart(item, p, tol, mode);
+            }
+            else {
+                hitInfo = this.hitTestElement(item, p, tol, mode);
+            }
         }
-        else if (item instanceof NodeBase) {
-            hitInfo = this.hitTestElement(item, p, tol, mode);
-        }
-        else if (item instanceof Wire) {
+        else {
             hitInfo = this.hitTestWire(item, p, tol, mode);
         }
         return hitInfo;
     }
     layout(item) {
-        if (item instanceof Functionchart) {
-            this.layoutFunctionchart(item);
+        if (item instanceof NodeBase) {
+            if (item instanceof Functionchart) {
+                this.layoutFunctionchart(item);
+            }
+            else {
+                this.layoutElement(item);
+            }
         }
-        else if (item instanceof NodeBase) {
-            this.layoutElement(item);
-        }
-        else if (item instanceof Wire) {
+        else {
             this.layoutWire(item);
         }
     }

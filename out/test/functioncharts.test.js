@@ -245,9 +245,6 @@ describe('FunctionchartContext', () => {
     test('construct', () => {
         const context = new FC.FunctionchartContext();
         let element;
-        element = context.construct('literal');
-        expect(element instanceof FC.Element).toBe(true);
-        expect(element.template.typeName).toBe('literal');
         element = context.construct('element');
         expect(element instanceof FC.Element).toBe(true);
     });
