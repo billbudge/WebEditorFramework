@@ -9,8 +9,9 @@ function mutate(context, callback) {
     callback();
     context.updateGraphInfo();
 }
-function addElement(functionchart, type) {
-    const context = functionchart.context, element = context.newElement(type);
+function addElement(functionchart, typeString) {
+    const context = functionchart.context, element = context.newElement('element');
+    element.typeString = typeString;
     mutate(context, () => context.addItem(element, functionchart));
     return element;
 }
@@ -38,8 +39,8 @@ function addFunctionchart(parent) {
 // function addRecursiveFunctionchart(parent: FC.Functionchart) : FC.Functionchart {
 //   const context = parent.context,
 //         functionchart = parent.context.newFunctionchart(),
-//         elem1 = addElement(functionchart, 'binop'),
-//         elem2 = addElement(functionchart, 'binop'),
+//         elem1 = addElement(functionchart, '[vv,v]'),
+//         elem2 = addElement(functionchart, '[vv,v]'),
 //         wire1 = addWire(functionchart, elem1, 0, elem2, 0);
 //   context.completeElements([elem1, elem2], pinPosition, pinPosition);
 //   const self1 = addFunctionInstance(functionchart, functionchart),
@@ -164,7 +165,7 @@ describe('parseTypeString', () => {
 });
 describe('FunctionchartContext', () => {
     test('element interface', () => {
-        const context = new FC.FunctionchartContext(), element = context.newElement('binop');
+        const context = new FC.FunctionchartContext(), element = context.newElement('element');
         expect(element instanceof FC.Element).toBe(true);
         expect(element.id).toBe(2);
         expect(element.x).toBe(0);
@@ -179,12 +180,6 @@ describe('FunctionchartContext', () => {
         element.typeString = '[v,v]';
         expect(element.typeString).toBe('[v,v]');
         expect(element.type.inputs.length).toBe(1);
-        expect(element.type.outputs.length).toBe(1);
-    });
-    test('cond element', () => {
-        const context = new FC.FunctionchartContext(), element = context.newElement('cond');
-        expect(element.typeString).toBe('[vvv,v](?)');
-        expect(element.type.inputs.length).toBe(3);
         expect(element.type.outputs.length).toBe(1);
     });
     test('pseudoelement interface', () => {
@@ -207,7 +202,7 @@ describe('FunctionchartContext', () => {
         expect(pseudoelement.type.outputs.length).toBe(1);
     });
     test('wire interface', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop'), wire = addWire(functionchart, elem1, 0, elem2, 0);
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, '[vv,v]'), elem2 = addElement(functionchart, '[vv,v]'), wire = addWire(functionchart, elem1, 0, elem2, 0);
         expect(wire instanceof FC.Wire).toBe(true);
         expect(wire.src).toBe(elem1);
         expect(wire.src).toBe(elem1); // twice to exercise reference caching.
@@ -233,7 +228,7 @@ describe('FunctionchartContext', () => {
                 expect(iterated).toContain(item);
             }
         }
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop'), wire1 = addWire(functionchart, elem1, 0, elem2, 0), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire2 = addWire(functionchart, input, 0, elem1, 1), wire3 = addWire(functionchart, input, 0, elem2, 1), wire4 = addWire(functionchart, elem2, 0, output1, 0), wire5 = addWire(functionchart, elem2, 0, output2, 0);
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, '[vv,v]'), elem2 = addElement(functionchart, '[vv,v]'), wire1 = addWire(functionchart, elem1, 0, elem2, 0), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire2 = addWire(functionchart, input, 0, elem1, 1), wire3 = addWire(functionchart, input, 0, elem2, 1), wire4 = addWire(functionchart, elem2, 0, output1, 0), wire5 = addWire(functionchart, elem2, 0, output2, 0);
         const inputFn = context.forInWires.bind(context), outputFn = context.forOutWires.bind(context);
         testIterator(inputFn, input, []);
         testIterator(outputFn, input, [wire2, wire3]);
@@ -243,7 +238,7 @@ describe('FunctionchartContext', () => {
         testIterator(outputFn, elem2, [wire4, wire5]);
     });
     test('resolveReference', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop'), wire = addWire(functionchart, elem1, 0, elem2, 0);
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, '[vv,v]'), elem2 = addElement(functionchart, '[vv,v]'), wire = addWire(functionchart, elem1, 0, elem2, 0);
         expect(context.resolveReference(wire, wire.template.src)).toBe(elem1);
         expect(context.resolveReference(wire, wire.template.dst)).toBe(elem2);
     });
@@ -253,18 +248,11 @@ describe('FunctionchartContext', () => {
         element = context.construct('literal');
         expect(element instanceof FC.Element).toBe(true);
         expect(element.template.typeName).toBe('literal');
-        element = context.construct('binop');
+        element = context.construct('element');
         expect(element instanceof FC.Element).toBe(true);
-        expect(element.template.typeName).toBe('binop');
-        element = context.construct('unop');
-        expect(element instanceof FC.Element).toBe(true);
-        expect(element.template.typeName).toBe('unop');
-        element = context.construct('cond');
-        expect(element instanceof FC.Element).toBe(true);
-        expect(element.template.typeName).toBe('cond');
     });
     test('isValidWire', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, wire = addWire(functionchart, undefined, 0, undefined, 0), elem1 = addElement(functionchart, 'element'), elem2 = addElement(functionchart, 'element'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
+        const context = new FC.FunctionchartContext(), functionchart = context.root, wire = addWire(functionchart, undefined, 0, undefined, 0), elem1 = addElement(functionchart, '[vv,v]'), elem2 = addElement(functionchart, '[vv,v]'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
         elem1.typeString = '[v,v]';
         elem2.typeString = '[v[v,v],v[v,v]]';
         expect(context.isValidWire(wire)).toBe(false); // src, dst undefined
@@ -295,7 +283,7 @@ describe('FunctionchartContext', () => {
         wire.dst = output;
         wire.dstPin = 0;
         expect(context.isValidWire(wire)).toBe(true); // wildcard match
-        const fc1 = addFunctionchart(functionchart), fc2 = addFunctionchart(functionchart), elem3 = addElement(fc1, 'binop'), elem4 = addElement(fc2, 'binop'), wire2 = addWire(fc1, elem3, 0, elem4, 0); // straddle sibling functioncharts.
+        const fc1 = addFunctionchart(functionchart), fc2 = addFunctionchart(functionchart), elem3 = addElement(fc1, '[vv,v]'), elem4 = addElement(fc2, '[vv,v]'), wire2 = addWire(fc1, elem3, 0, elem4, 0); // straddle sibling functioncharts.
         expect(context.isValidWire(wire2)).toBe(false);
         const wire3 = addWire(functionchart, elem1, 0, elem3, 0); // from parent fc to child fc.
         expect(context.isValidWire(wire3)).toBe(true);
@@ -303,7 +291,7 @@ describe('FunctionchartContext', () => {
         expect(context.isValidWire(wire4)).toBe(false);
     });
     test('isValidFunctionchart', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), elem2 = addElement(functionchart, 'binop');
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, '[vv,v]'), elem2 = addElement(functionchart, '[vv,v]');
         expect(context.isValidFunctionchart()).toBe(true);
         expect(context.isValidFunctionchart()).toBe(true);
         const wire = addWire(functionchart, elem1, 0, elem2, 0);
@@ -314,9 +302,9 @@ describe('FunctionchartContext', () => {
         expect(context.isValidFunctionchart()).toBe(true);
     });
     test('replaceElement', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output, 0);
-        // Replace concrete element with 'cond' element that has pass-throughs.
-        const elem2 = addElement(functionchart, 'cond');
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, '[vv,v]'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output, 0);
+        // Replace concrete element with 'cond' element that has pass-throughs.  TODO passthroughs?
+        const elem2 = addElement(functionchart, '[vvv,v]');
         mutate(context, () => context.replaceElement(elem1, elem2));
         expect(wire1.src).toBe(input);
         expect(wire1.dst).toBe(elem2);
@@ -324,7 +312,7 @@ describe('FunctionchartContext', () => {
         expect(wire2.dst).toBe(output);
     });
     test('disconnectElement', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, '[vv,v]'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
         expect(functionchart.wires.length).toBe(3);
         // expect(elem1.inWires[0]).toBeUndefined();
         // expect(elem1.inWires[1]).toBe(wire1);
@@ -335,7 +323,7 @@ describe('FunctionchartContext', () => {
         // expect(elem1.outWires[0].length).toBe(0);
     });
     test('disconnectSelection', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, '[vv,v]'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
         expect(functionchart.wires.length).toBe(3);
         expect(elem1.inWires[0]).toBeUndefined();
         expect(elem1.inWires[1]).toBe(wire1);
@@ -352,7 +340,7 @@ describe('FunctionchartContext', () => {
         expect(elem1.outWires[0].length).toBe(0);
     });
     test('extendSelectionToWires', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, '[vv,v]'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
         context.selection.add(elem1);
         expect(context.selection.length).toBe(1);
         context.extendSelectionToWires();
@@ -363,7 +351,7 @@ describe('FunctionchartContext', () => {
         expect(context.selection.has(wire1)).toBe(true);
     });
     test('getConnectedElements', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'binop'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, '[vv,v]'), input = addPseudoelement(functionchart, 'input'), output1 = addPseudoelement(functionchart, 'output'), output2 = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output1, 0), wire3 = addWire(functionchart, elem1, 0, output2, 0);
         let connected = context.getConnectedNodes([elem1], () => true, () => false);
         expect(connected.size).toBe(2);
         expect(connected.has(elem1)).toBe(true);
@@ -383,7 +371,7 @@ describe('FunctionchartContext', () => {
     // test('updateType', () => {
     //   const context = new FC.FunctionchartContext(),
     //         functionchart = context.root,
-    //         elem1 = addElement(functionchart, 'element'),
+    //         elem1 = addElement(functionchart, '[vv,v]'),
     //         input = addPseudoelement(functionchart, 'input'),
     //         output = addPseudoelement(functionchart, 'output');
     //   elem1.typeString = '[v,v]';
@@ -405,7 +393,7 @@ describe('FunctionchartContext', () => {
     // test('resolveOutputType', () => {
     //   const context = new FC.FunctionchartContext(),
     //         functionchart = context.root,
-    //         elem1 = addElement(functionchart, 'element'),
+    //         elem1 = addElement(functionchart, '[vv,v]'),
     //         input = addPseudoelement(functionchart, 'input'),
     //         output = addPseudoelement(functionchart, 'output'),
     //         ios = new Set<FC.ElementTypes>();  // TODO test contents
@@ -436,7 +424,7 @@ describe('FunctionchartContext', () => {
     test('resolvePinType - input type', () => {
         // const context = new FC.FunctionchartContext(),
         //       functionchart = context.root,
-        //       elem1 = addElement(functionchart, 'element'),
+        //       elem1 = addElement(functionchart, '[vv,v]'),
         //       input = addPseudoelement(functionchart, 'input'),
         //       output = addPseudoelement(functionchart, 'output'),
         //       pins = new Collections.Multimap<FC.ElementTypes, number>();
@@ -474,7 +462,7 @@ describe('FunctionchartContext', () => {
         // expect(pins.has(input, 0)).toBe(true);
     });
     test('reduceSelection', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, functionchart1 = addFunctionchart(functionchart), elem1 = addElement(functionchart1, 'element'), elem2 = addElement(functionchart1, 'element'), elem3 = addElement(functionchart, 'element');
+        const context = new FC.FunctionchartContext(), functionchart = context.root, functionchart1 = addFunctionchart(functionchart), elem1 = addElement(functionchart1, '[vv,v]'), elem2 = addElement(functionchart1, '[vv,v]'), elem3 = addElement(functionchart, '[vv,v]');
         context.reduceSelection();
         expect(context.selectedTrueElements().length).toBe(0);
         expect(context.selectedNodes().length).toBe(0);
@@ -493,7 +481,7 @@ describe('FunctionchartContext', () => {
         expect(context.selectedNodes()[0]).toBe(functionchart1);
     });
     test('getFunctionchartTypeInfo', () => {
-        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, 'cond'), elem2 = addElement(functionchart, 'cond');
+        const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, '[vvv,v]'), elem2 = addElement(functionchart, '[vvv,v]');
         let typeInfo = context.getFunctionchartTypeInfo(functionchart);
         // No inputs or outputs.
         expect(typeInfo.typeString).toBe('[,]');
@@ -528,16 +516,16 @@ describe('FunctionchartContext', () => {
                 "id": 3,
                 "nonWires": [
                     {
-                        "type": "binop",
+                        "type": "element",
                         "id": 4,
+                        "name": "binop",
                         "typeString": "[vv,v](+)",
-                        "elements": []
                     },
                     {
-                        "type": "binop",
+                        "type": "element",
                         "id": 5,
+                        "name": "binop",
                         "typeString": "[vv,v](+)",
-                        "elements": []
                     },
                     {
                         "type": "input",
@@ -661,10 +649,11 @@ describe('FunctionchartContext', () => {
                                 "height": 71.89064025878906,
                                 "nonWires": [
                                     {
-                                        "type": "binop",
+                                        "type": "element",
                                         "id": 2,
                                         "x": 56,
                                         "y": 11.1031494140625,
+                                        "name": "binop",
                                         "typeString": "[vv,v](+)"
                                     },
                                     {
@@ -722,10 +711,11 @@ describe('FunctionchartContext', () => {
                                 "height": 91.9937744140625,
                                 "nonWires": [
                                     {
-                                        "type": "binop",
+                                        "type": "element",
                                         "id": 8,
                                         "x": 56,
                                         "y": 11.1031494140625,
+                                        "name": "binop",
                                         "typeString": "[vv,v](+)"
                                     },
                                     {

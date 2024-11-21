@@ -14,10 +14,11 @@
       "name": "facstep",
       "nonWires": [
         {
-          "type": "cond",
+          "type": "element",
           "id": 4,
           "x": 255.40626525878906,
           "y": 34.78749465942383,
+          "name": "cond",
           "typeString": "[vvv,v](?)"
         },
         {
@@ -28,10 +29,11 @@
           "typeString": "[v,]"
         },
         {
-          "type": "binop",
+          "type": "element",
           "id": 6,
           "x": 122.93126678466797,
           "y": 124.62187194824219,
+          "name": "binop",
           "typeString": "[vv,v](*)"
         },
         {
@@ -49,17 +51,19 @@
           "typeString": "[,v(n)]"
         },
         {
-          "type": "binop",
+          "type": "element",
           "id": 9,
           "x": 161.2750473022461,
           "y": 15.768756866455078,
+          "name": "binop",
           "typeString": "[vv,v](<=)"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 10,
           "x": 103.83127975463867,
           "y": 57.778133392333984,
+          "name": "literal",
           "typeString": "[,v(1)]"
         },
         {
@@ -167,10 +171,11 @@
       "name": "-1",
       "nonWires": [
         {
-          "type": "binop",
+          "type": "element",
           "id": 14,
           "x": 66.4375,
           "y": 8,
+          "name": "binop",
           "typeString": "[vv,v](-)"
         },
         {
@@ -181,10 +186,11 @@
           "typeString": "[v,]"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 16,
           "x": 3.5187530517578125,
           "y": 47.75,
+          "name": "literal",
           "typeString": "[,v(1)]"
         },
         {
@@ -243,10 +249,11 @@
           "typeString": "[v,]"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 21,
           "x": 5.4375,
           "y": 46.5093994140625,
+          "name": "literal",
           "typeString": "[,v(1)]"
         },
         {
@@ -291,10 +298,11 @@
       "name": "foldstep",
       "nonWires": [
         {
-          "type": "cond",
+          "type": "element",
           "id": 24,
           "x": 255.40626525878906,
           "y": 34.78749465942383,
+          "name": "cond",
           "typeString": "[vvv,v](?)"
         },
         {
@@ -319,17 +327,19 @@
           "typeString": "[,v(n)]"
         },
         {
-          "type": "binop",
+          "type": "element",
           "id": 28,
           "x": 161.2750473022461,
           "y": 15.768756866455078,
+          "name": "binop",
           "typeString": "[vv,v](<=)"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 29,
           "x": 103.83127975463867,
           "y": 57.778133392333984,
+          "name": "literal",
           "typeString": "[,v(1)]"
         },
         {
@@ -465,10 +475,11 @@
           "typeString": "[v,]"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 36,
           "x": 5.4375,
           "y": 46.5093994140625,
+          "name": "literal",
           "typeString": "[,v(1)]"
         },
         {
@@ -541,10 +552,11 @@
           "typeString": "[v,]"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 42,
           "x": 5.4375,
           "y": 46.5093994140625,
+          "name": "literal",
           "typeString": "[,v(1)]"
         },
         {
@@ -563,17 +575,18 @@
         },
         {
           "type": "export",
-          "id": 47,
+          "id": 45,
           "x": 7.13427734375,
           "y": 79.14380264282227,
-          "width": 54.44374465942383,
+          "width": 56,
           "height": 64.0531005859375,
           "nonWires": [
             {
-              "type": "binop",
-              "id": 48,
+              "type": "element",
+              "id": 46,
               "x": 6.443744659423828,
               "y": 6.0531005859375,
+              "name": "binop",
               "typeString": "[vv,v](+)"
             }
           ],
@@ -604,7 +617,7 @@
         },
         {
           "type": "wire",
-          "src": 47,
+          "src": 45,
           "srcPin": 0,
           "dst": 44,
           "dstPin": 2

@@ -277,7 +277,7 @@ abstract class NonWireTemplate {
   readonly y = yProp;
 }
 
-export type ElementType = 'literal' | 'binop' | 'unop' | 'cond' | 'var' | 'import' | 'element';
+export type ElementType = 'import' | 'element';
 
 class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
@@ -334,12 +334,7 @@ class FunctionInstanceTemplate extends NonWireTemplate {
   readonly properties = [this.id, this.x, this.y, this.functionchart];
 }
 
-const literalTemplate = new ElementTemplate('literal'),
-      binopTemplate = new ElementTemplate('binop'),
-      unopTemplate = new ElementTemplate('unop'),
-      condTemplate = new ElementTemplate('cond'),
-      varTemplate = new ElementTemplate('var'),
-      importTemplate = new ElementTemplate('import'),
+const importTemplate = new ElementTemplate('import'),
       elementTemplate = new ElementTemplate('element'),
       inputTemplate = new PseudoelementTemplate('input'),
       outputTemplate = new PseudoelementTemplate('output'),
@@ -397,6 +392,8 @@ export class Element extends NodeBase<ElementTemplate> implements DataContextObj
   set x(value: number) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
   set y(value: number) { this.template.y.set(this, value); }
+  get name() { return this.template.name.get(this); }
+  set name(value: string) { this.template.name.set(this, value); }
   get typeString() { return this.template.typeString.get(this); }
   set typeString(value: string) { this.template.typeString.set(this, value); }
 
@@ -480,7 +477,7 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> implements Da
   set width(value: number) { this.template.width.set(this, value); }
   get height() { return this.template.height.get(this) || 0; }
   set height(value: number) { this.template.height.set(this, value); }
-  get name() { return this.template.name.get(this) || 0; }
+  get name() { return this.template.name.get(this); }
   set name(value: number) { this.template.name.set(this, value); }
 
   get nonWires() { return this.template.nonWires.get(this) as List<NodeTypes>; }
@@ -612,26 +609,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     let template: ElementTemplate,
         typeString: string;
     switch (typeName) {
-      case 'literal':
-        template = literalTemplate;
-        typeString = '[,v]';
-        break;
-      case 'binop':
-        template = binopTemplate;
-        typeString = '[vv,v]';
-        break;
-      case 'unop':
-        template = unopTemplate;
-        typeString = '[v,v]';
-        break;
-      case 'cond':
-        template = condTemplate;
-        typeString = '[vvv,v](?)';
-        break;
-      case 'var':
-        template = varTemplate;
-        typeString = '[,v[v,v]](var)';
-        break;
       case 'import':
         template = importTemplate;
         typeString = Type.emptyTypeString;
@@ -1926,14 +1903,19 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
   construct(typeName: string) : AllTypes {
     switch (typeName) {
-      case 'literal':
+      case 'import':
+      case 'element': return this.newElement(typeName);
+
+      // TODO remove this when files are converted.
       case 'binop':
       case 'unop':
       case 'cond':
-      case 'import':
-      case 'var':
-      case 'element': return this.newElement(typeName);
-
+      case 'literal':
+      case 'var': {
+        const result = this.newElement('element');
+        result.name = typeName;
+        return result;
+      }
       case 'input':
       case 'output': return this.newPseudoelement(typeName);
 
@@ -2759,11 +2741,11 @@ export class FunctionchartEditor implements CanvasLayer {
           functionchart = context.newFunctionchart('functionchart'),
           input = context.newPseudoelement('input'),
           output = context.newPseudoelement('output'),
-          literal = context.newElement('literal'),
-          binop = context.newElement('binop'),
-          unop = context.newElement('unop'),
-          cond = context.newElement('cond'),
-          varBinding = context.newElement('var'),
+          literal = context.newElement('element'),
+          binop = context.newElement('element'),
+          unop = context.newElement('element'),
+          cond = context.newElement('element'),
+          varBinding = context.newElement('element'),
           newFunctionchart = context.newFunctionchart('functionchart'),
           newExport = context.newFunctionchart('export');
 
@@ -2772,12 +2754,20 @@ export class FunctionchartEditor implements CanvasLayer {
     input.x = 8;  input.y = 8;
     output.x = 40; output.y = 8;
     literal.x = 8; literal.y = 32;
-    binop.x = 40; binop.y = 32;
+    literal.name = 'literal';
+    literal.typeString = '[,v(0)]';
+    binop.x = 56; binop.y = 32;
+    binop.name = 'binop';
     binop.typeString = '[vv,v](+)';  // binary addition
-    unop.x = 80; unop.y = 32;
-    unop.typeString = '[v,v](-)';    // unary negation
-    cond.x = 118; cond.y = 32;     // conditional
-    varBinding.x = 156; varBinding.y = 32;
+    unop.x = 96; unop.y = 32;
+    unop.name = 'unop';
+    unop.typeString = '[v,v](-)';  // unary negation
+    cond.x = 134; cond.y = 32;
+    cond.name = 'cond';
+    cond.typeString = '[vvv,v](?)';  // conditional
+    varBinding.x = 172; varBinding.y = 32;
+    varBinding.name = 'var';
+    varBinding.typeString = '[,v[v,v]](var)';
 
     newFunctionchart.x = 8; newFunctionchart.y = 90;
     newFunctionchart.width = this.theme.minFunctionchartWidth;
@@ -2823,14 +2813,17 @@ export class FunctionchartEditor implements CanvasLayer {
           return item.type.outputs[0].name || '';
         case 'output':      // [v(label),]
           return item.type.inputs[0].name || '';
-        case 'literal':     // [,v(label)]
-          return item.type.outputs[0].name || '';
-        case 'binop':       // [vv,v](label)
-        case 'unop':        // [v,v](label)
+        case 'element': {     // [vv,v](label), [v,v](label), [vvv,v](label)
+          const element = item as Element;
+          if (element.name == 'literal')
+            return item.type.outputs[0].name;
+          return item.type.name;
+        }
       }
       return '';
     }
-    function elementLabelSetter(info: ItemInfo, item: AllTypes, value: any) {
+    function elementLabelSetter(info: ItemInfo, item: NodeTypes, value: any) {
+      // TODO escape '(', ')', '/'
       const labelPart = value ? '(' + value + ')' : '';
       let newValue;
       switch (item.template.typeName) {
@@ -2840,15 +2833,17 @@ export class FunctionchartEditor implements CanvasLayer {
         case 'output':      // [v(label),]
           newValue = '[v' + labelPart + ',]';
           break;
-        case 'literal':     // [,v(label)]
-          newValue = '[,v' + labelPart + ']';
+        case 'element': {
+          const element = item as Element;
+          let type = element.type;
+          if (element.name === 'literal') {
+            type = new Type([], [new Pin(type.outputs[0].type, value)]);
+          } else {
+            type = new Type(type.inputs, type.outputs, value);
+          }
+          newValue = type.toString();
           break;
-        case 'binop':       // [vv,v](label)
-          newValue = '[vv,v]' + labelPart;
-          break;
-        case 'unop':       // [v,v](label)
-          newValue = '[v,v]' + labelPart;
-          break;
+        }
       }
       setter(info, item, newValue);
     }
@@ -2864,15 +2859,6 @@ export class FunctionchartEditor implements CanvasLayer {
     this.propertyInfo.set('output', [
       {
         label: 'label',
-        type: 'text',
-        getter: elementLabelGetter,
-        setter: elementLabelSetter,
-        prop: typeStringProp,
-      }
-    ]);
-    this.propertyInfo.set('literal', [
-      {
-        label: 'value',
         type: 'text',
         getter: elementLabelGetter,
         setter: elementLabelSetter,
@@ -2897,6 +2883,24 @@ export class FunctionchartEditor implements CanvasLayer {
         label: 'operator',
         type: 'enum',
         values: unaryOps.join(','),
+        getter: elementLabelGetter,
+        setter: elementLabelSetter,
+        prop: typeStringProp,
+      },
+    ]);
+    this.propertyInfo.set('literal', [
+      {
+        label: 'value',
+        type: 'text',
+        getter: elementLabelGetter,
+        setter: elementLabelSetter,
+        prop: typeStringProp,
+      }
+    ]);
+    this.propertyInfo.set('var', [
+      {
+        label: 'name',
+        type: 'text',
         getter: elementLabelGetter,
         setter: elementLabelSetter,
         prop: typeStringProp,
@@ -3279,8 +3283,13 @@ export class FunctionchartEditor implements CanvasLayer {
   }
   setPropertyGrid() {
     const context = this.context,
-          item = context.selection.lastSelected,
-          type = item ? item.template.typeName : undefined;
+          item = context.selection.lastSelected;
+    let type = undefined;
+    if (item instanceof Element) {
+      type = item.name;  // 'binop', 'unop', 'cond', 'literal', 'var'
+    } else if (item) {
+      type = item.template.typeName;
+    }
     this.propertyGridController.show(type, item);
   }
   onClick(canvasController: CanvasController) {

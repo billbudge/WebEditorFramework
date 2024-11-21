@@ -266,7 +266,7 @@ class FunctionInstanceTemplate extends NonWireTemplate {
         this.properties = [this.id, this.x, this.y, this.functionchart];
     }
 }
-const literalTemplate = new ElementTemplate('literal'), binopTemplate = new ElementTemplate('binop'), unopTemplate = new ElementTemplate('unop'), condTemplate = new ElementTemplate('cond'), varTemplate = new ElementTemplate('var'), importTemplate = new ElementTemplate('import'), elementTemplate = new ElementTemplate('element'), inputTemplate = new PseudoelementTemplate('input'), outputTemplate = new PseudoelementTemplate('output'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate('functionchart'), exportTemplate = new FunctionchartTemplate('export'), functionInstanceTemplate = new FunctionInstanceTemplate();
+const importTemplate = new ElementTemplate('import'), elementTemplate = new ElementTemplate('element'), inputTemplate = new PseudoelementTemplate('input'), outputTemplate = new PseudoelementTemplate('output'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate('functionchart'), exportTemplate = new FunctionchartTemplate('export'), functionInstanceTemplate = new FunctionInstanceTemplate();
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
@@ -302,6 +302,8 @@ export class Element extends NodeBase {
     set x(value) { this.template.x.set(this, value); }
     get y() { return this.template.y.get(this) || 0; }
     set y(value) { this.template.y.set(this, value); }
+    get name() { return this.template.name.get(this); }
+    set name(value) { this.template.name.set(this, value); }
     get typeString() { return this.template.typeString.get(this); }
     set typeString(value) { this.template.typeString.set(this, value); }
     constructor(template, context, id) {
@@ -364,7 +366,7 @@ export class Functionchart extends NodeBase {
     set width(value) { this.template.width.set(this, value); }
     get height() { return this.template.height.get(this) || 0; }
     set height(value) { this.template.height.set(this, value); }
-    get name() { return this.template.name.get(this) || 0; }
+    get name() { return this.template.name.get(this); }
     set name(value) { this.template.name.set(this, value); }
     get nonWires() { return this.template.nonWires.get(this); }
     get wires() { return this.template.wires.get(this); }
@@ -434,26 +436,6 @@ export class FunctionchartContext extends EventBase {
         const nextId = ++this.highestId;
         let template, typeString;
         switch (typeName) {
-            case 'literal':
-                template = literalTemplate;
-                typeString = '[,v]';
-                break;
-            case 'binop':
-                template = binopTemplate;
-                typeString = '[vv,v]';
-                break;
-            case 'unop':
-                template = unopTemplate;
-                typeString = '[v,v]';
-                break;
-            case 'cond':
-                template = condTemplate;
-                typeString = '[vvv,v](?)';
-                break;
-            case 'var':
-                template = varTemplate;
-                typeString = '[,v[v,v]](var)';
-                break;
             case 'import':
                 template = importTemplate;
                 typeString = Type.emptyTypeString;
@@ -1614,13 +1596,18 @@ export class FunctionchartContext extends EventBase {
     }
     construct(typeName) {
         switch (typeName) {
-            case 'literal':
+            case 'import':
+            case 'element': return this.newElement(typeName);
+            // TODO remove this when files are converted.
             case 'binop':
             case 'unop':
             case 'cond':
-            case 'import':
-            case 'var':
-            case 'element': return this.newElement(typeName);
+            case 'literal':
+            case 'var': {
+                const result = this.newElement('element');
+                result.name = typeName;
+                return result;
+            }
             case 'input':
             case 'output': return this.newPseudoelement(typeName);
             case 'wire': return this.newWire(undefined, -1, undefined, -1);
@@ -2262,7 +2249,7 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newElement('literal'), binop = context.newElement('binop'), unop = context.newElement('unop'), cond = context.newElement('cond'), varBinding = context.newElement('var'), newFunctionchart = context.newFunctionchart('functionchart'), newExport = context.newFunctionchart('export');
+        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), varBinding = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart'), newExport = context.newFunctionchart('export');
         context.root = functionchart;
         input.x = 8;
         input.y = 8;
@@ -2270,16 +2257,24 @@ export class FunctionchartEditor {
         output.y = 8;
         literal.x = 8;
         literal.y = 32;
-        binop.x = 40;
+        literal.name = 'literal';
+        literal.typeString = '[,v(0)]';
+        binop.x = 56;
         binop.y = 32;
+        binop.name = 'binop';
         binop.typeString = '[vv,v](+)'; // binary addition
-        unop.x = 80;
+        unop.x = 96;
         unop.y = 32;
+        unop.name = 'unop';
         unop.typeString = '[v,v](-)'; // unary negation
-        cond.x = 118;
-        cond.y = 32; // conditional
-        varBinding.x = 156;
+        cond.x = 134;
+        cond.y = 32;
+        cond.name = 'cond';
+        cond.typeString = '[vvv,v](?)'; // conditional
+        varBinding.x = 172;
         varBinding.y = 32;
+        varBinding.name = 'var';
+        varBinding.typeString = '[,v[v,v]](var)';
         newFunctionchart.x = 8;
         newFunctionchart.y = 90;
         newFunctionchart.width = this.theme.minFunctionchartWidth;
@@ -2322,14 +2317,17 @@ export class FunctionchartEditor {
                     return item.type.outputs[0].name || '';
                 case 'output': // [v(label),]
                     return item.type.inputs[0].name || '';
-                case 'literal': // [,v(label)]
-                    return item.type.outputs[0].name || '';
-                case 'binop': // [vv,v](label)
-                case 'unop': // [v,v](label)
+                case 'element': { // [vv,v](label), [v,v](label), [vvv,v](label)
+                    const element = item;
+                    if (element.name == 'literal')
+                        return item.type.outputs[0].name;
+                    return item.type.name;
+                }
             }
             return '';
         }
         function elementLabelSetter(info, item, value) {
+            // TODO escape '(', ')', '/'
             const labelPart = value ? '(' + value + ')' : '';
             let newValue;
             switch (item.template.typeName) {
@@ -2339,15 +2337,18 @@ export class FunctionchartEditor {
                 case 'output': // [v(label),]
                     newValue = '[v' + labelPart + ',]';
                     break;
-                case 'literal': // [,v(label)]
-                    newValue = '[,v' + labelPart + ']';
+                case 'element': {
+                    const element = item;
+                    let type = element.type;
+                    if (element.name === 'literal') {
+                        type = new Type([], [new Pin(type.outputs[0].type, value)]);
+                    }
+                    else {
+                        type = new Type(type.inputs, type.outputs, value);
+                    }
+                    newValue = type.toString();
                     break;
-                case 'binop': // [vv,v](label)
-                    newValue = '[vv,v]' + labelPart;
-                    break;
-                case 'unop': // [v,v](label)
-                    newValue = '[v,v]' + labelPart;
-                    break;
+                }
             }
             setter(info, item, newValue);
         }
@@ -2363,15 +2364,6 @@ export class FunctionchartEditor {
         this.propertyInfo.set('output', [
             {
                 label: 'label',
-                type: 'text',
-                getter: elementLabelGetter,
-                setter: elementLabelSetter,
-                prop: typeStringProp,
-            }
-        ]);
-        this.propertyInfo.set('literal', [
-            {
-                label: 'value',
                 type: 'text',
                 getter: elementLabelGetter,
                 setter: elementLabelSetter,
@@ -2396,6 +2388,24 @@ export class FunctionchartEditor {
                 label: 'operator',
                 type: 'enum',
                 values: unaryOps.join(','),
+                getter: elementLabelGetter,
+                setter: elementLabelSetter,
+                prop: typeStringProp,
+            },
+        ]);
+        this.propertyInfo.set('literal', [
+            {
+                label: 'value',
+                type: 'text',
+                getter: elementLabelGetter,
+                setter: elementLabelSetter,
+                prop: typeStringProp,
+            }
+        ]);
+        this.propertyInfo.set('var', [
+            {
+                label: 'name',
+                type: 'text',
                 getter: elementLabelGetter,
                 setter: elementLabelSetter,
                 prop: typeStringProp,
@@ -2723,7 +2733,14 @@ export class FunctionchartEditor {
         return hitInfo;
     }
     setPropertyGrid() {
-        const context = this.context, item = context.selection.lastSelected, type = item ? item.template.typeName : undefined;
+        const context = this.context, item = context.selection.lastSelected;
+        let type = undefined;
+        if (item instanceof Element) {
+            type = item.name; // 'binop', 'unop', 'cond', 'literal', 'var'
+        }
+        else if (item) {
+            type = item.template.typeName;
+        }
         this.propertyGridController.show(type, item);
     }
     onClick(canvasController) {

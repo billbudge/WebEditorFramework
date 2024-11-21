@@ -14,10 +14,11 @@
       "name": "sgn",
       "nonWires": [
         {
-          "type": "cond",
+          "type": "element",
           "id": 4,
           "x": 230.8046875,
           "y": 8.90625,
+          "name": "cond",
           "typeString": "[v**,*](?)"
         },
         {
@@ -28,24 +29,27 @@
           "typeString": "[v(b),]"
         },
         {
-          "type": "cond",
+          "type": "element",
           "id": 6,
           "x": 188.015625,
           "y": 80,
+          "name": "cond",
           "typeString": "[v**,*](?)"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 7,
           "x": 9.359375,
           "y": 88.79296875,
+          "name": "literal",
           "typeString": "[,v(0)]"
         },
         {
-          "type": "binop",
+          "type": "element",
           "id": 8,
           "x": 103.16796875,
           "y": 118.25,
+          "name": "binop",
           "typeString": "[vv,v](>)"
         },
         {
@@ -56,24 +60,27 @@
           "typeString": "[,v(a)]"
         },
         {
-          "type": "binop",
+          "type": "element",
           "id": 10,
           "x": 102.17578125,
           "y": 8.26171875,
+          "name": "binop",
           "typeString": "[vv,v](<)"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 11,
           "x": 86.9765625,
           "y": 77.26953125,
+          "name": "literal",
           "typeString": "[,v(1)]"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 12,
           "x": 146.15234375,
           "y": 48.390625,
+          "name": "literal",
           "typeString": "[,v(-1)]"
         }
       ],

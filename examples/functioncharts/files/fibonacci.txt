@@ -14,12 +14,12 @@
       "name": "-1",
       "nonWires": [
         {
-          "type": "binop",
+          "type": "element",
           "id": 4,
           "x": 85.79296875,
           "y": 8,
-          "typeString": "[vv,v](-)",
-          "elements": []
+          "name": "binop",
+          "typeString": "[vv,v](-)"
         },
         {
           "type": "output",
@@ -29,12 +29,12 @@
           "typeString": "[*,]"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 6,
           "x": 22.76171875,
           "y": 49.2109375,
-          "typeString": "[,v(1)]",
-          "elements": []
+          "name": "literal",
+          "typeString": "[,v(1)]"
         },
         {
           "type": "input",
@@ -78,12 +78,12 @@
       "name": "fibstep",
       "nonWires": [
         {
-          "type": "cond",
+          "type": "element",
           "id": 9,
           "x": 249.66796875,
           "y": 23.8359375,
-          "typeString": "[v**,*](?)",
-          "elements": []
+          "name": "cond",
+          "typeString": "[v**,*](?)"
         },
         {
           "type": "input",
@@ -93,12 +93,12 @@
           "typeString": "[,*(v0)]"
         },
         {
-          "type": "binop",
+          "type": "element",
           "id": 11,
           "x": 106.2578125,
           "y": 138.37890625,
-          "typeString": "[vv,v](+)",
-          "elements": []
+          "name": "binop",
+          "typeString": "[vv,v](+)"
         },
         {
           "type": "input",
@@ -108,20 +108,20 @@
           "typeString": "[,*(v1)]"
         },
         {
-          "type": "binop",
+          "type": "element",
           "id": 13,
           "x": 176.59375,
           "y": 9.95703125,
-          "typeString": "[vv,v](<=)",
-          "elements": []
+          "name": "binop",
+          "typeString": "[vv,v](<=)"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 14,
           "x": 115.01171875,
           "y": 41.57421875,
-          "typeString": "[,v(1)]",
-          "elements": []
+          "name": "literal",
+          "typeString": "[,v(1)]"
         },
         {
           "type": "input",
@@ -270,12 +270,12 @@
           "typeString": "[*,]"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 23,
           "x": 8,
           "y": 44.48828125,
-          "typeString": "[,v(1)]",
-          "elements": []
+          "name": "literal",
+          "typeString": "[,v(1)]"
         }
       ],
       "wires": [
