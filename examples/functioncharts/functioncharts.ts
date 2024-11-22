@@ -334,14 +334,24 @@ class FunctionInstanceTemplate extends NonWireTemplate {
   readonly properties = [this.id, this.x, this.y, this.functionchart];
 }
 
-const importTemplate = new ElementTemplate('import'),
-      elementTemplate = new ElementTemplate('element'),
-      inputTemplate = new PseudoelementTemplate('input'),
-      outputTemplate = new PseudoelementTemplate('output'),
+const importTemplate = new ElementTemplate('import'),       // abstract element
+      elementTemplate = new ElementTemplate('element'),     // built-in elements
+      inputTemplate = new PseudoelementTemplate('input'),   // input pseudoelement
+      outputTemplate = new PseudoelementTemplate('output'),  // output pseudoelement
       wireTemplate = new WireTemplate(),
       functionchartTemplate = new FunctionchartTemplate('functionchart'),
-      exportTemplate = new FunctionchartTemplate('export'),
+      exportTemplate = new FunctionchartTemplate('export'),  // 'export' functionchart
       functionInstanceTemplate = new FunctionInstanceTemplate();
+
+function isImport(item: AllTypes) {
+  return item.template === importTemplate;
+}
+function isFunctionDefinition(item: AllTypes) {
+  return item.template === functionchartTemplate;
+}
+function isFunctionExport(item: AllTypes) {
+  return item.template === exportTemplate;
+}
 
 const defaultPoint = { x: 0, y: 0 },
       defaultPointWithNormal: PointWithNormal = { x: 0, y: 0, nx: 0 , ny: 0 },
@@ -1615,7 +1625,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
     });
     // For 'export' functioncharts, unwired inputs and outputs.
-    if (functionchart.template === exportTemplate) {
+    if (isFunctionExport(functionchart)) {
       // Add all disconnected inputs and outputs as pins.
       subgraphInfo.elements.forEach(element => {
         if (element instanceof FunctionInstance && element.functionchart === functionchart)
@@ -1758,12 +1768,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       const typeInfo = this.getFunctionchartTypeInfo(item),
             typeString = typeInfo.typeString;
       let type = parseTypeString(typeString);
-      if (item.template === exportTemplate) {
+      if (isFunctionExport(item)) {
         type = type.toExportType();
       }
       item.type = type;
       // Update all instances of the functionchart.
-      if (item.template === functionchartTemplate) {
+      if (isFunctionDefinition(item)) {
         item.instances.forEach(instance => {
           self.updateType(instance, type);
         });
@@ -2073,7 +2083,7 @@ class Renderer implements ILayoutEngine {
           type = node.flatType,
           pin = type.inputs[index];
     // Handle special case of 'import' element's last input.
-    if (node.template === importTemplate) {
+    if (isImport(node)) {
       const inputs = type.inputs,
             lastInput = inputs.length - 1;
       if (index === lastInput) {
@@ -2089,7 +2099,7 @@ class Renderer implements ILayoutEngine {
           type = node.flatType,
           pin = type.outputs[index];
     // Handle special case of 'export' functionchart's output.
-    if (node.template === exportTemplate) {
+    if (isFunctionExport(node)) {
       return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
     }
     return { x: rect.x + rect.width, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
@@ -2329,7 +2339,7 @@ class Renderer implements ILayoutEngine {
         ctx.strokeStyle = theme.strokeColor;
         ctx.stroke();
         const type = element.flatType;
-        if (element.template === importTemplate) {
+        if (isImport(element)) {
           const name = type.name
           if (name) {
             ctx.fillStyle = theme.textColor;
@@ -2418,7 +2428,7 @@ class Renderer implements ILayoutEngine {
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
         ctx.stroke();
-        if (functionchart.template === functionchartTemplate) {
+        if (isFunctionDefinition(functionchart)) {
           const type = functionchart.flatType,
           instancerRect = this.instancerBounds(functionchart);
           ctx.beginPath();
@@ -2429,7 +2439,7 @@ class Renderer implements ILayoutEngine {
           ctx.lineWidth = 0.5;
           ctx.stroke();
           this.drawType(type, instancerRect.x, instancerRect.y);
-        } else if (functionchart.template === exportTemplate) {
+        } else if (isFunctionExport(functionchart)) {
           const pin = new Pin(Type.valueType),
                 r = this.theme.knobbyRadius;
           this.drawPin(pin, x + w - 2 * r, y + h / 2 - r);
@@ -2481,11 +2491,11 @@ class Renderer implements ILayoutEngine {
     let instancer = false, output = -1;
     if (!inner)
       return;
-    if (functionchart.template === functionchartTemplate) {
+    if (isFunctionDefinition(functionchart)) {
       const instancerRect = this.instancerBounds(functionchart);
       instancer = hitTestRect(
                 instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height, p, tol) !== undefined;
-    } else if (functionchart.template === exportTemplate) {
+    } else if (isFunctionExport(functionchart)) {
       const pinPt = this.outputPinToPoint(functionchart, 0),
             rect = this.pinToRect(functionchart.type.outputs[0], pinPt);
       if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
