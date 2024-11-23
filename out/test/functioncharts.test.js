@@ -22,7 +22,7 @@ function addPseudoelement(functionchart, type) {
 }
 function addFunctionInstance(functionchart, definition) {
     const context = functionchart.context, functionInstance = context.newFunctionInstance();
-    functionInstance.functionchart = definition;
+    functionInstance.instancer = definition;
     mutate(context, () => context.addItem(functionInstance, functionchart));
     return functionInstance;
 }
