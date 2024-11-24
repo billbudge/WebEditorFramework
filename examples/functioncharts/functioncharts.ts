@@ -16,6 +16,9 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
          getLowestCommonAncestor, ancestorInSet, reduceToRoots,
          List, TransactionManager, TransactionEvent, HistoryManager, ScalarPropertyTypes,
          ArrayPropertyTypes } from '../../src/dataModels.js'
+
+import { functionBuiltins } from '../../examples/functioncharts/functionBuiltins.js'
+
 import { types } from '@babel/core';
 import { isElementAccessChain } from 'typescript';
 
@@ -273,7 +276,7 @@ const idProp = new IdProp('id'),
       dstPinProp = new ScalarProp('dstPin'),
       nonWiresProp = new ChildArrayProp('nonWires'),
       wiresProp = new ChildArrayProp('wires'),
-      instancerProp = new ReferenceProp('functionchart');  // TODO 'instancer'
+      instancerProp = new ReferenceProp('functionchart');  // TODO rename 'instancer'
 
 abstract class NonWireTemplate {
   readonly id = idProp;
@@ -281,7 +284,7 @@ abstract class NonWireTemplate {
   readonly y = yProp;
 }
 
-export type ElementType = 'element' | 'instancer';
+export type ElementType = 'element' | 'builtin' | 'instancer';
 
 class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
@@ -339,6 +342,7 @@ class FunctionInstanceTemplate extends NonWireTemplate {
 }
 
 const elementTemplate = new ElementTemplate('element'),      // built-in elements
+      builtinTemplate = new ElementTemplate('builtin'),      // built-in elements
       instancerTemplate = new ElementTemplate('instancer'),  // abstract element
       inputTemplate = new PseudoelementTemplate('input'),    // input pseudoelement
       outputTemplate = new PseudoelementTemplate('output'),  // output pseudoelement
@@ -644,6 +648,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     switch (typeName) {
       case 'element':
         result = new Element(elementTemplate, this, nextId);
+        break;
+      case 'builtin':
+        result = new Element(builtinTemplate, this, nextId);
         break;
       case 'instancer':
         result = new InstancerElement(instancerTemplate, this, nextId);
@@ -1945,6 +1952,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   construct(typeName: string) : AllTypes {
     switch (typeName) {
       case 'element':
+      case 'builtin':
       case 'instancer': return this.newElement(typeName);
 
       // TODO remove this when files are converted.
@@ -2751,6 +2759,7 @@ export class FunctionchartEditor implements CanvasLayer {
   private hoverHitInfo: HitResultTypes | undefined;
   private hoverPoint: Point;
   private propertyInfo = new Map<string, ItemInfo[]>();
+  private builtinStrings: Array<string> = [];  // todo
 
   constructor(baseTheme: Theme,
               canvasController: CanvasController,
@@ -2788,6 +2797,7 @@ export class FunctionchartEditor implements CanvasLayer {
           unop = context.newElement('element'),
           cond = context.newElement('element'),
           varBinding = context.newElement('element'),
+          builtin = context.newElement('builtin'),
           newFunctionchart = context.newFunctionchart('functionchart'),
           newExport = context.newFunctionchart('export');
 
@@ -2810,6 +2820,9 @@ export class FunctionchartEditor implements CanvasLayer {
     varBinding.x = 172; varBinding.y = 32;
     varBinding.name = 'var';
     varBinding.typeString = '[,v[v,v]](var)';
+    builtin.x = 212; builtin.y = 32;
+    builtin.name = 'Math';
+    builtin.typeString = '[v,v](abs)';
 
     newFunctionchart.x = 8; newFunctionchart.y = 90;
     newFunctionchart.width = this.theme.minFunctionchartWidth;
@@ -2825,6 +2838,7 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nonWires.append(binop);
     functionchart.nonWires.append(unop);
     functionchart.nonWires.append(cond);
+    functionchart.nonWires.append(builtin);
     functionchart.nonWires.append(newFunctionchart);
     functionchart.nonWires.append(newExport);
     context.root = functionchart;
@@ -2919,7 +2933,7 @@ export class FunctionchartEditor implements CanvasLayer {
         prop: typeStringProp,
       },
     ]);
-    const unaryOps = ['!', '~', '-', '√'];
+    const unaryOps = ['!', '~', '-', '√'];  // TODO remove sqrt operator in favor of Math.sqrt.
     this.propertyInfo.set('unop', [
       {
         label: 'operator',
@@ -2942,12 +2956,40 @@ export class FunctionchartEditor implements CanvasLayer {
     this.propertyInfo.set('var', [
       {
         label: 'name',
-        type: 'text',
+        type: 'enum',
+        values: unaryOps.join(','),
         getter: elementLabelGetter,
         setter: elementLabelSetter,
         prop: typeStringProp,
       },
     ]);
+    this.propertyInfo.set('builtin', [
+      {
+        label: 'namespace',
+        type: 'enum',
+        values: functionBuiltins.namespaces.map(namespace => namespace.name).join(','),
+        getter: getter,
+        setter: setter,
+        prop: nameProp,
+      },
+      {
+        label: 'function',
+        type: 'enum',
+        values: '',  // Array owned by editor, tracking last selected builtin's namespace.
+        getter: getter,
+        setter: setter,
+        prop: nameProp,
+      }
+    ]);
+    // this.propertyInfo.set('Math', [
+    //   {
+    //     label: 'nameSpace',
+    //     type: 'text',
+    //     getter: elementLabelGetter,
+    //     setter: elementLabelSetter,
+    //     prop: typeStringProp,
+    //   }
+    // ]);
     this.propertyInfo.set('functionchart', [
       {
         label: 'name',
@@ -2956,13 +2998,6 @@ export class FunctionchartEditor implements CanvasLayer {
         setter: setter,
         prop: nameProp,
       },
-      // {
-      //   label: 'explicit',
-      //   type: 'boolean',
-      //   getter: getter,
-      //   setter: setter,
-      //   prop: explicitProp,
-      // },
     ]);
 
     this.propertyInfo.forEach((info, key) => {
@@ -3329,7 +3364,10 @@ export class FunctionchartEditor implements CanvasLayer {
           item = context.selection.lastSelected;
     let type = undefined;
     if (item instanceof Element) {
-      type = item.name;  // 'binop', 'unop', 'cond', 'literal', 'var'
+      if (item.template.typeName === 'builtin')
+        type = item.template.typeName;
+      else
+        type = item.name;  // 'binop', 'unop', 'cond', 'literal', 'var'
     } else if (item) {
       type = item.template.typeName;
     }

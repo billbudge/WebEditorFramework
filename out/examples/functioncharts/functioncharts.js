@@ -2,6 +2,7 @@ import { SelectionSet, Multimap } from '../../src/collections.js';
 import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, FileController } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
+import { functionBuiltins } from '../../examples/functioncharts/functionBuiltins.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 //------------------------------------------------------------------------------
 // TODO Check validity of function instances during drag-n-drop.
@@ -214,7 +215,7 @@ export function parseTypeString(s) {
 }
 //------------------------------------------------------------------------------
 // Properties and templates for the raw data interface for cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), instancerProp = new ReferenceProp('functionchart'); // TODO 'instancer'
+const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), instancerProp = new ReferenceProp('functionchart'); // TODO rename 'instancer'
 class NonWireTemplate {
     constructor() {
         this.id = idProp;
@@ -271,6 +272,7 @@ class FunctionInstanceTemplate extends NonWireTemplate {
     }
 }
 const elementTemplate = new ElementTemplate('element'), // built-in elements
+builtinTemplate = new ElementTemplate('builtin'), // built-in elements
 instancerTemplate = new ElementTemplate('instancer'), // abstract element
 inputTemplate = new PseudoelementTemplate('input'), // input pseudoelement
 outputTemplate = new PseudoelementTemplate('output'), // output pseudoelement
@@ -472,6 +474,9 @@ export class FunctionchartContext extends EventBase {
         switch (typeName) {
             case 'element':
                 result = new Element(elementTemplate, this, nextId);
+                break;
+            case 'builtin':
+                result = new Element(builtinTemplate, this, nextId);
                 break;
             case 'instancer':
                 result = new InstancerElement(instancerTemplate, this, nextId);
@@ -1637,6 +1642,7 @@ export class FunctionchartContext extends EventBase {
     construct(typeName) {
         switch (typeName) {
             case 'element':
+            case 'builtin':
             case 'instancer': return this.newElement(typeName);
             // TODO remove this when files are converted.
             case 'binop':
@@ -2290,7 +2296,7 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), varBinding = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart'), newExport = context.newFunctionchart('export');
+        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), varBinding = context.newElement('element'), builtin = context.newElement('builtin'), newFunctionchart = context.newFunctionchart('functionchart'), newExport = context.newFunctionchart('export');
         context.root = functionchart;
         input.x = 8;
         input.y = 8;
@@ -2316,6 +2322,10 @@ export class FunctionchartEditor {
         varBinding.y = 32;
         varBinding.name = 'var';
         varBinding.typeString = '[,v[v,v]](var)';
+        builtin.x = 212;
+        builtin.y = 32;
+        builtin.name = 'Math';
+        builtin.typeString = '[v,v](abs)';
         newFunctionchart.x = 8;
         newFunctionchart.y = 90;
         newFunctionchart.width = this.theme.minFunctionchartWidth;
@@ -2331,6 +2341,7 @@ export class FunctionchartEditor {
         functionchart.nonWires.append(binop);
         functionchart.nonWires.append(unop);
         functionchart.nonWires.append(cond);
+        functionchart.nonWires.append(builtin);
         functionchart.nonWires.append(newFunctionchart);
         functionchart.nonWires.append(newExport);
         context.root = functionchart;
@@ -2423,7 +2434,7 @@ export class FunctionchartEditor {
                 prop: typeStringProp,
             },
         ]);
-        const unaryOps = ['!', '~', '-', '√'];
+        const unaryOps = ['!', '~', '-', '√']; // TODO remove sqrt operator in favor of Math.sqrt.
         this.propertyInfo.set('unop', [
             {
                 label: 'operator',
@@ -2446,12 +2457,32 @@ export class FunctionchartEditor {
         this.propertyInfo.set('var', [
             {
                 label: 'name',
-                type: 'text',
+                type: 'enum',
+                values: unaryOps.join(','),
                 getter: elementLabelGetter,
                 setter: elementLabelSetter,
                 prop: typeStringProp,
             },
         ]);
+        this.propertyInfo.set('builtin', [
+            {
+                label: 'namespace',
+                type: 'enum',
+                values: functionBuiltins.namespaces.map(namespace => namespace.name).join(','),
+                getter: getter,
+                setter: setter,
+                prop: nameProp,
+            },
+        ]);
+        // this.propertyInfo.set('Math', [
+        //   {
+        //     label: 'nameSpace',
+        //     type: 'text',
+        //     getter: elementLabelGetter,
+        //     setter: elementLabelSetter,
+        //     prop: typeStringProp,
+        //   }
+        // ]);
         this.propertyInfo.set('functionchart', [
             {
                 label: 'name',
@@ -2460,13 +2491,6 @@ export class FunctionchartEditor {
                 setter: setter,
                 prop: nameProp,
             },
-            // {
-            //   label: 'explicit',
-            //   type: 'boolean',
-            //   getter: getter,
-            //   setter: setter,
-            //   prop: explicitProp,
-            // },
         ]);
         this.propertyInfo.forEach((info, key) => {
             propertyGridController.register(key, info);
@@ -2778,7 +2802,10 @@ export class FunctionchartEditor {
         const context = this.context, item = context.selection.lastSelected;
         let type = undefined;
         if (item instanceof Element) {
-            type = item.name; // 'binop', 'unop', 'cond', 'literal', 'var'
+            if (item.template.typeName === 'builtin')
+                type = item.template.typeName;
+            else
+                type = item.name; // 'binop', 'unop', 'cond', 'literal', 'var', 'builtin'
         }
         else if (item) {
             type = item.template.typeName;
