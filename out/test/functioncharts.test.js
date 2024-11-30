@@ -5,9 +5,9 @@ import * as FC from '../examples/functioncharts/functioncharts.js';
 // use this function to update the context's internal structures before and after mutation. Both
 // are needed since non-mutating methods like iteration need those structures to be up to date.
 function mutate(context, callback) {
-    context.updateGraphInfo();
+    context.updateDerivedInfo();
     callback();
-    context.updateGraphInfo();
+    context.updateDerivedInfo();
 }
 function addElement(functionchart, typeString) {
     const context = functionchart.context, element = context.newElement('element');

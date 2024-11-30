@@ -8,9 +8,9 @@ import { PointWithNormal } from '../src/geometry.js';
 // use this function to update the context's internal structures before and after mutation. Both
 // are needed since non-mutating methods like iteration need those structures to be up to date.
 function mutate(context: FC.FunctionchartContext, callback: () => void) : void {
-  context.updateGraphInfo();
+  context.updateDerivedInfo();
   callback();
-  context.updateGraphInfo();
+  context.updateDerivedInfo();
 }
 
 function addElement(functionchart: FC.Functionchart, typeString: string) {
