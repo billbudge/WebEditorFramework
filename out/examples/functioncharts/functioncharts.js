@@ -434,7 +434,7 @@ export class FunctionInstance extends NodeBase {
     get instancer() { return this.template.instancer.get(this); }
     set instancer(value) {
         this.template.instancer.set(this, value);
-        this.type = value.type;
+        this.type = value.instanceType;
     }
     constructor(context, id) {
         super(functionInstanceTemplate, context, id);
@@ -1052,7 +1052,10 @@ export class FunctionchartContext extends EventBase {
                 element.outWires[i] = new Array();
         });
         graphInfo.functioncharts.forEach(functionchart => {
-            functionchart.outWires = new Array(new Array());
+            const type = functionchart.type;
+            functionchart.outWires = new Array(type.outputs.length);
+            for (let i = 0; i < type.outputs.length; i++)
+                functionchart.outWires[i] = new Array();
         });
         // Push wires onto the corresponding wire arrays on the elements.
         graphInfo.wires.forEach(wire => {
@@ -1075,13 +1078,22 @@ export class FunctionchartContext extends EventBase {
         // Update Functionchart types. TODO InstancerElement types too?
         this.reverseVisitNonWires(this.functionchart, item => {
             if (item instanceof Functionchart) {
-                const typeInfo = self.getFunctionchartTypeInfo(item), typeString = typeInfo.typeString;
-                item.typeInfo = typeInfo;
-                const type = parseTypeString(typeString);
-                item.type = type;
-                item.instances.forEach((instance) => {
-                    instance.type = type;
-                });
+                if (isFunctionDefinition(item)) {
+                    const typeInfo = self.getFunctionchartTypeInfo(item), typeString = typeInfo.typeString;
+                    item.typeInfo = typeInfo;
+                    const type = parseTypeString(typeString);
+                    item.type = type;
+                    item.instances.forEach((instance) => {
+                        instance.type = type;
+                    });
+                }
+                else {
+                    // export
+                    const typeInfo = self.getExportTypeInfo(item), typeString = typeInfo.typeString;
+                    item.typeInfo = typeInfo;
+                    const type = parseTypeString(typeString);
+                    item.type = type;
+                }
             }
         });
     }
@@ -1238,8 +1250,13 @@ export class FunctionchartContext extends EventBase {
                     self.deleteItem(element);
                 }
                 else {
-                    const functionchart = element.instancer; // TODO instancer elements
-                    self.remapFunctionInstance(element, functionchart);
+                    const instancer = element.instancer;
+                    if (instancer instanceof Functionchart) {
+                        self.remapFunctionInstance(element, instancer);
+                    }
+                    else if (instancer instanceof InstancerElement) {
+                        element.type = instancer.instanceType;
+                    }
                 }
             }
         });
@@ -1391,11 +1408,9 @@ export class FunctionchartContext extends EventBase {
         return type;
     }
     getFunctionchartTypeInfo(functionchart) {
-        const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name;
-        // Collect subgraph info.
-        const subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray()), unwired = subgraphInfo.wires.size === 0, closed = subgraphInfo.inWires.size == 0;
+        const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name, subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray()), unwired = subgraphInfo.wires.size === 0, closed = subgraphInfo.inWires.size == 0;
         let abstract = unwired && closed;
-        // Collect the functionchart's inputs and outputs.
+        // Collect the functionchart's input and output pseudoelements.
         subgraphInfo.elements.forEach(item => {
             if (item.parent !== functionchart) // TODO this shouldn't be needed.
                 return;
@@ -1414,45 +1429,46 @@ export class FunctionchartContext extends EventBase {
                 }
             }
             else { // instanceof ElementTypes
-                abstract = false;
+                // Only instances of abstract functioncharts are abstract.
+                abstract = item instanceof FunctionInstance && item.instancer instanceof Functionchart;
             }
         });
-        // For 'export' functioncharts, unwired inputs and outputs.
-        if (isFunctionExport(functionchart)) {
-            // Add all disconnected inputs and outputs as pins.
-            subgraphInfo.elements.forEach(element => {
-                if (element instanceof FunctionInstance && element.instancer === functionchart)
-                    return; // We don't expose a recursive instance of the functionchart.
-                const firstOutput = element.inWires.length;
-                for (let i = 0; i < firstOutput; i++) {
-                    const wire = element.inWires[i];
-                    if (wire)
-                        continue;
-                    const connected = new Multimap();
-                    const pin = element.type.inputs[i], type = pin.type;
-                    const pinInfo = { element, index: i, type, connected, fcIndex: -1 };
-                    inputs.push(pinInfo);
-                }
-                for (let i = 0; i < element.outWires.length; i++) {
-                    const wires = element.outWires[i];
-                    if (wires.length !== 0)
-                        continue;
-                    const connected = new Multimap();
-                    const pin = element.type.outputs[i], type = pin.type;
-                    const pinInfo = { element, index: i + firstOutput, type, connected, fcIndex: -1 };
-                    outputs.push(pinInfo);
-                }
-            });
-        }
+        // Add disconnected instancer pins as input pins.
+        subgraphInfo.elements.forEach(element => {
+            if (!(element instanceof InstancerElement))
+                return;
+            const wire = element.inWires[0];
+            if (!wire) {
+                const connected = new Multimap();
+                const pin = element.type.inputs[0], type = pin.type;
+                const pinInfo = { element, index: 0, type, connected, fcIndex: -1 };
+                inputs.push(pinInfo);
+            }
+            ;
+        });
+        // Add disconnected function export pins as output pins.
+        subgraphInfo.functioncharts.forEach(functionchart => {
+            if (!isFunctionExport(functionchart))
+                return;
+            for (let i = 0; i < functionchart.outWires.length; i++) {
+                const wires = functionchart.outWires[i];
+                if (wires.length !== 0)
+                    continue;
+                const connected = new Multimap();
+                const pin = functionchart.type.outputs[i], type = pin.type;
+                const pinInfo = { element: functionchart, index: i, type, connected, fcIndex: -1 };
+                outputs.push(pinInfo);
+            }
+        });
         // Sort pins in increasing y-order. This lets users arrange the pins of the
         // new type in an intuitive way.
         function compareYs(p1, p2) {
             const element1 = p1.element, element2 = p2.element, pin1 = element1.getPin(p1.index), pin2 = element2.getPin(p2.index), y1 = element1.y + pin1.y, y2 = element2.y + pin2.y;
             return y1 - y2;
         }
-        function compareIndices(p1, p2) {
-            return p1.fcIndex - p2.fcIndex;
-        }
+        // function compareIndices(p1: PinInfo, p2: PinInfo) {
+        //   return p1.fcIndex - p2.fcIndex;
+        // }
         inputs.sort(compareYs);
         inputs.forEach((input, i) => { input.fcIndex = i; });
         outputs.sort(compareYs);
@@ -1476,12 +1492,45 @@ export class FunctionchartContext extends EventBase {
             typeString += '(' + name + ')';
         return { typeString, closed, abstract, inputs, outputs };
     }
+    getExportTypeInfo(functionchart) {
+        const self = this, outputs = new Array(), subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray());
+        // Collect the functionchart's true elements.
+        subgraphInfo.elements.forEach(item => {
+            if (item instanceof Element || item instanceof FunctionInstance) {
+                const connected = new Multimap();
+                const type = item.type;
+                const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
+                outputs.push(pinInfo);
+            }
+        });
+        // Sort pins in increasing y-order. This lets users arrange the pins of the
+        // new type in an intuitive way.
+        function compareYs(p1, p2) {
+            const element1 = p1.element, element2 = p2.element, pin1 = element1.getPin(p1.index), pin2 = element2.getPin(p2.index), y1 = element1.y + pin1.y, y2 = element2.y + pin2.y;
+            return y1 - y2;
+        }
+        outputs.sort(compareYs);
+        outputs.forEach((output, i) => { output.fcIndex = i; });
+        function getPinName(type, pin) {
+            let typeString = type.toString();
+            if (pin.name)
+                typeString += '(' + pin.name + ')';
+            return typeString;
+        }
+        let typeString = '[,';
+        outputs.forEach(output => {
+            typeString += getPinName(output.type, output.element.getPin(output.index));
+        });
+        typeString += ']';
+        return { typeString, closed: true, abstract: false, inputs: [], outputs };
+    }
     updateItem(item) {
         this.derivedInfoNeedsUpdate = true;
         if (item instanceof Wire)
             return;
         if (item instanceof Element || item instanceof Pseudoelement) {
-            item.type = parseTypeString(item.typeString);
+            const typeString = item.typeString, type = typeString ? parseTypeString(typeString) : Type.emptyType;
+            item.type = type;
         }
         // Update child items with our current position.
         this.visitNonWires(item, item => this.setGlobalPosition(item));
@@ -2023,8 +2072,8 @@ class Renderer {
                     this.drawType(type, instancerRect.x, instancerRect.y);
                 }
                 else if (isFunctionExport(functionchart)) {
-                    const pin = new Pin(Type.valueType), r = this.theme.knobbyRadius;
-                    this.drawPin(pin, x + w - 2 * r, y + h / 2 - r);
+                    const type = functionchart.flatType, tx = x + w - type.width, ty = y + r;
+                    this.drawType(functionchart.flatType, tx, ty);
                 }
                 break;
             case RenderMode.Highlight:
@@ -2068,9 +2117,12 @@ class Renderer {
             instancer = hitTestRect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height, p, tol) !== undefined;
         }
         else if (isFunctionExport(functionchart)) {
-            const pinPt = this.outputPinToPoint(functionchart, 0), rect = this.pinToRect(functionchart.type.outputs[0], pinPt);
-            if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
-                output = 0;
+            const self = this, type = functionchart.type;
+            for (let i = 0; i < type.outputs.length; i++) {
+                const pinPt = self.outputPinToPoint(functionchart, i), rect = self.pinToRect(type.outputs[i], pinPt);
+                if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
+                    output = i;
+                }
             }
         }
         return new FunctionchartHitResult(functionchart, inner, instancer, output);
