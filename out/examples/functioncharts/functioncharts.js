@@ -284,14 +284,7 @@ instancerTemplate = new ElementTemplate('instancer'), // abstract element
 exporterTemplate = new ExporterTemplate('exporter'), // abstract element
 inputTemplate = new PseudoelementTemplate('input'), // input pseudoelement
 outputTemplate = new PseudoelementTemplate('output'), // output pseudoelement
-wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate('functionchart'), exportTemplate = new FunctionchartTemplate('export'), // 'export' functionchart
-functionInstanceTemplate = new FunctionInstanceTemplate();
-function isFunctionDefinition(item) {
-    return item.template === functionchartTemplate;
-}
-function isFunctionExport(item) {
-    return item.template === exportTemplate;
-}
+wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate('functionchart'), functionInstanceTemplate = new FunctionInstanceTemplate();
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
@@ -581,9 +574,6 @@ export class FunctionchartContext extends EventBase {
         switch (typeName) {
             case 'functionchart':
                 template = functionchartTemplate;
-                break;
-            case 'export':
-                template = exportTemplate;
                 break;
             default: throw new Error('Unknown functionchart type: ' + typeName);
         }
@@ -1119,22 +1109,21 @@ export class FunctionchartContext extends EventBase {
         // Update Functionchart types. TODO InstancerElement types too?
         this.reverseVisitNonWires(this.functionchart, item => {
             if (item instanceof Functionchart) {
-                if (isFunctionDefinition(item)) {
-                    const typeInfo = self.getFunctionchartTypeInfo(item), typeString = typeInfo.typeString;
-                    item.typeInfo = typeInfo;
-                    const type = parseTypeString(typeString);
-                    item.type = type;
-                    item.instances.forEach((instance) => {
-                        instance.type = type;
-                    });
-                }
-                else {
-                    // export
-                    const typeInfo = self.getExportTypeInfo(item), typeString = typeInfo.typeString;
-                    item.typeInfo = typeInfo;
-                    const type = parseTypeString(typeString);
-                    item.type = type;
-                }
+                const typeInfo = self.getFunctionchartTypeInfo(item), typeString = typeInfo.typeString;
+                item.typeInfo = typeInfo;
+                const type = parseTypeString(typeString);
+                item.type = type;
+                item.instances.forEach((instance) => {
+                    instance.type = type;
+                });
+                //  else {
+                //   // export
+                //   const typeInfo = self.getExportTypeInfo(item),
+                //         typeString = typeInfo.typeString;
+                //   item.typeInfo = typeInfo;
+                //   const type = parseTypeString(typeString);
+                //   item.type = type;
+                // }
             }
         });
     }
@@ -1495,8 +1484,6 @@ export class FunctionchartContext extends EventBase {
         });
         // Add disconnected function export pins as output pins.
         subgraphInfo.functioncharts.forEach(functionchart => {
-            if (!isFunctionExport(functionchart))
-                return;
             for (let i = 0; i < functionchart.outWires.length; i++) {
                 const wires = functionchart.outWires[i];
                 if (wires.length !== 0)
@@ -1539,38 +1526,45 @@ export class FunctionchartContext extends EventBase {
             typeString += '(' + name + ')';
         return { typeString, closed, abstract, inputs, outputs };
     }
-    getExportTypeInfo(functionchart) {
-        const self = this, outputs = new Array(), subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray());
-        // Collect the functionchart's true elements.
-        subgraphInfo.elements.forEach(item => {
-            if (item instanceof Element || item instanceof FunctionInstance) {
-                const connected = new Multimap();
-                const type = item.type;
-                const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
-                outputs.push(pinInfo);
-            }
-        });
-        // Sort pins in increasing y-order. This lets users arrange the pins of the
-        // new type in an intuitive way.
-        function compareYs(p1, p2) {
-            const element1 = p1.element, element2 = p2.element, pin1 = element1.getPin(p1.index), pin2 = element2.getPin(p2.index), y1 = element1.y + pin1.y, y2 = element2.y + pin2.y;
-            return y1 - y2;
-        }
-        outputs.sort(compareYs);
-        outputs.forEach((output, i) => { output.fcIndex = i; });
-        function getPinName(type, pin) {
-            let typeString = type.toString();
-            if (pin.name)
-                typeString += '(' + pin.name + ')';
-            return typeString;
-        }
-        let typeString = '[,';
-        outputs.forEach(output => {
-            typeString += getPinName(output.type, output.element.getPin(output.index));
-        });
-        typeString += ']';
-        return { typeString, closed: true, abstract: false, inputs: [], outputs };
-    }
+    // getExportTypeInfo(functionchart: Functionchart) {
+    //   const self = this,
+    //         outputs = new Array<PinInfo>(),
+    //         subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray());
+    //   // Collect the functionchart's true elements.
+    //   subgraphInfo.elements.forEach(item => {
+    //     if (item instanceof Element || item instanceof FunctionInstance) {
+    //       const connected = new Multimap<NodeTypes, number>();
+    //       const type = item.type;
+    //       const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
+    //       outputs.push(pinInfo);
+    //   }
+    //   });
+    //   // Sort pins in increasing y-order. This lets users arrange the pins of the
+    //   // new type in an intuitive way.
+    //   function compareYs(p1: PinInfo, p2: PinInfo) {
+    //     const element1 = p1.element,
+    //           element2 = p2.element,
+    //           pin1 = element1.getPin(p1.index),
+    //           pin2 = element2.getPin(p2.index),
+    //           y1 = element1.y + pin1.y,
+    //           y2 = element2.y + pin2.y;
+    //     return y1 - y2;
+    //   }
+    //   outputs.sort(compareYs);
+    //   outputs.forEach((output, i) => { output.fcIndex = i; });
+    //   function getPinName(type: Type, pin: Pin) : string {
+    //     let typeString = type.toString();
+    //     if (pin.name)
+    //       typeString += '(' + pin.name + ')';
+    //     return typeString;
+    //   }
+    //   let typeString = '[,';
+    //   outputs.forEach(output => {
+    //     typeString += getPinName(output.type, output.element.getPin(output.index));
+    //   });
+    //   typeString += ']';
+    //   return { typeString, closed: true, abstract: false, inputs: [], outputs };
+    // }
     updateItem(item) {
         this.derivedInfoNeedsUpdate = true;
         if (item instanceof Wire)
@@ -1856,9 +1850,9 @@ class Renderer {
     outputPinToPoint(node, index) {
         const rect = this.getBounds(node), type = node.flatType, pin = type.outputs[index];
         // Handle special case of 'export' functionchart's output.
-        if (isFunctionExport(node)) {
-            return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
-        }
+        // if (isFunctionExport(node)) {
+        //   return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
+        // }
         if (node instanceof ExporterElement) {
             return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
         }
@@ -2123,21 +2117,21 @@ class Renderer {
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
-                if (isFunctionDefinition(functionchart)) {
-                    const type = functionchart.type, instancerRect = this.instancerBounds(functionchart);
-                    ctx.beginPath();
-                    ctx.rect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height);
-                    ctx.fillStyle = theme.altBgColor;
-                    ctx.fill();
-                    ctx.strokeStyle = theme.strokeColor;
-                    ctx.lineWidth = 0.5;
-                    ctx.stroke();
-                    this.drawType(type, instancerRect.x, instancerRect.y);
-                }
-                else if (isFunctionExport(functionchart)) {
-                    const type = functionchart.flatType, tx = x + w - type.width, ty = y + r;
-                    this.drawType(functionchart.flatType, tx, ty);
-                }
+                const type = functionchart.type, instancerRect = this.instancerBounds(functionchart);
+                ctx.beginPath();
+                ctx.rect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height);
+                ctx.fillStyle = theme.altBgColor;
+                ctx.fill();
+                ctx.strokeStyle = theme.strokeColor;
+                ctx.lineWidth = 0.5;
+                ctx.stroke();
+                this.drawType(type, instancerRect.x, instancerRect.y);
+                //  else if (isFunctionExport(functionchart)) {
+                //   const type = functionchart.flatType,
+                //         tx = x + w - type.width,
+                //         ty = y + r;
+                //   this.drawType(functionchart.flatType, tx, ty);
+                // }
                 break;
             case RenderMode.Highlight:
             case RenderMode.HotTrack:
@@ -2175,19 +2169,19 @@ class Renderer {
         if (!inner)
             return;
         let instancer = false, output = -1;
-        if (isFunctionDefinition(functionchart)) {
-            const instancerRect = this.instancerBounds(functionchart);
-            instancer = hitTestRect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height, p, tol) !== undefined;
-        }
-        else if (isFunctionExport(functionchart)) {
-            const self = this, type = functionchart.type;
-            for (let i = 0; i < type.outputs.length; i++) {
-                const pinPt = self.outputPinToPoint(functionchart, i), rect = self.pinToRect(type.outputs[i], pinPt);
-                if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
-                    output = i;
-                }
-            }
-        }
+        const instancerRect = this.instancerBounds(functionchart);
+        instancer = hitTestRect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height, p, tol) !== undefined;
+        //  else if (isFunctionExport(functionchart)) {
+        //   const self = this,
+        //         type = functionchart.type;
+        //   for (let i = 0; i < type.outputs.length; i++) {
+        //     const pinPt = self.outputPinToPoint(functionchart, i),
+        //           rect = self.pinToRect(type.outputs[i], pinPt);
+        //     if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
+        //       output = i;
+        //     }
+        //   }
+        // }
         return new FunctionchartHitResult(functionchart, inner, instancer, output);
     }
     drawWire(wire, mode) {
@@ -2375,7 +2369,7 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), varBinding = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart'), newExport = context.newFunctionchart('export');
+        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), varBinding = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart');
         context.root = functionchart;
         input.x = 8;
         input.y = 8;
@@ -2405,10 +2399,6 @@ export class FunctionchartEditor {
         newFunctionchart.y = 90;
         newFunctionchart.width = this.theme.minFunctionchartWidth;
         newFunctionchart.height = this.theme.minFunctionchartHeight;
-        newExport.x = 72;
-        newExport.y = 90;
-        newExport.width = this.theme.minFunctionchartWidth;
-        newExport.height = this.theme.minFunctionchartHeight;
         functionchart.nonWires.append(input);
         functionchart.nonWires.append(output);
         functionchart.nonWires.append(varBinding);
@@ -2417,7 +2407,6 @@ export class FunctionchartEditor {
         functionchart.nonWires.append(unop);
         functionchart.nonWires.append(cond);
         functionchart.nonWires.append(newFunctionchart);
-        functionchart.nonWires.append(newExport);
         context.root = functionchart;
         this.palette = functionchart;
         // Default Functionchart.
@@ -3104,7 +3093,7 @@ export class FunctionchartEditor {
             else if (dst === undefined) {
                 const p = wire.pDst, pin = src.type.outputs[wire.srcPin];
                 let output;
-                if (pin.type === Type.valueType || isFunctionExport(wire.src)) { // TODO We don't want to instantiate export
+                if (pin.type === Type.valueType) {
                     output = context.newOutputForWire(wire, p);
                 }
                 else {
