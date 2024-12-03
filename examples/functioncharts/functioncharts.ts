@@ -19,7 +19,7 @@ import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
 
 import { functionBuiltins } from '../../examples/functioncharts/functionBuiltins.js'
 
-import { types } from '@babel/core';
+import { parse, types } from '@babel/core';
 import { isElementAccessChain } from 'typescript';
 
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
@@ -276,7 +276,8 @@ const idProp = new IdProp('id'),
       dstPinProp = new ScalarProp('dstPin'),
       nonWiresProp = new ChildArrayProp('nonWires'),
       wiresProp = new ChildArrayProp('wires'),
-      instancerProp = new ReferenceProp('functionchart');  // TODO rename 'instancer'
+      instancerProp = new ReferenceProp('functionchart'),  // TODO rename 'instancer'
+      innerTypeStringProp = new ScalarProp('innerTypeString');
 
 abstract class NonWireTemplate {
   readonly id = idProp;
@@ -284,7 +285,7 @@ abstract class NonWireTemplate {
   readonly y = yProp;
 }
 
-export type ElementType = 'element' | 'builtin' | 'instancer';
+export type ElementType = 'element' | 'exporter' | 'instancer';
 
 class ElementTemplate extends NonWireTemplate {
   readonly typeName: ElementType;
@@ -294,6 +295,16 @@ class ElementTemplate extends NonWireTemplate {
   constructor(typeName: ElementType) {
     super();
     this.typeName = typeName;
+  }
+}
+
+class ExporterTemplate extends ElementTemplate {
+  readonly instancer = instancerProp;
+  readonly innerTypeString = innerTypeStringProp;
+  readonly properties: PropertyTypes[] =
+    [this.id, this.x, this.y, this.name, this.typeString, this.instancer, this.innerTypeString];
+  constructor(typeName: ElementType) {
+    super(typeName);
   }
 }
 
@@ -342,8 +353,8 @@ class FunctionInstanceTemplate extends NonWireTemplate {
 }
 
 const elementTemplate = new ElementTemplate('element'),      // built-in elements
-      builtinTemplate = new ElementTemplate('builtin'),      // built-in elements
       instancerTemplate = new ElementTemplate('instancer'),  // abstract element
+      exporterTemplate = new ExporterTemplate('exporter'),  // abstract element
       inputTemplate = new PseudoelementTemplate('input'),    // input pseudoelement
       outputTemplate = new PseudoelementTemplate('output'),  // output pseudoelement
       wireTemplate = new WireTemplate(),
@@ -351,9 +362,6 @@ const elementTemplate = new ElementTemplate('element'),      // built-in element
       exportTemplate = new FunctionchartTemplate('export'),  // 'export' functionchart
       functionInstanceTemplate = new FunctionInstanceTemplate();
 
-function isInstancer(item: AllTypes) {
-  return item.template === instancerTemplate;
-}
 function isFunctionDefinition(item: AllTypes) {
   return item.template === functionchartTemplate;
 }
@@ -377,8 +385,8 @@ abstract class NodeBase<T extends NonWireTemplate> {
   // Derived properties, managed by the FunctionchartContext.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
-  private _type: Type = Type.emptyType;
-  get type() { return this._type; }
+  protected _type: Type;
+  get type() { return this._type || Type.emptyType; }
   set type(type: Type) {
     const atomized = type.atomized();
     if (atomized !== this._type) {
@@ -408,7 +416,8 @@ abstract class NodeBase<T extends NonWireTemplate> {
   }
 }
 
-export class Element extends NodeBase<ElementTemplate> implements DataContextObject, ReferencedObject {
+export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBase<T>
+    implements DataContextObject, ReferencedObject {
   get x() { return this.template.x.get(this) || 0; }
   set x(value: number) { this.template.x.set(this, value); }
   get y() { return this.template.y.get(this) || 0; }
@@ -418,7 +427,7 @@ export class Element extends NodeBase<ElementTemplate> implements DataContextObj
   get typeString() { return this.template.typeString.get(this) || Type.emptyTypeString; }
   set typeString(value: string) { this.template.typeString.set(this, value); }
 
-  constructor(template: ElementTemplate, context: FunctionchartContext, id: number) {
+  constructor(template: T, context: FunctionchartContext, id: number) {
     super(template, context,  id);
   }
 }
@@ -437,6 +446,33 @@ export class InstancerElement extends Element {
 
   constructor(template: ElementTemplate, context: FunctionchartContext, id: number) {
     super(template, context,  id);
+  }
+}
+
+export class ExporterElement extends Element<ExporterTemplate> {
+
+  get instancer() { return this.template.instancer.get(this) as InstancerTypes | undefined; }
+  set instancer(value: InstancerTypes | undefined) { this.template.instancer.set(this, value); }
+  get innerTypeString() { return this.template.innerTypeString.get(this); }
+  set innerTypeString(value: string) { this.template.innerTypeString.set(this, value); }
+
+  // Derived properties.
+  private _innerType: Type;
+  get innerType() : Type {
+    if (!this._innerType) {
+      const instancer = this.instancer;
+      if (instancer) {
+        this._innerType = instancer.instanceType;
+      } else {
+        const typeString = this.innerTypeString;
+        if (typeString) {
+          this._innerType = parseTypeString(typeString).toFlatType().atomized();
+        } else {
+          this._innerType = Type.emptyType;
+        }
+      }
+    }
+    return this._innerType;
   }
 }
 
@@ -565,10 +601,23 @@ export class FunctionInstance extends NodeBase<FunctionInstanceTemplate> impleme
   get y() { return this.template.y.get(this) || 0; }
   set y(value: number) { this.template.y.set(this, value); }
   get instancer() { return this.template.instancer.get(this) as InstancerTypes; }
-  set instancer(value: InstancerTypes) {
-    this.template.instancer.set(this, value);
-    this.type = value.instanceType;
+  set instancer(value: InstancerTypes) { this.template.instancer.set(this, value); }
+
+  // Derived Properties
+  get type() : Type {
+    let type = this._type;
+    if (!type) {
+      const instancer = this.instancer;
+      if (instancer) {
+        type = instancer.instanceType;
+      } else {
+        type = Type.emptyType;
+      }
+    }
+    super.type = type;
+    return this._type;
   }
+  set type(value: Type) { super.type = value; }
 
   constructor(context: FunctionchartContext, id: number) {
     super(functionInstanceTemplate, context, id);
@@ -685,11 +734,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'element':
         result = new Element(elementTemplate, this, nextId);
         break;
-      case 'builtin':
-        result = new Element(builtinTemplate, this, nextId);
-        break;
       case 'instancer':
         result = new InstancerElement(instancerTemplate, this, nextId);
+        break;
+      case 'exporter':
+        result = new ExporterElement(exporterTemplate, this, nextId);
         break;
       default: throw new Error('Unknown element type: ' + typeName);
     }
@@ -1605,12 +1654,20 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.deleteItem(node);
   }
 
-  // exportElement(element: TrueElement) : Functionchart {
-  //   // const result = this.newDerivedElement('export'),
-  //   //       newType = new Type([], [new Pin(element.type.copyUnlabeled())]);
-  //   // result.typeString = newType.toString();
-  //   // return result;
-  // }
+  exportElement(element: TrueElement) : ExporterElement {
+    const result = this.newElement('exporter') as ExporterElement,
+          newType = new Type([], [new Pin(element.type.copyUnlabeled())]);
+    result.x = element.x;
+    result.y = element.y;
+    result.typeString = newType.toString();
+    if (element instanceof Element) {
+      result.name = element.name;
+    } else if (element instanceof FunctionInstance) {
+      result.instancer = element.instancer;
+    }
+    result.innerTypeString = element.type.toString();
+    return result;
+  }
 
   importElement(type: Type) : Element {
     const result = this.newElement('instancer'),
@@ -1620,17 +1677,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   exportElements(elements: TrueElement[]) {
-    // const self = this,
-    //       selection = this.selection;
+    const self = this,
+          selection = this.selection;
 
-    // // Open each non-input/output element.
-    // elements.forEach(element => {
-    //   selection.delete(element);
-    //   const newElement = self.exportElement(element);
-    //   self.replaceElement(element, newElement);
-    //   newElement.inner = element;  // newElement owns the base element.
-    //   selection.add(newElement);
-    // });
+    // Convert each TrueElement to an ExporterElement.
+    elements.forEach(element => {
+      selection.delete(element);
+      const newElement = self.exportElement(element);
+      self.replaceElement(element, newElement);
+      selection.add(newElement);
+    });
   }
 
   importElements(elements: TrueElement[]) {
@@ -1994,20 +2050,20 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   construct(typeName: string) : AllTypes {
     switch (typeName) {
       case 'element':
-      case 'builtin':
-      case 'instancer': return this.newElement(typeName);
+      case 'instancer':
+      case 'exporter': return this.newElement(typeName);
       case 'import': return this.newElement('instancer');  // TODO
 
-      // TODO remove this when files are converted.
-      case 'binop':
-      case 'unop':
-      case 'cond':
-      case 'literal':
-      case 'var': {
-        const result = this.newElement('element');
-        result.name = typeName;
-        return result;
-      }
+      // // TODO remove this when files are converted.
+      // case 'binop':
+      // case 'unop':
+      // case 'cond':
+      // case 'literal':
+      // case 'var': {
+      //   const result = this.newElement('element');
+      //   result.name = typeName;
+      //   return result;
+      // }
       case 'input':
       case 'output': return this.newPseudoelement(typeName);
 
@@ -2156,11 +2212,15 @@ class Renderer implements ILayoutEngine {
         const type = item.flatType;
         width = type.width;
         height = type.height;
-        if (isInstancer(item)) {
+        if (item instanceof InstancerElement) {
           const spacing = this.theme.spacing,
                 innerType = item.type.inputs[0].type;
           width = innerType.width + 3 * spacing;
           height = innerType.height + 2 * spacing;
+        } else if (item instanceof ExporterElement) {
+          const spacing = this.theme.spacing;
+          width = 3 * spacing + item.innerType.width;
+          height = 2 * spacing + item.innerType.height;
         }
       }
     }
@@ -2172,7 +2232,7 @@ class Renderer implements ILayoutEngine {
           type = node.flatType,
           pin = type.inputs[index];
     // Handle special case of InstancerElement.
-    if (isInstancer(node)) {
+    if (node instanceof InstancerElement) {
       return { x: rect.x, y: rect.y + rect.height / 2, nx: -1, ny: 0 };
     }
     return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 };
@@ -2183,6 +2243,9 @@ class Renderer implements ILayoutEngine {
           pin = type.outputs[index];
     // Handle special case of 'export' functionchart's output.
     if (isFunctionExport(node)) {
+      return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
+    }
+    if (node instanceof ExporterElement) {
       return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
     }
     return { x: rect.x + rect.width, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
@@ -2431,6 +2494,13 @@ class Renderer implements ILayoutEngine {
           ctx.fill();
           ctx.stroke();
           this.drawType(innerType, x + 2 * spacing, y + spacing);
+        } else if (element instanceof ExporterElement) {
+          const innerType = element.innerType;
+          ctx.beginPath();
+          ctx.rect(x + spacing, y + spacing, innerType.width, innerType.height);
+          ctx.stroke();
+          this.drawType(innerType, x + spacing, y + spacing);
+          this.drawPin(type.outputs[0], x + w - 2 * r, y + h / 2 - r);
         } else {
           this.drawType(element.flatType, x, y);
         }
@@ -2807,7 +2877,6 @@ export class FunctionchartEditor implements CanvasLayer {
   private hoverHitInfo: HitResultTypes | undefined;
   private hoverPoint: Point;
   private propertyInfo = new Map<string, ItemInfo[]>();
-  private builtinStrings: Array<string> = [];  // todo
 
   constructor(baseTheme: Theme,
               canvasController: CanvasController,
@@ -2845,7 +2914,6 @@ export class FunctionchartEditor implements CanvasLayer {
           unop = context.newElement('element'),
           cond = context.newElement('element'),
           varBinding = context.newElement('element'),
-          builtin = context.newElement('builtin'),
           newFunctionchart = context.newFunctionchart('functionchart'),
           newExport = context.newFunctionchart('export');
 
@@ -2868,9 +2936,6 @@ export class FunctionchartEditor implements CanvasLayer {
     varBinding.x = 172; varBinding.y = 32;
     varBinding.name = 'var';
     varBinding.typeString = '[,v[v,v]](var)';
-    builtin.x = 212; builtin.y = 32;
-    builtin.name = 'Math';
-    builtin.typeString = '[v,v](abs)';
 
     newFunctionchart.x = 8; newFunctionchart.y = 90;
     newFunctionchart.width = this.theme.minFunctionchartWidth;
@@ -2886,7 +2951,6 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nonWires.append(binop);
     functionchart.nonWires.append(unop);
     functionchart.nonWires.append(cond);
-    functionchart.nonWires.append(builtin);
     functionchart.nonWires.append(newFunctionchart);
     functionchart.nonWires.append(newExport);
     context.root = functionchart;
@@ -3011,33 +3075,6 @@ export class FunctionchartEditor implements CanvasLayer {
         prop: typeStringProp,
       },
     ]);
-    this.propertyInfo.set('builtin', [
-      {
-        label: 'namespace',
-        type: 'enum',
-        values: functionBuiltins.namespaces.map(namespace => namespace.name).join(','),
-        getter: getter,
-        setter: setter,
-        prop: nameProp,
-      },
-      {
-        label: 'function',
-        type: 'enum',
-        values: '',  // Array owned by editor, tracking last selected builtin's namespace.
-        getter: getter,
-        setter: setter,
-        prop: nameProp,
-      }
-    ]);
-    // this.propertyInfo.set('Math', [
-    //   {
-    //     label: 'nameSpace',
-    //     type: 'text',
-    //     getter: elementLabelGetter,
-    //     setter: elementLabelSetter,
-    //     prop: typeStringProp,
-    //   }
-    // ]);
     this.propertyInfo.set('functionchart', [
       {
         label: 'name',
@@ -3403,7 +3440,7 @@ export class FunctionchartEditor implements CanvasLayer {
   getDraggableAncestor(hitList: Array<HitResultTypes>, hitInfo: HitResultTypes | undefined) {
     while (hitInfo && !isDraggable(hitInfo)) {
       const parent = hitInfo.item.parent;
-      hitInfo = this.getFirstHit(hitList, info => { return info.item === parent; })
+      hitInfo = this.getFirstHit(hitList, info => { return info.item === parent; });
     }
     return hitInfo;
   }
@@ -3412,10 +3449,7 @@ export class FunctionchartEditor implements CanvasLayer {
           item = context.selection.lastSelected;
     let type = undefined;
     if (item instanceof Element) {
-      if (item.template.typeName === 'builtin')
-        type = item.template.typeName;
-      else
-        type = item.name;  // 'binop', 'unop', 'cond', 'literal', 'var'
+      type = item.name;  // 'binop', 'unop', 'cond', 'literal', 'var'
     } else if (item) {
       type = item.template.typeName;
     }

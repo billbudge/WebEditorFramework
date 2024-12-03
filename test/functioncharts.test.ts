@@ -385,6 +385,7 @@ describe('FunctionchartContext', () => {
     const cycleWire = addWire(functionchart, elem2, 0, elem1, 0);
     expect(context.isValidFunctionchart()).toBe(false);
     functionchart.wires.remove(cycleWire);
+    context.updateDerivedInfo();
     expect(context.isValidFunctionchart()).toBe(true);
   });
   test('replaceElement', () => {

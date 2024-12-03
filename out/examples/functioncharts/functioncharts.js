@@ -2,7 +2,6 @@ import { SelectionSet, Multimap } from '../../src/collections.js';
 import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, FileController } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
-import { functionBuiltins } from '../../examples/functioncharts/functionBuiltins.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 //------------------------------------------------------------------------------
 // TODO Check validity of function instances during drag-n-drop.
@@ -215,7 +214,8 @@ export function parseTypeString(s) {
 }
 //------------------------------------------------------------------------------
 // Properties and templates for the raw data interface for cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), instancerProp = new ReferenceProp('functionchart'); // TODO rename 'instancer'
+const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nonWiresProp = new ChildArrayProp('nonWires'), wiresProp = new ChildArrayProp('wires'), instancerProp = new ReferenceProp('functionchart'), // TODO rename 'instancer'
+innerTypeStringProp = new ScalarProp('innerTypeString');
 class NonWireTemplate {
     constructor() {
         this.id = idProp;
@@ -230,6 +230,14 @@ class ElementTemplate extends NonWireTemplate {
         this.typeString = typeStringProp;
         this.properties = [this.id, this.x, this.y, this.name, this.typeString];
         this.typeName = typeName;
+    }
+}
+class ExporterTemplate extends ElementTemplate {
+    constructor(typeName) {
+        super(typeName);
+        this.instancer = instancerProp;
+        this.innerTypeString = innerTypeStringProp;
+        this.properties = [this.id, this.x, this.y, this.name, this.typeString, this.instancer, this.innerTypeString];
     }
 }
 class PseudoelementTemplate extends NonWireTemplate {
@@ -272,15 +280,12 @@ class FunctionInstanceTemplate extends NonWireTemplate {
     }
 }
 const elementTemplate = new ElementTemplate('element'), // built-in elements
-builtinTemplate = new ElementTemplate('builtin'), // built-in elements
 instancerTemplate = new ElementTemplate('instancer'), // abstract element
+exporterTemplate = new ExporterTemplate('exporter'), // abstract element
 inputTemplate = new PseudoelementTemplate('input'), // input pseudoelement
 outputTemplate = new PseudoelementTemplate('output'), // output pseudoelement
 wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate('functionchart'), exportTemplate = new FunctionchartTemplate('export'), // 'export' functionchart
 functionInstanceTemplate = new FunctionInstanceTemplate();
-function isInstancer(item) {
-    return item.template === instancerTemplate;
-}
 function isFunctionDefinition(item) {
     return item.template === functionchartTemplate;
 }
@@ -293,7 +298,7 @@ const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 
 // Type safe interfaces over the raw templated data.
 // Base element class to implement type fields, and incoming/outgoing wire arrays.
 class NodeBase {
-    get type() { return this._type; }
+    get type() { return this._type || Type.emptyType; }
     set type(type) {
         const atomized = type.atomized();
         if (atomized !== this._type) {
@@ -310,7 +315,6 @@ class NodeBase {
     }
     constructor(template, context, id) {
         this.globalPosition = defaultPoint;
-        this._type = Type.emptyType;
         // Flat type has the same arity as type, but all pins are value type.
         this._flatType = Type.emptyType;
         this.inWires = new Array(); // one input per pin (no fan in).
@@ -344,6 +348,30 @@ export class InstancerElement extends Element {
         super(template, context, id);
         // Derived properties, managed by the FunctionchartContext.
         this.instances = new Set(); // TODO do we need this mapping to instances?
+    }
+}
+export class ExporterElement extends Element {
+    get instancer() { return this.template.instancer.get(this); }
+    set instancer(value) { this.template.instancer.set(this, value); }
+    get innerTypeString() { return this.template.innerTypeString.get(this); }
+    set innerTypeString(value) { this.template.innerTypeString.set(this, value); }
+    get innerType() {
+        if (!this._innerType) {
+            const instancer = this.instancer;
+            if (instancer) {
+                this._innerType = instancer.instanceType;
+            }
+            else {
+                const typeString = this.innerTypeString;
+                if (typeString) {
+                    this._innerType = parseTypeString(typeString).toFlatType().atomized();
+                }
+                else {
+                    this._innerType = Type.emptyType;
+                }
+            }
+        }
+        return this._innerType;
     }
 }
 export class Pseudoelement extends NodeBase {
@@ -432,10 +460,23 @@ export class FunctionInstance extends NodeBase {
     get y() { return this.template.y.get(this) || 0; }
     set y(value) { this.template.y.set(this, value); }
     get instancer() { return this.template.instancer.get(this); }
-    set instancer(value) {
-        this.template.instancer.set(this, value);
-        this.type = value.instanceType;
+    set instancer(value) { this.template.instancer.set(this, value); }
+    // Derived Properties
+    get type() {
+        let type = this._type;
+        if (!type) {
+            const instancer = this.instancer;
+            if (instancer) {
+                type = instancer.instanceType;
+            }
+            else {
+                type = Type.emptyType;
+            }
+        }
+        super.type = type;
+        return this._type;
     }
+    set type(value) { super.type = value; }
     constructor(context, id) {
         super(functionInstanceTemplate, context, id);
     }
@@ -499,11 +540,11 @@ export class FunctionchartContext extends EventBase {
             case 'element':
                 result = new Element(elementTemplate, this, nextId);
                 break;
-            case 'builtin':
-                result = new Element(builtinTemplate, this, nextId);
-                break;
             case 'instancer':
                 result = new InstancerElement(instancerTemplate, this, nextId);
+                break;
+            case 'exporter':
+                result = new ExporterElement(exporterTemplate, this, nextId);
                 break;
             default: throw new Error('Unknown element type: ' + typeName);
         }
@@ -1318,28 +1359,34 @@ export class FunctionchartContext extends EventBase {
         });
         this.deleteItem(node);
     }
-    // exportElement(element: TrueElement) : Functionchart {
-    //   // const result = this.newDerivedElement('export'),
-    //   //       newType = new Type([], [new Pin(element.type.copyUnlabeled())]);
-    //   // result.typeString = newType.toString();
-    //   // return result;
-    // }
+    exportElement(element) {
+        const result = this.newElement('exporter'), newType = new Type([], [new Pin(element.type.copyUnlabeled())]);
+        result.x = element.x;
+        result.y = element.y;
+        result.typeString = newType.toString();
+        if (element instanceof Element) {
+            result.name = element.name;
+        }
+        else if (element instanceof FunctionInstance) {
+            result.instancer = element.instancer;
+        }
+        result.innerTypeString = element.type.toString();
+        return result;
+    }
     importElement(type) {
         const result = this.newElement('instancer'), instancerType = type.copyUnlabeled().toInstancerType();
         result.typeString = instancerType.toString();
         return result;
     }
     exportElements(elements) {
-        // const self = this,
-        //       selection = this.selection;
-        // // Open each non-input/output element.
-        // elements.forEach(element => {
-        //   selection.delete(element);
-        //   const newElement = self.exportElement(element);
-        //   self.replaceElement(element, newElement);
-        //   newElement.inner = element;  // newElement owns the base element.
-        //   selection.add(newElement);
-        // });
+        const self = this, selection = this.selection;
+        // Convert each TrueElement to an ExporterElement.
+        elements.forEach(element => {
+            selection.delete(element);
+            const newElement = self.exportElement(element);
+            self.replaceElement(element, newElement);
+            selection.add(newElement);
+        });
     }
     importElements(elements) {
         const self = this, selection = this.selection;
@@ -1654,19 +1701,19 @@ export class FunctionchartContext extends EventBase {
     construct(typeName) {
         switch (typeName) {
             case 'element':
-            case 'builtin':
-            case 'instancer': return this.newElement(typeName);
+            case 'instancer':
+            case 'exporter': return this.newElement(typeName);
             case 'import': return this.newElement('instancer'); // TODO
-            // TODO remove this when files are converted.
-            case 'binop':
-            case 'unop':
-            case 'cond':
-            case 'literal':
-            case 'var': {
-                const result = this.newElement('element');
-                result.name = typeName;
-                return result;
-            }
+            // // TODO remove this when files are converted.
+            // case 'binop':
+            // case 'unop':
+            // case 'cond':
+            // case 'literal':
+            // case 'var': {
+            //   const result = this.newElement('element');
+            //   result.name = typeName;
+            //   return result;
+            // }
             case 'input':
             case 'output': return this.newPseudoelement(typeName);
             case 'wire': return this.newWire(undefined, -1, undefined, -1);
@@ -1783,10 +1830,15 @@ class Renderer {
                 const type = item.flatType;
                 width = type.width;
                 height = type.height;
-                if (isInstancer(item)) {
+                if (item instanceof InstancerElement) {
                     const spacing = this.theme.spacing, innerType = item.type.inputs[0].type;
                     width = innerType.width + 3 * spacing;
                     height = innerType.height + 2 * spacing;
+                }
+                else if (item instanceof ExporterElement) {
+                    const spacing = this.theme.spacing;
+                    width = 3 * spacing + item.innerType.width;
+                    height = 2 * spacing + item.innerType.height;
                 }
             }
         }
@@ -1796,7 +1848,7 @@ class Renderer {
     inputPinToPoint(node, index) {
         const rect = this.getBounds(node), type = node.flatType, pin = type.inputs[index];
         // Handle special case of InstancerElement.
-        if (isInstancer(node)) {
+        if (node instanceof InstancerElement) {
             return { x: rect.x, y: rect.y + rect.height / 2, nx: -1, ny: 0 };
         }
         return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 };
@@ -1805,6 +1857,9 @@ class Renderer {
         const rect = this.getBounds(node), type = node.flatType, pin = type.outputs[index];
         // Handle special case of 'export' functionchart's output.
         if (isFunctionExport(node)) {
+            return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
+        }
+        if (node instanceof ExporterElement) {
             return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
         }
         return { x: rect.x + rect.width, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 };
@@ -1996,6 +2051,14 @@ class Renderer {
                     ctx.fill();
                     ctx.stroke();
                     this.drawType(innerType, x + 2 * spacing, y + spacing);
+                }
+                else if (element instanceof ExporterElement) {
+                    const innerType = element.innerType;
+                    ctx.beginPath();
+                    ctx.rect(x + spacing, y + spacing, innerType.width, innerType.height);
+                    ctx.stroke();
+                    this.drawType(innerType, x + spacing, y + spacing);
+                    this.drawPin(type.outputs[0], x + w - 2 * r, y + h / 2 - r);
                 }
                 else {
                     this.drawType(element.flatType, x, y);
@@ -2294,7 +2357,6 @@ export class FunctionchartEditor {
         this.scrap = [];
         this.clickInPalette = false;
         this.propertyInfo = new Map();
-        this.builtinStrings = []; // todo
         const self = this, theme = new FunctionchartTheme(baseTheme);
         this.theme = theme;
         this.canvasController = canvasController;
@@ -2313,7 +2375,7 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), varBinding = context.newElement('element'), builtin = context.newElement('builtin'), newFunctionchart = context.newFunctionchart('functionchart'), newExport = context.newFunctionchart('export');
+        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), varBinding = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart'), newExport = context.newFunctionchart('export');
         context.root = functionchart;
         input.x = 8;
         input.y = 8;
@@ -2339,10 +2401,6 @@ export class FunctionchartEditor {
         varBinding.y = 32;
         varBinding.name = 'var';
         varBinding.typeString = '[,v[v,v]](var)';
-        builtin.x = 212;
-        builtin.y = 32;
-        builtin.name = 'Math';
-        builtin.typeString = '[v,v](abs)';
         newFunctionchart.x = 8;
         newFunctionchart.y = 90;
         newFunctionchart.width = this.theme.minFunctionchartWidth;
@@ -2358,7 +2416,6 @@ export class FunctionchartEditor {
         functionchart.nonWires.append(binop);
         functionchart.nonWires.append(unop);
         functionchart.nonWires.append(cond);
-        functionchart.nonWires.append(builtin);
         functionchart.nonWires.append(newFunctionchart);
         functionchart.nonWires.append(newExport);
         context.root = functionchart;
@@ -2481,33 +2538,6 @@ export class FunctionchartEditor {
                 prop: typeStringProp,
             },
         ]);
-        this.propertyInfo.set('builtin', [
-            {
-                label: 'namespace',
-                type: 'enum',
-                values: functionBuiltins.namespaces.map(namespace => namespace.name).join(','),
-                getter: getter,
-                setter: setter,
-                prop: nameProp,
-            },
-            {
-                label: 'function',
-                type: 'enum',
-                values: '',
-                getter: getter,
-                setter: setter,
-                prop: nameProp,
-            }
-        ]);
-        // this.propertyInfo.set('Math', [
-        //   {
-        //     label: 'nameSpace',
-        //     type: 'text',
-        //     getter: elementLabelGetter,
-        //     setter: elementLabelSetter,
-        //     prop: typeStringProp,
-        //   }
-        // ]);
         this.propertyInfo.set('functionchart', [
             {
                 label: 'name',
@@ -2827,10 +2857,7 @@ export class FunctionchartEditor {
         const context = this.context, item = context.selection.lastSelected;
         let type = undefined;
         if (item instanceof Element) {
-            if (item.template.typeName === 'builtin')
-                type = item.template.typeName;
-            else
-                type = item.name; // 'binop', 'unop', 'cond', 'literal', 'var'
+            type = item.name; // 'binop', 'unop', 'cond', 'literal', 'var'
         }
         else if (item) {
             type = item.template.typeName;
