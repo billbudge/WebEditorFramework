@@ -99,23 +99,13 @@ describe('Pin' , () => {
     const namedPin = new FC.Pin(valuePin.type, 'pin1');
     expect(namedPin.toString()).toBe('v(pin1)');
     expect(namedPin.typeString).toBe('v(pin1)');
-
-    const valuePin2 = valuePin.copy();
-    expect(valuePin2).not.toBe(valuePin);
-    expect(valuePin2.type).toBe(valuePin.type);
-    expect(valuePin2.name).toBe(valuePin.name);
-
-    const unlabeledValuePin = valuePin.copyUnlabeled();
-    expect(unlabeledValuePin).not.toBe(valuePin);
-    expect(unlabeledValuePin.type).toBe(valuePin.type);
-    expect(unlabeledValuePin.name).toBeUndefined();
   });
 });
 
 describe('Type' , () => {
   test('Type', () => {
-    const type1 = FC.parseTypeString('[v,v]'),
-          type2 = FC.parseTypeString('[vv,v]');
+    const type1 = FC.Type.typeFromString('[v,v]'),
+          type2 = FC.Type.typeFromString('[vv,v]');
     expect(type1).not.toBe(type2);
     expect(type1.inputs.length).toBe(1);
     expect(type1.inputs[0].type).toBe(FC.Type.valueType);
@@ -127,43 +117,35 @@ describe('Type' , () => {
     expect(type2.outputs.length).toBe(1);
     expect(type2.outputs[0].type).toBe(FC.Type.valueType);
 
-    const named = new FC.Type(type1.inputs, type1.outputs, 'type1');
+    const named = FC.Type.typeFromInfo(type1.inputs, type1.outputs, 'type1');
     expect(named).not.toBe(type1);
     expect(type1.toString()).toBe('[v,v]');
     expect(named.toString()).toBe('[v,v](type1)');
     expect(named.toString()).toBe('[v,v](type1)');
 
-    const copy = type1.copy();
-    expect(copy).not.toBe(type1);
-    expect(copy.inputs[0]).not.toBe(type1.inputs[0]);
-    expect(copy.inputs[0].type).toBe(type1.inputs[0].type);
-
-    const copyUnlabeled = type1.copyUnlabeled();
-    expect(copyUnlabeled).not.toBe(type1);
+    const labeled = FC.Type.typeFromString('[v(1)v(2),v(3)](foo)'),
+          copyUnlabeled = labeled.copyUnlabeled();
+    expect(copyUnlabeled).not.toBe(labeled);
     expect(copyUnlabeled.name).toBeUndefined();
-    expect(copyUnlabeled.toString()).toBe('[v,v]');
-    expect(copyUnlabeled.toString()).toBe('[v,v]');
+    expect(copyUnlabeled.toString()).toBe('[vv,v]');
   });
   test('base Types', () => {
-    const valueType = FC.parseTypeString('v'),
-          emptyType = FC.parseTypeString('[,]');
+    const valueType = FC.Type.typeFromString('v'),
+          emptyType = FC.Type.typeFromString('[,]');
     expect(valueType).toBe(FC.Type.valueType);
     expect(emptyType).toBe(FC.Type.emptyType);
   });
   test('atomized', () => {
     const valueType = FC.Type.valueType,
-          type1 = new FC.Type([new FC.Pin(valueType), new FC.Pin(valueType)], [new FC.Pin(valueType)]),
-          type2 = new FC.Type([new FC.Pin(valueType), new FC.Pin(valueType)], [new FC.Pin(valueType)]);
-    expect(type1).not.toBe(type2);
-    expect(type1.atomized()).toStrictEqual(type1);
-    expect(type2.atomized()).toStrictEqual(type1);
-
+          type1 = FC.Type.typeFromInfo([new FC.Pin(valueType), new FC.Pin(valueType)], [new FC.Pin(valueType)]),
+          type2 = FC.Type.typeFromInfo([new FC.Pin(valueType), new FC.Pin(valueType)], [new FC.Pin(valueType)]);
+    expect(type1).toBe(type2);
   });
   test('canConnect', () => {
     expect(FC.Type.valueType.canConnectTo(FC.Type.valueType)).toBe(true);
 
-    // const type1 = FC.parseTypeString('[v,v]'),
-    //       type2 = FC.parseTypeString('[vv,v]');
+    // const type1 = FC.Type.typeFromString('[v,v]'),
+    //       type2 = FC.Type.typeFromString('[vv,v]');
     // expect (type1.canConnectTo(FC.Type.valueType)).toBe(false);
     // expect(type1.canConnectTo(type2)).toBe(false);
     // expect(type2.canConnectTo(type1)).toBe(true);
@@ -180,16 +162,16 @@ describe('parseTypeString', () => {
       '[,[,v][v,v]](@)',
       '[[v,vv(q)](a)v(b),v(c)](foo)',
     ];
-    typeStrings.forEach(typeString => expect(FC.parseTypeString(typeString)!.toString()).toBe(typeString));
+    typeStrings.forEach(typeString => expect(FC.Type.typeFromString(typeString)!.toString()).toBe(typeString));
     typeStrings.forEach(typeString => expect(FC.Type.atomizedTypes.has(typeString)).toBe(true));
-    expect(FC.parseTypeString('[v,v]').name).toBeUndefined();
-    expect(FC.parseTypeString('[vv,v](+)').name).toBe('+');
-    const type1 = FC.parseTypeString('[v(a)v(b),v(c)]');
+    expect(FC.Type.typeFromString('[v,v]').name).toBeUndefined();
+    expect(FC.Type.typeFromString('[vv,v](+)').name).toBe('+');
+    const type1 = FC.Type.typeFromString('[v(a)v(b),v(c)]');
     expect(type1.name).toBeUndefined();
     expect(type1.inputs[0].name).toBe('a');
     expect(type1.inputs[1].name).toBe('b');
     expect(type1.outputs[0].name).toBe('c');
-    const type2 = FC.parseTypeString('[,[,v][v,v]](@)');
+    const type2 = FC.Type.typeFromString('[,[,v][v,v]](@)');
     expect(type2.name).toBe('@');
     expect(type2.inputs.length).toBe(0);
     expect(type2.outputs.length).toBe(2);

@@ -294,7 +294,7 @@
       "x": 417.4969787597656,
       "y": 282.00627517700195,
       "width": 420.05311584472656,
-      "height": 213.25624084472656,
+      "height": 215.4718780517578,
       "name": "foldstep",
       "nonWires": [
         {
@@ -358,17 +358,18 @@
         },
         {
           "type": "instancer",
-          "id": 47,
+          "id": 32,
           "x": 17.534385681152344,
           "y": 141.4718780517578,
-          "typeString": "[[vv,v],]"
+          "typeString": "[[vv,v],]",
+          "innerTypeString": "[vv,v](f)"
         },
         {
           "type": "instance",
-          "id": 48,
+          "id": 33,
           "x": 117.86251068115234,
           "y": 132.76564025878906,
-          "functionchart": 47
+          "functionchart": 32
         }
       ],
       "wires": [
@@ -390,14 +391,14 @@
           "type": "wire",
           "src": 26,
           "srcPin": 0,
-          "dst": 48,
+          "dst": 33,
           "dstPin": 1
         },
         {
           "type": "wire",
           "src": 27,
           "srcPin": 0,
-          "dst": 48,
+          "dst": 33,
           "dstPin": 0
         },
         {
@@ -409,7 +410,7 @@
         },
         {
           "type": "wire",
-          "src": 48,
+          "src": 33,
           "srcPin": 0,
           "dst": 30,
           "dstPin": 1
@@ -518,6 +519,13 @@
           "srcPin": 0,
           "dst": 38,
           "dstPin": 0
+        },
+        {
+          "type": "wire",
+          "src": 39,
+          "srcPin": 0,
+          "dst": 38,
+          "dstPin": 2
         }
       ]
     },
@@ -603,7 +611,7 @@
     },
     {
       "type": "instance",
-      "id": 49,
+      "id": 46,
       "x": 192.68759155273438,
       "y": 404.21875381469727,
       "functionchart": 23

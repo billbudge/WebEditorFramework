@@ -29,10 +29,11 @@
           "typeString": "[v,]"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 6,
           "x": 22.76171875,
           "y": 49.2109375,
+          "name": "literal",
           "typeString": "[,v(0)]"
         },
         {
@@ -92,10 +93,11 @@
           "typeString": "[v,]"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 11,
           "x": 22.76171875,
           "y": 49.2109375,
+          "name": "literal",
           "typeString": "[,v(0)]"
         },
         {
@@ -288,24 +290,27 @@
           "typeString": "[*,]"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 27,
           "x": 120.8828125,
           "y": 134.01171875,
+          "name": "literal",
           "typeString": "[,v(0)]"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 28,
           "x": 124.12030029296875,
           "y": 106.59375,
+          "name": "literal",
           "typeString": "[,v(1)]"
         },
         {
-          "type": "literal",
+          "type": "element",
           "id": 29,
           "x": 111.67657470703125,
           "y": 41.544525146484375,
+          "name": "literal",
           "typeString": "[,v(-1)]"
         },
         {
