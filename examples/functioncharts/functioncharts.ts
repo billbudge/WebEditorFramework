@@ -137,9 +137,9 @@ export class Type {
     const newType = Type.fromInfo([new Pin(this)], [], this.name);
     return newType;
   }
-  toExportType() : Type {
+  toExporterType() : Type {
     const inputs: Array<Pin> = [],
-          outputs = [new Pin(this)];
+          outputs = [new Pin(this, this.name)];
     return Type.fromInfo(inputs, outputs);
   }
   atomized() : Type {
@@ -1667,10 +1667,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   exportElement(element: TrueElement) : ExporterElement {
     const result = this.newElement('exporter') as ExporterElement,
-          newType = Type.fromInfo([], [new Pin(element.type.copyUnlabeled())]);
+          exporterType = element.type.toExporterType();
     result.x = element.x;
     result.y = element.y;
-    result.typeString = newType.toString();
+    result.typeString = exporterType.toString();
     if (element instanceof Element) {
       result.name = element.name;
     } else if (element instanceof FunctionInstance) {
@@ -1680,11 +1680,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
-  importElement(type: Type) : Element {
+  importElement(element: TrueElement) : Element {
     const result = this.newElement('instancer') as InstancerElement,
-          instancerType = type.toInstancerType();
+          instancerType = element.type.toInstancerType();
     result.typeString = instancerType.toString();
-    result.innerTypeString = type.toString();
+    result.innerTypeString = element.type.toString();
     return result;
   }
 
@@ -1708,7 +1708,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // Open each non-input/output element.
     elements.forEach(element => {
       selection.delete(element);
-      const newElement = self.importElement(element.type);
+      const newElement = self.importElement(element);
       self.replaceElement(element, newElement);
       selection.add(newElement);
     });
@@ -1742,10 +1742,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (index < firstOutput) {
       const wire = node.inWires[index];
       if (wire) {
-        const src = wire.src! as NodeTypes,  // We can only reach elements from elements.
-              srcPin = wire.srcPin,
-              index = src.type.inputs.length + srcPin;
-        this.visitPin(src, index, visitor, visited);
+        const src = wire.src;
+        if (src) {
+          const srcPin = wire.srcPin,
+                index = src.type.inputs.length + srcPin;
+          this.visitPin(src, index, visitor, visited);
+        }
       }
     } else {
       const wires = node.outWires[index - firstOutput];
@@ -1753,9 +1755,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         for (let i = 0; i < wires.length; i++) {
           const wire = wires[i];
           if (wire) {
-            const dst = wire.dst!,
-                  dstPin = wire.dstPin;
-            this.visitPin(dst, dstPin, visitor, visited);
+            const dst = wire.dst;
+            if (dst) {
+              const dstPin = wire.dstPin;
+              this.visitPin(dst, dstPin, visitor, visited);
+            }
           }
         }
       }
@@ -1850,7 +1854,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
     function getPinName(type: Type, pin: Pin) : string {
       let typeString = type.toString();
-      if (pin.name && !typeString.endsWith(')'))
+      if (pin.name && !typeString.endsWith(')'))  // TODO we shouldn't need this check.
         typeString += '(' + pin.name + ')';
       return typeString;
     }
@@ -2392,7 +2396,7 @@ class Renderer implements ILayoutEngine {
     if (height !== functionchart.height)
       functionchart.height = height;
   }
-  
+
   private drawInputs(type: Type, x: number, y: number, limit: number) {
     const ctx = this.ctx,
           spacing = this.theme.spacing;

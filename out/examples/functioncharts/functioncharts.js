@@ -89,8 +89,8 @@ export class Type {
         const newType = Type.fromInfo([new Pin(this)], [], this.name);
         return newType;
     }
-    toExportType() {
-        const inputs = [], outputs = [new Pin(this)];
+    toExporterType() {
+        const inputs = [], outputs = [new Pin(this, this.name)];
         return Type.fromInfo(inputs, outputs);
     }
     atomized() {
@@ -1364,10 +1364,10 @@ export class FunctionchartContext extends EventBase {
         this.deleteItem(node);
     }
     exportElement(element) {
-        const result = this.newElement('exporter'), newType = Type.fromInfo([], [new Pin(element.type.copyUnlabeled())]);
+        const result = this.newElement('exporter'), exporterType = element.type.toExporterType();
         result.x = element.x;
         result.y = element.y;
-        result.typeString = newType.toString();
+        result.typeString = exporterType.toString();
         if (element instanceof Element) {
             result.name = element.name;
         }
@@ -1377,10 +1377,10 @@ export class FunctionchartContext extends EventBase {
         result.innerTypeString = element.type.toString();
         return result;
     }
-    importElement(type) {
-        const result = this.newElement('instancer'), instancerType = type.toInstancerType();
+    importElement(element) {
+        const result = this.newElement('instancer'), instancerType = element.type.toInstancerType();
         result.typeString = instancerType.toString();
-        result.innerTypeString = type.toString();
+        result.innerTypeString = element.type.toString();
         return result;
     }
     exportElements(elements) {
@@ -1398,7 +1398,7 @@ export class FunctionchartContext extends EventBase {
         // Open each non-input/output element.
         elements.forEach(element => {
             selection.delete(element);
-            const newElement = self.importElement(element.type);
+            const newElement = self.importElement(element);
             self.replaceElement(element, newElement);
             selection.add(newElement);
         });
@@ -1425,9 +1425,11 @@ export class FunctionchartContext extends EventBase {
         if (index < firstOutput) {
             const wire = node.inWires[index];
             if (wire) {
-                const src = wire.src, // We can only reach elements from elements.
-                srcPin = wire.srcPin, index = src.type.inputs.length + srcPin;
-                this.visitPin(src, index, visitor, visited);
+                const src = wire.src;
+                if (src) {
+                    const srcPin = wire.srcPin, index = src.type.inputs.length + srcPin;
+                    this.visitPin(src, index, visitor, visited);
+                }
             }
         }
         else {
@@ -1436,8 +1438,11 @@ export class FunctionchartContext extends EventBase {
                 for (let i = 0; i < wires.length; i++) {
                     const wire = wires[i];
                     if (wire) {
-                        const dst = wire.dst, dstPin = wire.dstPin;
-                        this.visitPin(dst, dstPin, visitor, visited);
+                        const dst = wire.dst;
+                        if (dst) {
+                            const dstPin = wire.dstPin;
+                            this.visitPin(dst, dstPin, visitor, visited);
+                        }
                     }
                 }
             }
@@ -1520,7 +1525,7 @@ export class FunctionchartContext extends EventBase {
         outputs.forEach((output, i) => { output.fcIndex = i; });
         function getPinName(type, pin) {
             let typeString = type.toString();
-            if (pin.name && !typeString.endsWith(')'))
+            if (pin.name && !typeString.endsWith(')')) // TODO we shouldn't need this check.
                 typeString += '(' + pin.name + ')';
             return typeString;
         }
