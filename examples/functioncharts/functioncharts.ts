@@ -30,6 +30,13 @@ import { isElementAccessChain } from 'typescript';
 
 // Value and Function type descriptions.
 
+function escapeName(name: string) : string {
+  return name.replace(')', '))');
+}
+function unescapeName(name: string) : string {
+  return name.replace('))', ')');
+}
+
 export class Pin {
   readonly type: Type;
   readonly name?: string;
@@ -45,7 +52,7 @@ export class Pin {
   toString() : string {
     let s = this.type.toString();
     if (this.name)
-      s += '(' + this.name + ')';
+      s += '(' + escapeName(this.name) + ')';
     return s;
   }
 }
@@ -105,7 +112,7 @@ export class Type {
     this.outputs.forEach(output => s += output.toString());
     s += ']';
     if (this.name)
-      s += '(' + this.name + ')';
+      s += '(' + escapeName(this.name) + ')';
     return s;
   }
   toFlatType(): Type {
@@ -113,17 +120,17 @@ export class Type {
     this.inputs.forEach((pin: Pin) => {
       typeString += 'v';
       if (pin.name)
-        typeString += '(' + pin.name + ')';
+        typeString += '(' + escapeName(pin.name) + ')';
     });
     typeString += ',';
     this.outputs.forEach((pin: Pin) => {
       typeString += 'v';
       if (pin.name)
-        typeString += '(' + pin.name + ')';
+        typeString += '(' + escapeName(pin.name) + ')';
     });
     typeString += ']';
     if (this.name) {
-      typeString += '(' + this.name + ')';
+      typeString += '(' + escapeName(this.name) + ')';
     }
     return Type.fromString(typeString);
   }
@@ -192,10 +199,16 @@ function parseTypeString(s: string) : Type {
   function parseName() : string | undefined {
     let name;
     if (s[j] === '(') {
-      let i = j + 1;
-      j = s.indexOf(')', i);
-      if (j > i)
+      let i = j + 1,
+          k = i;
+      // Advance to right paren, skipping the escape sequence '))'.
+      while ((j = s.indexOf(')', k)) > i && s[j + 1] === ')') {
+        k = j + 2;
+      }
+      if (j > i) {
         name = s.substring(i, j);
+        name = unescapeName(name);
+      }
       j++;
     }
     return name;
@@ -431,7 +444,9 @@ export class InstancerElement extends Element<InstancerTemplate> {
   // Derived properties, managed by the FunctionchartContext.
   instances = new Set<FunctionInstance>();  // TODO do we need this mapping to instances?
 
-  private _instanceType: Type;
+  resetTypeCache() { this._instanceType = undefined; }
+
+  private _instanceType: Type | undefined;
   private _instanceFlatType: Type;
   get instanceType() : Type {
     if (!this._instanceType) {
@@ -598,7 +613,7 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> implements Da
   get height() { return this.template.height.get(this) || 0; }
   set height(value: number) { this.template.height.set(this, value); }
   get name() { return this.template.name.get(this); }
-  set name(value: number) { this.template.name.set(this, value); }
+  set name(value: string) { this.template.name.set(this, value); }
 
   get nonWires() { return this.template.nonWires.get(this) as List<NodeTypes>; }
   get wires() { return this.template.wires.get(this) as List<Wire>; }
@@ -1869,54 +1884,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
     typeString += ']';
     if (name)
-      typeString += '(' + name + ')';
+      typeString += '(' + escapeName(name) + ')';
 
     return { typeString, closed, abstract, inputs, outputs };
   }
-
-  // getExportTypeInfo(functionchart: Functionchart) {
-  //   const self = this,
-  //         outputs = new Array<PinInfo>(),
-  //         subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray());
-
-  //   // Collect the functionchart's true elements.
-  //   subgraphInfo.elements.forEach(item => {
-  //     if (item instanceof Element || item instanceof FunctionInstance) {
-  //       const connected = new Multimap<NodeTypes, number>();
-  //       const type = item.type;
-  //       const pinInfo = { element: item, index: 0, type, connected, fcIndex: -1 };
-  //       outputs.push(pinInfo);
-  //   }
-  //   });
-  //   // Sort pins in increasing y-order. This lets users arrange the pins of the
-  //   // new type in an intuitive way.
-  //   function compareYs(p1: PinInfo, p2: PinInfo) {
-  //     const element1 = p1.element,
-  //           element2 = p2.element,
-  //           pin1 = element1.getPin(p1.index),
-  //           pin2 = element2.getPin(p2.index),
-  //           y1 = element1.y + pin1.y,
-  //           y2 = element2.y + pin2.y;
-  //     return y1 - y2;
-  //   }
-  //   outputs.sort(compareYs);
-  //   outputs.forEach((output, i) => { output.fcIndex = i; });
-
-  //   function getPinName(type: Type, pin: Pin) : string {
-  //     let typeString = type.toString();
-  //     if (pin.name)
-  //       typeString += '(' + pin.name + ')';
-  //     return typeString;
-  //   }
-
-  //   let typeString = '[,';
-  //   outputs.forEach(output => {
-  //     typeString += getPinName(output.type, output.element.getPin(output.index));
-  //   });
-  //   typeString += ']';
-
-  //   return { typeString, closed: true, abstract: false, inputs: [], outputs };
-  // }
 
   private updateItem(item: AllTypes) {
     this.derivedInfoNeedsUpdate = true;
@@ -2028,6 +1999,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
     } else if (owner instanceof Functionchart) {
       // TODO if we have any properties that would change the type in the future.
+    } else if (owner instanceof InstancerElement) {
+      if (this.nodes.has(owner)) {
+        if (prop === innerTypeStringProp) {
+          owner.resetTypeCache();
+        }
+      }
     } else if (owner instanceof NodeBase) {
       if (this.nodes.has(owner)) {
         if (prop === typeStringProp) {
@@ -2969,54 +2946,61 @@ export class FunctionchartEditor implements CanvasLayer {
       }
     }
     function nodeLabelGetter(info: ItemInfo, item: NodeTypes) {
+      let result;
       switch (item.template.typeName) {
         case 'input':       // [,v(label)]
-          return item.type.outputs[0].name || '';
+          result = item.type.outputs[0].name;
+          break;
         case 'output':      // [v(label),]
-          return item.type.inputs[0].name || '';
+          result = item.type.inputs[0].name;
+          break;
         case 'element': {     // [vv,v](label), [v,v](label), [vvv,v](label)
           const element = item as Element;
           if (element.name == 'literal')
-            return item.type.outputs[0].name;
-          return item.type.name;
+            result = item.type.outputs[0].name;
+          else
+            result = item.type.name;
+          break;
         }
         case 'instancer': { // [,[...]]
-          return (item as InstancerElement).innerType.name;
+          const element =  item as InstancerElement,
+                innerType = element.innerType;
+          result = innerType.name;
+          break;
         }
       }
-      return '';
+      return result ? result : '';
     }
     function nodeLabelSetter(info: ItemInfo, item: NodeTypes, value: any) {
-      // TODO escape '(', ')', '/'
-      const labelPart = value ? '(' + value + ')' : '';
-      let newValue;
+      let newType;
       switch (item.template.typeName) {
-        case 'input':       // [,v(label)]
-          newValue = '[,v' + labelPart + ']';
+        case 'input':
+          newType = Type.fromInfo([], [new Pin(Type.valueType, value)]);
           break;
-        case 'output':      // [v(label),]
-          newValue = '[v' + labelPart + ',]';
+        case 'output':
+          newType = Type.fromInfo([new Pin(Type.valueType, value)], []);
           break;
         case 'element': {
-          const element = item as Element;
-          let type = element.type;
+          const element = item as Element,
+                type = element.type;
           if (element.name === 'literal') {
-            type = Type.fromInfo([], [new Pin(type.outputs[0].type, value)]);
+            newType = Type.fromInfo([], [new Pin(type.outputs[0].type, value)]);
           } else {
-            type = Type.fromInfo(type.inputs, type.outputs, value);
+            newType = Type.fromInfo(type.inputs, type.outputs, value);
           }
-          newValue = type.toString();
           break;
         }
         case 'instancer': {
           const element =  item as InstancerElement,
-                innerType = element.innerType,
-                type = Type.fromInfo(innerType.inputs, innerType.outputs, value);
-          newValue = type.toString();
+                innerType = element.innerType;
+          newType = Type.fromInfo(innerType.inputs, innerType.outputs, value);
           break;
         }
       }
-      setter(info, item, newValue);
+      if (newType) {
+        const newValue = newType.toString();
+        setter(info, item, newValue);
+      }
     }
     this.propertyInfo.set('input', [
       {

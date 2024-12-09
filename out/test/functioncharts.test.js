@@ -127,6 +127,7 @@ describe('parseTypeString', () => {
             '[v(a)v(b),v(c)]',
             '[,[,v][v,v]](@)',
             '[[v,vv(q)](a)v(b),v(c)](foo)',
+            '[v(p(0))),](p(0))=1)', // labels with ')' in them (escaped).
         ];
         typeStrings.forEach(typeString => expect(FC.Type.fromString(typeString).toString()).toBe(typeString));
         typeStrings.forEach(typeString => expect(FC.Type.atomizedTypes.has(typeString)).toBe(true));
