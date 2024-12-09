@@ -40,7 +40,8 @@ function unescapeName(name: string) : string {
 export class Pin {
   readonly type: Type;
   readonly name?: string;
-  get typeString() { return this.toString(); }
+  varArgs: boolean = false;
+
   y = 0;
   baseline = 0;
 
@@ -51,6 +52,8 @@ export class Pin {
 
   toString() : string {
     let s = this.type.toString();
+    if (this.varArgs)
+      s += '*';
     if (this.name)
       s += '(' + escapeName(this.name) + ')';
     return s;
@@ -116,23 +119,9 @@ export class Type {
     return s;
   }
   toFlatType(): Type {
-    let typeString = '[';
-    this.inputs.forEach((pin: Pin) => {
-      typeString += 'v';
-      if (pin.name)
-        typeString += '(' + escapeName(pin.name) + ')';
-    });
-    typeString += ',';
-    this.outputs.forEach((pin: Pin) => {
-      typeString += 'v';
-      if (pin.name)
-        typeString += '(' + escapeName(pin.name) + ')';
-    });
-    typeString += ']';
-    if (this.name) {
-      typeString += '(' + escapeName(this.name) + ')';
-    }
-    return Type.fromString(typeString);
+    const inputs = this.inputs.map(pin => new Pin(Type.valueType, pin.name)),
+          outputs = this.outputs.map(pin => new Pin(Type.valueType, pin.name));
+    return new Type(inputs, outputs, this.name);
   }
   toImportType() : Type {
     const inputs = this.inputs.slice();
@@ -141,13 +130,10 @@ export class Type {
     return newType;
   }
   toInstancerType() : Type {
-    const newType = Type.fromInfo([new Pin(this)], [], this.name);
-    return newType;
+    return Type.fromInfo([new Pin(this)], [], this.name);
   }
   toExporterType() : Type {
-    const inputs: Array<Pin> = [],
-          outputs = [new Pin(this, this.name)];
-    return Type.fromInfo(inputs, outputs);
+    return Type.fromInfo([], [new Pin(this, this.name)]);
   }
   atomized() : Type {
     let s = this.toString();
@@ -1874,17 +1860,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       return typeString;
     }
 
-    let typeString = '[';
-    inputs.forEach(input => {
-      typeString += getPinName(input.type, input.element.getPin(input.index));
+    const inputPins = inputs.map(pinInfo => {
+      const pin = pinInfo.element.getPin(pinInfo.index);  // TODO Maybe store pin instead?
+      return new Pin(pinInfo.type, pin.name);
     });
-    typeString += ',';
-    outputs.forEach(output => {
-      typeString += getPinName(output.type, output.element.getPin(output.index));
+    const outputPins = outputs.map(pinInfo => {
+      const pin = pinInfo.element.getPin(pinInfo.index);  // TODO Maybe store pin instead?
+      return new Pin(pinInfo.type, pin.name);
     });
-    typeString += ']';
-    if (name)
-      typeString += '(' + escapeName(name) + ')';
+    const type = Type.fromInfo(inputPins, outputPins, name),
+          typeString = type.toString();
 
     return { typeString, closed, abstract, inputs, outputs };
   }
@@ -2313,10 +2298,13 @@ class Renderer implements ILayoutEngine {
       this.layoutType(type);
       this.layoutType(element.flatType);
     }
-    if (element instanceof InstancerElement) {
-      const innerType = element.innerType;
+    if (element instanceof InstancerElement || element instanceof ExporterElement) {
+      const innerType = element.innerType,
+            innerFlatType = element.innerFlatType;
       if (innerType.needsLayout)
         this.layoutType(innerType);
+      if (innerFlatType.needsLayout)
+        this.layoutType(innerFlatType);
     }
   }
 

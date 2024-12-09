@@ -71,10 +71,10 @@ describe('Pin', () => {
         expect(valuePin.type).toBe(FC.Type.valueType);
         expect(valuePin.name).toBeUndefined();
         expect(valuePin.toString()).toBe('v');
-        expect(valuePin.typeString).toBe('v');
+        expect(valuePin.toString()).toBe('v');
         const namedPin = new FC.Pin(valuePin.type, 'pin1');
         expect(namedPin.toString()).toBe('v(pin1)');
-        expect(namedPin.typeString).toBe('v(pin1)');
+        expect(namedPin.toString()).toBe('v(pin1)');
     });
 });
 describe('Type', () => {
@@ -142,8 +142,8 @@ describe('parseTypeString', () => {
         expect(type2.name).toBe('@');
         expect(type2.inputs.length).toBe(0);
         expect(type2.outputs.length).toBe(2);
-        expect(type2.outputs[0].typeString).toBe('[,v]');
-        expect(type2.outputs[1].typeString).toBe('[v,v]');
+        expect(type2.outputs[0].toString()).toBe('[,v]');
+        expect(type2.outputs[1].toString()).toBe('[v,v]');
         // Make sure subtypes are present.
         const subTypeStrings = ['[v,v]', '[,v]', '[v,vv(q)]'];
         subTypeStrings.forEach(typeString => expect(FC.Type.atomizedTypes.has(typeString)).toBe(true));

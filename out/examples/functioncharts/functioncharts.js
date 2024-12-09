@@ -13,8 +13,8 @@ function unescapeName(name) {
     return name.replace('))', ')');
 }
 export class Pin {
-    get typeString() { return this.toString(); }
     constructor(type, name) {
+        this.varArgs = false;
         this.y = 0;
         this.baseline = 0;
         this.type = type;
@@ -22,6 +22,8 @@ export class Pin {
     }
     toString() {
         let s = this.type.toString();
+        if (this.varArgs)
+            s += '*';
         if (this.name)
             s += '(' + escapeName(this.name) + ')';
         return s;
@@ -67,23 +69,8 @@ export class Type {
         return s;
     }
     toFlatType() {
-        let typeString = '[';
-        this.inputs.forEach((pin) => {
-            typeString += 'v';
-            if (pin.name)
-                typeString += '(' + escapeName(pin.name) + ')';
-        });
-        typeString += ',';
-        this.outputs.forEach((pin) => {
-            typeString += 'v';
-            if (pin.name)
-                typeString += '(' + escapeName(pin.name) + ')';
-        });
-        typeString += ']';
-        if (this.name) {
-            typeString += '(' + escapeName(this.name) + ')';
-        }
-        return Type.fromString(typeString);
+        const inputs = this.inputs.map(pin => new Pin(Type.valueType, pin.name)), outputs = this.outputs.map(pin => new Pin(Type.valueType, pin.name));
+        return new Type(inputs, outputs, this.name);
     }
     toImportType() {
         const inputs = this.inputs.slice();
@@ -92,12 +79,10 @@ export class Type {
         return newType;
     }
     toInstancerType() {
-        const newType = Type.fromInfo([new Pin(this)], [], this.name);
-        return newType;
+        return Type.fromInfo([new Pin(this)], [], this.name);
     }
     toExporterType() {
-        const inputs = [], outputs = [new Pin(this, this.name)];
-        return Type.fromInfo(inputs, outputs);
+        return Type.fromInfo([], [new Pin(this, this.name)]);
     }
     atomized() {
         let s = this.toString();
@@ -1541,17 +1526,15 @@ export class FunctionchartContext extends EventBase {
                 typeString += '(' + pin.name + ')';
             return typeString;
         }
-        let typeString = '[';
-        inputs.forEach(input => {
-            typeString += getPinName(input.type, input.element.getPin(input.index));
+        const inputPins = inputs.map(pinInfo => {
+            const pin = pinInfo.element.getPin(pinInfo.index); // TODO Maybe store pin instead?
+            return new Pin(pinInfo.type, pin.name);
         });
-        typeString += ',';
-        outputs.forEach(output => {
-            typeString += getPinName(output.type, output.element.getPin(output.index));
+        const outputPins = outputs.map(pinInfo => {
+            const pin = pinInfo.element.getPin(pinInfo.index); // TODO Maybe store pin instead?
+            return new Pin(pinInfo.type, pin.name);
         });
-        typeString += ']';
-        if (name)
-            typeString += '(' + escapeName(name) + ')';
+        const type = Type.fromInfo(inputPins, outputPins, name), typeString = type.toString();
         return { typeString, closed, abstract, inputs, outputs };
     }
     updateItem(item) {
@@ -1908,10 +1891,12 @@ class Renderer {
             this.layoutType(type);
             this.layoutType(element.flatType);
         }
-        if (element instanceof InstancerElement) {
-            const innerType = element.innerType;
+        if (element instanceof InstancerElement || element instanceof ExporterElement) {
+            const innerType = element.innerType, innerFlatType = element.innerFlatType;
             if (innerType.needsLayout)
                 this.layoutType(innerType);
+            if (innerFlatType.needsLayout)
+                this.layoutType(innerFlatType);
         }
     }
     layoutWire(wire) {
@@ -3114,7 +3099,7 @@ export class FunctionchartEditor {
                 context.select(output);
             }
             else {
-                // Auto-delete any existing wire at dst.
+                // The user's new wire takes precedence over any existing wire (fan-in <= 1).
                 const current = dst.inWires[wire.dstPin];
                 if (current) {
                     context.deleteItem(current);
