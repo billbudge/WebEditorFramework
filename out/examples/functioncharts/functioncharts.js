@@ -3113,6 +3113,13 @@ export class FunctionchartEditor {
                 }
                 context.select(output);
             }
+            else {
+                // Auto-delete any existing wire at dst.
+                const current = dst.inWires[wire.dstPin];
+                if (current) {
+                    context.deleteItem(current);
+                }
+            }
             wire.pSrc = wire.pDst = undefined;
         }
         else if (drag instanceof NonWireDrag &&

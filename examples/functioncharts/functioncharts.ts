@@ -1171,7 +1171,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  private deleteItem(item: AllTypes) {
+  deleteItem(item: AllTypes) {
     this.unparent(item);
     this.selection.delete(item);
   }
@@ -3716,6 +3716,12 @@ export class FunctionchartEditor implements CanvasLayer {
           output = context.newInstancerForWire(wire, p);
         }
         context.select(output);
+      } else {
+        // The user's new wire takes precedence over any existing wire (fan-in <= 1).
+        const current = dst.inWires[wire.dstPin];
+        if (current) {
+          context.deleteItem(current);
+        }
       }
       wire.pSrc = wire.pDst = undefined;
     } else if (drag instanceof NonWireDrag &&
