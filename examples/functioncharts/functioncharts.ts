@@ -74,7 +74,7 @@ export class Type {
 
   readonly inputs: Pin[];
   readonly outputs: Pin[];
-  readonly name?: string;
+  readonly name: string | undefined;
   x = 0;
   y = 0;
   width = 0;
@@ -121,13 +121,7 @@ export class Type {
   toFlatType(): Type {
     const inputs = this.inputs.map(pin => new Pin(Type.valueType, pin.name)),
           outputs = this.outputs.map(pin => new Pin(Type.valueType, pin.name));
-    return new Type(inputs, outputs, this.name);
-  }
-  toImportType() : Type {
-    const inputs = this.inputs.slice();
-    inputs.push(new Pin(this));
-    const newType = Type.fromInfo(inputs, this.outputs);
-    return newType;
+    return Type.fromInfo(inputs, outputs, this.name);
   }
   toInstancerType() : Type {
     return Type.fromInfo([new Pin(this)], [], this.name);
@@ -135,7 +129,7 @@ export class Type {
   toExporterType() : Type {
     return Type.fromInfo([], [new Pin(this, this.name)]);
   }
-  atomized() : Type {
+  private atomized() : Type {
     let s = this.toString();
     let atomizedType = Type.atomizedTypes.get(s);
     if (!atomizedType) {
@@ -202,15 +196,21 @@ function parseTypeString(s: string) : Type {
   function parsePin() : Pin {
     let i = j;
     // value type
-    if (s[j] === Type.valueTypeString || s[j] === '*') {  // TODO remove when files converted
+    if (s[j] === Type.valueTypeString) {
       j++;
-      return new Pin(Type.valueType, parseName());
+      let varArgs = false;
+      if (s[j] === '*') {
+        varArgs = true;
+        j++;
+      }
+      const result = new Pin(Type.valueType, parseName());
+      result.varArgs = varArgs;
+      return result;
     }
     // function types
     let type = parseFunction(),
         typeString = s.substring(i, j);
     // Add the pin type, without label.
-    type = type.atomized();
     return new Pin(type, parseName());
   }
   function parseFunction() : Type {
@@ -244,7 +244,6 @@ function parseTypeString(s: string) : Type {
             outputs = type.outputs.map(pin => new Pin(pin.type, pin.name));
       type = Type.fromInfo(inputs, outputs, name);
     }
-    type = type.atomized();
   }
   return type;
 }
@@ -356,6 +355,7 @@ const elementTemplate = new ElementTemplate('element'),      // built-in element
       exporterTemplate = new ExporterTemplate('exporter'),   // exporter element
       inputTemplate = new PseudoelementTemplate('input'),    // input pseudoelement
       outputTemplate = new PseudoelementTemplate('output'),  // output pseudoelement
+      useTemplate = new PseudoelementTemplate('use'),
       wireTemplate = new WireTemplate(),
       functionchartTemplate = new FunctionchartTemplate('functionchart'),
       functionInstanceTemplate = new FunctionInstanceTemplate();
@@ -379,10 +379,9 @@ abstract class NodeBase<T extends NonWireTemplate> {
   protected _type: Type;
   get type() { return this._type || Type.emptyType; }
   set type(type: Type) {
-    const atomized = type.atomized();
-    if (atomized !== this._type) {
-      this._type = atomized;
-      this._flatType = type.toFlatType().atomized();
+    if (type !== this._type) {
+      this._type = type;
+      this._flatType = type.toFlatType();
     }
   }
   // Flat type has the same arity as type, but all pins are value type.
@@ -481,7 +480,7 @@ export class ExporterElement extends Element<ExporterTemplate> {
       } else {
         const typeString = this.innerTypeString;
         if (typeString) {
-          this._innerType = Type.fromString(typeString).toFlatType().atomized();
+          this._innerType = Type.fromString(typeString).toFlatType();
         } else {
           this._innerType = Type.emptyType;
         }
@@ -520,6 +519,9 @@ export class Pseudoelement extends NodeBase<PseudoelementTemplate> implements Da
         break;
       case 'output':
         this.typeString = '[v,]';
+        break;
+      case 'use':
+        this.typeString = '[v*,v]';
         break;
       }
   }
@@ -779,6 +781,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     switch (typeName) {
       case 'input': template = inputTemplate; break;
       case 'output': template = outputTemplate; break;
+      case 'use': template = useTemplate; break;
       default: throw new Error('Unknown pseudoelement type: ' + typeName);
     }
     const result: Pseudoelement = new Pseudoelement(this, template, nextId);
@@ -1578,6 +1581,34 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         if (lastTypeInfo === emptyTypeInfo)
           lastTypeInfo = typeInfo;
         node.pinMap = self.makePinMap(lastTypeInfo, typeInfo);
+      } else if (node instanceof Pseudoelement && node.template === useTemplate) {
+        // Reroute wires so there are no empty pins.
+        const inWires = node.inWires,
+              length = inWires.length;
+        let wired = 0,
+            unwired = 0;
+        for (let i = 0; i < length; i++) {
+          const wire = inWires[i];
+          if (wire) {
+            if (unwired > 0) {
+              wire.dstPin = wire.dstPin - unwired;
+            }
+            wired++;
+          } else {
+            unwired++;
+          }
+        }
+
+        const newLength = wired + 1;
+        if (newLength !== length) {
+          // The type has to change.
+          const inputs = new Array<Pin>(newLength);
+          for (let i = 0; i < newLength; i++)
+            inputs[i] = new Pin(Type.valueType)
+          inputs[newLength - 1].varArgs = true;
+          const newType = Type.fromInfo(inputs, [new Pin(Type.valueType)]);
+          node.typeString = newType.toString();
+        }
       }
     });
 
@@ -1797,16 +1828,18 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // Collect the functionchart's input and output pseudoelements.
     subgraphInfo.nodes.forEach(node => {
       if (node instanceof Pseudoelement) {
-        if (node.template.typeName === 'input') {
+        if (node.template === inputTemplate) {
           const connected = new Multimap<NodeTypes, number>();
           const type = self.inferPinType(node, 0, connected);
           const pinInfo = { element: node, index: 0, type, connected, fcIndex: -1 };
           inputs.push(pinInfo);
-        } else if(node.template.typeName === 'output') {
+        } else if (node.template === outputTemplate) {
           const connected = new Multimap<NodeTypes, number>();
           const type = self.inferPinType(node, 0, connected);
           const pinInfo = { element: node, index: 0, type, connected, fcIndex: -1 };
           outputs.push(pinInfo);
+        } else if (node.template === useTemplate) {
+          // TODO
         }
       } else {  // instanceof ElementTypes
         // Only instances of abstract functioncharts are abstract.
@@ -2024,7 +2057,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'exporter': return this.newElement(typeName);
 
       case 'input':
-      case 'output': return this.newPseudoelement(typeName);
+      case 'output':
+      case 'use': return this.newPseudoelement(typeName);
 
       case 'wire': return this.newWire(undefined, -1, undefined, -1);
 
@@ -2498,19 +2532,20 @@ class Renderer implements ILayoutEngine {
         switch (element.template.typeName) {
           case 'input': {
             inFlagPath(x, y, w, h, d, ctx);
-            ctx.fill();
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
             break;
           }
           case 'output': {
             outFlagPath(x, y, w, h, d, ctx);
-            ctx.fill();
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
             break;
           }
+          case 'use' : {
+            ctx.beginPath();
+            ctx.rect(x, y, w, h);
+          }
         }
+        ctx.fill();
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
         this.drawType(element.flatType, x, y);
         break;
       }
@@ -2872,6 +2907,7 @@ export class FunctionchartEditor implements CanvasLayer {
           functionchart = context.newFunctionchart('functionchart'),
           input = context.newPseudoelement('input'),
           output = context.newPseudoelement('output'),
+          use = context.newPseudoelement('use'),
           literal = context.newElement('element'),
           binop = context.newElement('element'),
           unop = context.newElement('element'),
@@ -2883,6 +2919,7 @@ export class FunctionchartEditor implements CanvasLayer {
 
     input.x = 8;  input.y = 8;
     output.x = 40; output.y = 8;
+    use.x = 72; use.y = 8;
     literal.x = 8; literal.y = 32;
     literal.name = 'literal';
     literal.typeString = '[,v(0)]';
@@ -2905,6 +2942,7 @@ export class FunctionchartEditor implements CanvasLayer {
 
     functionchart.nonWires.append(input);
     functionchart.nonWires.append(output);
+    functionchart.nonWires.append(use);
     functionchart.nonWires.append(varBinding);
     functionchart.nonWires.append(literal);
     functionchart.nonWires.append(binop);
