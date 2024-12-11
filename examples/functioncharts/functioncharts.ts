@@ -263,7 +263,7 @@ const idProp = new IdProp('id'),
       srcPinProp = new ScalarProp('srcPin'),
       dstProp = new ReferenceProp('dst'),
       dstPinProp = new ScalarProp('dstPin'),
-      nonWiresProp = new ChildArrayProp('nonWires'),
+      nodesProp = new ChildArrayProp('nonWires'),  // TODO rename nonWires in files
       wiresProp = new ChildArrayProp('wires'),
       instancerProp = new ReferenceProp('functionchart'),  // TODO rename 'instancer'
       innerTypeStringProp = new ScalarProp('innerTypeString');
@@ -334,10 +334,10 @@ class FunctionchartTemplate extends NonWireTemplate {
   readonly width = widthProp;
   readonly height = heightProp;
   readonly name = nameProp;
-  readonly nonWires = nonWiresProp;
+  readonly nodes = nodesProp;
   readonly wires = wiresProp;
   readonly properties = [this.id, this.x, this.y, this.width, this.height, this.name,
-                         this.nonWires, this.wires];
+                         this.nodes, this.wires];
     constructor(typeName: FunctionchartType) {
       super();
       this.typeName = typeName;
@@ -427,6 +427,8 @@ export class InstancerElement extends Element<InstancerTemplate> {
   set innerTypeString(value: string) { this.template.innerTypeString.set(this, value); }
 
   // Derived properties, managed by the FunctionchartContext.
+  get isAbstract()  { return false; }
+
   instances = new Set<FunctionInstance>();  // TODO do we need this mapping to instances?
 
   resetTypeCache() { this._instanceType = undefined; }
@@ -603,10 +605,12 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> implements Da
   get name() { return this.template.name.get(this); }
   set name(value: string) { this.template.name.set(this, value); }
 
-  get nonWires() { return this.template.nonWires.get(this) as List<NodeTypes>; }
+  get nodes() { return this.template.nodes.get(this) as List<NodeTypes>; }
   get wires() { return this.template.wires.get(this) as List<Wire>; }
 
   // Derived properties.
+  get isAbstract() { return this.typeInfo.abstract; }
+
   typeInfo = emptyTypeInfo;
   lastTypeInfo: TypeInfo | undefined;
   pinMap: Array<number> | undefined;
@@ -633,6 +637,8 @@ export class FunctionInstance extends NodeBase<FunctionInstanceTemplate> impleme
   set instancer(value: InstancerTypes) { this.template.instancer.set(this, value); }
 
   // Derived Properties
+  get isAbstract()  { return this.instancer.isAbstract; }
+
   get type() : Type {
     let type = this._type;
     if (!type) {
@@ -827,7 +833,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const self = this;
     visitor(item);
     if (item instanceof Functionchart) {
-      item.nonWires.forEach(t => self.visitAll(t, visitor));
+      item.nodes.forEach(t => self.visitAll(t, visitor));
       item.wires.forEach(t => self.visitAll(t, visitor));
     }
   }
@@ -835,35 +841,35 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const self = this;
     if (item instanceof Functionchart) {
       item.wires.forEachReverse(t => self.reverseVisitAll(t, visitor));
-      item.nonWires.forEachReverse(t => self.reverseVisitAll(t, visitor));
+      item.nodes.forEachReverse(t => self.reverseVisitAll(t, visitor));
     }
     visitor(item);
   }
-  visitNonWires(item: NodeTypes, visitor: NodeVisitor) : void {
+  visitNodes(item: NodeTypes, visitor: NodeVisitor) : void {
     const self = this;
     visitor(item);
     if (item instanceof Functionchart) {
-      item.nonWires.forEach(item => self.visitNonWires(item, visitor));
+      item.nodes.forEach(item => self.visitNodes(item, visitor));
     }
   }
-  reverseVisitNonWires(item: NodeTypes, visitor: NodeVisitor) : void {
+  reverseVisitNodes(item: NodeTypes, visitor: NodeVisitor) : void {
     const self = this;
     if (item instanceof Functionchart) {
-      item.nonWires.forEachReverse(item => self.reverseVisitNonWires(item, visitor));
+      item.nodes.forEachReverse(item => self.reverseVisitNodes(item, visitor));
     }
     visitor(item);
   }
   visitWires(functionchart: Functionchart, visitor: WireVisitor) : void {
     const self = this;
     functionchart.wires.forEach(t => visitor(t));
-    functionchart.nonWires.forEach(t => {
+    functionchart.nodes.forEach(t => {
       if (t instanceof Functionchart)
         self.visitWires(t, visitor)
     });
   }
   reverseVisitWires(functionchart: Functionchart, visitor: WireVisitor) : void {
     const self = this;
-    functionchart.nonWires.forEachReverse(t => {
+    functionchart.nodes.forEachReverse(t => {
       if (t instanceof Functionchart)
         self.reverseVisitWires(t, visitor)
     });
@@ -1128,7 +1134,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (item instanceof Wire) {
       parent.wires.append(item);
     } else {
-      parent.nonWires.append(item);
+      parent.nodes.append(item);
     }
     return item;
   }
@@ -1155,7 +1161,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (item instanceof Wire) {
         parent.wires.remove(item);
       } else {
-        parent.nonWires.remove(item);
+        parent.nodes.remove(item);
       }
     }
   }
@@ -1403,7 +1409,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   private updateFunctionchartTypes() {
     const self = this;
     // Update Functionchart types. TODO InstancerElement types too?
-    this.reverseVisitNonWires(this.functionchart, item => {
+    this.reverseVisitNodes(this.functionchart, item => {
       if (item instanceof Functionchart) {
         const typeInfo = self.getFunctionchartTypeInfo(item),
               typeString = typeInfo.typeString;
@@ -1414,14 +1420,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         item.instances.forEach((instance) => {
           instance.type = type;
         });
-        //  else {
-        //   // export
-        //   const typeInfo = self.getExportTypeInfo(item),
-        //         typeString = typeInfo.typeString;
-        //   item.typeInfo = typeInfo;
-        //   const type = parseTypeString(typeString);
-        //   item.type = type;
-        // }
       }
     });
   }
@@ -1820,7 +1818,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           inputs = new Array<PinInfo>(),
           outputs = new Array<PinInfo>(),
           name = functionchart.name,
-          subgraphInfo = self.getSubgraphInfo(functionchart.nonWires.asArray()),
+          subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()),
           unwired = subgraphInfo.wires.size === 0,
           closed = subgraphInfo.inWires.size == 0;
     let abstract = unwired && closed;
@@ -1842,8 +1840,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           // TODO
         }
       } else {  // instanceof ElementTypes
-        // Only instances of abstract functioncharts are abstract.
-        abstract = node instanceof FunctionInstance && node.instancer instanceof Functionchart;
+        if (abstract) {
+          // Only instancers, exporters, or functioncharts are allowed if abstract.
+          abstract = (node instanceof InstancerElement) ||
+                     (node instanceof ExporterElement) ||
+                     (node instanceof Functionchart);
+        }
       }
     });
     // Add disconnected instancer pins as input pins.
@@ -1858,7 +1860,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         };
       } else if (node instanceof ExporterElement) {
         const wires = node.outWires[0];
-        if (wires && wires.length === 0) {  // TODO we shouldn't need to check 'wires' here.
+        if (wires === undefined || wires.length === 0) {  // TODO we shouldn't need to check 'wires' here.
           const connected = new Multimap<NodeTypes, number>();
           const pin = node.type.outputs[0],
                 type = pin.type;
@@ -1920,7 +1922,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
 
     // Update child items with our current position.
-    this.visitNonWires(item, item => this.setGlobalPosition(item));
+    this.visitNodes(item, item => this.setGlobalPosition(item));
   }
 
   private insertElement(element: AllElementTypes, parent: Functionchart) {
@@ -1949,7 +1951,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     functionchart.parent = parent;
 
     const self = this;
-    functionchart.nonWires.forEach(item => self.insertItem(item, functionchart));
+    functionchart.nodes.forEach(item => self.insertItem(item, functionchart));
     functionchart.wires.forEach(wire => self.insertWire(wire, functionchart));
 
     // Update function chart after all descendants have been added and updated. We need that
@@ -1961,7 +1963,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.nodes.delete(functionchart);
     const self = this;
     functionchart.wires.forEach(wire => self.removeWire(wire));
-    functionchart.nonWires.forEach(element => self.removeItem(element));
+    functionchart.nodes.forEach(element => self.removeItem(element));
   }
 
   private insertWire(wire: Wire, parent: Functionchart) {
@@ -2366,18 +2368,18 @@ class Renderer implements ILayoutEngine {
           spacing = this.theme.spacing,
           type = functionchart.type,
           flatType = functionchart.flatType,
-          nonWires = functionchart.nonWires;
+          nodes = functionchart.nodes;
     if (type.needsLayout) {
       self.layoutType(type);
       self.layoutType(flatType);
     }
 
     let width, height;
-    if (nonWires.length === 0) {
+    if (nodes.length === 0) {
       width = self.theme.minFunctionchartWidth;
       height = self.theme.minFunctionchartHeight;
     } else {
-      const extents = self.sumBounds(nonWires.asArray()),
+      const extents = self.sumBounds(nodes.asArray()),
             global = functionchart.globalPosition,
             x = global.x,
             y = global.y,
@@ -2481,7 +2483,13 @@ class Renderer implements ILayoutEngine {
         ctx.fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
-        ctx.stroke();
+        if (element instanceof FunctionInstance && element.isAbstract) {
+          ctx.setLineDash([5]);
+          ctx.stroke();
+          ctx.setLineDash([0]);
+        } else {
+          ctx.stroke();
+        }
         const type = element.flatType;
         if (element instanceof InstancerElement) {
           this.drawPin(type.inputs[0], x, y + h / 2 - r);
@@ -2584,7 +2592,13 @@ class Renderer implements ILayoutEngine {
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
-        ctx.stroke();
+        if (functionchart.isAbstract) {
+          ctx.setLineDash([5]);
+          ctx.stroke();
+          ctx.setLineDash([0]);
+        } else {
+          ctx.stroke();
+        }
         this.drawType(type, instancerRect.x, instancerRect.y);
         //  else if (isFunctionExport(functionchart)) {
         //   const type = functionchart.flatType,
@@ -2940,15 +2954,15 @@ export class FunctionchartEditor implements CanvasLayer {
     newFunctionchart.width = this.theme.minFunctionchartWidth;
     newFunctionchart.height = this.theme.minFunctionchartHeight;
 
-    functionchart.nonWires.append(input);
-    functionchart.nonWires.append(output);
-    functionchart.nonWires.append(use);
-    functionchart.nonWires.append(varBinding);
-    functionchart.nonWires.append(literal);
-    functionchart.nonWires.append(binop);
-    functionchart.nonWires.append(unop);
-    functionchart.nonWires.append(cond);
-    functionchart.nonWires.append(newFunctionchart);
+    functionchart.nodes.append(input);
+    functionchart.nodes.append(output);
+    functionchart.nodes.append(use);
+    functionchart.nodes.append(varBinding);
+    functionchart.nodes.append(literal);
+    functionchart.nodes.append(binop);
+    functionchart.nodes.append(unop);
+    functionchart.nodes.append(cond);
+    functionchart.nodes.append(newFunctionchart);
     context.root = functionchart;
     this.palette = functionchart;
 
@@ -3150,7 +3164,7 @@ export class FunctionchartEditor implements CanvasLayer {
 
     // Layout any items in the functionchart.
     renderer.begin(this.canvasController.getCtx());
-    context.reverseVisitNonWires(this.functionchart, item => renderer.layout(item));
+    context.reverseVisitNodes(this.functionchart, item => renderer.layout(item));
     context.visitWires(this.functionchart, item => renderer.layout(item));
     renderer.end();
   }
@@ -3162,7 +3176,7 @@ export class FunctionchartEditor implements CanvasLayer {
       renderer.begin(canvasController.getCtx());
       this.context.reverseVisitAll(this.palette, item => renderer.layout(item));
       // Draw the palette items.
-      this.palette.nonWires.forEach(item => renderer.draw(item, RenderMode.Print));
+      this.palette.nodes.forEach(item => renderer.draw(item, RenderMode.Print));
       renderer.end();
     }
   }
@@ -3292,8 +3306,8 @@ export class FunctionchartEditor implements CanvasLayer {
       canvasController.applyTransform();
 
       // Don't draw the root functionchart.
-      functionchart.nonWires.forEach(item => {
-        context.visitNonWires(item, item => { renderer.draw(item, RenderMode.Normal); });
+      functionchart.nodes.forEach(item => {
+        context.visitNodes(item, item => { renderer.draw(item, RenderMode.Normal); });
       });
       // Draw wires after elements.
       context.visitWires(functionchart, wire => {
@@ -3322,7 +3336,7 @@ export class FunctionchartEditor implements CanvasLayer {
       ctx.fillStyle = this.theme.bgColor;
       ctx.fillRect(0, 0, size.width, size.height);
 
-      this.palette.nonWires.forEach(item => { renderer.draw(item, RenderMode.Palette); });
+      this.palette.nodes.forEach(item => { renderer.draw(item, RenderMode.Palette); });
       // Draw any selected object in the palette. Translate object to palette coordinates.
       const offset = canvasController.offsetToOtherCanvas(this.canvasController);
       ctx.translate(offset.x, offset.y);
@@ -3350,7 +3364,7 @@ export class FunctionchartEditor implements CanvasLayer {
     // Calculate document bounds. We don't need to consider wires as they should be  mostly
     // in the bounds of the elements.
     const items: AllTypes[] = new Array();
-    functionchart.nonWires.forEach(item => items.push(item));
+    functionchart.nodes.forEach(item => items.push(item));
 
     const bounds = renderer.sumBounds(items);
     // If there is a last selected element, we also render its hover info.
@@ -3379,8 +3393,8 @@ export class FunctionchartEditor implements CanvasLayer {
     canvasController.applyTransform();
 
     // Don't draw the root functionchart.
-    functionchart.nonWires.forEach(item => {
-      context.visitNonWires(item, item => { renderer.draw(item, renderMode); });
+    functionchart.nodes.forEach(item => {
+      context.visitNodes(item, item => { renderer.draw(item, renderMode); });
     });
     // Draw wires after elements.
     context.visitWires(functionchart, wire => {
@@ -3424,8 +3438,8 @@ export class FunctionchartEditor implements CanvasLayer {
       pushInfo(renderer.hitTestWire(wire, cp, tol, RenderMode.Normal));
     });
     // Skip the root functionchart, as hits there should go to the underlying canvas controller.
-    functionchart.nonWires.forEachReverse(item => {
-      context.reverseVisitNonWires(item, (item: NodeTypes) => {
+    functionchart.nodes.forEachReverse(item => {
+      context.reverseVisitNodes(item, (item: NodeTypes) => {
         pushInfo(renderer.hitTest(item, cp, tol, RenderMode.Normal));
       });
     });
@@ -3443,7 +3457,7 @@ export class FunctionchartEditor implements CanvasLayer {
         hitList.push(info);
     }
     renderer.begin(ctx);
-    this.palette.nonWires.forEachReverse(item => {
+    this.palette.nodes.forEachReverse(item => {
       pushInfo(renderer.hitTest(item, p, tol, RenderMode.Palette));
     });
     renderer.end();
@@ -3812,7 +3826,7 @@ export class FunctionchartEditor implements CanvasLayer {
     if (cmdKey) {
       switch (keyCode) {
         case 65: { // 'a'
-          functionchart.nonWires.forEach(function (v) {
+          functionchart.nodes.forEach(function (v) {
             context.selection.add(v);
           });
           self.canvasController.draw();

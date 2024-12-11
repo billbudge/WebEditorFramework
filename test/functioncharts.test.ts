@@ -730,12 +730,12 @@ describe('FunctionchartContext', () => {
     const context = new FC.FunctionchartContext(),
           functionchart = DataModels.Deserialize(recursiveFuncionchart, context) as FC.Functionchart;
     context.root = functionchart;
-    expect(functionchart.nonWires.length).toBe(1);
-    const fc = functionchart.nonWires.at(0) as FC.Functionchart;
+    expect(functionchart.nodes.length).toBe(1);
+    const fc = functionchart.nodes.at(0) as FC.Functionchart;
     expect(fc).toBeInstanceOf(FC.Functionchart);
-    expect(fc.nonWires.length).toBe(8);
-    const rfi1 = fc.nonWires.at(6) as FC.FunctionInstance,
-          rfi2 = fc.nonWires.at(7) as FC.FunctionInstance;
+    expect(fc.nodes.length).toBe(8);
+    const rfi1 = fc.nodes.at(6) as FC.FunctionInstance,
+          rfi2 = fc.nodes.at(7) as FC.FunctionInstance;
     expect(rfi1).toBeInstanceOf(FC.FunctionInstance);
     expect(rfi2).toBeInstanceOf(FC.FunctionInstance);
     expect(fc.wires.length).toBe(6);
@@ -901,10 +901,10 @@ describe('FunctionchartContext', () => {
     const context = new FC.FunctionchartContext(),
           functionchart = DataModels.Deserialize(canAddFunctionchart, context) as FC.Functionchart;
     context.root = functionchart;
-    const greatGrandparent = functionchart.nonWires.at(0) as FC.Functionchart,
-          grandParent = greatGrandparent.nonWires.at(0) as FC.Functionchart,
-          fc1 = grandParent!.nonWires.at(0) as FC.Functionchart,
-          fc2 = grandParent!.nonWires.at(1) as FC.Functionchart;
+    const greatGrandparent = functionchart.nodes.at(0) as FC.Functionchart,
+          grandParent = greatGrandparent.nodes.at(0) as FC.Functionchart,
+          fc1 = grandParent!.nodes.at(0) as FC.Functionchart,
+          fc2 = grandParent!.nodes.at(1) as FC.Functionchart;
     expect(greatGrandparent).toBeInstanceOf(FC.Functionchart);
     expect(grandParent).toBeInstanceOf(FC.Functionchart);
     expect(fc1).toBeInstanceOf(FC.Functionchart);
