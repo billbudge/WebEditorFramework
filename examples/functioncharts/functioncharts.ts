@@ -75,10 +75,17 @@ export class Type {
   readonly inputs: Pin[];
   readonly outputs: Pin[];
   readonly name: string | undefined;
-  x = 0;
-  y = 0;
   width = 0;
   height = 0;
+
+  // Flat type has the same number of pins as type, but all pins are value type.
+  // The flat type is more compact, and is only used for rendering.
+  private _flatType: Type;
+  get flatType() {
+    if (!this._flatType)
+      this._flatType = this.toFlatType();
+    return this._flatType;
+  }
 
   get needsLayout() {
     return this.height === 0;  // width may be 0 in the case of spacer type.
@@ -118,7 +125,7 @@ export class Type {
       s += '(' + escapeName(this.name) + ')';
     return s;
   }
-  toFlatType(): Type {
+  private toFlatType(): Type {
     const inputs = this.inputs.map(pin => new Pin(Type.valueType, pin.name)),
           outputs = this.outputs.map(pin => new Pin(Type.valueType, pin.name));
     return Type.fromInfo(inputs, outputs, this.name);
@@ -381,12 +388,9 @@ abstract class NodeBase<T extends NonWireTemplate> {
   set type(type: Type) {
     if (type !== this._type) {
       this._type = type;
-      this._flatType = type.toFlatType();
     }
   }
-  // Flat type has the same arity as type, but all pins are value type.
-  private _flatType: Type = Type.emptyType;
-  get flatType() { return this._flatType; }
+
   inWires = new Array<Wire | undefined>();   // one input per pin (no fan in).
   outWires = new Array<Array<Wire>>();       // multiple outputs per pin (fan out).
 
@@ -434,27 +438,18 @@ export class InstancerElement extends Element<InstancerTemplate> {
   resetTypeCache() { this._instanceType = undefined; }
 
   private _instanceType: Type | undefined;
-  private _instanceFlatType: Type;
   get instanceType() : Type {
     if (!this._instanceType) {
       const typeString = this.innerTypeString;
       if (typeString === Type.emptyTypeString)
         return Type.emptyType;
       this._instanceType = Type.fromString(typeString);
-      this._instanceFlatType = this._instanceType.toFlatType();
     }
     return this._instanceType;
-  }
-  get instanceFlatType() : Type {
-    this.instanceType;  // ensure flat type is initialized.
-    return this._instanceFlatType;
   }
 
   get innerType() : Type {
     return this.instanceType;
-  }
-  get innerFlatType() : Type {
-    return this.instanceFlatType;
   }
 
   constructor(context: FunctionchartContext, id: number) {
@@ -473,7 +468,6 @@ export class ExporterElement extends Element<ExporterTemplate> {
 
   // Derived properties.
   private _innerType: Type;
-  private _innerFlatType: Type;
   get innerType() : Type {
     if (!this._innerType) {
       const instancer = this.instancer;
@@ -482,18 +476,13 @@ export class ExporterElement extends Element<ExporterTemplate> {
       } else {
         const typeString = this.innerTypeString;
         if (typeString) {
-          this._innerType = Type.fromString(typeString).toFlatType();
+          this._innerType = Type.fromString(typeString).flatType;
         } else {
           this._innerType = Type.emptyType;
         }
       }
-      this._innerFlatType = this._innerType.toFlatType();
     }
     return this._innerType;
-  }
-  get innerFlatType() : Type {
-    const type = this.innerType;  // ensure flat type is initialized.
-    return this._innerFlatType;
   }
 
   constructor(context: FunctionchartContext, id: number) {
@@ -616,15 +605,7 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> implements Da
   pinMap: Array<number> | undefined;
   instances = new Set<FunctionInstance>();
 
-  _instanceType: Type;
-  instanceFlatType: Type;
-  get instanceType() : Type {
-    return this._instanceType;
-  }
-  set instanceType(type: Type) {
-    this._instanceType = type;
-    this.instanceFlatType = type.toFlatType();
-  }
+  instanceType: Type = Type.emptyType;
 
   constructor(context: FunctionchartContext, template: FunctionchartTemplate, id: number) {
     super(template, context, id);
@@ -2208,12 +2189,12 @@ class Renderer implements ILayoutEngine {
         height = item.height;
       } else {
         // All element types.
-        const type = item.flatType;
+        const type = item.type.flatType;
         width = type.width;
         height = type.height;
         if (item instanceof InstancerElement || item instanceof ExporterElement) {
           const spacing = this.theme.spacing,
-                innerType = item.innerFlatType;
+                innerType = item.innerType.flatType;
           width = 3 * spacing + innerType.width;
           height = 2 * spacing + innerType.height;
         }
@@ -2224,7 +2205,7 @@ class Renderer implements ILayoutEngine {
   // Get wire attachment point for element input/output pins.
   inputPinToPoint(node: NodeTypes, index: number) : PointWithNormal {
     const rect = this.getBounds(node),
-          type = node.flatType,
+          type = node.type.flatType,
           pin = type.inputs[index];
     // Handle special case of InstancerElement.
     if (node instanceof InstancerElement) {
@@ -2234,7 +2215,7 @@ class Renderer implements ILayoutEngine {
   }
   outputPinToPoint(node: NodeTypes, index: number) : PointWithNormal {
     const rect = this.getBounds(node),
-          type = node.flatType,
+          type = node.type.flatType,
           pin = type.outputs[index];
     // Handle special case of 'export' functionchart's output.
     if (node instanceof Functionchart) {
@@ -2258,7 +2239,7 @@ class Renderer implements ILayoutEngine {
           rect = this.getBounds(instancer),
           right = rect.x + rect.width,
           bottom = rect.y + rect.height,
-          type = instancer.instanceFlatType,
+          type = instancer.instanceType.flatType,
           width = type.width,
           height = type.height;
     return { x: right - width - spacing, y: bottom - height - spacing, width, height };
@@ -2324,6 +2305,10 @@ class Renderer implements ILayoutEngine {
 
     type.width = Math.round(Math.max(width, wIn + wOut, theme.minTypeWidth));
     type.height = Math.round(Math.max(yIn, yOut, theme.minTypeHeight) + spacing / 2);
+
+    if (type.flatType.needsLayout) {
+      this.layoutType(type.flatType);
+    }
   }
 
   layoutPin(pin: Pin) {
@@ -2336,15 +2321,11 @@ class Renderer implements ILayoutEngine {
     const type = element.type;
     if (type.needsLayout) {
       this.layoutType(type);
-      this.layoutType(element.flatType);
     }
     if (element instanceof InstancerElement || element instanceof ExporterElement) {
-      const innerType = element.innerType,
-            innerFlatType = element.innerFlatType;
+      const innerType = element.innerType;
       if (innerType.needsLayout)
         this.layoutType(innerType);
-      if (innerFlatType.needsLayout)
-        this.layoutType(innerFlatType);
     }
   }
 
@@ -2371,13 +2352,10 @@ class Renderer implements ILayoutEngine {
     const self = this,
           spacing = this.theme.spacing,
           type = functionchart.instanceType,
-          flatType = functionchart.instanceFlatType,
           nodes = functionchart.nodes;
     if (type.needsLayout) {
-      self.layoutType(type);
-      self.layoutType(flatType);
+      this.layoutType(type);
     }
-
     let width, height;
     if (nodes.length === 0) {
       width = self.theme.minFunctionchartWidth;
@@ -2391,8 +2369,8 @@ class Renderer implements ILayoutEngine {
       width = extents.x + extents.width - x + margin;
       height = extents.y + extents.height - y + margin;
       // Make sure instancer fits. It may overlap with the contents at the bottom right.
-      width = Math.max(width, flatType.width + margin);
-      height = Math.max(height, flatType.height + margin);
+      width = Math.max(width, type.flatType.width + margin);
+      height = Math.max(height, type.flatType.height + margin);
     }
     width = Math.max(width, functionchart.width);
     height = Math.max(height, functionchart.height);
@@ -2494,10 +2472,10 @@ class Renderer implements ILayoutEngine {
         } else {
           ctx.stroke();
         }
-        const type = element.flatType;
+        const type = element.type.flatType;
         if (element instanceof InstancerElement) {
           this.drawPin(type.inputs[0], x, y + h / 2 - r);
-          const innerType = element.instanceFlatType;
+          const innerType = element.instanceType.flatType;
           ctx.beginPath();
           ctx.rect(x + w - innerType.width - spacing,
                    y + h - innerType.height - spacing, innerType.width, innerType.height);
@@ -2506,14 +2484,14 @@ class Renderer implements ILayoutEngine {
           ctx.stroke();
           this.drawType(innerType, x + 2 * spacing, y + spacing);
         } else if (element instanceof ExporterElement) {
-          const innerType = element.innerFlatType;
+          const innerType = element.innerType.flatType;
           ctx.beginPath();
           ctx.rect(x + spacing, y + spacing, innerType.width, innerType.height);
           ctx.stroke();
           this.drawType(innerType, x + spacing, y + spacing);
           this.drawPin(type.outputs[0], x + w - 2 * r, y + h / 2 - r);
         } else {
-          this.drawType(element.flatType, x, y);
+          this.drawType(element.type.flatType, x, y);
         }
         break;
       }
@@ -2558,7 +2536,7 @@ class Renderer implements ILayoutEngine {
         ctx.fill();
         ctx.lineWidth = 0.5;
         ctx.stroke();
-        this.drawType(element.flatType, x, y);
+        this.drawType(element.type.flatType, x, y);
         break;
       }
       case RenderMode.Highlight:
@@ -2588,7 +2566,7 @@ class Renderer implements ILayoutEngine {
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
         ctx.stroke();
-        const type = functionchart.instanceFlatType,
+        const type = functionchart.instanceType.flatType,
               instancerRect = this.instancerBounds(functionchart);
         ctx.beginPath();
         ctx.rect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height);
@@ -2604,7 +2582,7 @@ class Renderer implements ILayoutEngine {
           ctx.stroke();
         }
         // Draw the single output pin.
-        if (type.outputs[0]) {  // TODO clean up.
+        if (!functionchart.isAbstract) {
           const r = this.theme.knobbyRadius;
           this.drawPin(type.outputs[0], x + w - 2 * r, y + h / 2 - r);
         }
@@ -2629,7 +2607,7 @@ class Renderer implements ILayoutEngine {
       return;
     const self = this,
           result = new ElementHitResult(element, hitInfo),
-          type = element.flatType;
+          type = element.type.flatType;
     for (let i = 0; i < type.inputs.length; i++) {
       const pinPt = self.inputPinToPoint(element, i),
             rect = self.pinToRect(type.inputs[i], pinPt);
@@ -2659,9 +2637,11 @@ class Renderer implements ILayoutEngine {
       return;
     const r = this.theme.knobbyRadius;
     let output = -1;
-    const pinPt = this.outputPinToPoint(functionchart, 0);
-    if (hitTestRect(pinPt.x - 2 * r, pinPt.y - r, 2 * r, 2 * r, p, 0)) {
-      output = 0;
+    if (!functionchart.isAbstract) {
+      const pinPt = this.outputPinToPoint(functionchart, 0);
+      if (hitTestRect(pinPt.x - 2 * r, pinPt.y - r, 2 * r, 2 * r, p, 0)) {
+        output = 0;
+      }
     }
     let instancer = false;
     if (output < 0) {

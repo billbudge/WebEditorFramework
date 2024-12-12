@@ -30,6 +30,11 @@ export class Pin {
     }
 }
 export class Type {
+    get flatType() {
+        if (!this._flatType)
+            this._flatType = this.toFlatType();
+        return this._flatType;
+    }
     get needsLayout() {
         return this.height === 0; // width may be 0 in the case of spacer type.
     }
@@ -45,8 +50,6 @@ export class Type {
         return result;
     }
     constructor(inputs, outputs, name) {
-        this.x = 0;
-        this.y = 0;
         this.width = 0;
         this.height = 0;
         this.inputs = inputs;
@@ -290,10 +293,8 @@ class NodeBase {
     set type(type) {
         if (type !== this._type) {
             this._type = type;
-            this._flatType = type.toFlatType();
         }
     }
-    get flatType() { return this._flatType; }
     // Get the pin for the node type.
     getPin(index) {
         const type = this.type, firstOutput = type.inputs.length, pin = index < firstOutput ? type.inputs[index] :
@@ -302,8 +303,6 @@ class NodeBase {
     }
     constructor(template, context, id) {
         this.globalPosition = defaultPoint;
-        // Flat type has the same arity as type, but all pins are value type.
-        this._flatType = Type.emptyType;
         this.inWires = new Array(); // one input per pin (no fan in).
         this.outWires = new Array(); // multiple outputs per pin (fan out).
         this.template = template;
@@ -336,19 +335,11 @@ export class InstancerElement extends Element {
             if (typeString === Type.emptyTypeString)
                 return Type.emptyType;
             this._instanceType = Type.fromString(typeString);
-            this._instanceFlatType = this._instanceType.toFlatType();
         }
         return this._instanceType;
     }
-    get instanceFlatType() {
-        this.instanceType; // ensure flat type is initialized.
-        return this._instanceFlatType;
-    }
     get innerType() {
         return this.instanceType;
-    }
-    get innerFlatType() {
-        return this.instanceFlatType;
     }
     constructor(context, id) {
         super(instancerTemplate, context, id);
@@ -371,19 +362,14 @@ export class ExporterElement extends Element {
             else {
                 const typeString = this.innerTypeString;
                 if (typeString) {
-                    this._innerType = Type.fromString(typeString).toFlatType();
+                    this._innerType = Type.fromString(typeString).flatType;
                 }
                 else {
                     this._innerType = Type.emptyType;
                 }
             }
-            this._innerFlatType = this._innerType.toFlatType();
         }
         return this._innerType;
-    }
-    get innerFlatType() {
-        const type = this.innerType; // ensure flat type is initialized.
-        return this._innerFlatType;
     }
     constructor(context, id) {
         super(exporterTemplate, context, id);
@@ -462,17 +448,11 @@ export class Functionchart extends NodeBase {
     get wires() { return this.template.wires.get(this); }
     // Derived properties.
     get isAbstract() { return this.typeInfo.abstract; }
-    get instanceType() {
-        return this._instanceType;
-    }
-    set instanceType(type) {
-        this._instanceType = type;
-        this.instanceFlatType = type.toFlatType();
-    }
     constructor(context, template, id) {
         super(template, context, id);
         this.typeInfo = emptyTypeInfo;
         this.instances = new Set();
+        this.instanceType = Type.emptyType;
     }
 }
 // Radius of rounded corners. This isn't themeable, as it's conceptually part of the notation.
@@ -1827,11 +1807,11 @@ class Renderer {
             }
             else {
                 // All element types.
-                const type = item.flatType;
+                const type = item.type.flatType;
                 width = type.width;
                 height = type.height;
                 if (item instanceof InstancerElement || item instanceof ExporterElement) {
-                    const spacing = this.theme.spacing, innerType = item.innerFlatType;
+                    const spacing = this.theme.spacing, innerType = item.innerType.flatType;
                     width = 3 * spacing + innerType.width;
                     height = 2 * spacing + innerType.height;
                 }
@@ -1841,7 +1821,7 @@ class Renderer {
     }
     // Get wire attachment point for element input/output pins.
     inputPinToPoint(node, index) {
-        const rect = this.getBounds(node), type = node.flatType, pin = type.inputs[index];
+        const rect = this.getBounds(node), type = node.type.flatType, pin = type.inputs[index];
         // Handle special case of InstancerElement.
         if (node instanceof InstancerElement) {
             return { x: rect.x, y: rect.y + rect.height / 2, nx: -1, ny: 0 };
@@ -1849,7 +1829,7 @@ class Renderer {
         return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 };
     }
     outputPinToPoint(node, index) {
-        const rect = this.getBounds(node), type = node.flatType, pin = type.outputs[index];
+        const rect = this.getBounds(node), type = node.type.flatType, pin = type.outputs[index];
         // Handle special case of 'export' functionchart's output.
         if (node instanceof Functionchart) {
             return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
@@ -1864,7 +1844,7 @@ class Renderer {
         return { x, y, width, height };
     }
     instancerBounds(instancer) {
-        const spacing = this.theme.spacing, rect = this.getBounds(instancer), right = rect.x + rect.width, bottom = rect.y + rect.height, type = instancer.instanceFlatType, width = type.width, height = type.height;
+        const spacing = this.theme.spacing, rect = this.getBounds(instancer), right = rect.x + rect.width, bottom = rect.y + rect.height, type = instancer.instanceType.flatType, width = type.width, height = type.height;
         return { x: right - width - spacing, y: bottom - height - spacing, width, height };
     }
     sumBounds(items) {
@@ -1917,6 +1897,9 @@ class Renderer {
             wOut += spacing;
         type.width = Math.round(Math.max(width, wIn + wOut, theme.minTypeWidth));
         type.height = Math.round(Math.max(yIn, yOut, theme.minTypeHeight) + spacing / 2);
+        if (type.flatType.needsLayout) {
+            this.layoutType(type.flatType);
+        }
     }
     layoutPin(pin) {
         const type = pin.type;
@@ -1927,14 +1910,11 @@ class Renderer {
         const type = element.type;
         if (type.needsLayout) {
             this.layoutType(type);
-            this.layoutType(element.flatType);
         }
         if (element instanceof InstancerElement || element instanceof ExporterElement) {
-            const innerType = element.innerType, innerFlatType = element.innerFlatType;
+            const innerType = element.innerType;
             if (innerType.needsLayout)
                 this.layoutType(innerType);
-            if (innerFlatType.needsLayout)
-                this.layoutType(innerFlatType);
         }
     }
     layoutWire(wire) {
@@ -1953,10 +1933,9 @@ class Renderer {
     }
     // Make sure a functionchart is big enough to enclose its contents.
     layoutFunctionchart(functionchart) {
-        const self = this, spacing = this.theme.spacing, type = functionchart.instanceType, flatType = functionchart.instanceFlatType, nodes = functionchart.nodes;
+        const self = this, spacing = this.theme.spacing, type = functionchart.instanceType, nodes = functionchart.nodes;
         if (type.needsLayout) {
-            self.layoutType(type);
-            self.layoutType(flatType);
+            this.layoutType(type);
         }
         let width, height;
         if (nodes.length === 0) {
@@ -1968,8 +1947,8 @@ class Renderer {
             width = extents.x + extents.width - x + margin;
             height = extents.y + extents.height - y + margin;
             // Make sure instancer fits. It may overlap with the contents at the bottom right.
-            width = Math.max(width, flatType.width + margin);
-            height = Math.max(height, flatType.height + margin);
+            width = Math.max(width, type.flatType.width + margin);
+            height = Math.max(height, type.flatType.height + margin);
         }
         width = Math.max(width, functionchart.width);
         height = Math.max(height, functionchart.height);
@@ -2050,10 +2029,10 @@ class Renderer {
                 else {
                     ctx.stroke();
                 }
-                const type = element.flatType;
+                const type = element.type.flatType;
                 if (element instanceof InstancerElement) {
                     this.drawPin(type.inputs[0], x, y + h / 2 - r);
-                    const innerType = element.instanceFlatType;
+                    const innerType = element.instanceType.flatType;
                     ctx.beginPath();
                     ctx.rect(x + w - innerType.width - spacing, y + h - innerType.height - spacing, innerType.width, innerType.height);
                     ctx.fillStyle = theme.altBgColor;
@@ -2062,7 +2041,7 @@ class Renderer {
                     this.drawType(innerType, x + 2 * spacing, y + spacing);
                 }
                 else if (element instanceof ExporterElement) {
-                    const innerType = element.innerFlatType;
+                    const innerType = element.innerType.flatType;
                     ctx.beginPath();
                     ctx.rect(x + spacing, y + spacing, innerType.width, innerType.height);
                     ctx.stroke();
@@ -2070,7 +2049,7 @@ class Renderer {
                     this.drawPin(type.outputs[0], x + w - 2 * r, y + h / 2 - r);
                 }
                 else {
-                    this.drawType(element.flatType, x, y);
+                    this.drawType(element.type.flatType, x, y);
                 }
                 break;
             }
@@ -2108,7 +2087,7 @@ class Renderer {
                 ctx.fill();
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
-                this.drawType(element.flatType, x, y);
+                this.drawType(element.type.flatType, x, y);
                 break;
             }
             case RenderMode.Highlight:
@@ -2133,7 +2112,7 @@ class Renderer {
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
-                const type = functionchart.instanceFlatType, instancerRect = this.instancerBounds(functionchart);
+                const type = functionchart.instanceType.flatType, instancerRect = this.instancerBounds(functionchart);
                 ctx.beginPath();
                 ctx.rect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height);
                 ctx.fillStyle = theme.altBgColor;
@@ -2149,7 +2128,7 @@ class Renderer {
                     ctx.stroke();
                 }
                 // Draw the single output pin.
-                if (type.outputs[0]) {
+                if (!functionchart.isAbstract) {
                     const r = this.theme.knobbyRadius;
                     this.drawPin(type.outputs[0], x + w - 2 * r, y + h / 2 - r);
                 }
@@ -2167,7 +2146,7 @@ class Renderer {
         const rect = this.getBounds(element), x = rect.x, y = rect.y, width = rect.width, height = rect.height, hitInfo = hitTestRect(x, y, width, height, p, tol);
         if (!hitInfo)
             return;
-        const self = this, result = new ElementHitResult(element, hitInfo), type = element.flatType;
+        const self = this, result = new ElementHitResult(element, hitInfo), type = element.type.flatType;
         for (let i = 0; i < type.inputs.length; i++) {
             const pinPt = self.inputPinToPoint(element, i), rect = self.pinToRect(type.inputs[i], pinPt);
             if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
@@ -2192,13 +2171,17 @@ class Renderer {
             return;
         const r = this.theme.knobbyRadius;
         let output = -1;
-        const pinPt = this.outputPinToPoint(functionchart, 0);
-        if (hitTestRect(pinPt.x - 2 * r, pinPt.y - r, 2 * r, 2 * r, p, 0)) {
-            output = 0;
+        if (!functionchart.isAbstract) {
+            const pinPt = this.outputPinToPoint(functionchart, 0);
+            if (hitTestRect(pinPt.x - 2 * r, pinPt.y - r, 2 * r, 2 * r, p, 0)) {
+                output = 0;
+            }
         }
         let instancer = false;
-        const instancerRect = this.instancerBounds(functionchart);
-        instancer = hitTestRect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height, p, tol) !== undefined;
+        if (output < 0) {
+            const instancerRect = this.instancerBounds(functionchart);
+            instancer = hitTestRect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height, p, tol) !== undefined;
+        }
         return new FunctionchartHitResult(functionchart, inner, instancer, output);
     }
     drawWire(wire, mode) {
