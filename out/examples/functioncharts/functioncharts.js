@@ -341,7 +341,7 @@ export class InstancerElement extends Element {
         return this._instanceType;
     }
     get instanceFlatType() {
-        const type = this.instanceType; // ensure flat type is initialized.
+        this.instanceType; // ensure flat type is initialized.
         return this._instanceFlatType;
     }
     get innerType() {
@@ -1851,9 +1851,9 @@ class Renderer {
     outputPinToPoint(node, index) {
         const rect = this.getBounds(node), type = node.flatType, pin = type.outputs[index];
         // Handle special case of 'export' functionchart's output.
-        // if (isFunctionExport(node)) {
-        //   return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
-        // }
+        if (node instanceof Functionchart) {
+            return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
+        }
         if (node instanceof ExporterElement) {
             return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
         }
@@ -2148,13 +2148,12 @@ class Renderer {
                 else {
                     ctx.stroke();
                 }
+                // Draw the single output pin.
+                if (type.outputs[0]) {
+                    const r = this.theme.knobbyRadius;
+                    this.drawPin(type.outputs[0], x + w - 2 * r, y + h / 2 - r);
+                }
                 this.drawType(type, instancerRect.x, instancerRect.y);
-                //  else if (isFunctionExport(functionchart)) {
-                //   const type = functionchart.flatType,
-                //         tx = x + w - type.width,
-                //         ty = y + r;
-                //   this.drawType(functionchart.flatType, tx, ty);
-                // }
                 break;
             case RenderMode.Highlight:
             case RenderMode.HotTrack:
@@ -2188,23 +2187,18 @@ class Renderer {
         return result;
     }
     hitTestFunctionchart(functionchart, p, tol, mode) {
-        const r = Functionchart.radius, rect = this.getBounds(functionchart), x = rect.x, y = rect.y, w = rect.width, h = rect.height, inner = hitTestRect(x, y, w, h, p, tol);
+        const rect = this.getBounds(functionchart), x = rect.x, y = rect.y, w = rect.width, h = rect.height, inner = hitTestRect(x, y, w, h, p, tol);
         if (!inner)
             return;
-        let instancer = false, output = -1;
+        const r = this.theme.knobbyRadius;
+        let output = -1;
+        const pinPt = this.outputPinToPoint(functionchart, 0);
+        if (hitTestRect(pinPt.x - 2 * r, pinPt.y - r, 2 * r, 2 * r, p, 0)) {
+            output = 0;
+        }
+        let instancer = false;
         const instancerRect = this.instancerBounds(functionchart);
         instancer = hitTestRect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height, p, tol) !== undefined;
-        //  else if (isFunctionExport(functionchart)) {
-        //   const self = this,
-        //         type = functionchart.type;
-        //   for (let i = 0; i < type.outputs.length; i++) {
-        //     const pinPt = self.outputPinToPoint(functionchart, i),
-        //           rect = self.pinToRect(type.outputs[i], pinPt);
-        //     if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
-        //       output = i;
-        //     }
-        //   }
-        // }
         return new FunctionchartHitResult(functionchart, inner, instancer, output);
     }
     drawWire(wire, mode) {
