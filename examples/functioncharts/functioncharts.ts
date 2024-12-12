@@ -616,11 +616,14 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> implements Da
   pinMap: Array<number> | undefined;
   instances = new Set<FunctionInstance>();
 
+  _instanceType: Type;
+  instanceFlatType: Type;
   get instanceType() : Type {
-    return this.type;
+    return this._instanceType;
   }
-  get instanceFlatType() : Type {
-    return this.flatType;
+  set instanceType(type: Type) {
+    this._instanceType = type;
+    this.instanceFlatType = type.toFlatType();
   }
 
   constructor(context: FunctionchartContext, template: FunctionchartTemplate, id: number) {
@@ -1415,8 +1418,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
               typeString = typeInfo.typeString;
         item.typeInfo = typeInfo;
         const type = Type.fromString(typeString);
-        item.type = type;
-
+        item.type = type.toExporterType();
+        item.instanceType = type;
+        // The instances have the internal type.
         item.instances.forEach((instance) => {
           instance.type = type;
         });
@@ -2366,8 +2370,8 @@ class Renderer implements ILayoutEngine {
   layoutFunctionchart(functionchart: Functionchart) {
     const self = this,
           spacing = this.theme.spacing,
-          type = functionchart.type,
-          flatType = functionchart.flatType,
+          type = functionchart.instanceType,
+          flatType = functionchart.instanceFlatType,
           nodes = functionchart.nodes;
     if (type.needsLayout) {
       self.layoutType(type);
@@ -2484,7 +2488,7 @@ class Renderer implements ILayoutEngine {
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         if (element instanceof FunctionInstance && element.isAbstract) {
-          ctx.setLineDash([5]);
+          ctx.setLineDash([6, 3]);
           ctx.stroke();
           ctx.setLineDash([0]);
         } else {
@@ -2584,7 +2588,7 @@ class Renderer implements ILayoutEngine {
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
         ctx.stroke();
-        const type = functionchart.flatType,
+        const type = functionchart.instanceFlatType,
               instancerRect = this.instancerBounds(functionchart);
         ctx.beginPath();
         ctx.rect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height);
@@ -2593,7 +2597,7 @@ class Renderer implements ILayoutEngine {
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
         if (functionchart.isAbstract) {
-          ctx.setLineDash([5]);
+          ctx.setLineDash([6, 3]);
           ctx.stroke();
           ctx.setLineDash([0]);
         } else {
@@ -2779,7 +2783,7 @@ class Renderer implements ILayoutEngine {
       type = info.item.type;  // Wire type is src or dst pin type.
     } else if (info instanceof FunctionchartHitResult) {
       if (info.instancer || info.output >= 0) {
-        type = info.item.type;
+        type = info.item.instanceType;
       }
     }
     const w = type.width, h = type.height;

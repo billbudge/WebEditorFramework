@@ -463,10 +463,11 @@ export class Functionchart extends NodeBase {
     // Derived properties.
     get isAbstract() { return this.typeInfo.abstract; }
     get instanceType() {
-        return this.type;
+        return this._instanceType;
     }
-    get instanceFlatType() {
-        return this.flatType;
+    set instanceType(type) {
+        this._instanceType = type;
+        this.instanceFlatType = type.toFlatType();
     }
     constructor(context, template, id) {
         super(template, context, id);
@@ -1134,7 +1135,9 @@ export class FunctionchartContext extends EventBase {
                 const typeInfo = self.getFunctionchartTypeInfo(item), typeString = typeInfo.typeString;
                 item.typeInfo = typeInfo;
                 const type = Type.fromString(typeString);
-                item.type = type;
+                item.type = type.toExporterType();
+                item.instanceType = type;
+                // The instances have the internal type.
                 item.instances.forEach((instance) => {
                     instance.type = type;
                 });
@@ -1950,7 +1953,7 @@ class Renderer {
     }
     // Make sure a functionchart is big enough to enclose its contents.
     layoutFunctionchart(functionchart) {
-        const self = this, spacing = this.theme.spacing, type = functionchart.type, flatType = functionchart.flatType, nodes = functionchart.nodes;
+        const self = this, spacing = this.theme.spacing, type = functionchart.instanceType, flatType = functionchart.instanceFlatType, nodes = functionchart.nodes;
         if (type.needsLayout) {
             self.layoutType(type);
             self.layoutType(flatType);
@@ -2040,7 +2043,7 @@ class Renderer {
                 ctx.fill();
                 ctx.strokeStyle = theme.strokeColor;
                 if (element instanceof FunctionInstance && element.isAbstract) {
-                    ctx.setLineDash([5]);
+                    ctx.setLineDash([6, 3]);
                     ctx.stroke();
                     ctx.setLineDash([0]);
                 }
@@ -2130,7 +2133,7 @@ class Renderer {
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
-                const type = functionchart.flatType, instancerRect = this.instancerBounds(functionchart);
+                const type = functionchart.instanceFlatType, instancerRect = this.instancerBounds(functionchart);
                 ctx.beginPath();
                 ctx.rect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height);
                 ctx.fillStyle = theme.altBgColor;
@@ -2138,7 +2141,7 @@ class Renderer {
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 if (functionchart.isAbstract) {
-                    ctx.setLineDash([5]);
+                    ctx.setLineDash([6, 3]);
                     ctx.stroke();
                     ctx.setLineDash([0]);
                 }
@@ -2307,7 +2310,7 @@ class Renderer {
         }
         else if (info instanceof FunctionchartHitResult) {
             if (info.instancer || info.output >= 0) {
-                type = info.item.type;
+                type = info.item.instanceType;
             }
         }
         const w = type.width, h = type.height;
