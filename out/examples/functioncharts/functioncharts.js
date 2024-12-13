@@ -14,7 +14,7 @@ function unescapeName(name) {
 }
 export class Pin {
     constructor(type, name) {
-        this.varArgs = false;
+        this.varArgs = 0; // no var args
         this.y = 0;
         this.baseline = 0;
         this.type = type;
@@ -22,10 +22,10 @@ export class Pin {
     }
     toString() {
         let s = this.type.toString();
-        if (this.varArgs)
-            s += '*';
         if (this.name)
             s += '(' + escapeName(this.name) + ')';
+        if (this.varArgs)
+            s += '{' + this.varArgs.toString() + '}';
         return s;
     }
 }
@@ -63,6 +63,19 @@ export class Type {
         if (this === Type.valueType)
             return Type.valueTypeString;
         let s = '[';
+        const inputs = this.inputs, length = inputs.length;
+        for (let i = 0; i < length; i++) {
+            let input = inputs[i];
+            while (input.varArgs) {
+                if (i === length - 1)
+                    break; // last pin
+                if (input.varArgs > inputs[i + 1].varArgs)
+                    break; // last in this var args sequence
+                i++;
+                input = inputs[i];
+            }
+            s += input.toString();
+        }
         this.inputs.forEach(input => s += input.toString());
         s += ',';
         this.outputs.forEach(output => s += output.toString());
@@ -152,14 +165,21 @@ function parseTypeString(s) {
     function parsePin() {
         let i = j;
         // value type
-        if (s[j] === Type.valueTypeString) {
+        if (s[j] === Type.valueTypeString || s[j] === '*') { // TODO remove when files converted
             j++;
-            let varArgs = false;
-            if (s[j] === '*') {
-                varArgs = true;
-                j++;
-            }
             const result = new Pin(Type.valueType, parseName());
+            let varArgs = 0;
+            if (s[j] === '{') {
+                j++;
+                const k = s.indexOf('}', j);
+                if (k < 0)
+                    throw new Error('Invalid type string: ' + s);
+                const varArgsString = s.substring(j, k);
+                varArgs = parseInt(varArgsString);
+                if (isNaN(varArgs))
+                    varArgs = 0;
+                j = k + 1;
+            }
             result.varArgs = varArgs;
             return result;
         }
@@ -177,7 +197,15 @@ function parseTypeString(s) {
             j++;
             let inputs = new Array, outputs = new Array;
             while (s[j] !== ',') {
-                inputs.push(parsePin());
+                const pin = parsePin(), varArgs = pin.varArgs;
+                if (varArgs) {
+                    for (let i = 1; i < varArgs; i++) {
+                        const vaPin = new Pin(pin.type, pin.name);
+                        vaPin.varArgs = i;
+                        inputs.push(vaPin);
+                    }
+                }
+                inputs.push(pin); // in the var args case, this pin has the count.
             }
             j++;
             while (s[j] !== ']') {
@@ -394,7 +422,7 @@ export class Pseudoelement extends NodeBase {
                 this.typeString = '[v,]';
                 break;
             case 'use':
-                this.typeString = '[v*,v]';
+                this.typeString = '[v{1},v]';
                 break;
         }
     }
@@ -1283,9 +1311,10 @@ export class FunctionchartContext extends EventBase {
                 if (newLength !== length) {
                     // The type has to change.
                     const inputs = new Array(newLength);
-                    for (let i = 0; i < newLength; i++)
+                    for (let i = 0; i < newLength; i++) {
                         inputs[i] = new Pin(Type.valueType);
-                    inputs[newLength - 1].varArgs = true;
+                        inputs[i].varArgs = i + 1;
+                    }
                     const newType = Type.fromInfo(inputs, [new Pin(Type.valueType)]);
                     node.typeString = newType.toString();
                 }
