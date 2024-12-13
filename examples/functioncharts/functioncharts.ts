@@ -75,6 +75,7 @@ export class Type {
   readonly inputs: Pin[];
   readonly outputs: Pin[];
   readonly name: string | undefined;
+  readonly varArgs: boolean;
   width = 0;
   height = 0;
 
@@ -107,6 +108,7 @@ export class Type {
     this.inputs = inputs;
     this.outputs = outputs;
     this.name = name;
+    this.varArgs = inputs.some(input => !!input.varArgs);
   }
 
   copyUnlabeled() : Type {
@@ -129,7 +131,6 @@ export class Type {
       }
       s += input.toString();
     }
-    this.inputs.forEach(input => s += input.toString());
     s += ',';
     this.outputs.forEach(output => s += output.toString());
     s += ']';

@@ -153,19 +153,24 @@ describe('Type' , () => {
   test('varArgs', () => {
     let t;
     t = FC.Type.fromString('[v(name),v]');
+    expect(t.varArgs).toBe(false);
     expect(t.inputs[0].varArgs).toBe(0);
     t = FC.Type.fromString('[v(name){foo},v]');  // ill-formed => 0
+    expect(t.varArgs).toBe(false);
     expect(t.inputs.length).toBe(1);
     expect(t.inputs[0].varArgs).toBe(0);
 
     t = FC.Type.fromString('[v(name){1},v]');
+    expect(t.varArgs).toBe(true);
     expect(t.inputs.length).toBe(1);
     expect(t.inputs[0].varArgs).toBe(1);
     t = FC.Type.fromString('[v(name){2},v]');
+    expect(t.varArgs).toBe(true);
     expect(t.inputs.length).toBe(2);
     expect(t.inputs[0].varArgs).toBe(1);
     expect(t.inputs[1].varArgs).toBe(2);
     t = FC.Type.fromString('[vv(name){2}v{2},v]');
+    expect(t.varArgs).toBe(true);
     expect(t.inputs.length).toBe(5);
     expect(t.inputs[0].varArgs).toBe(0);
     expect(t.inputs[1].varArgs).toBe(1);
