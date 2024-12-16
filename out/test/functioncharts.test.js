@@ -21,7 +21,7 @@ function addPseudoelement(functionchart, type) {
     return pseudo;
 }
 function addFunctionInstance(functionchart, definition) {
-    const context = functionchart.context, functionInstance = context.newFunctionInstance();
+    const context = functionchart.context, functionInstance = context.newElement('instance');
     functionInstance.instancer = definition;
     mutate(context, () => context.addItem(functionInstance, functionchart));
     return functionInstance;
@@ -95,10 +95,10 @@ describe('Type', () => {
         expect(type1.toString()).toBe('[v,v]');
         expect(named.toString()).toBe('[v,v](type1)');
         expect(named.toString()).toBe('[v,v](type1)');
-        const labeled = FC.Type.fromString('[v(1)v(2),v(3)](foo)'), copyUnlabeled = labeled.copyUnlabeled();
-        expect(copyUnlabeled).not.toBe(labeled);
-        expect(copyUnlabeled.name).toBeUndefined();
-        expect(copyUnlabeled.toString()).toBe('[vv,v]');
+        const labeled = FC.Type.fromString('[v(1)v(2),v(3)](foo)'), copyUnnamed = labeled.copyUnnamed();
+        expect(copyUnnamed).not.toBe(labeled);
+        expect(copyUnnamed.name).toBeUndefined();
+        expect(copyUnnamed.toString()).toBe('[v(1)v(2),v(3)]');
     });
     test('base Types', () => {
         const valueType = FC.Type.fromString('v'), emptyType = FC.Type.fromString('[,]');
@@ -120,18 +120,23 @@ describe('Type', () => {
     test('varArgs', () => {
         let t;
         t = FC.Type.fromString('[v(name),v]');
+        expect(t.varArgs).toBe(false);
         expect(t.inputs[0].varArgs).toBe(0);
         t = FC.Type.fromString('[v(name){foo},v]'); // ill-formed => 0
+        expect(t.varArgs).toBe(false);
         expect(t.inputs.length).toBe(1);
         expect(t.inputs[0].varArgs).toBe(0);
         t = FC.Type.fromString('[v(name){1},v]');
+        expect(t.varArgs).toBe(true);
         expect(t.inputs.length).toBe(1);
         expect(t.inputs[0].varArgs).toBe(1);
         t = FC.Type.fromString('[v(name){2},v]');
+        expect(t.varArgs).toBe(true);
         expect(t.inputs.length).toBe(2);
         expect(t.inputs[0].varArgs).toBe(1);
         expect(t.inputs[1].varArgs).toBe(2);
         t = FC.Type.fromString('[vv(name){2}v{2},v]');
+        expect(t.varArgs).toBe(true);
         expect(t.inputs.length).toBe(5);
         expect(t.inputs[0].varArgs).toBe(0);
         expect(t.inputs[1].varArgs).toBe(1);
@@ -181,7 +186,7 @@ describe('FunctionchartContext', () => {
         expect(element.x).toBe(10);
     });
     test('element typeString', () => {
-        const context = new FC.FunctionchartContext(), element = context.newElement('element');
+        const context = new FC.FunctionchartContext(), functionchart = context.root, element = addElement(functionchart, '[,]');
         expect(element.typeString).toBe('[,]');
         expect(element.type.inputs.length).toBe(0);
         expect(element.type.outputs.length).toBe(0);
@@ -191,16 +196,16 @@ describe('FunctionchartContext', () => {
         expect(element.type.outputs.length).toBe(1);
     });
     test('pseudoelement interface', () => {
-        const context = new FC.FunctionchartContext(), pseudostate = context.newPseudoelement('input');
-        expect(pseudostate instanceof FC.Pseudoelement).toBe(true);
-        expect(pseudostate.id).toBe(2);
-        expect(pseudostate.template.typeName).toBe('input');
-        expect(pseudostate.x).toBe(0);
-        pseudostate.x = 10;
-        expect(pseudostate.x).toBe(10);
+        const context = new FC.FunctionchartContext(), functionchart = context.root, pseudoelement = addPseudoelement(functionchart, 'input');
+        expect(pseudoelement instanceof FC.Pseudoelement).toBe(true);
+        expect(pseudoelement.id).toBe(2);
+        expect(pseudoelement.template.typeName).toBe('input');
+        expect(pseudoelement.x).toBe(0);
+        pseudoelement.x = 10;
+        expect(pseudoelement.x).toBe(10);
     });
     test('pseudoelement typeString', () => {
-        const context = new FC.FunctionchartContext(), pseudoelement = context.newPseudoelement('input');
+        const context = new FC.FunctionchartContext(), functionchart = context.root, pseudoelement = addPseudoelement(functionchart, 'input');
         expect(pseudoelement.typeString).toBe('[,v]');
         expect(pseudoelement.type.inputs.length).toBe(0);
         expect(pseudoelement.type.outputs.length).toBe(1);
@@ -516,11 +521,11 @@ describe('FunctionchartContext', () => {
     const recursiveFuncionchart = {
         "type": "functionchart",
         "id": 2,
-        "nonWires": [
+        "nodes": [
             {
                 "type": "functionchart",
                 "id": 3,
-                "nonWires": [
+                "nodes": [
                     {
                         "type": "element",
                         "id": 4,
@@ -556,12 +561,12 @@ describe('FunctionchartContext', () => {
                     {
                         "type": "instance",
                         "id": 10,
-                        "functionchart": 3
+                        "instancer": 3
                     },
                     {
                         "type": "instance",
                         "id": 11,
-                        "functionchart": 3
+                        "instancer": 3
                     }
                 ],
                 "wires": [
@@ -629,7 +634,7 @@ describe('FunctionchartContext', () => {
         "id": 0,
         "width": 853.3439201116562,
         "height": 479.58752822875977,
-        "nonWires": [
+        "nodes": [
             {
                 "type": "functionchart",
                 "id": 15,
@@ -637,7 +642,7 @@ describe('FunctionchartContext', () => {
                 "y": 207.09062957763672,
                 "width": 308.9689712524414,
                 "height": 256.49689865112305,
-                "nonWires": [
+                "nodes": [
                     {
                         "type": "functionchart",
                         "id": 12,
@@ -645,7 +650,7 @@ describe('FunctionchartContext', () => {
                         "y": 11.693740844726562,
                         "width": 234.31880569458008,
                         "height": 228.80315780639648,
-                        "nonWires": [
+                        "nodes": [
                             {
                                 "type": "functionchart",
                                 "id": 6,
@@ -653,7 +658,7 @@ describe('FunctionchartContext', () => {
                                 "y": 29.593730926513672,
                                 "width": 143.38131713867188,
                                 "height": 71.89064025878906,
-                                "nonWires": [
+                                "nodes": [
                                     {
                                         "type": "element",
                                         "id": 2,
@@ -715,7 +720,7 @@ describe('FunctionchartContext', () => {
                                 "y": 120.80938339233398,
                                 "width": 143.20623779296875,
                                 "height": 91.9937744140625,
-                                "nonWires": [
+                                "nodes": [
                                     {
                                         "type": "element",
                                         "id": 8,

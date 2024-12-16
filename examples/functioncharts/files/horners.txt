@@ -3,7 +3,7 @@
   "id": 2,
   "width": 1366.62890625,
   "height": 526.92578125,
-  "nonWires": [
+  "nodes": [
     {
       "type": "functionchart",
       "id": 3,
@@ -11,13 +11,13 @@
       "y": 43.29454040527344,
       "width": 664.1171875,
       "height": 205.4765625,
-      "nonWires": [
+      "nodes": [
         {
           "type": "input",
           "id": 4,
           "x": 7.33984375,
           "y": 54.14921569824219,
-          "typeString": "[,*(x)]"
+          "typeString": "[,v(x)]"
         },
         {
           "type": "functionchart",
@@ -26,13 +26,13 @@
           "y": 31.41796875,
           "width": 312.890625,
           "height": 135.37109375,
-          "nonWires": [
+          "nodes": [
             {
               "type": "input",
               "id": 6,
               "x": 29.846099853515625,
               "y": 15.3125,
-              "typeString": "[,*(a)]"
+              "typeString": "[,v(a)]"
             },
             {
               "type": "element",
@@ -55,14 +55,14 @@
               "id": 9,
               "x": 42.728118896484375,
               "y": 87.80859375,
-              "typeString": "[,*(b)]"
+              "typeString": "[,v(b)]"
             },
             {
               "type": "output",
               "id": 10,
               "x": 207.890625,
               "y": 62.7734375,
-              "typeString": "[*(),]"
+              "typeString": "[v(),]"
             }
           ],
           "wires": [
@@ -101,28 +101,28 @@
           "id": 11,
           "x": 481.125,
           "y": 68.10546875,
-          "functionchart": 5
+          "instancer": 5
         },
         {
           "type": "input",
           "id": 12,
           "x": 434.07421875,
           "y": 83.359375,
-          "typeString": "[,*()]"
+          "typeString": "[,v()]"
         },
         {
           "type": "input",
           "id": 13,
           "x": 435.96875,
           "y": 113.625,
-          "typeString": "[,*()]"
+          "typeString": "[,v()]"
         },
         {
           "type": "output",
           "id": 14,
           "x": 568.1171875,
           "y": 64.91015625,
-          "typeString": "[*(),]"
+          "typeString": "[v(),]"
         },
         {
           "type": "element",
@@ -168,7 +168,7 @@
       "id": 16,
       "x": 798.3211059570312,
       "y": 291.97265625,
-      "functionchart": 3
+      "instancer": 3
     }
   ],
   "wires": []

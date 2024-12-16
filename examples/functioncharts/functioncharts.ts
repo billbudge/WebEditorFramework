@@ -50,6 +50,14 @@ export class Pin {
     this.name = name;
   }
 
+  copy() : Pin {
+    const result = new Pin(this.type, this.name);
+    result.varArgs = this.varArgs;
+    result.y = this.y;
+    result.baseline = this.baseline;
+    return result;
+  }
+
   toString() : string {
     let s = this.type.toString();
     if (this.name)
@@ -63,13 +71,17 @@ export class Pin {
 export class Type {
   static readonly emptyPins = [];
   static readonly valueTypeString = 'v';
-  static readonly valueType = new Type(Type.emptyPins, Type.emptyPins);  // not atomized, happens below.
+  static readonly valueType = new Type(Type.emptyPins, Type.emptyPins);
   static readonly emptyTypeString = '[,]';
   static readonly emptyType = new Type(Type.emptyPins, Type.emptyPins);
+  static readonly emptyExporterTypeString = '[,' + this.emptyTypeString + ']';  // export the empty type
+  static readonly emptyExporterType = new Type(Type.emptyPins, [new Pin(Type.emptyType)]);
 
+  // Manually atomize the base types.
   static readonly atomizedTypes = new Map<string, Type>([
     [Type.valueTypeString, Type.valueType],
     [Type.emptyTypeString, Type.emptyType],
+    [Type.emptyExporterTypeString, Type.emptyExporterType],
   ]);
 
   readonly inputs: Pin[];
@@ -93,7 +105,8 @@ export class Type {
   }
 
   static fromInfo(inputs: Pin[], outputs: Pin[], name?: string) : Type {
-    const type = new Type(inputs, outputs, name);
+    // Generally, pins can't be shared between types.
+    const type = new Type(inputs.map(pin => pin.copy()), outputs.map(pin => pin.copy()), name);
     return type.atomized();
   }
   static fromString(typeString: string) : Type {
@@ -108,24 +121,23 @@ export class Type {
     this.inputs = inputs;
     this.outputs = outputs;
     this.name = name;
-    this.varArgs = inputs.some(input => !!input.varArgs);
+    this.varArgs = inputs.some(input => (input.varArgs > 0));
   }
 
-  copyUnlabeled() : Type {
-    return Type.fromInfo(this.inputs.map(pin => new Pin(pin.type)),
-                             this.outputs.map(pin => new Pin(pin.type)));
+  copyUnnamed() : Type {
+    return Type.fromInfo(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()));
   }
-  toString() : string {
+  toString() : string {  // TODO consider caching type string on type.
     if (this === Type.valueType)
       return Type.valueTypeString;
     let s = '[';
     const inputs = this.inputs,
           length = inputs.length;
     for (let i = 0; i < length; i++) {
-      let input = inputs[i];
+      let input = inputs[i];  // TODO improve this code.
       while (input.varArgs) {
         if (i === length - 1) break;  // last pin
-        if (input.varArgs > inputs[i + 1].varArgs) break;  // last in this var args sequence
+        if (input.varArgs > inputs[i + 1].varArgs) break;  // last in this var args range
         i++;
         input = inputs[i];
       }
@@ -216,7 +228,7 @@ function parseTypeString(s: string) : Type {
   function parsePin() : Pin {
     let i = j;
     // value type
-    if (s[j] === Type.valueTypeString || s[j] === '*') {  // TODO remove when files converted
+    if (s[j] === Type.valueTypeString) {
       j++;
       const result = new Pin(Type.valueType, parseName());
       let varArgs = 0;
@@ -242,7 +254,7 @@ function parseTypeString(s: string) : Type {
   }
   function parseFunction() : Type {
     let i = j;
-    if (s[j] === Type.valueTypeString || s[j] === '*') {  // TODO remove when files converted
+    if (s[j] === Type.valueTypeString) {
       return Type.valueType;
     } else if (s[j] === '[') {
       j++;
@@ -299,24 +311,28 @@ const idProp = new IdProp('id'),
       srcPinProp = new ScalarProp('srcPin'),
       dstProp = new ReferenceProp('dst'),
       dstPinProp = new ScalarProp('dstPin'),
-      nodesProp = new ChildArrayProp('nonWires'),  // TODO rename nonWires in files
+      nodesProp = new ChildArrayProp('nodes'),
       wiresProp = new ChildArrayProp('wires'),
-      instancerProp = new ReferenceProp('functionchart'),  // TODO rename 'instancer'
+      instancerProp = new ReferenceProp('instancer'),
       innerTypeStringProp = new ScalarProp('innerTypeString');
 
-abstract class NonWireTemplate {
+type NodeType = ElementType | PseudoelementType | FunctionchartType;
+
+abstract class NodeTemplate {
+  readonly typeName: NodeType;
   readonly id = idProp;
+  readonly typeString = typeStringProp;
   readonly x = xProp;
   readonly y = yProp;
+  readonly properties: PropertyTypes[] = [];
 }
 
-export type ElementType = 'element' | 'exporter' | 'instancer';
+export type ElementType = 'element' | 'instance' | 'exporter' | 'instancer';
 
-class ElementTemplate extends NonWireTemplate {
+class ElementTemplate extends NodeTemplate {
   readonly typeName: ElementType;
   readonly name = nameProp;
-  readonly typeString = typeStringProp;
-  readonly properties: PropertyTypes[] = [this.id, this.x, this.y, this.name, this.typeString];
+  readonly properties: PropertyTypes[] = [this.id, this.typeString, this.x, this.y, this.name];
   constructor(typeName: ElementType) {
     super();
     this.typeName = typeName;
@@ -326,7 +342,7 @@ class ElementTemplate extends NonWireTemplate {
 class InstancerTemplate extends ElementTemplate {
   readonly innerTypeString = innerTypeStringProp;
   readonly properties: PropertyTypes[] =
-    [this.id, this.x, this.y, this.name, this.typeString, this.innerTypeString];
+    [this.id, this.typeString, this.x, this.y, this.name, this.innerTypeString];
   constructor(typeName: ElementType) {
     super(typeName);
   }
@@ -336,7 +352,7 @@ class ExporterTemplate extends ElementTemplate {
   readonly instancer = instancerProp;
   readonly innerTypeString = innerTypeStringProp;
   readonly properties: PropertyTypes[] =
-    [this.id, this.x, this.y, this.name, this.typeString, this.instancer, this.innerTypeString];
+    [this.id, this.typeString, this.x, this.y, this.name, this.instancer, this.innerTypeString];
   constructor(typeName: ElementType) {
     super(typeName);
   }
@@ -344,10 +360,9 @@ class ExporterTemplate extends ElementTemplate {
 
 export type PseudoelementType = 'input' | 'output' | 'use';
 
-class PseudoelementTemplate extends NonWireTemplate {
+class PseudoelementTemplate extends NodeTemplate {
   readonly typeName: PseudoelementType;
-  readonly typeString = typeStringProp;
-  readonly properties = [this.id, this.x, this.y, this.typeString];
+  readonly properties = [this.id, this.typeString, this.x, this.y];
   constructor(typeName: PseudoelementType) {
     super();
     this.typeName = typeName;
@@ -363,27 +378,26 @@ class WireTemplate {
   readonly properties = [this.src, this.srcPin, this.dst, this.dstPin];
 }
 
-export type FunctionchartType = 'functionchart' | 'export';
+export type FunctionchartType = 'functionchart';
 
-class FunctionchartTemplate extends NonWireTemplate {
+class FunctionchartTemplate extends NodeTemplate {
   readonly typeName : FunctionchartType;
   readonly width = widthProp;
   readonly height = heightProp;
   readonly name = nameProp;
   readonly nodes = nodesProp;
   readonly wires = wiresProp;
-  readonly properties = [this.id, this.x, this.y, this.width, this.height, this.name,
-                         this.nodes, this.wires];
+  readonly properties = [this.id, this.typeString, this.x, this.y, this.width, this.height,
+                         this.name, this.nodes, this.wires];
     constructor(typeName: FunctionchartType) {
       super();
       this.typeName = typeName;
   }
 }
 
-class FunctionInstanceTemplate extends NonWireTemplate {
-  readonly typeName = 'instance';
+class FunctionInstanceTemplate extends ElementTemplate {
   readonly instancer = instancerProp;
-  readonly properties = [this.id, this.x, this.y, this.instancer];
+  readonly properties = [this.id, this.typeString, this.x, this.y, this.instancer];  // no 'name' property
 }
 
 const elementTemplate = new ElementTemplate('element'),      // built-in elements
@@ -394,7 +408,7 @@ const elementTemplate = new ElementTemplate('element'),      // built-in element
       useTemplate = new PseudoelementTemplate('use'),
       wireTemplate = new WireTemplate(),
       functionchartTemplate = new FunctionchartTemplate('functionchart'),
-      functionInstanceTemplate = new FunctionInstanceTemplate();
+      functionInstanceTemplate = new FunctionInstanceTemplate('instance');
 
 const defaultPoint = { x: 0, y: 0 },
       defaultPointWithNormal: PointWithNormal = { x: 0, y: 0, nx: 0 , ny: 0 },
@@ -404,16 +418,29 @@ const defaultPoint = { x: 0, y: 0 },
 // Type safe interfaces over the raw templated data.
 
 // Base element class to implement type fields, and incoming/outgoing wire arrays.
-abstract class NodeBase<T extends NonWireTemplate> {
+abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, ReferencedObject {
   readonly template: T;
   readonly context: FunctionchartContext;
   readonly id: number;
+
+  get typeString() { return this.template.typeString.get(this) || Type.emptyTypeString; }
+  set typeString(value: string) { this.template.typeString.set(this, value); }
+
+  get x() { return this.template.x.get(this) || 0; }
+  set x(value: number) { this.template.x.set(this, value); }
+  get y() { return this.template.y.get(this) || 0; }
+  set y(value: number) { this.template.y.set(this, value); }
 
   // Derived properties, managed by the FunctionchartContext.
   parent: Functionchart | undefined;
   globalPosition = defaultPoint;
   protected _type: Type;
-  get type() { return this._type || Type.emptyType; }
+  get type() {
+    if (!this._type) {
+      this._type = Type.fromString(this.typeString);
+    }
+    return this._type;
+  }
   set type(type: Type) {
     if (type !== this._type) {
       this._type = type;
@@ -422,6 +449,8 @@ abstract class NodeBase<T extends NonWireTemplate> {
 
   inWires = new Array<Wire | undefined>();   // one input per pin (no fan in).
   outWires = new Array<Array<Wire>>();       // multiple outputs per pin (fan out).
+
+  get isAbstract() { return false; }
 
   // Get the pin for the node type.
   getPin(index: number) : Pin {
@@ -439,16 +468,9 @@ abstract class NodeBase<T extends NonWireTemplate> {
   }
 }
 
-export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBase<T>
-    implements DataContextObject, ReferencedObject {
-  get x() { return this.template.x.get(this) || 0; }
-  set x(value: number) { this.template.x.set(this, value); }
-  get y() { return this.template.y.get(this) || 0; }
-  set y(value: number) { this.template.y.set(this, value); }
+export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBase<T> {
   get name() { return this.template.name.get(this); }
   set name(value: string) { this.template.name.set(this, value); }
-  get typeString() { return this.template.typeString.get(this) || Type.emptyTypeString; }
-  set typeString(value: string) { this.template.typeString.set(this, value); }
 
   constructor(template: T, context: FunctionchartContext, id: number) {
     super(template, context,  id);
@@ -464,8 +486,6 @@ export class InstancerElement extends Element<InstancerTemplate> {
 
   instances = new Set<FunctionInstance>();  // TODO do we need this mapping to instances?
 
-  resetTypeCache() { this._instanceType = undefined; }
-
   private _instanceType: Type | undefined;
   get instanceType() : Type {
     if (!this._instanceType) {
@@ -475,6 +495,9 @@ export class InstancerElement extends Element<InstancerTemplate> {
       this._instanceType = Type.fromString(typeString);
     }
     return this._instanceType;
+  }
+  set instanceType(type: Type) {
+    this._instanceType = type;
   }
 
   get innerType() : Type {
@@ -519,14 +542,7 @@ export class ExporterElement extends Element<ExporterTemplate> {
   }
 }
 
-export class Pseudoelement extends NodeBase<PseudoelementTemplate> implements DataContextObject, ReferencedObject {
-  get x() { return this.template.x.get(this) || 0; }
-  set x(value: number) { this.template.x.set(this, value); }
-  get y() { return this.template.y.get(this) || 0; }
-  set y(value: number) { this.template.y.set(this, value); }
-  get typeString() : string { return this.template.typeString.get(this); }
-  set typeString(value: string) { this.template.typeString.set(this, value); }
-
+export class Pseudoelement extends NodeBase<PseudoelementTemplate> {
   // Derived properties.
   // index: number = -1;
 
@@ -587,7 +603,7 @@ export type PinInfo = {
   element: NodeTypes,
   index: number,
   type: Type,
-  // connected: PinRefSet,
+  name: string | undefined,
   fcIndex: number,
 };
 
@@ -601,25 +617,25 @@ export type TypeInfo = {
 
 // This TypeInfo instance signals that the functionchart hasn't been initialized yet.
 const emptyTypeInfo : TypeInfo = {
-  typeString: Type.emptyTypeString,
+  typeString: Type.emptyExporterTypeString,
   closed: true,
   abstract: true,
   inputs: [],
   outputs: [],
 }
 
-export class Functionchart extends NodeBase<FunctionchartTemplate> implements DataContextObject {
+export class Functionchart extends NodeBase<FunctionchartTemplate> {
   // Radius of rounded corners. This isn't themeable, as it's conceptually part of the notation.
   static radius: number = 8;
 
-  get x() { return this.template.x.get(this) || 0; }
-  set x(value: number) { this.template.x.set(this, value); }
-  get y() { return this.template.y.get(this) || 0; }
-  set y(value: number) { this.template.y.set(this, value); }
   get width() { return this.template.width.get(this) || 0; }
   set width(value: number) { this.template.width.set(this, value); }
   get height() { return this.template.height.get(this) || 0; }
   set height(value: number) { this.template.height.set(this, value); }
+  get typeString() : string {
+    return this.template.typeString.get(this) || this.typeInfo.typeString;  // TODO remove when files converted
+  }
+  set typeString(value: string) { this.template.typeString.set(this, value); }
   get name() { return this.template.name.get(this); }
   set name(value: string) { this.template.name.set(this, value); }
 
@@ -641,11 +657,7 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> implements Da
   }
 }
 
-export class FunctionInstance extends NodeBase<FunctionInstanceTemplate> implements DataContextObject, ReferencedObject {
-  get x() { return this.template.x.get(this) || 0; }
-  set x(value: number) { this.template.x.set(this, value); }
-  get y() { return this.template.y.get(this) || 0; }
-  set y(value: number) { this.template.y.set(this, value); }
+export class FunctionInstance extends Element<FunctionInstanceTemplate>  {
   get instancer() { return this.template.instancer.get(this) as InstancerTypes; }
   set instancer(value: InstancerTypes) { this.template.instancer.set(this, value); }
 
@@ -674,9 +686,8 @@ export class FunctionInstance extends NodeBase<FunctionInstanceTemplate> impleme
   }
 }
 
-export type TrueElement = Element | FunctionInstance;
-export type AllElementTypes = TrueElement | Pseudoelement;
-export type NodeTypes = AllElementTypes | Functionchart;
+export type ElementTypes = Element | Pseudoelement;
+export type NodeTypes = ElementTypes | Functionchart;
 export type InstancerTypes = Functionchart | InstancerElement;
 export type AllTypes = NodeTypes | Wire;
 
@@ -738,7 +749,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         this.transactionManager.onChanged.bind(this.transactionManager));
 
     function update() {
-      self.updateDerivedInfo();  // updates wire lists and sorts topologically.
+      self.updateDerivedInfo();
     }
     this.transactionManager.addHandler('transactionEnded', update);
     this.transactionManager.addHandler('transactionCanceled', update);
@@ -772,6 +783,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.functionchart = root;
     this.insertFunctionchart(root, undefined);
     this.derivedInfoNeedsUpdate = true;
+    this.updateWireLists();
     this.updateDerivedInfo();
   }
 
@@ -781,6 +793,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     switch (typeName) {
       case 'element':
         result = new Element(elementTemplate, this, nextId);
+        break;
+      case 'instance':
+        result = new FunctionInstance(this, nextId);
         break;
       case 'instancer':
         result = new InstancerElement(this, nextId);
@@ -827,13 +842,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.referentMap.set(nextId, result);
     return result;
   }
-  newFunctionInstance() : FunctionInstance {
-    const nextId = ++this.highestId;
-    const result = new FunctionInstance(this, nextId);
-    this.referentMap.set(nextId, result);
-    return result;
-  }
-
   contains(item: AllTypes) : boolean {
     if (item instanceof NodeBase)
       return this.nodes.has(item);
@@ -842,6 +850,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return false;
   }
 
+  // TODO make these free standing functions?
   visitAll(item: AllTypes, visitor: FunctionchartVisitor) : void {
     const self = this;
     visitor(item);
@@ -1064,10 +1073,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.selection.contents();
   }
 
-  selectedTrueElements() : TrueElement[] {
-    const result = new Array<TrueElement>();
+  selectedTrueElements() : Element[] {
+    const result = new Array<Element>();
     this.selection.forEach(item => {
-      if (item instanceof Element || item instanceof FunctionInstance)
+      if (item instanceof Element)
         result.push(item);
     });
     return result;
@@ -1426,6 +1435,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (item instanceof Functionchart) {
         const typeInfo = self.getFunctionchartTypeInfo(item),
               typeString = typeInfo.typeString;
+        item.typeString = typeString;  // TODO fix
         item.typeInfo = typeInfo;
         const type = Type.fromString(typeString);
         item.type = type.toExporterType();
@@ -1473,8 +1483,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
   updateDerivedInfo(updateInstancers: boolean = true) {
     if (this.derivedInfoNeedsUpdate) {
-      // Clear the update flag to avoid re-entering. This shouldn't happen as long as no mutating methods
-      // are called while we're here.
+      // Clear the update flag to avoid re-entering. No mutation should happen while
+      // we're here.
       this.derivedInfoNeedsUpdate = false;
       if (updateInstancers)
         this.updateFunctionchartTypes();
@@ -1593,9 +1603,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         if (lastTypeInfo === emptyTypeInfo)
           lastTypeInfo = typeInfo;
         node.pinMap = self.makePinMap(lastTypeInfo, typeInfo);
-      } else if (node instanceof Pseudoelement && node.template === useTemplate) {
-        // Reroute wires so there are no empty pins.
-        const inWires = node.inWires,
+      } else if (node.type.varArgs) {
+        // Reroute wires to maintain the varArgs invariants:
+        // 1) There are no gaps in the varArgs range...
+        // 2) Except the last pin, which is unwired.
+        const type = node.type,
+              inWires = node.inWires,
               length = inWires.length;
         let wired = 0,
             unwired = 0;
@@ -1710,22 +1723,22 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.deleteItem(node);
   }
 
-  exportElement(element: TrueElement) : ExporterElement {
+  exportElement(element: Element) : ExporterElement {
     const result = this.newElement('exporter') as ExporterElement,
           exporterType = element.type.toExporterType();
     result.x = element.x;
     result.y = element.y;
     result.typeString = exporterType.toString();
-    if (element instanceof Element) {
-      result.name = element.name;
-    } else if (element instanceof FunctionInstance) {
+    if (element instanceof FunctionInstance) {
       result.instancer = element.instancer;
+    } else if (element instanceof Element) {
+      result.name = element.name;
     }
     result.innerTypeString = element.type.toString();
     return result;
   }
 
-  importElement(element: TrueElement) : Element {
+  importElement(element: Element) : Element {
     const result = this.newElement('instancer') as InstancerElement,
           instancerType = element.type.toInstancerType();
     result.typeString = instancerType.toString();
@@ -1733,7 +1746,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return result;
   }
 
-  exportElements(elements: TrueElement[]) {
+  exportElements(elements: Element[]) {
     const self = this,
           selection = this.selection;
 
@@ -1746,7 +1759,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  importElements(elements: TrueElement[]) {
+  importElements(elements: Element[]) {
     const self = this,
           selection = this.selection;
 
@@ -1842,14 +1855,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     subgraphInfo.nodes.forEach(node => {
       if (node instanceof Pseudoelement) {
         if (node.template === inputTemplate) {
-          const connected = new Multimap<NodeTypes, number>();
+          const connected = new Multimap<NodeTypes, number>();  // TODO move this out
           const type = self.inferPinType(node, 0, connected);
-          const pinInfo = { element: node, index: 0, type, connected, fcIndex: -1 };
+          const name = node.type.outputs[0].name;
+          const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
           inputs.push(pinInfo);
         } else if (node.template === outputTemplate) {
           const connected = new Multimap<NodeTypes, number>();
           const type = self.inferPinType(node, 0, connected);
-          const pinInfo = { element: node, index: 0, type, connected, fcIndex: -1 };
+          const name = node.type.inputs[0].name;
+          const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
           outputs.push(pinInfo);
         } else if (node.template === useTemplate) {
           // TODO
@@ -1868,18 +1883,19 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (node instanceof InstancerElement) {
         const wire = node.inWires[0];
         if (!wire) {
-          const connected = new Multimap<NodeTypes, number>();
-          const type = node.innerType;
-          const pinInfo = { element: node, index: 0, type, connected, fcIndex: -1 };
+          const innerType = node.innerType,
+                type = innerType.copyUnnamed(),
+                name = innerType.name;
+          const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
           inputs.push(pinInfo);
         };
       } else if (node instanceof ExporterElement) {
         const wires = node.outWires[0];
-        if (wires === undefined || wires.length === 0) {  // TODO we shouldn't need to check 'wires' here.
-          const connected = new Multimap<NodeTypes, number>();
+        if (wires && wires.length === 0) {  // Wires may be undefined.
           const pin = node.type.outputs[0],
-                type = pin.type;
-          const pinInfo = { element: node, index: 0, type, connected, fcIndex: -1 };
+                type = pin.type.copyUnnamed(),
+                name = node.type.name;
+          const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
           outputs.push(pinInfo);
         }
       }
@@ -1903,20 +1919,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     outputs.sort(compareYs);
     outputs.forEach((output, i) => { output.fcIndex = i; });
 
-    function getPinName(type: Type, pin: Pin) : string {
-      let typeString = type.toString();
-      if (pin.name && !typeString.endsWith(')'))  // TODO we shouldn't need this check.
-        typeString += '(' + pin.name + ')';
-      return typeString;
-    }
-
     const inputPins = inputs.map(pinInfo => {
-      const pin = pinInfo.element.getPin(pinInfo.index);  // TODO Maybe store pin instead?
-      return new Pin(pinInfo.type, pin.name);
+      return new Pin(pinInfo.type, pinInfo.name);
     });
     const outputPins = outputs.map(pinInfo => {
-      const pin = pinInfo.element.getPin(pinInfo.index);  // TODO Maybe store pin instead?
-      return new Pin(pinInfo.type, pin.name);
+      return new Pin(pinInfo.type, pinInfo.name);
     });
     const type = Type.fromInfo(inputPins, outputPins, name),
           typeString = type.toString();
@@ -1924,26 +1931,18 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return { typeString, closed, abstract, inputs, outputs };
   }
 
-  private updateItem(item: AllTypes) {
+  private updateGlobalPosition(item: AllTypes) {
     this.derivedInfoNeedsUpdate = true;
 
-    if (item instanceof Wire)
-      return;
-
-    if (item instanceof Element || item instanceof Pseudoelement) {
-      const typeString = item.typeString,
-            type = typeString ? Type.fromString(typeString) : Type.emptyType;
-      item.type = type;
+    if (item instanceof NodeBase) {
+      this.visitNodes(item, item => this.setGlobalPosition(item));
     }
-
-    // Update child items with our current position.
-    this.visitNodes(item, item => this.setGlobalPosition(item));
   }
 
-  private insertElement(element: AllElementTypes, parent: Functionchart) {
+  private insertElement(element: ElementTypes, parent: Functionchart) {
     this.nodes.add(element);
     element.parent = parent;
-    this.updateItem(element);
+    this.updateGlobalPosition(element);
     this.derivedInfoNeedsUpdate = true;
     if (element instanceof FunctionInstance) {
       const functionChart = element.instancer;
@@ -1951,7 +1950,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  private removeElement(element: AllElementTypes) {
+  private removeElement(element: ElementTypes) {
     this.nodes.delete(element);
     this.derivedInfoNeedsUpdate = true;
     if (element instanceof FunctionInstance) {
@@ -1971,7 +1970,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
     // Update function chart after all descendants have been added and updated. We need that
     // in order to compute the type info for the functionchart.
-    this.updateItem(functionchart);
+    this.updateGlobalPosition(functionchart);
   }
 
   private removeFunctionchart(functionchart: Functionchart) {
@@ -1984,7 +1983,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   private insertWire(wire: Wire, parent: Functionchart) {
     this.wires.add(wire);
     wire.parent = parent;
-    this.updateItem(wire);
+    this.updateGlobalPosition(wire);
     this.derivedInfoNeedsUpdate = true;
   }
 
@@ -2024,32 +2023,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (this.wires.has(owner)) {
         this.insertWire(owner, owner.parent!);
       }
-    } else if (owner instanceof FunctionInstance) {
-      if (this.nodes.has(owner)) {
-        if (prop === instancerProp) {
-          // We are initializing the functionchart property, so set the instance's type.
-          // TODO remove, we shouldn't change instancer prop once an element is 'live'.
-          owner.type = owner.instancer.type;
-        }
-      }
-    } else if (owner instanceof Functionchart) {
-      // TODO if we have any properties that would change the type in the future.
-    } else if (owner instanceof InstancerElement) {
-      if (this.nodes.has(owner)) {
-        if (prop === innerTypeStringProp) {
-          owner.resetTypeCache();
-        }
-      }
-    } else if (owner instanceof NodeBase) {
-      if (this.nodes.has(owner)) {
-        if (prop === typeStringProp) {
-          const type = Type.fromString(owner.typeString);
-          owner.type = type;
-        }
+    } else if (this.nodes.has(owner)) {
+      if (owner instanceof InstancerElement && prop === innerTypeStringProp) {
+        owner.instanceType = Type.fromString(owner.innerTypeString);
+      } else if (prop === typeStringProp) {
+        owner.type = Type.fromString(owner.typeString);
       }
     }
     this.onValueChanged(owner, prop, oldValue);
-    this.updateItem(owner);  // Update any derived properties.
+    this.updateGlobalPosition(owner);  // Update any derived properties.
   }
   elementInserted(owner: Functionchart, prop: ArrayPropertyTypes, index: number) : void {
     const value: AllTypes = prop.get(owner).at(index) as AllTypes;
@@ -2070,6 +2052,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   construct(typeName: string) : AllTypes {
     switch (typeName) {
       case 'element':
+      case 'instance':
       case 'instancer':
       case 'exporter': return this.newElement(typeName);
 
@@ -2079,10 +2062,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
       case 'wire': return this.newWire(undefined, -1, undefined, -1);
 
-      case 'functionchart':
-      case 'export': return this.newFunctionchart(typeName);
+      case 'functionchart': return this.newFunctionchart(typeName);
 
-      case 'instance': return this.newFunctionInstance();
     }
     throw new Error('Unknown type');
   }
@@ -2141,12 +2122,12 @@ class FunctionchartTheme extends Theme {
 }
 
 class ElementHitResult {
-  item: AllElementTypes;
+  item: ElementTypes;
   inner: RectHitResult;
   input: number = -1;
   output: number = -1;
   instancer: boolean = false;
-  constructor(item: AllElementTypes, inner: RectHitResult) {
+  constructor(item: ElementTypes, inner: RectHitResult) {
     this.item = item;
     this.inner = inner;
   }
@@ -2347,7 +2328,7 @@ class Renderer implements ILayoutEngine {
       this.layoutType(type);
   }
 
-  layoutElement(element: AllElementTypes) {
+  layoutElement(element: ElementTypes) {
     const type = element.type;
     if (type.needsLayout) {
       this.layoutType(type);
@@ -2476,7 +2457,7 @@ class Renderer implements ILayoutEngine {
     }
   }
 
-  drawElement(element: AllElementTypes, mode: RenderMode) {
+  drawElement(element: ElementTypes, mode: RenderMode) {
     const ctx = this.ctx,
           theme = this.theme,
           spacing = theme.spacing,
@@ -2495,7 +2476,7 @@ class Renderer implements ILayoutEngine {
         ctx.fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
-        if (element instanceof FunctionInstance && element.isAbstract) {
+        if (element.isAbstract) {
           ctx.setLineDash([6, 3]);
           ctx.stroke();
           ctx.setLineDash([0]);
@@ -2596,7 +2577,7 @@ class Renderer implements ILayoutEngine {
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
         ctx.stroke();
-        const type = functionchart.instanceType.flatType,
+        const instanceType = functionchart.instanceType.flatType,
               instancerRect = this.instancerBounds(functionchart);
         ctx.beginPath();
         ctx.rect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height);
@@ -2614,10 +2595,10 @@ class Renderer implements ILayoutEngine {
         // Draw the single output pin.
         if (!functionchart.isAbstract) {
           const r = this.theme.knobbyRadius;
-          this.drawPin(type.outputs[0], x + w - 2 * r, y + h / 2 - r);
+          this.drawPin(functionchart.type.flatType.outputs[0], x + w - 2 * r, y + h / 2 - r);
         }
 
-        this.drawType(type, instancerRect.x, instancerRect.y);
+        this.drawType(instanceType, instancerRect.x, instancerRect.y);
         break;
       case RenderMode.Highlight:
       case RenderMode.HotTrack:
@@ -2628,7 +2609,7 @@ class Renderer implements ILayoutEngine {
     }
   }
 
-  hitTestElement(element: AllElementTypes, p: Point, tol: number, mode: RenderMode) :
+  hitTestElement(element: ElementTypes, p: Point, tol: number, mode: RenderMode) :
                  ElementHitResult | undefined {
     const rect = this.getBounds(element),
           x = rect.x, y = rect.y, width = rect.width, height = rect.height,
@@ -2638,18 +2619,20 @@ class Renderer implements ILayoutEngine {
     const self = this,
           result = new ElementHitResult(element, hitInfo),
           type = element.type.flatType;
-    for (let i = 0; i < type.inputs.length; i++) {
-      const pinPt = self.inputPinToPoint(element, i),
-            rect = self.pinToRect(type.inputs[i], pinPt);
-      if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
-        result.input = i;
+    if (!element.isAbstract && mode !== RenderMode.Palette) {
+      for (let i = 0; i < type.inputs.length; i++) {
+        const pinPt = self.inputPinToPoint(element, i),
+              rect = self.pinToRect(type.inputs[i], pinPt);
+        if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
+          result.input = i;
+        }
       }
-    }
-    for (let i = 0; i < type.outputs.length; i++) {
-      const pinPt = self.outputPinToPoint(element, i),
-            rect = self.pinToRect(type.outputs[i], pinPt);
-      if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
-        result.output = i;
+      for (let i = 0; i < type.outputs.length; i++) {
+        const pinPt = self.outputPinToPoint(element, i),
+              rect = self.pinToRect(type.outputs[i], pinPt);
+        if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
+          result.output = i;
+        }
       }
     }
     if (element instanceof InstancerElement) {
@@ -3554,8 +3537,7 @@ export class FunctionchartEditor implements CanvasLayer {
         newWire: Wire | undefined;
     // First check for a drag that creates a new wire.
     if ((pointerHitInfo instanceof ElementHitResult &&
-        (pointerHitInfo.input >= 0 || pointerHitInfo.output >= 0 ||
-           pointerHitInfo.instancer)) && !this.clickInPalette) {
+        (pointerHitInfo.input >= 0 || pointerHitInfo.output >= 0 || pointerHitInfo.instancer))) {
       const cp0 = this.getCanvasPosition(canvasController, p0);
       if (pointerHitInfo.input >= 0) {
         const dst = dragItem as NodeTypes;
@@ -3628,9 +3610,10 @@ export class FunctionchartEditor implements CanvasLayer {
         drag.items = copies;
       } else if  (drag.kind === 'instantiateFunctionchart') {
         const instancer = drag.items[0] as InstancerTypes,
-              newInstance = context.newFunctionInstance(),
+              newInstance = context.newElement('instance') as FunctionInstance,
               instancerRect = this.renderer.instancerBounds(instancer);
         newInstance.instancer = instancer;
+        newInstance.typeString = instancer.instanceType.toString();  // TODO fixme
         newInstance.x = instancerRect.x;
         newInstance.y = instancerRect.y;
         drag.items = [newInstance];
@@ -3682,7 +3665,7 @@ export class FunctionchartEditor implements CanvasLayer {
           break;
         }
         case 'resizeFunctionchart': {
-          const hitInfo = pointerHitInfo as ElementHitResult,
+          const hitInfo = pointerHitInfo as FunctionchartHitResult,
                 item = drag.items[0] as Functionchart,
                 oldX = context.getOldValue(item, 'x'),
                 oldY = context.getOldValue(item, 'y'),

@@ -3,7 +3,7 @@
   "id": 2,
   "width": 1366.62890625,
   "height": 671.3836212158203,
-  "nonWires": [
+  "nodes": [
     {
       "type": "functionchart",
       "id": 3,
@@ -12,13 +12,13 @@
       "width": 440.08453369140625,
       "height": 521.1421966552734,
       "name": "poly",
-      "nonWires": [
+      "nodes": [
         {
           "type": "input",
           "id": 4,
           "x": 7.33984375,
           "y": 54.14921569824219,
-          "typeString": "[,*(x)]"
+          "typeString": "[,v(x)]"
         },
         {
           "type": "functionchart",
@@ -28,7 +28,7 @@
           "width": 192.62188720703125,
           "height": 116.07421875,
           "name": "step",
-          "nonWires": [
+          "nodes": [
             {
               "type": "input",
               "id": 6,
@@ -64,7 +64,7 @@
               "id": 10,
               "x": 160.62188720703125,
               "y": 36.498443603515625,
-              "typeString": "[*(),]"
+              "typeString": "[v(),]"
             }
           ],
           "wires": [
@@ -105,13 +105,13 @@
           "y": 131.39453887939453,
           "width": 184.05078125,
           "height": 88.71484375,
-          "nonWires": [
+          "nodes": [
             {
               "type": "instance",
               "id": 12,
               "x": 55.05078125,
               "y": 11.1953125,
-              "functionchart": 5
+              "instancer": 5
             },
             {
               "type": "input",
@@ -166,13 +166,13 @@
           "y": 236.79144287109375,
           "width": 205.46014404296875,
           "height": 105.69766235351562,
-          "nonWires": [
+          "nodes": [
             {
               "type": "instance",
               "id": 17,
               "x": 55.05078125,
               "y": 11.1953125,
-              "functionchart": 5
+              "instancer": 5
             },
             {
               "type": "input",
@@ -200,7 +200,7 @@
               "id": 21,
               "x": 72.32110595703125,
               "y": 47.697662353515625,
-              "functionchart": 5
+              "instancer": 5
             },
             {
               "type": "input",
@@ -255,13 +255,13 @@
           "y": 360.0414276123047,
           "width": 205.46014404296875,
           "height": 145.10076904296875,
-          "nonWires": [
+          "nodes": [
             {
               "type": "instance",
               "id": 24,
               "x": 55.05078125,
               "y": 11.1953125,
-              "functionchart": 5
+              "instancer": 5
             },
             {
               "type": "input",
@@ -289,7 +289,7 @@
               "id": 28,
               "x": 72.32110595703125,
               "y": 47.697662353515625,
-              "functionchart": 5
+              "instancer": 5
             },
             {
               "type": "input",
@@ -303,7 +303,7 @@
               "id": 30,
               "x": 84.2711181640625,
               "y": 87.10076904296875,
-              "functionchart": 5
+              "instancer": 5
             },
             {
               "type": "input",
@@ -371,7 +371,7 @@
           "x": 260.4781494140625,
           "y": 156.453125,
           "typeString": "[,[vv,v]]",
-          "functionchart": 11,
+          "instancer": 11,
           "innerTypeString": "[vv,v]"
         },
         {
@@ -380,7 +380,7 @@
           "x": 271.9561767578125,
           "y": 260.73907470703125,
           "typeString": "[,[vvv,v]]",
-          "functionchart": 16,
+          "instancer": 16,
           "innerTypeString": "[vvv,v]"
         },
         {
@@ -389,7 +389,7 @@
           "x": 269.87200927734375,
           "y": 394.40777587890625,
           "typeString": "[,[vvvv,v]]",
-          "functionchart": 23,
+          "instancer": 23,
           "innerTypeString": "[vvvv,v]"
         }
       ],
@@ -408,14 +408,14 @@
       "id": 35,
       "x": 835.5444946289062,
       "y": 268.98675537109375,
-      "functionchart": 3
+      "instancer": 3
     },
     {
       "type": "instance",
       "id": 47,
       "x": 836.91650390625,
       "y": 145.08047485351562,
-      "functionchart": 3
+      "instancer": 3
     }
   ],
   "wires": []

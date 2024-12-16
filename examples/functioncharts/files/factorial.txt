@@ -3,7 +3,7 @@
   "id": 2,
   "width": 1093.4032135009766,
   "height": 508.3562812805176,
-  "nonWires": [
+  "nodes": [
     {
       "type": "functionchart",
       "id": 3,
@@ -12,7 +12,7 @@
       "width": 413.05311584472656,
       "height": 187.25624084472656,
       "name": "facstep",
-      "nonWires": [
+      "nodes": [
         {
           "type": "element",
           "id": 4,
@@ -71,14 +71,14 @@
           "id": 11,
           "x": 215.73133850097656,
           "y": 125.25624084472656,
-          "functionchart": 3
+          "instancer": 3
         },
         {
           "type": "instance",
           "id": 12,
           "x": 170.0906639099121,
           "y": 96.31561660766602,
-          "functionchart": 13
+          "instancer": 13
         }
       ],
       "wires": [
@@ -169,7 +169,7 @@
       "width": 194.4375,
       "height": 81.75,
       "name": "-1",
-      "nonWires": [
+      "nodes": [
         {
           "type": "element",
           "id": 14,
@@ -233,13 +233,13 @@
       "width": 227.09063720703125,
       "height": 72.26876831054688,
       "name": "n!",
-      "nonWires": [
+      "nodes": [
         {
           "type": "instance",
           "id": 19,
           "x": 58.09063720703125,
           "y": 8,
-          "functionchart": 3
+          "instancer": 3
         },
         {
           "type": "output",

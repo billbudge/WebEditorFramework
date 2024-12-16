@@ -3,7 +3,7 @@
   "id": 2,
   "width": 1041.3250068426132,
   "height": 377.51565170288086,
-  "nonWires": [
+  "nodes": [
     {
       "type": "functionchart",
       "id": 3,
@@ -11,7 +11,7 @@
       "y": 132.4906120300293,
       "width": 205.08128356933594,
       "height": 113.3125114440918,
-      "nonWires": [
+      "nodes": [
         {
           "type": "output",
           "id": 4,
@@ -102,7 +102,7 @@
       "y": 115.59061431884766,
       "width": 331.10308837890625,
       "height": 177.82814407348633,
-      "nonWires": [
+      "nodes": [
         {
           "type": "input",
           "id": 11,
@@ -115,7 +115,7 @@
           "id": 12,
           "x": 204.51556396484375,
           "y": 73.90623474121094,
-          "functionchart": 3
+          "instancer": 3
         },
         {
           "type": "output",
@@ -136,7 +136,7 @@
           "id": 15,
           "x": 129.8499755859375,
           "y": 51.82188415527344,
-          "functionchart": 3
+          "instancer": 3
         },
         {
           "type": "input",
@@ -150,7 +150,7 @@
           "id": 17,
           "x": 56,
           "y": 8,
-          "functionchart": 3
+          "instancer": 3
         },
         {
           "type": "input",
@@ -245,7 +245,7 @@
       "id": 20,
       "x": 947.7468818426132,
       "y": 140.43752670288086,
-      "functionchart": 10
+      "instancer": 10
     }
   ],
   "wires": []
