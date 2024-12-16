@@ -1005,8 +1005,8 @@ export class FunctionchartContext extends EventBase {
         this.deleteSelectionHelper();
         this.endTransaction();
     }
-    newInputForWire(wire, p) {
-        const dst = wire.dst, parent = dst.parent, input = this.newPseudoelement('input'), offset = this.layoutEngine.outputPinToPoint(input, 0);
+    newInputForWire(wire, parent, p) {
+        const dst = wire.dst, input = this.newPseudoelement('input'), offset = this.layoutEngine.outputPinToPoint(input, 0);
         input.x = p.x - offset.x;
         input.y = p.y - offset.y;
         wire.src = input;
@@ -1017,12 +1017,12 @@ export class FunctionchartContext extends EventBase {
     connectInput(node, pin) {
         const parent = node.parent, p = this.layoutEngine.inputPinToPoint(node, pin), wire = this.newWire(undefined, 0, node, pin);
         p.x -= 32;
-        const input = this.newInputForWire(wire, p);
+        const input = this.newInputForWire(wire, parent, p);
         this.addItem(wire, parent);
         return { input, wire };
     }
-    newOutputForWire(wire, p) {
-        const src = wire.src, parent = src.parent, output = this.newPseudoelement('output'), offset = this.layoutEngine.inputPinToPoint(output, 0);
+    newOutputForWire(wire, parent, p) {
+        const src = wire.src, output = this.newPseudoelement('output'), offset = this.layoutEngine.inputPinToPoint(output, 0);
         output.x = p.x - offset.x;
         output.y = p.y - offset.y;
         wire.dst = output;
@@ -1030,8 +1030,8 @@ export class FunctionchartContext extends EventBase {
         this.addItem(output, parent);
         return output;
     }
-    newInstancerForWire(wire, p) {
-        const src = wire.src, parent = src.parent, type = src.type.outputs[wire.srcPin].type, element = this.newElement('instancer'), newType = type.toInstancerType();
+    newInstancerForWire(wire, parent, p) {
+        const src = wire.src, type = src.type.outputs[wire.srcPin].type, element = this.newElement('instancer'), newType = type.toInstancerType();
         element.typeString = newType.toString();
         element.innerTypeString = type.toString();
         const offset = this.layoutEngine.inputPinToPoint(element, 0);
@@ -1045,7 +1045,7 @@ export class FunctionchartContext extends EventBase {
     connectOutput(node, pin) {
         const parent = node.parent, p = this.layoutEngine.outputPinToPoint(node, pin), wire = this.newWire(node, pin, undefined, 0);
         p.x += 32;
-        const output = this.newOutputForWire(wire, p);
+        const output = this.newOutputForWire(wire, parent, p);
         this.addItem(wire, parent);
         return { output, wire };
     }
@@ -3120,23 +3120,29 @@ export class FunctionchartEditor {
         if (!drag)
             return;
         const context = this.context, functionchart = this.functionchart, selection = context.selection, p = canvasController.getCurrentPointerPosition(), cp = this.getCanvasPosition(canvasController, p);
+        // Find element or functionchart beneath mouse.
+        const hitList = this.hitTestCanvas(cp), hitInfo = this.getFirstHit(hitList, isDropTarget), lastSelected = selection.lastSelected;
+        let parent = functionchart;
+        if (hitInfo instanceof FunctionchartHitResult) {
+            parent = hitInfo.item;
+        }
         if (drag instanceof WireDrag) {
             const wire = drag.wire, src = wire.src, dst = wire.dst;
             // Auto-complete if wire has no src or destination. Inputs of all types and
             // outputs of value type auto-complete to input/output pseudoelements. Outputs
             // of function type auto-complete to an InstancerElement of the src pin type.
             if (src === undefined) {
-                const p = wire.pSrc, input = context.newInputForWire(wire, p);
+                const p = wire.pSrc, input = context.newInputForWire(wire, parent, p);
                 context.select(input);
             }
             else if (dst === undefined) {
                 const p = wire.pDst, pin = src.type.outputs[wire.srcPin];
                 let output;
                 if (pin.type === Type.valueType) {
-                    output = context.newOutputForWire(wire, p);
+                    output = context.newOutputForWire(wire, parent, p);
                 }
                 else {
-                    output = context.newInstancerForWire(wire, p);
+                    output = context.newInstancerForWire(wire, parent, p);
                 }
                 context.select(output);
             }
@@ -3152,8 +3158,6 @@ export class FunctionchartEditor {
         else if (drag instanceof NonWireDrag &&
             (drag.kind == 'copyPalette' || drag.kind === 'moveSelection' ||
                 drag.kind === 'moveCopySelection' || drag.kind === 'instantiateFunctionchart')) {
-            // Find element or functionchart beneath mouse.
-            const hitList = this.hitTestCanvas(cp), hitInfo = this.getFirstHit(hitList, isDropTarget), lastSelected = selection.lastSelected;
             if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase &&
                 lastSelected.type.canConnectTo(hitInfo.item.type)) {
                 if (!(lastSelected instanceof Functionchart)) // TODO support Functionchart somehow?
