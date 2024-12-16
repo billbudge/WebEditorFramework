@@ -1536,6 +1536,13 @@ export class FunctionchartContext extends EventBase {
                 }
             }
             else { // instanceof ElementTypes
+                if (node instanceof Element && node.isAbstract) {
+                    // abstract elements become inputs.
+                    const type = node.type.copyUnnamed();
+                    const name = node.type.name;
+                    const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                    inputs.push(pinInfo);
+                }
                 if (abstract) {
                     // Only instancers, exporters, or functioncharts are allowed if abstract.
                     abstract = (node instanceof InstancerElement) ||
@@ -2154,13 +2161,16 @@ class Renderer {
         if (!hitInfo)
             return;
         const self = this, result = new ElementHitResult(element, hitInfo), type = element.type.flatType;
-        if (!element.isAbstract && mode !== RenderMode.Palette) {
-            for (let i = 0; i < type.inputs.length; i++) {
-                const pinPt = self.inputPinToPoint(element, i), rect = self.pinToRect(type.inputs[i], pinPt);
-                if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
-                    result.input = i;
+        if (mode !== RenderMode.Palette) {
+            if (!element.isAbstract) {
+                for (let i = 0; i < type.inputs.length; i++) {
+                    const pinPt = self.inputPinToPoint(element, i), rect = self.pinToRect(type.inputs[i], pinPt);
+                    if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
+                        result.input = i;
+                    }
                 }
             }
+            // Abstract element outputs can be wired.  // TODO we shouldn't be enforcing this here.
             for (let i = 0; i < type.outputs.length; i++) {
                 const pinPt = self.outputPinToPoint(element, i), rect = self.pinToRect(type.outputs[i], pinPt);
                 if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
