@@ -1,12 +1,14 @@
 {
   "type": "functionchart",
   "id": 2,
+  "typeString": "[,]",
   "width": 1041.3250068426132,
   "height": 377.51565170288086,
   "nodes": [
     {
       "type": "functionchart",
       "id": 3,
+      "typeString": "[v(a)v(x)v(b),v]",
       "x": 271.88749158382416,
       "y": 132.4906120300293,
       "width": 205.08128356933594,
@@ -15,46 +17,46 @@
         {
           "type": "output",
           "id": 4,
+          "typeString": "[v,]",
           "x": 173.08128356933594,
-          "y": 21.943767547607422,
-          "typeString": "[v,]"
+          "y": 21.943767547607422
         },
         {
           "type": "element",
           "id": 5,
+          "typeString": "[vv,v](+)",
           "x": 121.78440856933594,
           "y": 7.650020599365234,
-          "name": "binop",
-          "typeString": "[vv,v](+)"
+          "name": "binop"
         },
         {
           "type": "input",
           "id": 6,
+          "typeString": "[,v(b)]",
           "x": 44.77503967285156,
-          "y": 79.3125114440918,
-          "typeString": "[,v(b)]"
+          "y": 79.3125114440918
         },
         {
           "type": "element",
           "id": 7,
+          "typeString": "[vv,v](*)",
           "x": 68.15625,
           "y": 8,
-          "name": "binop",
-          "typeString": "[vv,v](*)"
+          "name": "binop"
         },
         {
           "type": "input",
           "id": 8,
+          "typeString": "[,v(x)]",
           "x": 8.20623779296875,
-          "y": 54.88438415527344,
-          "typeString": "[,v(x)]"
+          "y": 54.88438415527344
         },
         {
           "type": "input",
           "id": 9,
+          "typeString": "[,v(a)]",
           "x": 8,
-          "y": 30.134384155273438,
-          "typeString": "[,v(a)]"
+          "y": 30.134384155273438
         }
       ],
       "wires": [
@@ -98,6 +100,7 @@
     {
       "type": "functionchart",
       "id": 10,
+      "typeString": "[v(a)v(b)v(c)v(d)v(x),v]",
       "x": 537.3812812566757,
       "y": 115.59061431884766,
       "width": 331.10308837890625,
@@ -106,13 +109,14 @@
         {
           "type": "input",
           "id": 11,
+          "typeString": "[,v(x)]",
           "x": 30.184354782104492,
-          "y": 143.82814407348633,
-          "typeString": "[,v(x)]"
+          "y": 143.82814407348633
         },
         {
           "type": "instance",
           "id": 12,
+          "typeString": "[v(a)v(x)v(b),v]",
           "x": 204.51556396484375,
           "y": 73.90623474121094,
           "instancer": 3
@@ -120,20 +124,21 @@
         {
           "type": "output",
           "id": 13,
+          "typeString": "[v,]",
           "x": 280.625,
-          "y": 44.337493896484375,
-          "typeString": "[v,]"
+          "y": 44.337493896484375
         },
         {
           "type": "input",
           "id": 14,
+          "typeString": "[,v(d)]",
           "x": 12.19061279296875,
-          "y": 107.0999755859375,
-          "typeString": "[,v(d)]"
+          "y": 107.0999755859375
         },
         {
           "type": "instance",
           "id": 15,
+          "typeString": "[v(a)v(x)v(b),v]",
           "x": 129.8499755859375,
           "y": 51.82188415527344,
           "instancer": 3
@@ -141,13 +146,14 @@
         {
           "type": "input",
           "id": 16,
+          "typeString": "[,v(c)]",
           "x": 11.8499755859375,
-          "y": 72.73126220703125,
-          "typeString": "[,v(c)]"
+          "y": 72.73126220703125
         },
         {
           "type": "instance",
           "id": 17,
+          "typeString": "[v(a)v(x)v(b),v]",
           "x": 56,
           "y": 8,
           "instancer": 3
@@ -155,16 +161,16 @@
         {
           "type": "input",
           "id": 18,
+          "typeString": "[,v(b)]",
           "x": 8,
-          "y": 37,
-          "typeString": "[,v(b)]"
+          "y": 37
         },
         {
           "type": "input",
           "id": 19,
+          "typeString": "[,v(a)]",
           "x": 8,
-          "y": 9,
-          "typeString": "[,v(a)]"
+          "y": 9
         }
       ],
       "wires": [
@@ -243,6 +249,7 @@
     {
       "type": "instance",
       "id": 20,
+      "typeString": "[v(a)v(b)v(c)v(d)v(x),v]",
       "x": 947.7468818426132,
       "y": 140.43752670288086,
       "instancer": 10

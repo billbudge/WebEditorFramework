@@ -268,7 +268,8 @@ class InstancerTemplate extends ElementTemplate {
     constructor(typeName) {
         super(typeName);
         this.innerTypeString = innerTypeStringProp;
-        this.properties = [this.id, this.typeString, this.x, this.y, this.name, this.innerTypeString];
+        this.properties = [this.id, this.typeString, this.x, this.y, this.name,
+            this.innerTypeString];
     }
 }
 class ExporterTemplate extends ElementTemplate {
@@ -276,7 +277,15 @@ class ExporterTemplate extends ElementTemplate {
         super(typeName);
         this.instancer = instancerProp;
         this.innerTypeString = innerTypeStringProp;
-        this.properties = [this.id, this.typeString, this.x, this.y, this.name, this.instancer, this.innerTypeString];
+        this.properties = [this.id, this.typeString, this.x, this.y, this.name,
+            this.instancer, this.innerTypeString];
+    }
+}
+class FunctionInstanceTemplate extends ElementTemplate {
+    constructor() {
+        super(...arguments);
+        this.instancer = instancerProp;
+        this.properties = [this.id, this.typeString, this.x, this.y, this.instancer]; // no 'name' property
     }
 }
 class PseudoelementTemplate extends NodeTemplate {
@@ -307,13 +316,6 @@ class FunctionchartTemplate extends NodeTemplate {
         this.properties = [this.id, this.typeString, this.x, this.y, this.width, this.height,
             this.name, this.nodes, this.wires];
         this.typeName = typeName;
-    }
-}
-class FunctionInstanceTemplate extends ElementTemplate {
-    constructor() {
-        super(...arguments);
-        this.instancer = instancerProp;
-        this.properties = [this.id, this.typeString, this.x, this.y, this.instancer]; // no 'name' property
     }
 }
 const elementTemplate = new ElementTemplate('element'), // built-in elements
@@ -422,6 +424,32 @@ export class ExporterElement extends Element {
         super(exporterTemplate, context, id);
     }
 }
+export class FunctionInstance extends Element {
+    get instancer() { return this.template.instancer.get(this); }
+    set instancer(value) { this.template.instancer.set(this, value); }
+    // Derived Properties
+    get isAbstract() { return this.instancer.isAbstract; }
+    get type() {
+        let type = this._type;
+        if (!type) {
+            const instancer = this.instancer;
+            if (instancer) {
+                type = instancer.instanceType;
+            }
+            else {
+                type = Type.emptyType;
+            }
+        }
+        super.type = type;
+        return type;
+    }
+    set type(value) {
+        super.type = value;
+    }
+    constructor(context, id) {
+        super(functionInstanceTemplate, context, id);
+    }
+}
 export class Pseudoelement extends NodeBase {
     // Derived properties.
     // index: number = -1;
@@ -498,32 +526,6 @@ export class Functionchart extends NodeBase {
 }
 // Radius of rounded corners. This isn't themeable, as it's conceptually part of the notation.
 Functionchart.radius = 8;
-export class FunctionInstance extends Element {
-    get instancer() { return this.template.instancer.get(this); }
-    set instancer(value) { this.template.instancer.set(this, value); }
-    // Derived Properties
-    get isAbstract() { return this.instancer.isAbstract; }
-    get type() {
-        let type = this._type;
-        if (!type) {
-            const instancer = this.instancer;
-            if (instancer) {
-                type = instancer.instanceType;
-            }
-            else {
-                type = Type.emptyType;
-            }
-        }
-        super.type = type;
-        return type;
-    }
-    set type(value) {
-        super.type = value;
-    }
-    constructor(context, id) {
-        super(functionInstanceTemplate, context, id);
-    }
-}
 export class FunctionchartContext extends EventBase {
     constructor(layoutEngine = new Renderer()) {
         super();
@@ -1154,9 +1156,11 @@ export class FunctionchartContext extends EventBase {
                 const type = Type.fromString(typeString);
                 item.type = type.toExporterType();
                 item.instanceType = type;
-                // The instances have the internal type.
+                const instanceTypeString = type.toString(); // TODO clean up
+                // Update instances.
                 item.instances.forEach((instance) => {
-                    instance.type = type;
+                    if (instance.typeString === Type.emptyTypeString)
+                        instance.typeString = instanceTypeString;
                 });
             }
         });
@@ -1536,7 +1540,7 @@ export class FunctionchartContext extends EventBase {
                 }
             }
             else { // instanceof ElementTypes
-                if (node instanceof Element && node.isAbstract) {
+                if (node instanceof Element && node.isAbstract && node.type !== Type.emptyType) {
                     // abstract elements become inputs.
                     const type = node.type.copyUnnamed();
                     const name = node.type.name;
@@ -1671,12 +1675,12 @@ export class FunctionchartContext extends EventBase {
     }
     // DataContext interface implementation.
     valueChanged(owner, prop, oldValue) {
+        if (owner.context !== this) // Object should be of this context.
+            return;
         if (owner instanceof Wire) {
-            if (this.wires.has(owner)) {
-                this.insertWire(owner, owner.parent);
-            }
+            this.insertWire(owner, owner.parent);
         }
-        else if (this.nodes.has(owner)) {
+        else {
             if (owner instanceof InstancerElement && prop === innerTypeStringProp) {
                 owner.instanceType = Type.fromString(owner.innerTypeString);
             }

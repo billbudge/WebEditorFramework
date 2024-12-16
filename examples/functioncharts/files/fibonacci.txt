@@ -143,6 +143,7 @@
         {
           "type": "instance",
           "id": 17,
+          "typeString": "[v(n)v(v0)v(v1),v](fibstep)",
           "x": 162.66796875,
           "y": 90.98828125,
           "instancer": 8
@@ -150,6 +151,7 @@
         {
           "type": "instance",
           "id": 18,
+          "typeString": "[v,v](-1)",
           "x": 66.84771728515625,
           "y": 53.50624084472656,
           "instancer": 3
@@ -262,6 +264,7 @@
         {
           "type": "instance",
           "id": 21,
+          "typeString": "[v(n)v(v0)v(v1),v](fibstep)",
           "x": 95.03515625,
           "y": 8,
           "instancer": 8
@@ -316,6 +319,7 @@
     {
       "type": "instance",
       "id": 24,
+      "typeString": "[v,v](Fₖ)",
       "x": 784.7984008789062,
       "y": 316.8460998535156,
       "instancer": 19

@@ -63,6 +63,7 @@
         {
           "type": "instance",
           "id": 10,
+          "typeString": "[v(n)v(acc)[vv,v](f),v](reduce)",
           "x": 212.45631408691406,
           "y": 128.48435974121094,
           "instancer": 3
@@ -70,6 +71,7 @@
         {
           "type": "instance",
           "id": 11,
+          "typeString": "[v,v](-1)",
           "x": 170.0906639099121,
           "y": 96.31561660766602,
           "instancer": 14
@@ -249,6 +251,7 @@
         {
           "type": "instance",
           "id": 20,
+          "typeString": "[v(n)v(acc)[vv,v](f),v](reduce)",
           "x": 58.09063720703125,
           "y": 8,
           "instancer": 3

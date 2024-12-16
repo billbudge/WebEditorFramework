@@ -1,12 +1,14 @@
 {
   "type": "functionchart",
   "id": 2,
+  "typeString": "[,]",
   "width": 1093.4032135009766,
   "height": 508.3562812805176,
   "nodes": [
     {
       "type": "functionchart",
       "id": 3,
+      "typeString": "[v(n)v(acc),v](facstep)",
       "x": 404.58135986328125,
       "y": 179.01877212524414,
       "width": 413.05311584472656,
@@ -16,59 +18,60 @@
         {
           "type": "element",
           "id": 4,
+          "typeString": "[vvv,v](?)",
           "x": 255.40626525878906,
           "y": 34.78749465942383,
-          "name": "cond",
-          "typeString": "[vvv,v](?)"
+          "name": "cond"
         },
         {
           "type": "output",
           "id": 5,
+          "typeString": "[v,]",
           "x": 308.05311584472656,
-          "y": 37.24375534057617,
-          "typeString": "[v,]"
+          "y": 37.24375534057617
         },
         {
           "type": "element",
           "id": 6,
+          "typeString": "[vv,v](*)",
           "x": 122.93126678466797,
           "y": 124.62187194824219,
-          "name": "binop",
-          "typeString": "[vv,v](*)"
+          "name": "binop"
         },
         {
           "type": "input",
           "id": 7,
+          "typeString": "[,v(acc)]",
           "x": 14.721923828125,
-          "y": 97.5374927520752,
-          "typeString": "[,v(acc)]"
+          "y": 97.5374927520752
         },
         {
           "type": "input",
           "id": 8,
+          "typeString": "[,v(n)]",
           "x": 17.128173828125,
-          "y": 51.87500190734863,
-          "typeString": "[,v(n)]"
+          "y": 51.87500190734863
         },
         {
           "type": "element",
           "id": 9,
+          "typeString": "[vv,v](<=)",
           "x": 161.2750473022461,
           "y": 15.768756866455078,
-          "name": "binop",
-          "typeString": "[vv,v](<=)"
+          "name": "binop"
         },
         {
           "type": "element",
           "id": 10,
+          "typeString": "[,v(1)]",
           "x": 103.83127975463867,
           "y": 57.778133392333984,
-          "name": "literal",
-          "typeString": "[,v(1)]"
+          "name": "literal"
         },
         {
           "type": "instance",
           "id": 11,
+          "typeString": "[v(n)v(acc),v](facstep)",
           "x": 215.73133850097656,
           "y": 125.25624084472656,
           "instancer": 3
@@ -76,6 +79,7 @@
         {
           "type": "instance",
           "id": 12,
+          "typeString": "[v,v](-1)",
           "x": 170.0906639099121,
           "y": 96.31561660766602,
           "instancer": 13
@@ -164,6 +168,7 @@
     {
       "type": "functionchart",
       "id": 13,
+      "typeString": "[v,v](-1)",
       "x": 165.26562118530273,
       "y": 224.0156478881836,
       "width": 194.4375,
@@ -173,32 +178,32 @@
         {
           "type": "element",
           "id": 14,
+          "typeString": "[vv,v](-)",
           "x": 66.4375,
           "y": 8,
-          "name": "binop",
-          "typeString": "[vv,v](-)"
+          "name": "binop"
         },
         {
           "type": "output",
           "id": 15,
+          "typeString": "[v,]",
           "x": 130.4375,
-          "y": 22,
-          "typeString": "[v,]"
+          "y": 22
         },
         {
           "type": "element",
           "id": 16,
+          "typeString": "[,v(1)]",
           "x": 3.5187530517578125,
           "y": 47.75,
-          "name": "literal",
-          "typeString": "[,v(1)]"
+          "name": "literal"
         },
         {
           "type": "input",
           "id": 17,
+          "typeString": "[,v]",
           "x": 18.4375,
-          "y": 22,
-          "typeString": "[,v]"
+          "y": 22
         }
       ],
       "wires": [
@@ -228,6 +233,7 @@
     {
       "type": "functionchart",
       "id": 18,
+      "typeString": "[v,v](n!)",
       "x": 842.3125762939453,
       "y": 233.45936965942383,
       "width": 227.09063720703125,
@@ -237,6 +243,7 @@
         {
           "type": "instance",
           "id": 19,
+          "typeString": "[v(n)v(acc),v](facstep)",
           "x": 58.09063720703125,
           "y": 8,
           "instancer": 3
@@ -244,24 +251,24 @@
         {
           "type": "output",
           "id": 20,
+          "typeString": "[v,]",
           "x": 163.09063720703125,
-          "y": 8,
-          "typeString": "[v,]"
+          "y": 8
         },
         {
           "type": "element",
           "id": 21,
+          "typeString": "[,v(1)]",
           "x": 8,
           "y": 38.268768310546875,
-          "name": "literal",
-          "typeString": "[,v(1)]"
+          "name": "literal"
         },
         {
           "type": "input",
           "id": 22,
+          "typeString": "[,v]",
           "x": 10.09063720703125,
-          "y": 9,
-          "typeString": "[,v]"
+          "y": 9
         }
       ],
       "wires": [

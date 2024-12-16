@@ -85,6 +85,7 @@
         {
           "type": "instance",
           "id": 13,
+          "typeString": "[v(n)v(x)v(y),v]",
           "x": 198.11878648400307,
           "y": 149.04371786117554,
           "instancer": 3
@@ -92,6 +93,7 @@
         {
           "type": "instance",
           "id": 14,
+          "typeString": "[v(n)v(x)v(y),v]",
           "x": 241.46882310509682,
           "y": 238.1031355857849,
           "instancer": 3
@@ -107,6 +109,7 @@
         {
           "type": "instance",
           "id": 16,
+          "typeString": "[v,v](== 0)",
           "x": 142.31570878624916,
           "y": 21.043744564056396,
           "instancer": 23
@@ -114,6 +117,7 @@
         {
           "type": "instance",
           "id": 17,
+          "typeString": "[v(n),v(even)]",
           "x": 127.15308061242104,
           "y": 64.04688787460327,
           "instancer": 18

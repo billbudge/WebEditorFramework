@@ -276,6 +276,7 @@
         {
           "type": "instance",
           "id": 24,
+          "typeString": "[v,v](> 0)",
           "x": 100.06640625,
           "y": 68.2734375,
           "instancer": 8
@@ -283,6 +284,7 @@
         {
           "type": "instance",
           "id": 25,
+          "typeString": "[vvvvv,v](?)",
           "x": 227.37890625,
           "y": 38.53125,
           "instancer": 13
@@ -321,6 +323,7 @@
         {
           "type": "instance",
           "id": 30,
+          "typeString": "[v,v](< 0)",
           "x": 95.7398681640625,
           "y": 4.287506103515625,
           "instancer": 3

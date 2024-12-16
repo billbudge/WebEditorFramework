@@ -327,7 +327,7 @@ abstract class NodeTemplate {
   readonly properties: PropertyTypes[] = [];
 }
 
-export type ElementType = 'element' | 'instance' | 'exporter' | 'instancer';
+export type ElementType = 'element' | 'exporter' | 'instancer' | 'instance';
 
 class ElementTemplate extends NodeTemplate {
   readonly typeName: ElementType;
@@ -341,8 +341,8 @@ class ElementTemplate extends NodeTemplate {
 
 class InstancerTemplate extends ElementTemplate {
   readonly innerTypeString = innerTypeStringProp;
-  readonly properties: PropertyTypes[] =
-    [this.id, this.typeString, this.x, this.y, this.name, this.innerTypeString];
+  readonly properties: PropertyTypes[] = [this.id, this.typeString, this.x, this.y, this.name,
+                                          this.innerTypeString];
   constructor(typeName: ElementType) {
     super(typeName);
   }
@@ -351,11 +351,16 @@ class InstancerTemplate extends ElementTemplate {
 class ExporterTemplate extends ElementTemplate {
   readonly instancer = instancerProp;
   readonly innerTypeString = innerTypeStringProp;
-  readonly properties: PropertyTypes[] =
-    [this.id, this.typeString, this.x, this.y, this.name, this.instancer, this.innerTypeString];
+  readonly properties: PropertyTypes[] = [this.id, this.typeString, this.x, this.y, this.name,
+                                          this.instancer, this.innerTypeString];
   constructor(typeName: ElementType) {
     super(typeName);
   }
+}
+
+class FunctionInstanceTemplate extends ElementTemplate {
+  readonly instancer = instancerProp;
+  readonly properties = [this.id, this.typeString, this.x, this.y, this.instancer];  // no 'name' property
 }
 
 export type PseudoelementType = 'input' | 'output' | 'use';
@@ -393,11 +398,6 @@ class FunctionchartTemplate extends NodeTemplate {
       super();
       this.typeName = typeName;
   }
-}
-
-class FunctionInstanceTemplate extends ElementTemplate {
-  readonly instancer = instancerProp;
-  readonly properties = [this.id, this.typeString, this.x, this.y, this.instancer];  // no 'name' property
 }
 
 const elementTemplate = new ElementTemplate('element'),      // built-in elements
@@ -542,6 +542,35 @@ export class ExporterElement extends Element<ExporterTemplate> {
   }
 }
 
+export class FunctionInstance extends Element<FunctionInstanceTemplate>  {
+  get instancer() { return this.template.instancer.get(this) as InstancerTypes; }
+  set instancer(value: InstancerTypes) { this.template.instancer.set(this, value); }
+
+  // Derived Properties
+  get isAbstract()  { return this.instancer.isAbstract; }
+
+  get type() : Type {
+    let type = this._type;
+    if (!type) {
+      const instancer = this.instancer;
+      if (instancer) {
+        type = instancer.instanceType;
+      } else {
+        type = Type.emptyType;
+      }
+    }
+    super.type = type;
+    return type;
+  }
+  set type(value: Type) {
+    super.type = value;
+  }
+
+  constructor(context: FunctionchartContext, id: number) {
+    super(functionInstanceTemplate, context, id);
+  }
+}
+
 export class Pseudoelement extends NodeBase<PseudoelementTemplate> {
   // Derived properties.
   // index: number = -1;
@@ -654,35 +683,6 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> {
 
   constructor(context: FunctionchartContext, template: FunctionchartTemplate, id: number) {
     super(template, context, id);
-  }
-}
-
-export class FunctionInstance extends Element<FunctionInstanceTemplate>  {
-  get instancer() { return this.template.instancer.get(this) as InstancerTypes; }
-  set instancer(value: InstancerTypes) { this.template.instancer.set(this, value); }
-
-  // Derived Properties
-  get isAbstract()  { return this.instancer.isAbstract; }
-
-  get type() : Type {
-    let type = this._type;
-    if (!type) {
-      const instancer = this.instancer;
-      if (instancer) {
-        type = instancer.instanceType;
-      } else {
-        type = Type.emptyType;
-      }
-    }
-    super.type = type;
-    return type;
-  }
-  set type(value: Type) {
-    super.type = value;
-  }
-
-  constructor(context: FunctionchartContext, id: number) {
-    super(functionInstanceTemplate, context, id);
   }
 }
 
@@ -1438,9 +1438,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         const type = Type.fromString(typeString);
         item.type = type.toExporterType();
         item.instanceType = type;
-        // The instances have the internal type.
+        const instanceTypeString = type.toString();  // TODO clean up
+        // Update instances.
         item.instances.forEach((instance) => {
-          instance.type = type;
+          if (instance.typeString === Type.emptyTypeString)
+            instance.typeString = instanceTypeString;
         });
       }
     });
@@ -1868,7 +1870,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           // TODO
         }
       } else {  // instanceof ElementTypes
-        if (node instanceof Element && node.isAbstract) {
+        if (node instanceof Element && node.isAbstract && node.type !== Type.emptyType) {
           // abstract elements become inputs.
           const type = node.type.copyUnnamed();
           const name = node.type.name;
@@ -2024,11 +2026,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // DataContext interface implementation.
   valueChanged(owner: AllTypes, prop: ScalarPropertyTypes, oldValue: any) : void {
+    if (owner.context !== this)  // Object should be of this context.
+      return;
     if (owner instanceof Wire) {
-      if (this.wires.has(owner)) {
-        this.insertWire(owner, owner.parent!);
-      }
-    } else if (this.nodes.has(owner)) {
+      this.insertWire(owner, owner.parent!);
+    } else {
       if (owner instanceof InstancerElement && prop === innerTypeStringProp) {
         owner.instanceType = Type.fromString(owner.innerTypeString);
       } else if (prop === typeStringProp) {
