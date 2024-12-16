@@ -1273,7 +1273,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   connectInput(node: NodeTypes, pin: number) {
-    const parent = node.parent as Functionchart,
+    const parent = node.parent,
           p = this.layoutEngine.inputPinToPoint(node, pin),
           wire = this.newWire(undefined, 0, node, pin);
     p.x -= 32;
@@ -1296,8 +1296,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   newInstancerForWire(wire: Wire, p: Point) {
-    const parent = wire.parent as Functionchart,
-          type = wire.src!.type.outputs[wire.srcPin].type,
+    const src = wire.src!,
+          parent = src.parent,
+          type = src.type.outputs[wire.srcPin].type,
           element = this.newElement('instancer') as InstancerElement,
           newType = type.toInstancerType();
     element.typeString = newType.toString();
@@ -1312,7 +1313,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   connectOutput(node: NodeTypes, pin: number) {
-    const parent = node.parent as Functionchart,
+    const parent = node.parent,
           p = this.layoutEngine.outputPinToPoint(node, pin),
           wire = this.newWire(node, pin, undefined, 0);
     p.x += 32;

@@ -1031,7 +1031,7 @@ export class FunctionchartContext extends EventBase {
         return output;
     }
     newInstancerForWire(wire, p) {
-        const parent = wire.parent, type = wire.src.type.outputs[wire.srcPin].type, element = this.newElement('instancer'), newType = type.toInstancerType();
+        const src = wire.src, parent = src.parent, type = src.type.outputs[wire.srcPin].type, element = this.newElement('instancer'), newType = type.toInstancerType();
         element.typeString = newType.toString();
         element.innerTypeString = type.toString();
         const offset = this.layoutEngine.inputPinToPoint(element, 0);
@@ -1577,12 +1577,6 @@ export class FunctionchartContext extends EventBase {
         inputs.forEach((input, i) => { input.fcIndex = i; });
         outputs.sort(compareYs);
         outputs.forEach((output, i) => { output.fcIndex = i; });
-        function getPinName(type, pin) {
-            let typeString = type.toString();
-            if (pin.name && !typeString.endsWith(')')) // TODO we shouldn't need this check.
-                typeString += '(' + pin.name + ')';
-            return typeString;
-        }
         const inputPins = inputs.map(pinInfo => {
             return new Pin(pinInfo.type, pinInfo.name);
         });
