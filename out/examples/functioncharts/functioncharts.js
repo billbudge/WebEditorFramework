@@ -29,7 +29,7 @@ export class Pin {
         return result;
     }
     toString() {
-        let s = this.type.toString();
+        let s = this.type.typeString;
         if (this.name)
             s += '(' + escapeName(this.name) + ')';
         if (this.varArgs)
@@ -38,6 +38,13 @@ export class Pin {
     }
 }
 export class Type {
+    get typeString() {
+        return this._typeString;
+    }
+    initializeBaseType(value) {
+        this._typeString = value;
+        return this;
+    }
     get flatType() {
         if (!this._flatType)
             this._flatType = this.toFlatType();
@@ -58,6 +65,15 @@ export class Type {
         }
         return result;
     }
+    copyUnnamed() {
+        return Type.fromInfo(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()));
+    }
+    toInstancerType() {
+        return Type.fromInfo([new Pin(this)], [], this.name);
+    }
+    toExporterType() {
+        return Type.fromInfo([], [new Pin(this, this.name)]);
+    }
     constructor(inputs, outputs, name) {
         this.width = 0;
         this.height = 0;
@@ -65,9 +81,6 @@ export class Type {
         this.outputs = outputs;
         this.name = name;
         this.varArgs = inputs.some(input => (input.varArgs > 0));
-    }
-    copyUnnamed() {
-        return Type.fromInfo(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()));
     }
     toString() {
         if (this === Type.valueType)
@@ -97,17 +110,12 @@ export class Type {
         const inputs = this.inputs.map(pin => new Pin(Type.valueType, pin.name)), outputs = this.outputs.map(pin => new Pin(Type.valueType, pin.name));
         return Type.fromInfo(inputs, outputs, this.name);
     }
-    toInstancerType() {
-        return Type.fromInfo([new Pin(this)], [], this.name);
-    }
-    toExporterType() {
-        return Type.fromInfo([], [new Pin(this, this.name)]);
-    }
     atomized() {
         let s = this.toString();
         let atomizedType = Type.atomizedTypes.get(s);
         if (!atomizedType) {
             atomizedType = this;
+            this._typeString = s;
             Type.atomizedTypes.set(s, atomizedType);
         }
         return atomizedType;
@@ -144,9 +152,9 @@ Type.emptyExporterTypeString = '[,' + _a.emptyTypeString + ']'; // export the em
 Type.emptyExporterType = new Type(Type.emptyPins, [new Pin(Type.emptyType)]);
 // Manually atomize the base types.
 Type.atomizedTypes = new Map([
-    [Type.valueTypeString, Type.valueType],
-    [Type.emptyTypeString, Type.emptyType],
-    [Type.emptyExporterTypeString, Type.emptyExporterType],
+    [Type.valueTypeString, Type.valueType.initializeBaseType(Type.valueTypeString)],
+    [Type.emptyTypeString, Type.emptyType.initializeBaseType(Type.emptyTypeString)],
+    [Type.emptyExporterTypeString, Type.emptyExporterType.initializeBaseType(Type.emptyExporterTypeString)],
 ]);
 // export type TypeVisitor = (type: Type, parent: Type | undefined) => void;
 // export function forEachType(type: Type, callback: TypeVisitor) {
@@ -1034,8 +1042,8 @@ export class FunctionchartContext extends EventBase {
     }
     newInstancerForWire(wire, parent, p) {
         const src = wire.src, type = src.type.outputs[wire.srcPin].type, element = this.newElement('instancer'), newType = type.toInstancerType();
-        element.typeString = newType.toString();
-        element.innerTypeString = type.toString();
+        element.typeString = newType.typeString;
+        element.innerTypeString = type.typeString;
         const offset = this.layoutEngine.inputPinToPoint(element, 0);
         element.x = p.x - offset.x;
         element.y = p.y - offset.y;
@@ -1156,7 +1164,7 @@ export class FunctionchartContext extends EventBase {
                 const type = Type.fromString(typeString);
                 item.type = type.toExporterType();
                 item.instanceType = type;
-                const instanceTypeString = type.toString(); // TODO clean up
+                const instanceTypeString = type.typeString; // TODO clean up
                 // Update instances.
                 item.instances.forEach((instance) => {
                     if (instance.typeString === Type.emptyTypeString)
@@ -1331,7 +1339,7 @@ export class FunctionchartContext extends EventBase {
                         inputs[i].varArgs = i + 1;
                     }
                     const newType = Type.fromInfo(inputs, [new Pin(Type.valueType)]);
-                    node.typeString = newType.toString();
+                    node.typeString = newType.typeString;
                 }
             }
         });
@@ -1418,20 +1426,20 @@ export class FunctionchartContext extends EventBase {
         const result = this.newElement('exporter'), exporterType = element.type.toExporterType();
         result.x = element.x;
         result.y = element.y;
-        result.typeString = exporterType.toString();
+        result.typeString = exporterType.typeString;
         if (element instanceof FunctionInstance) {
             result.instancer = element.instancer;
         }
         else if (element instanceof Element) {
             result.name = element.name;
         }
-        result.innerTypeString = element.type.toString();
+        result.innerTypeString = element.type.typeString;
         return result;
     }
     importElement(element) {
         const result = this.newElement('instancer'), instancerType = element.type.toInstancerType();
-        result.typeString = instancerType.toString();
-        result.innerTypeString = element.type.toString();
+        result.typeString = instancerType.typeString;
+        result.innerTypeString = element.type.typeString;
         return result;
     }
     exportElements(elements) {
@@ -1594,7 +1602,7 @@ export class FunctionchartContext extends EventBase {
         const outputPins = outputs.map(pinInfo => {
             return new Pin(pinInfo.type, pinInfo.name);
         });
-        const type = Type.fromInfo(inputPins, outputPins, name), typeString = type.toString();
+        const type = Type.fromInfo(inputPins, outputPins, name), typeString = type.typeString;
         return { typeString, closed, abstract, inputs, outputs };
     }
     updateGlobalPosition(item) {
@@ -2503,7 +2511,7 @@ export class FunctionchartEditor {
                 }
             }
             if (newType) {
-                const newValue = newType.toString();
+                const newValue = newType.typeString;
                 setter(info, item, newValue);
             }
         }
@@ -3039,7 +3047,7 @@ export class FunctionchartEditor {
             else if (drag.kind === 'instantiateFunctionchart') {
                 const instancer = drag.items[0], newInstance = context.newElement('instance'), instancerRect = this.renderer.instancerBounds(instancer);
                 newInstance.instancer = instancer;
-                newInstance.typeString = instancer.instanceType.toString(); // TODO fixme
+                newInstance.typeString = instancer.instanceType.typeString; // TODO fixme
                 newInstance.x = instancerRect.x;
                 newInstance.y = instancerRect.y;
                 drag.items = [newInstance];

@@ -119,15 +119,15 @@ describe('Type' , () => {
 
     const named = FC.Type.fromInfo(type1.inputs, type1.outputs, 'type1');
     expect(named).not.toBe(type1);
-    expect(type1.toString()).toBe('[v,v]');
-    expect(named.toString()).toBe('[v,v](type1)');
-    expect(named.toString()).toBe('[v,v](type1)');
+    expect(type1.typeString).toBe('[v,v]');
+    expect(named.typeString).toBe('[v,v](type1)');
+    expect(named.typeString).toBe('[v,v](type1)');
 
     const labeled = FC.Type.fromString('[v(1)v(2),v(3)](foo)'),
           copyUnnamed = labeled.copyUnnamed();
     expect(copyUnnamed).not.toBe(labeled);
     expect(copyUnnamed.name).toBeUndefined();
-    expect(copyUnnamed.toString()).toBe('[v(1)v(2),v(3)]');
+    expect(copyUnnamed.typeString).toBe('[v(1)v(2),v(3)]');
   });
   test('base Types', () => {
     const valueType = FC.Type.fromString('v'),
@@ -191,7 +191,7 @@ describe('parseTypeString', () => {
       '[[v,vv(q)](a)v(b),v(c)](foo)',
       '[v(p(0))),](p(0))=1)',  // labels with ')' in them (escaped).
     ];
-    typeStrings.forEach(typeString => expect(FC.Type.fromString(typeString).toString()).toBe(typeString));
+    typeStrings.forEach(typeString => expect(FC.Type.fromString(typeString).typeString).toBe(typeString));
     typeStrings.forEach(typeString => expect(FC.Type.atomizedTypes.has(typeString)).toBe(true));
     expect(FC.Type.fromString('[v,v]').name).toBeUndefined();
     expect(FC.Type.fromString('[vv,v](+)').name).toBe('+');

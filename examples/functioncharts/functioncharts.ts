@@ -59,7 +59,7 @@ export class Pin {
   }
 
   toString() : string {
-    let s = this.type.toString();
+    let s = this.type.typeString;
     if (this.name)
       s += '(' + escapeName(this.name) + ')';
     if (this.varArgs)
@@ -79,9 +79,9 @@ export class Type {
 
   // Manually atomize the base types.
   static readonly atomizedTypes = new Map<string, Type>([
-    [Type.valueTypeString, Type.valueType],
-    [Type.emptyTypeString, Type.emptyType],
-    [Type.emptyExporterTypeString, Type.emptyExporterType],
+    [Type.valueTypeString, Type.valueType.initializeBaseType(Type.valueTypeString)],
+    [Type.emptyTypeString, Type.emptyType.initializeBaseType(Type.emptyTypeString)],
+    [Type.emptyExporterTypeString, Type.emptyExporterType.initializeBaseType(Type.emptyExporterTypeString)],
   ]);
 
   readonly inputs: Pin[];
@@ -90,6 +90,15 @@ export class Type {
   readonly varArgs: boolean;
   width = 0;
   height = 0;
+
+  private _typeString: string;
+  get typeString() : string {
+    return this._typeString;
+  }
+  private initializeBaseType(value: string) : Type {
+    this._typeString = value;
+    return this;
+  }
 
   // Flat type has the same number of pins as type, but all pins are value type.
   // The flat type is more compact, and is only used for rendering.
@@ -117,6 +126,17 @@ export class Type {
     return result;
   }
 
+  copyUnnamed() : Type {
+    return Type.fromInfo(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()));
+  }
+
+  toInstancerType() : Type {
+    return Type.fromInfo([new Pin(this)], [], this.name);
+  }
+  toExporterType() : Type {
+    return Type.fromInfo([], [new Pin(this, this.name)]);
+  }
+
   private constructor(inputs: Pin[], outputs: Pin[], name?: string) {
     this.inputs = inputs;
     this.outputs = outputs;
@@ -124,10 +144,7 @@ export class Type {
     this.varArgs = inputs.some(input => (input.varArgs > 0));
   }
 
-  copyUnnamed() : Type {
-    return Type.fromInfo(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()));
-  }
-  toString() : string {  // TODO consider caching type string on type.
+  private toString() : string {
     if (this === Type.valueType)
       return Type.valueTypeString;
     let s = '[';
@@ -155,17 +172,12 @@ export class Type {
           outputs = this.outputs.map(pin => new Pin(Type.valueType, pin.name));
     return Type.fromInfo(inputs, outputs, this.name);
   }
-  toInstancerType() : Type {
-    return Type.fromInfo([new Pin(this)], [], this.name);
-  }
-  toExporterType() : Type {
-    return Type.fromInfo([], [new Pin(this, this.name)]);
-  }
   private atomized() : Type {
     let s = this.toString();
     let atomizedType = Type.atomizedTypes.get(s);
     if (!atomizedType) {
       atomizedType = this;
+      this._typeString = s;
       Type.atomizedTypes.set(s, atomizedType);
     }
     return atomizedType;
@@ -1298,8 +1310,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           type = src.type.outputs[wire.srcPin].type,
           element = this.newElement('instancer') as InstancerElement,
           newType = type.toInstancerType();
-    element.typeString = newType.toString();
-    element.innerTypeString = type.toString();
+    element.typeString = newType.typeString;
+    element.innerTypeString = type.typeString;
     const offset = this.layoutEngine.inputPinToPoint(element, 0);
     element.x = p.x - offset.x;
     element.y = p.y - offset.y;
@@ -1438,7 +1450,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         const type = Type.fromString(typeString);
         item.type = type.toExporterType();
         item.instanceType = type;
-        const instanceTypeString = type.toString();  // TODO clean up
+        const instanceTypeString = type.typeString;  // TODO clean up
         // Update instances.
         item.instances.forEach((instance) => {
           if (instance.typeString === Type.emptyTypeString)
@@ -1633,7 +1645,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
             inputs[i].varArgs = i + 1;
           }
           const newType = Type.fromInfo(inputs, [new Pin(Type.valueType)]);
-          node.typeString = newType.toString();
+          node.typeString = newType.typeString;
         }
       }
     });
@@ -1728,21 +1740,21 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           exporterType = element.type.toExporterType();
     result.x = element.x;
     result.y = element.y;
-    result.typeString = exporterType.toString();
+    result.typeString = exporterType.typeString;
     if (element instanceof FunctionInstance) {
       result.instancer = element.instancer;
     } else if (element instanceof Element) {
       result.name = element.name;
     }
-    result.innerTypeString = element.type.toString();
+    result.innerTypeString = element.type.typeString;
     return result;
   }
 
   importElement(element: Element) : Element {
     const result = this.newElement('instancer') as InstancerElement,
           instancerType = element.type.toInstancerType();
-    result.typeString = instancerType.toString();
-    result.innerTypeString = element.type.toString();
+    result.typeString = instancerType.typeString;
+    result.innerTypeString = element.type.typeString;
     return result;
   }
 
@@ -1933,7 +1945,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       return new Pin(pinInfo.type, pinInfo.name);
     });
     const type = Type.fromInfo(inputPins, outputPins, name),
-          typeString = type.toString();
+          typeString = type.typeString;
 
     return { typeString, closed, abstract, inputs, outputs };
   }
@@ -3041,7 +3053,7 @@ export class FunctionchartEditor implements CanvasLayer {
         }
       }
       if (newType) {
-        const newValue = newType.toString();
+        const newValue = newType.typeString;
         setter(info, item, newValue);
       }
     }
@@ -3623,7 +3635,7 @@ export class FunctionchartEditor implements CanvasLayer {
               newInstance = context.newElement('instance') as FunctionInstance,
               instancerRect = this.renderer.instancerBounds(instancer);
         newInstance.instancer = instancer;
-        newInstance.typeString = instancer.instanceType.toString();  // TODO fixme
+        newInstance.typeString = instancer.instanceType.typeString;  // TODO fixme
         newInstance.x = instancerRect.x;
         newInstance.y = instancerRect.y;
         drag.items = [newInstance];
