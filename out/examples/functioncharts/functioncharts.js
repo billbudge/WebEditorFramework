@@ -1863,7 +1863,7 @@ class Renderer {
     }
     instancerBounds(instancer) {
         const spacing = this.theme.spacing, rect = this.getBounds(instancer), right = rect.x + rect.width, bottom = rect.y + rect.height, type = instancer.instanceType.flatType, width = type.width, height = type.height;
-        return { x: right - width - spacing, y: bottom - height - spacing, width, height };
+        return { x: right - width - 2 * spacing, y: bottom - height - spacing, width, height };
     }
     sumBounds(items) {
         let xMin = Number.POSITIVE_INFINITY, yMin = Number.POSITIVE_INFINITY, xMax = -Number.POSITIVE_INFINITY, yMax = -Number.POSITIVE_INFINITY;

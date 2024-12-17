@@ -2260,7 +2260,7 @@ class Renderer implements ILayoutEngine {
           type = instancer.instanceType.flatType,
           width = type.width,
           height = type.height;
-    return { x: right - width - spacing, y: bottom - height - spacing, width, height };
+    return { x: right - width - 2 * spacing, y: bottom - height - spacing, width, height };
 }
 
   sumBounds(items: AllTypes[]) : Rect {
