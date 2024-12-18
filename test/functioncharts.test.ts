@@ -608,19 +608,19 @@ describe('FunctionchartContext', () => {
           elem2 = addElement(functionchart1, '[vv,v]'),
           elem3 = addElement(functionchart, '[vv,v]');
     context.reduceSelection();
-    expect(context.selectedTrueElements().length).toBe(0);
+    expect(context.selectedElements().length).toBe(0);
     expect(context.selectedNodes().length).toBe(0);
     expect(context.selectedNodes().length).toBe(0);
     context.selection.add(elem1);
     context.reduceSelection();
-    expect(context.selectedTrueElements().length).toBe(1);
+    expect(context.selectedElements().length).toBe(1);
     expect(context.selectedNodes().length).toBe(1);
     expect(context.selectedNodes().length).toBe(1);
     context.selection.add(functionchart1);
-    expect(context.selectedTrueElements().length).toBe(1);
+    expect(context.selectedElements().length).toBe(1);
     expect(context.selectedNodes().length).toBe(2);
     context.reduceSelection();
-    expect(context.selectedTrueElements().length).toBe(0);
+    expect(context.selectedElements().length).toBe(0);
     expect(context.selectedNodes().length).toBe(1);
     expect(context.selectedNodes()[0]).toBe(functionchart1);
   });

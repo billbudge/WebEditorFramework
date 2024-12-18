@@ -1085,7 +1085,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.selection.contents();
   }
 
-  selectedTrueElements() : Element[] {
+  selectedElements() : Element[] {
     const result = new Array<Element>();
     this.selection.forEach(item => {
       if (item instanceof Element)
@@ -1762,8 +1762,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const self = this,
           selection = this.selection;
 
-    // Convert each TrueElement to an ExporterElement.
     elements.forEach(element => {
+      if (element instanceof InstancerElement || element instanceof ExporterElement) return;
+      if (element instanceof FunctionInstance && element.isAbstract) return;
       selection.delete(element);
       const newElement = self.exportElement(element);
       self.replaceElement(element, newElement);
@@ -1777,6 +1778,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
     // Open each non-input/output element.
     elements.forEach(element => {
+      if (element instanceof InstancerElement || element instanceof ExporterElement) return;
+      if (element instanceof FunctionInstance && element.isAbstract) return;
       selection.delete(element);
       const newElement = self.importElement(element);
       self.replaceElement(element, newElement);
@@ -3227,14 +3230,8 @@ export class FunctionchartEditor implements CanvasLayer {
 
     switch (change.type) {
       case 'valueChanged': {
-        // For changes to x, y, width, height, or type strings, layout affected elements and wires.
-        if (prop === xProp || prop === yProp || prop === widthProp || prop === heightProp ||
-            prop === typeStringProp || prop === innerTypeStringProp) {
-          // Visit item and sub-items to layout all affected wires.
-          context.visitAll(item, addItems);
-        } else if (item instanceof Wire) {
-          addItems(item);
-        }
+        // Visit item and sub-items to layout all affected wires.
+        context.visitAll(item, addItems);
         break;
       }
       case 'elementInserted': {
@@ -3915,13 +3912,13 @@ export class FunctionchartEditor implements CanvasLayer {
         }
         case 75: { // 'k'
           context.beginTransaction('export elements');
-          context.exportElements(context.selectedTrueElements());
+          context.exportElements(context.selectedElements());
           context.endTransaction();
           return true;
         }
         case 76: // 'l'
           context.beginTransaction('open elements');
-          context.importElements(context.selectedTrueElements());
+          context.importElements(context.selectedElements());
           context.endTransaction();
           return true;
         case 78: { // ctrl 'n'   // Can't intercept cmd n.
