@@ -437,23 +437,6 @@ export class FunctionInstance extends Element {
     set instancer(value) { this.template.instancer.set(this, value); }
     // Derived Properties
     get isAbstract() { return this.instancer.isAbstract; }
-    get type() {
-        let type = this._type;
-        if (!type) {
-            const instancer = this.instancer;
-            if (instancer) {
-                type = instancer.instanceType;
-            }
-            else {
-                type = Type.emptyType;
-            }
-        }
-        super.type = type;
-        return type;
-    }
-    set type(value) {
-        super.type = value;
-    }
     constructor(context, id) {
         super(functionInstanceTemplate, context, id);
     }
@@ -506,7 +489,7 @@ export class Wire {
 const emptyTypeInfo = {
     typeString: Type.emptyExporterTypeString,
     closed: true,
-    abstract: true,
+    abstract: false,
     inputs: [],
     outputs: [],
 };
@@ -583,7 +566,7 @@ export class FunctionchartContext extends EventBase {
         this.functionchart = root;
         this.insertFunctionchart(root, undefined);
         this.derivedInfoNeedsUpdate = true;
-        this.updateWireLists();
+        this.updateWireLists(); // TODO needed?
         this.updateDerivedInfo();
     }
     newElement(typeName) {
@@ -1690,12 +1673,8 @@ export class FunctionchartContext extends EventBase {
     }
     // DataContext interface implementation.
     valueChanged(owner, prop, oldValue) {
-        if (owner.context !== this) // Object should be of this context.
-            return;
-        if (owner instanceof Wire) {
-            this.insertWire(owner, owner.parent);
-        }
-        else {
+        if (owner instanceof NodeBase && this.nodes.has(owner)) {
+            // TODO move this into the Node classes, with an onValueChanged method on DataContextObject.
             if (owner instanceof InstancerElement && prop === innerTypeStringProp) {
                 owner.instanceType = Type.fromString(owner.innerTypeString);
             }
@@ -1707,13 +1686,17 @@ export class FunctionchartContext extends EventBase {
         this.updateGlobalPosition(owner); // Update any derived properties.
     }
     elementInserted(owner, prop, index) {
-        const value = prop.get(owner).at(index);
-        this.insertItem(value, owner);
-        this.onElementInserted(owner, prop, index);
+        if (this.nodes.has(owner)) {
+            const value = prop.get(owner).at(index);
+            this.insertItem(value, owner);
+            this.onElementInserted(owner, prop, index);
+        }
     }
     elementRemoved(owner, prop, index, oldValue) {
-        this.removeItem(oldValue);
-        this.onElementRemoved(owner, prop, index, oldValue);
+        if (this.nodes.has(owner)) {
+            this.removeItem(oldValue);
+            this.onElementRemoved(owner, prop, index, oldValue);
+        }
     }
     resolveReference(owner, prop) {
         // Look up element id.

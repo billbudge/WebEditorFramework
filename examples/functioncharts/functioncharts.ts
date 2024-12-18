@@ -561,23 +561,6 @@ export class FunctionInstance extends Element<FunctionInstanceTemplate>  {
   // Derived Properties
   get isAbstract()  { return this.instancer.isAbstract; }
 
-  get type() : Type {
-    let type = this._type;
-    if (!type) {
-      const instancer = this.instancer;
-      if (instancer) {
-        type = instancer.instanceType;
-      } else {
-        type = Type.emptyType;
-      }
-    }
-    super.type = type;
-    return type;
-  }
-  set type(value: Type) {
-    super.type = value;
-  }
-
   constructor(context: FunctionchartContext, id: number) {
     super(functionInstanceTemplate, context, id);
   }
@@ -660,7 +643,7 @@ export type TypeInfo = {
 const emptyTypeInfo : TypeInfo = {
   typeString: Type.emptyExporterTypeString,
   closed: true,
-  abstract: true,
+  abstract: false,
   inputs: [],
   outputs: [],
 }
@@ -795,7 +778,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.functionchart = root;
     this.insertFunctionchart(root, undefined);
     this.derivedInfoNeedsUpdate = true;
-    this.updateWireLists();
+    this.updateWireLists();  // TODO needed?
     this.updateDerivedInfo();
   }
 
@@ -2041,11 +2024,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // DataContext interface implementation.
   valueChanged(owner: AllTypes, prop: ScalarPropertyTypes, oldValue: any) : void {
-    if (owner.context !== this)  // Object should be of this context.
-      return;
-    if (owner instanceof Wire) {
-      this.insertWire(owner, owner.parent!);
-    } else {
+    if (owner instanceof NodeBase && this.nodes.has(owner)) {
+      // TODO move this into the Node classes, with an onValueChanged method on DataContextObject.
       if (owner instanceof InstancerElement && prop === innerTypeStringProp) {
         owner.instanceType = Type.fromString(owner.innerTypeString);
       } else if (prop === typeStringProp) {
@@ -2056,13 +2036,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.updateGlobalPosition(owner);  // Update any derived properties.
   }
   elementInserted(owner: Functionchart, prop: ArrayPropertyTypes, index: number) : void {
-    const value: AllTypes = prop.get(owner).at(index) as AllTypes;
-    this.insertItem(value, owner);
-    this.onElementInserted(owner, prop, index);
+    if (this.nodes.has(owner)) {
+      const value: AllTypes = prop.get(owner).at(index) as AllTypes;
+      this.insertItem(value, owner);
+      this.onElementInserted(owner, prop, index);
+    }
   }
   elementRemoved(owner: Functionchart, prop: ArrayPropertyTypes, index: number, oldValue: AllTypes) : void {
-    this.removeItem(oldValue);
-    this.onElementRemoved(owner, prop, index, oldValue);
+    if (this.nodes.has(owner)) {
+      this.removeItem(oldValue);
+      this.onElementRemoved(owner, prop, index, oldValue);
+      }
   }
   resolveReference(owner: AllTypes, prop: ReferenceProp) : ReferencedObject | undefined {
     // Look up element id.
