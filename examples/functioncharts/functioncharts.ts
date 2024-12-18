@@ -2945,6 +2945,7 @@ export class FunctionchartEditor implements CanvasLayer {
           unop = context.newElement('element'),
           cond = context.newElement('element'),
           varBinding = context.newElement('element'),
+          external = context.newElement('element'),
           newFunctionchart = context.newFunctionchart('functionchart');
 
     context.root = functionchart;
@@ -2967,6 +2968,9 @@ export class FunctionchartEditor implements CanvasLayer {
     varBinding.x = 172; varBinding.y = 32;
     varBinding.name = 'var';
     varBinding.typeString = '[,v[v,v]](var)';
+    external.x = 214; external.y = 32;
+    external.name = 'external';
+    external.typeString = '[,](lib)'
 
     newFunctionchart.x = 8; newFunctionchart.y = 90;
     newFunctionchart.width = this.theme.minFunctionchartWidth;
@@ -2975,11 +2979,12 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nodes.append(input);
     functionchart.nodes.append(output);
     functionchart.nodes.append(use);
-    functionchart.nodes.append(varBinding);
     functionchart.nodes.append(literal);
     functionchart.nodes.append(binop);
     functionchart.nodes.append(unop);
     functionchart.nodes.append(cond);
+    functionchart.nodes.append(varBinding);
+    functionchart.nodes.append(external);
     functionchart.nodes.append(newFunctionchart);
     context.root = functionchart;
     this.palette = functionchart;
@@ -3117,6 +3122,15 @@ export class FunctionchartEditor implements CanvasLayer {
         values: unaryOps.join(','),
         getter: nodeLabelGetter,
         setter: nodeLabelSetter,
+        prop: typeStringProp,
+      },
+    ]);
+    this.propertyInfo.set('external', [
+      {
+        label: 'typeString',
+        type: 'text',
+        getter: getter,
+        setter: setter,
         prop: typeStringProp,
       },
     ]);
