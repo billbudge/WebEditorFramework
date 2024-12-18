@@ -1017,7 +1017,6 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
           if (oldDst)
             StatechartContext.removeTransitionHelper(oldDst.inTransitions, owner);
         }
-        this.insertTransition(owner, owner.parent!);
       }
     }
     this.onValueChanged(owner, prop, oldValue);
