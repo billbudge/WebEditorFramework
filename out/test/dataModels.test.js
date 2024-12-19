@@ -17,7 +17,7 @@ class TestDataContext extends Data.EventBase {
         this.onValueChanged(owner, prop, oldValue);
     }
     elementInserted(owner, prop, index) {
-        const value = prop.get(owner).at(index);
+        const value = prop.get(owner).get(index);
         this.elementInsert = { owner, prop, index, value };
         this.onElementInserted(owner, prop, index);
     }
@@ -42,7 +42,8 @@ class TestDataContext extends Data.EventBase {
     }
     onElementInserted(item, prop, index) {
         const change = { type: 'elementInserted', item: item, prop: prop, index: index, oldValue: undefined };
-        item.array.at(index).parent = item;
+        const value = prop.get(item).get(index);
+        value.parent = item;
         super.onEvent('elementInserted', change);
         return this.onChanged(change);
     }
@@ -64,9 +65,10 @@ class TestDataObjectTemplate {
         this.typeName = 'TestDataObjectTemplate';
         this.id = new Data.IdProp('id');
         this.x = new Data.ScalarProp('x');
-        this.array = new Data.ChildArrayProp('array');
+        this.array = new Data.ChildListProp('array');
+        this.child = new Data.ChildSlotProp('child');
         this.reference = new Data.ReferenceProp('reference');
-        this.properties = [this.id, this.x, this.array, this.reference];
+        this.properties = [this.id, this.x, this.array, this.child, this.reference];
     }
 }
 const testDataObjectTemplate = new TestDataObjectTemplate(), testDataObjectTemplate2 = new TestDataObjectTemplate();
@@ -80,6 +82,7 @@ class TestDataContextObject {
     get x() { return this.template.x.get(this); }
     set x(value) { this.template.x.set(this, value); }
     get array() { return this.template.array.get(this); }
+    get child() { return this.template.child.get(this); }
     get reference() { return this.template.reference.get(this); }
     set reference(value) { this.template.reference.set(this, value); }
 }
@@ -101,8 +104,8 @@ describe('DataContext', () => {
         const child1 = new TestDataContextObject(context);
         item.array.append(child1);
         expect(item.array.length).toBe(1);
-        expect(item.array.at(0)).toBe(child1);
-        expect(() => item.array.at(1)).toThrow(RangeError);
+        expect(item.array.get(0)).toBe(child1);
+        expect(() => item.array.get(1)).toThrow(RangeError);
         expect(context.elementInsert.owner).toBe(item);
         expect(context.elementInsert.prop).toBe(item.template.array);
         expect(context.elementInsert.index).toBe(0);
@@ -110,8 +113,8 @@ describe('DataContext', () => {
         const child2 = new TestDataContextObject(context);
         item.array.insert(child2, 0);
         expect(item.array.length).toBe(2);
-        expect(item.array.at(0)).toBe(child2);
-        expect(item.array.at(1)).toBe(child1);
+        expect(item.array.get(0)).toBe(child2);
+        expect(item.array.get(1)).toBe(child1);
         expect(item.array.indexOf(child1)).toBe(1);
         expect(item.array.indexOf(child2)).toBe(0);
         const forward = new Array();
@@ -126,6 +129,34 @@ describe('DataContext', () => {
         expect(context.elementRemove.index).toBe(0);
         expect(context.elementRemove.oldValue).toBe(child2);
         expect(() => item.array.removeAt(1)).toThrow(RangeError);
+    });
+    test('ChildProp', () => {
+        const context = new TestDataContext(), item = new TestDataContextObject(context);
+        expect(() => item.child.get(1)).toThrow(RangeError);
+        expect(item.child.get(0)).toBeUndefined();
+        const child1 = new TestDataContextObject(context);
+        item.child.set(0, child1);
+        expect(item.child.get(0)).toBe(child1);
+        expect(context.elementInsert.owner).toBe(item);
+        expect(context.elementInsert.prop).toBe(item.template.child);
+        expect(context.elementInsert.index).toBe(0);
+        expect(context.elementInsert.value).toBe(child1);
+        const child2 = new TestDataContextObject(context);
+        item.child.set(0, child2);
+        expect(context.elementRemove.owner).toBe(item);
+        expect(context.elementRemove.prop).toBe(item.template.child);
+        expect(context.elementRemove.index).toBe(0);
+        expect(context.elementRemove.oldValue).toBe(child1);
+        expect(item.child.get(0)).toBe(child2);
+        expect(context.elementInsert.owner).toBe(item);
+        expect(context.elementInsert.prop).toBe(item.template.child);
+        expect(context.elementInsert.index).toBe(0);
+        expect(context.elementInsert.value).toBe(child2);
+        item.child.set(0, undefined);
+        expect(context.elementRemove.owner).toBe(item);
+        expect(context.elementRemove.prop).toBe(item.template.child);
+        expect(context.elementRemove.index).toBe(0);
+        expect(context.elementRemove.oldValue).toBe(child2);
     });
     test('ReferenceProp', () => {
         const context = new TestDataContext(), item = new TestDataContextObject(context), child1 = new TestDataContextObject(context);
@@ -179,9 +210,9 @@ describe('Cloning', () => {
         expect(copies[0] instanceof TestDataContextObject).toBe(true);
         const itemCopy = copies[0];
         expect(itemCopy.array.length).toBe(2);
-        expect(itemCopy.array.at(0) instanceof TestDataContextObject).toBe(true);
-        expect(itemCopy.array.at(1) instanceof TestDataContextObject).toBe(true);
-        const child1Copy = itemCopy.array.at(0), child2Copy = itemCopy.array.at(1);
+        expect(itemCopy.array.get(0) instanceof TestDataContextObject).toBe(true);
+        expect(itemCopy.array.get(1) instanceof TestDataContextObject).toBe(true);
+        const child1Copy = itemCopy.array.get(0), child2Copy = itemCopy.array.get(1);
         expect(child1Copy).not.toBe(child1);
         expect(child2Copy).not.toBe(child2);
         expect(child1Copy.reference).toBe(item); // not itemCopy, since item is outside the cloned graph.
@@ -205,11 +236,11 @@ describe('Serialization, deserialization', () => {
         expect(copy instanceof TestDataContextObject).toBe(true);
         const itemCopy = copy;
         expect(itemCopy.array.length).toBe(1);
-        expect(itemCopy.array.at(0) instanceof TestDataContextObject).toBe(true);
-        const child3Copy = itemCopy.array.at(0);
+        expect(itemCopy.array.get(0) instanceof TestDataContextObject).toBe(true);
+        const child3Copy = itemCopy.array.get(0);
         expect(child3Copy.array.length).toBe(2);
         expect(child3Copy.x).toBe(3);
-        const child1Copy = child3Copy.array.at(0), child2Copy = child3Copy.array.at(1);
+        const child1Copy = child3Copy.array.get(0), child2Copy = child3Copy.array.get(1);
         expect(child1Copy.reference).toBe(itemCopy);
         expect(child1Copy.x).toBe(1);
         expect(child2Copy.x).toBe(2);
@@ -308,17 +339,17 @@ describe('TransactionManager', () => {
         transactionManager.endTransaction();
         expect(item.array.length).toBe(0);
         transaction1.undo();
-        expect(item.array.at(0)).toBe(child);
+        expect(item.array.get(0)).toBe(child);
         transaction1.redo();
         expect(item.array.length).toBe(0);
         const transaction2 = transactionManager.beginTransaction('test');
         item.array.append(child); // inside transaction.
         transactionManager.endTransaction();
-        expect(item.array.at(0)).toBe(child);
+        expect(item.array.get(0)).toBe(child);
         transaction2.undo();
         expect(item.array.length).toBe(0);
         transaction2.redo();
-        expect(item.array.at(0)).toBe(child);
+        expect(item.array.get(0)).toBe(child);
     });
     test('value change coalescing', () => {
         const context = new TestDataContext(), item = new TestDataContextObject(context), reference = new TestDataContextObject(context), transactionManager = new Data.TransactionManager();

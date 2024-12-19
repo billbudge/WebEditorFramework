@@ -10,11 +10,11 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
 import { Point, Rect, PointWithNormal, getExtents, projectPointToCircle,
          BezierCurve, evaluateBezier, CurveHitResult, expandRect } from '../../src/geometry.js'
 
-import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
+import { ScalarProp, ChildListProp, ReferenceProp, IdProp, PropertyTypes,
          ReferencedObject, DataContext, DataContextObject, EventBase, Change, ChangeEvents,
          copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet,
          reduceToRoots, List, TransactionManager, HistoryManager, ScalarPropertyTypes,
-         ArrayPropertyTypes } from '../../src/dataModels.js'
+         ChildPropertyTypes } from '../../src/dataModels.js'
 
 import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
@@ -36,9 +36,9 @@ const idProp = new IdProp('id'),
       guardProp = new ScalarProp('guard'),
       actionProp = new ScalarProp('action'),
       tTextProp = new ScalarProp('tText'),
-      statesProp = new ChildArrayProp('states'),
-      transitionsProp = new ChildArrayProp('transitions'),
-      statechartsProp = new ChildArrayProp('statecharts');
+      statesProp = new ChildListProp('states'),
+      transitionsProp = new ChildListProp('transitions'),
+      statechartsProp = new ChildListProp('statecharts');
 
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
@@ -1022,12 +1022,12 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.onValueChanged(owner, prop, oldValue);
     this.updateItem(owner);  // Update any derived properties.
   }
-  elementInserted(owner: State | Statechart, prop: ArrayPropertyTypes, index: number) : void {
-    const value: AllTypes = prop.get(owner).at(index) as AllTypes;
+  elementInserted(owner: State | Statechart, prop: ChildPropertyTypes, index: number) : void {
+    const value: AllTypes = prop.get(owner).get(index) as AllTypes;
     this.insertItem(value, owner);
     this.onElementInserted(owner, prop, index);
   }
-  elementRemoved(owner: State | Statechart, prop: ArrayPropertyTypes, index: number, oldValue: AllTypes) : void {
+  elementRemoved(owner: State | Statechart, prop: ChildPropertyTypes, index: number, oldValue: AllTypes) : void {
     this.removeItem(oldValue);
     this.onElementRemoved(owner, prop, index, oldValue);
   }
@@ -1064,7 +1064,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     return this.onChanged(change);
   }
   private onElementInserted(
-      owner: State | Statechart, prop: ArrayPropertyTypes, index: number) :
+      owner: State | Statechart, prop: ChildPropertyTypes, index: number) :
       Change {
     const change: Change =
         { type: 'elementInserted', item: owner, prop: prop, index: index, oldValue: undefined };
@@ -1072,7 +1072,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     return this.onChanged(change);
   }
   private onElementRemoved(
-      owner: State | Statechart, prop: ArrayPropertyTypes, index: number, oldValue: AllTypes ) :
+      owner: State | Statechart, prop: ChildPropertyTypes, index: number, oldValue: AllTypes ) :
       Change {
     const change: Change =
         { type: 'elementRemoved', item: owner, prop: prop, index: index, oldValue: oldValue };
@@ -1265,7 +1265,7 @@ class Renderer {
   getNextStatechartY(state: State) {
     let y = 0;
     if (state.statecharts.length > 0) {
-      const lastStatechart = state.statecharts.at(state.statecharts.length - 1);
+      const lastStatechart = state.statecharts.get(state.statecharts.length - 1);
       y = lastStatechart.y + lastStatechart.height;
     }
     return y;
@@ -1321,7 +1321,7 @@ class Renderer {
 
     if (statecharts.length > 0) {
       // Expand the last statechart to fill its parent state.
-      const lastStatechart = statecharts.at(statecharts.length - 1),
+      const lastStatechart = statecharts.get(statecharts.length - 1),
             lastHeight = lastStatechart.height + height - stateOffsetY;
       if (lastStatechart.height !== lastHeight)
         lastStatechart.height = lastHeight;
@@ -1479,7 +1479,7 @@ class Renderer {
         if (statecharts) {
           let separatorY = lineBase;
           for (var i = 0; i < statecharts.length - 1; i++) {
-            const statechart = statecharts.at(i);
+            const statechart = statecharts.get(i);
             separatorY += statechart.height;
             ctx.setLineDash([5]);
             ctx.beginPath();
@@ -2118,7 +2118,7 @@ export class StatechartEditor implements CanvasLayer {
       }
       case 'elementInserted': {
         // Update item subtrees as they are inserted.
-        context.reverseVisitAll(prop.get(item).at(change.index), addItems);
+        context.reverseVisitAll(prop.get(item).get(change.index), addItems);
         break;
       }
     }

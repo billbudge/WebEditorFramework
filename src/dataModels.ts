@@ -9,8 +9,8 @@ import { SelectionSet } from './collections.js';
 
 export interface DataContext {
   valueChanged(owner: DataContextObject, prop: ScalarPropertyTypes, oldValue: any) : void;
-  elementInserted(owner: DataContextObject, prop: ArrayPropertyTypes, index: number) : void;
-  elementRemoved(owner: DataContextObject, prop: ArrayPropertyTypes, index: number, oldValue: DataContextObject) : void;
+  elementInserted(owner: DataContextObject, prop: ChildPropertyTypes, index: number) : void;
+  elementRemoved(owner: DataContextObject, prop: ChildPropertyTypes, index: number, oldValue: DataContextObject) : void;
   resolveReference(owner: DataContextObject, prop: ReferenceProp) : ReferencedObject | undefined;
   construct(typeName: string) : DataContextObject;
 }
@@ -35,8 +35,8 @@ export interface ReferencedObject extends DataContextObject {
 // Simple property descriptors.
 
 export type ScalarPropertyTypes = ScalarProp | ReferenceProp;
-export type ArrayPropertyTypes = ChildArrayProp;
-export type PropertyTypes = ScalarPropertyTypes | ArrayPropertyTypes | IdProp;
+export type ChildPropertyTypes = ChildListProp | ChildSlotProp;  // TODO ChildSlotProp => ChildArrayProp
+export type PropertyTypes = ScalarPropertyTypes | ChildPropertyTypes | IdProp;
 
 export class ScalarProp {
   readonly name: string;
@@ -47,7 +47,7 @@ export class ScalarProp {
   }
   set(owner: DataContextObject, value: any) : any {
     const oldValue = (owner as any)[this.internalName];
-    (owner as any)[this.internalName] = value;
+    (owner as any)[this.internalName] = value;  // TODO don't notify if the value isn't changed.
     owner.context.valueChanged(owner, this, oldValue);
     return oldValue;
   }
@@ -59,7 +59,7 @@ export class ScalarProp {
 
 export interface List<T = any> {
   length: number;
-  at: (index: number) => T;
+  get: (index: number) => T;
   append(element: T) : void;
   insert(element: T, index: number) : void;
   indexOf(element: T) : number;
@@ -74,13 +74,13 @@ export interface List<T = any> {
 // Internal implementation of List<T>.
 class DataList implements List {
   private owner: DataContextObject;
-  private prop: ChildArrayProp;
+  private prop: ChildListProp;
   private array = new Array<any>();
 
   get length() : number {
     return this.array.length;
   }
-  at(index: number) : any {
+  get(index: number) : any {
     const array = this.array;
     if (array.length <= index)
       throw new RangeError('Index out of range: ' + index);
@@ -125,30 +125,13 @@ class DataList implements List {
     }
   }
 
-  constructor(owner: DataContextObject, prop: ChildArrayProp) {
+  constructor(owner: DataContextObject, prop: ChildListProp) {
     this.owner = owner;
     this.prop = prop;
   }
 }
 
-// TODO Implement child element properties. This requires changing the element
-// inserted/removed events.
-// export class ChildProp<T extends DataContextObject = DataContextObject> {
-//   readonly name: string;
-//   readonly internalName: string;
-//   readonly cacheKey: symbol;
-
-//   get(owner: DataContextObject) : DataContextObject {
-//     return (owner as any)[this.cacheKey];
-//   }
-//   constructor(name: string) {
-//     this.name = name;
-//     this.internalName = '_' + name;
-//     this.cacheKey = Symbol.for(name);
-//   }
-// }
-
-export class ChildArrayProp<T extends DataContextObject = DataContextObject> {
+export class ChildListProp<T extends DataContextObject = DataContextObject> {
   readonly name: string;
   readonly internalName: string;
   readonly cacheKey: symbol;
@@ -160,6 +143,66 @@ export class ChildArrayProp<T extends DataContextObject = DataContextObject> {
       (owner as any)[this.cacheKey] = list;
     }
     return list;
+  }
+  constructor(name: string) {
+    this.name = name;
+    this.internalName = '_' + name;
+    this.cacheKey = Symbol.for(name);
+  }
+}
+
+export interface Slot<T = any> {
+  get: (index: number) => T | undefined;
+  set: (index: number, value: T | undefined) => T | undefined;
+}
+
+// Internal implementation of ChildSlot<T>.
+// We notify changes using the elementInserted and elementRemoved methods of DataContext,
+// so make slot look like a single element array.
+class DataSlot<T extends DataContextObject = DataContextObject> implements Slot<T> {
+  private owner: DataContextObject;
+  private prop: ChildSlotProp;
+  private slot: T | undefined;
+
+  get(index: number) : T | undefined {
+    if (index !== 0)
+      throw new RangeError('Index out of range: ' + index);
+    return this.slot;
+  }
+  set(index: number, value: T | undefined) : T | undefined {
+    if (index !== 0)
+      throw new RangeError('Index out of range: ' + index);
+    const oldValue = this.slot;
+    this.slot = value;
+    if (value !== oldValue) {
+      if (oldValue) {
+        this.owner.context.elementRemoved(this.owner, this.prop, 0, oldValue);
+      }
+      if (value) {
+        this.owner.context.elementInserted(this.owner, this.prop, 0);
+      }
+    }
+    return oldValue;
+  }
+
+  constructor(owner: DataContextObject, prop: ChildSlotProp) {
+    this.owner = owner;
+    this.prop = prop;
+  }
+}
+
+export class ChildSlotProp<T extends DataContextObject = DataContextObject> {
+  readonly name: string;
+  readonly internalName: string;
+  readonly cacheKey: symbol;
+
+  get(owner: DataContextObject) : Slot<T> {
+    let slot = (owner as any)[this.cacheKey];
+    if (slot === undefined) {
+      slot = new DataSlot(owner, this);
+      (owner as any)[this.cacheKey] = slot;
+    }
+    return slot;
   }
   constructor(name: string) {
     this.name = name;
@@ -262,13 +305,13 @@ function isomorphicHelper(item1: any, item2: any, visited: Map<any, any>) : bool
         return ref2 === undefined;
       if (!isomorphicHelper(ref1, ref2, visited))
         return false;
-    } else if (p instanceof ChildArrayProp) {
+    } else if (p instanceof ChildListProp) {
       const list1 = p.get(item1),
             list2 = p.get(item2);
       if (list1.length !== list2.length)
         return false;
       for (let i = 0; i < list1.length; ++i) {
-        if (!isomorphicHelper(list1.at(i), list2.at(i), visited))
+        if (!isomorphicHelper(list1.get(i), list2.get(i), visited))
           return false;
       }
     }
@@ -294,7 +337,7 @@ function copyItem(
       prop.set(copy, prop.get(original));
     } else if (prop instanceof IdProp) {
       prop.setMap(original, copy, map);
-    } else if (prop instanceof ChildArrayProp) {
+    } else if (prop instanceof ChildListProp) {
       const originalList = prop.get(original),
       copyList = prop.get(copy);
       originalList.forEach(original => {
@@ -309,7 +352,7 @@ function copyItem(
 function remapItem(copy: DataContextObject, map: Map<number, ReferencedObject>) {
   const properties = copy.template.properties;
   for (let prop of properties) {
-    if (prop instanceof ChildArrayProp) {
+    if (prop instanceof ChildListProp) {
       const list = prop.get(copy);
       list.forEach(copy => remapItem(copy, map));
     } else if (prop instanceof ReferenceProp) {
@@ -353,7 +396,7 @@ function serializeItem(original: DataContextObject) : object {
     } else if (prop instanceof ReferenceProp) {
       const value = prop.getId(original);
       result[prop.name] = value;
-    } else if (prop instanceof ChildArrayProp) {
+    } else if (prop instanceof ChildListProp) {
       const originalList = prop.get(original),
             copyList = new Array<object>();
       result[prop.name] = copyList;
@@ -388,7 +431,7 @@ function deserializeItem1(
       // Copy the old id, to be remapped in the second pass.
       const id = raw[prop.name];
       prop.setId(item, id);
-    } else if (prop instanceof ChildArrayProp) {
+    } else if (prop instanceof ChildListProp) {
       const rawList = raw[prop.name],
             list = prop.get(item);
       if (rawList) {
@@ -409,7 +452,7 @@ function deserializeItem2(
     if (prop instanceof ReferenceProp) {
       const id = prop.getId(item);
       prop.set(item, map.get(id));
-    } else if (prop instanceof ChildArrayProp) {
+    } else if (prop instanceof ChildListProp) {
       const list = prop.get(item);
       list.forEach(child => deserializeItem2(child, map, context));
     }
@@ -586,16 +629,16 @@ class ChangeOp implements Operation {
         break;
       }
       case 'elementInserted': {
-        if (prop instanceof ChildArrayProp) {
+        if (prop instanceof ChildListProp) {
           const list = prop.get(item), index = change.index;
-          change.oldValue = list.at(index);
+          change.oldValue = list.get(index);
           list.removeAt(index);
           change.type = 'elementRemoved';
         }
         break;
       }
       case 'elementRemoved': {
-        if (prop instanceof ChildArrayProp) {
+        if (prop instanceof ChildListProp) {
           const list = prop.get(item), index = change.index;
           list.insert(change.oldValue, index);
           change.type = 'elementInserted';
@@ -665,10 +708,6 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
     const transaction = this.transaction;
     if (!transaction)
       throw new Error('Transaction ended or canceled');
-    if (transaction.ops.length === 0) {
-      this.cancelTransaction();
-      return transaction;
-    }
     this.endingOrCanceling = true;
     super.onEvent('transactionEnding', transaction);
     this.transaction = undefined;
@@ -841,6 +880,10 @@ export class HistoryManager {
 
   private onTransactionEnded(op: CompoundOp) {
     this.startingSelection = [];
+
+    if (op.ops.length === 0)  // Empty transaction.
+      return;
+
     if (this.undone.length)
       this.undone = [];
     this.done.push(op);

@@ -2,7 +2,7 @@ var _a;
 import { SelectionSet, Multimap } from '../../src/collections.js';
 import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, FileController } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
-import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
+import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 //------------------------------------------------------------------------------
 // TODO Check validity of function instances during drag-n-drop.
@@ -254,7 +254,7 @@ function parseTypeString(s) {
 }
 //------------------------------------------------------------------------------
 // Properties and templates for the raw data interface for cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nodesProp = new ChildArrayProp('nodes'), wiresProp = new ChildArrayProp('wires'), instancerProp = new ReferenceProp('instancer'), innerTypeStringProp = new ScalarProp('innerTypeString');
+const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerTypeStringProp = new ScalarProp('innerTypeString');
 class NodeTemplate {
     constructor() {
         this.id = idProp;
@@ -1687,7 +1687,7 @@ export class FunctionchartContext extends EventBase {
     }
     elementInserted(owner, prop, index) {
         if (this.nodes.has(owner)) {
-            const value = prop.get(owner).at(index);
+            const value = prop.get(owner).get(index);
             this.insertItem(value, owner);
             this.onElementInserted(owner, prop, index);
         }
@@ -2681,7 +2681,7 @@ export class FunctionchartEditor {
             }
             case 'elementInserted': {
                 // Update item subtrees as they are inserted.
-                context.reverseVisitAll(prop.get(item).at(change.index), addItems);
+                context.reverseVisitAll(prop.get(item).get(change.index), addItems);
                 break;
             }
         }

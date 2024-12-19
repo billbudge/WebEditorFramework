@@ -1,9 +1,9 @@
 import { SelectionSet } from '../../src/collections.js';
 import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam, circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, diskPath, hitTestDisk, roundRectPath, bezierEdgePath, hitTestBezier, measureNameValuePairs, FileController } from '../../src/diagrams.js';
 import { getExtents, projectPointToCircle, evaluateBezier, expandRect } from '../../src/geometry.js';
-import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
+import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
 //------------------------------------------------------------------------------
-const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), entryProp = new ScalarProp('entry'), exitProp = new ScalarProp('exit'), srcProp = new ReferenceProp('src'), tSrcProp = new ScalarProp('tSrc'), dstProp = new ReferenceProp('dst'), tDstProp = new ScalarProp('tDst'), eventProp = new ScalarProp('event'), guardProp = new ScalarProp('guard'), actionProp = new ScalarProp('action'), tTextProp = new ScalarProp('tText'), statesProp = new ChildArrayProp('states'), transitionsProp = new ChildArrayProp('transitions'), statechartsProp = new ChildArrayProp('statecharts');
+const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), entryProp = new ScalarProp('entry'), exitProp = new ScalarProp('exit'), srcProp = new ReferenceProp('src'), tSrcProp = new ScalarProp('tSrc'), dstProp = new ReferenceProp('dst'), tDstProp = new ScalarProp('tDst'), eventProp = new ScalarProp('event'), guardProp = new ScalarProp('guard'), actionProp = new ScalarProp('action'), tTextProp = new ScalarProp('tText'), statesProp = new ChildListProp('states'), transitionsProp = new ChildListProp('transitions'), statechartsProp = new ChildListProp('statecharts');
 // Implement type-safe interfaces as well as a raw data interface for
 // cloning, serialization, etc.
 class StateBaseTemplate {
@@ -851,7 +851,7 @@ export class StatechartContext extends EventBase {
         this.updateItem(owner); // Update any derived properties.
     }
     elementInserted(owner, prop, index) {
-        const value = prop.get(owner).at(index);
+        const value = prop.get(owner).get(index);
         this.insertItem(value, owner);
         this.onElementInserted(owner, prop, index);
     }
@@ -1046,7 +1046,7 @@ class Renderer {
     getNextStatechartY(state) {
         let y = 0;
         if (state.statecharts.length > 0) {
-            const lastStatechart = state.statecharts.at(state.statecharts.length - 1);
+            const lastStatechart = state.statecharts.get(state.statecharts.length - 1);
             y = lastStatechart.y + lastStatechart.height;
         }
         return y;
@@ -1094,7 +1094,7 @@ class Renderer {
             state.height = height;
         if (statecharts.length > 0) {
             // Expand the last statechart to fill its parent state.
-            const lastStatechart = statecharts.at(statecharts.length - 1), lastHeight = lastStatechart.height + height - stateOffsetY;
+            const lastStatechart = statecharts.get(statecharts.length - 1), lastHeight = lastStatechart.height + height - stateOffsetY;
             if (lastStatechart.height !== lastHeight)
                 lastStatechart.height = lastHeight;
         }
@@ -1219,7 +1219,7 @@ class Renderer {
                 if (statecharts) {
                     let separatorY = lineBase;
                     for (var i = 0; i < statecharts.length - 1; i++) {
-                        const statechart = statecharts.at(i);
+                        const statechart = statecharts.get(i);
                         separatorY += statechart.height;
                         ctx.setLineDash([5]);
                         ctx.beginPath();
@@ -1754,7 +1754,7 @@ export class StatechartEditor {
             }
             case 'elementInserted': {
                 // Update item subtrees as they are inserted.
-                context.reverseVisitAll(prop.get(item).at(change.index), addItems);
+                context.reverseVisitAll(prop.get(item).get(change.index), addItems);
                 break;
             }
         }

@@ -176,7 +176,7 @@ describe('StatechartContext', () => {
         context.root = statechart;
         expect(statechart.states.length).toBe(0);
         statechart.states.append(state1);
-        expect(statechart.states.at(0)).toBe(state1);
+        expect(statechart.states.get(0)).toBe(state1);
         statechart.states.removeAt(0);
         expect(statechart.states.length).toBe(0);
     });

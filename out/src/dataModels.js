@@ -4,7 +4,7 @@ export class ScalarProp {
     }
     set(owner, value) {
         const oldValue = owner[this.internalName];
-        owner[this.internalName] = value;
+        owner[this.internalName] = value; // TODO don't notify if the value isn't changed.
         owner.context.valueChanged(owner, this, oldValue);
         return oldValue;
     }
@@ -18,7 +18,7 @@ class DataList {
     get length() {
         return this.array.length;
     }
-    at(index) {
+    get(index) {
         const array = this.array;
         if (array.length <= index)
             throw new RangeError('Index out of range: ' + index);
@@ -69,22 +69,7 @@ class DataList {
         this.prop = prop;
     }
 }
-// TODO Implement child element properties. This requires changing the element
-// inserted/removed events.
-// export class ChildProp<T extends DataContextObject = DataContextObject> {
-//   readonly name: string;
-//   readonly internalName: string;
-//   readonly cacheKey: symbol;
-//   get(owner: DataContextObject) : DataContextObject {
-//     return (owner as any)[this.cacheKey];
-//   }
-//   constructor(name: string) {
-//     this.name = name;
-//     this.internalName = '_' + name;
-//     this.cacheKey = Symbol.for(name);
-//   }
-// }
-export class ChildArrayProp {
+export class ChildListProp {
     get(owner) {
         let list = owner[this.cacheKey];
         if (list === undefined) {
@@ -92,6 +77,50 @@ export class ChildArrayProp {
             owner[this.cacheKey] = list;
         }
         return list;
+    }
+    constructor(name) {
+        this.name = name;
+        this.internalName = '_' + name;
+        this.cacheKey = Symbol.for(name);
+    }
+}
+// Internal implementation of ChildSlot<T>.
+// We notify changes using the elementInserted and elementRemoved methods of DataContext,
+// so make slot look like a single element array.
+class DataSlot {
+    get(index) {
+        if (index !== 0)
+            throw new RangeError('Index out of range: ' + index);
+        return this.slot;
+    }
+    set(index, value) {
+        if (index !== 0)
+            throw new RangeError('Index out of range: ' + index);
+        const oldValue = this.slot;
+        this.slot = value;
+        if (value !== oldValue) {
+            if (oldValue) {
+                this.owner.context.elementRemoved(this.owner, this.prop, 0, oldValue);
+            }
+            if (value) {
+                this.owner.context.elementInserted(this.owner, this.prop, 0);
+            }
+        }
+        return oldValue;
+    }
+    constructor(owner, prop) {
+        this.owner = owner;
+        this.prop = prop;
+    }
+}
+export class ChildSlotProp {
+    get(owner) {
+        let slot = owner[this.cacheKey];
+        if (slot === undefined) {
+            slot = new DataSlot(owner, this);
+            owner[this.cacheKey] = slot;
+        }
+        return slot;
     }
     constructor(name) {
         this.name = name;
@@ -178,12 +207,12 @@ function isomorphicHelper(item1, item2, visited) {
             if (!isomorphicHelper(ref1, ref2, visited))
                 return false;
         }
-        else if (p instanceof ChildArrayProp) {
+        else if (p instanceof ChildListProp) {
             const list1 = p.get(item1), list2 = p.get(item2);
             if (list1.length !== list2.length)
                 return false;
             for (let i = 0; i < list1.length; ++i) {
-                if (!isomorphicHelper(list1.at(i), list2.at(i), visited))
+                if (!isomorphicHelper(list1.get(i), list2.get(i), visited))
                     return false;
             }
         }
@@ -204,7 +233,7 @@ function copyItem(original, context, map) {
         else if (prop instanceof IdProp) {
             prop.setMap(original, copy, map);
         }
-        else if (prop instanceof ChildArrayProp) {
+        else if (prop instanceof ChildListProp) {
             const originalList = prop.get(original), copyList = prop.get(copy);
             originalList.forEach(original => {
                 const copy = copyItem(original, context, map);
@@ -217,7 +246,7 @@ function copyItem(original, context, map) {
 function remapItem(copy, map) {
     const properties = copy.template.properties;
     for (let prop of properties) {
-        if (prop instanceof ChildArrayProp) {
+        if (prop instanceof ChildListProp) {
             const list = prop.get(copy);
             list.forEach(copy => remapItem(copy, map));
         }
@@ -258,7 +287,7 @@ function serializeItem(original) {
             const value = prop.getId(original);
             result[prop.name] = value;
         }
-        else if (prop instanceof ChildArrayProp) {
+        else if (prop instanceof ChildListProp) {
             const originalList = prop.get(original), copyList = new Array();
             result[prop.name] = copyList;
             originalList.forEach(child => {
@@ -290,7 +319,7 @@ function deserializeItem1(raw, map, context) {
             const id = raw[prop.name];
             prop.setId(item, id);
         }
-        else if (prop instanceof ChildArrayProp) {
+        else if (prop instanceof ChildListProp) {
             const rawList = raw[prop.name], list = prop.get(item);
             if (rawList) {
                 for (let rawChild of rawList) {
@@ -309,7 +338,7 @@ function deserializeItem2(item, map, context) {
             const id = prop.getId(item);
             prop.set(item, map.get(id));
         }
-        else if (prop instanceof ChildArrayProp) {
+        else if (prop instanceof ChildListProp) {
             const list = prop.get(item);
             list.forEach(child => deserializeItem2(child, map, context));
         }
@@ -427,16 +456,16 @@ class ChangeOp {
                 break;
             }
             case 'elementInserted': {
-                if (prop instanceof ChildArrayProp) {
+                if (prop instanceof ChildListProp) {
                     const list = prop.get(item), index = change.index;
-                    change.oldValue = list.at(index);
+                    change.oldValue = list.get(index);
                     list.removeAt(index);
                     change.type = 'elementRemoved';
                 }
                 break;
             }
             case 'elementRemoved': {
-                if (prop instanceof ChildArrayProp) {
+                if (prop instanceof ChildListProp) {
                     const list = prop.get(item), index = change.index;
                     list.insert(change.oldValue, index);
                     change.type = 'elementInserted';
@@ -496,10 +525,6 @@ export class TransactionManager extends EventBase {
         const transaction = this.transaction;
         if (!transaction)
             throw new Error('Transaction ended or canceled');
-        if (transaction.ops.length === 0) {
-            this.cancelTransaction();
-            return transaction;
-        }
         this.endingOrCanceling = true;
         super.onEvent('transactionEnding', transaction);
         this.transaction = undefined;
@@ -644,6 +669,8 @@ export class HistoryManager {
     }
     onTransactionEnded(op) {
         this.startingSelection = [];
+        if (op.ops.length === 0) // Empty transaction.
+            return;
         if (this.undone.length)
             this.undone = [];
         this.done.push(op);

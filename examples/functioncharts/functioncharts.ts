@@ -10,12 +10,12 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
 import { Point, Rect, PointWithNormal, getExtents, projectPointToCircle,
          BezierCurve, evaluateBezier, CurveHitResult, expandRect } from '../../src/geometry.js'
 
-import { ScalarProp, ChildArrayProp, ReferenceProp, IdProp, PropertyTypes,
+import { ScalarProp, ChildListProp, ReferenceProp, IdProp, PropertyTypes,
          ReferencedObject, DataContext, DataContextObject, EventBase, EventHandler,
          Change, ChangeEvents, CompoundOp, copyItems, Serialize, Deserialize,
          getLowestCommonAncestor, ancestorInSet, reduceToRoots,
          List, TransactionManager, TransactionEvent, HistoryManager, ScalarPropertyTypes,
-         ArrayPropertyTypes } from '../../src/dataModels.js'
+         ChildPropertyTypes } from '../../src/dataModels.js'
 
 import { functionBuiltins } from '../../examples/functioncharts/functionBuiltins.js'
 
@@ -323,8 +323,8 @@ const idProp = new IdProp('id'),
       srcPinProp = new ScalarProp('srcPin'),
       dstProp = new ReferenceProp('dst'),
       dstPinProp = new ScalarProp('dstPin'),
-      nodesProp = new ChildArrayProp('nodes'),
-      wiresProp = new ChildArrayProp('wires'),
+      nodesProp = new ChildListProp('nodes'),
+      wiresProp = new ChildListProp('wires'),
       instancerProp = new ReferenceProp('instancer'),
       innerTypeStringProp = new ScalarProp('innerTypeString');
 
@@ -2035,14 +2035,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.onValueChanged(owner, prop, oldValue);
     this.updateGlobalPosition(owner);  // Update any derived properties.
   }
-  elementInserted(owner: Functionchart, prop: ArrayPropertyTypes, index: number) : void {
+  elementInserted(owner: Functionchart, prop: ChildPropertyTypes, index: number) : void {
     if (this.nodes.has(owner)) {
-      const value: AllTypes = prop.get(owner).at(index) as AllTypes;
+      const value: AllTypes = prop.get(owner).get(index) as AllTypes;
       this.insertItem(value, owner);
       this.onElementInserted(owner, prop, index);
     }
   }
-  elementRemoved(owner: Functionchart, prop: ArrayPropertyTypes, index: number, oldValue: AllTypes) : void {
+  elementRemoved(owner: Functionchart, prop: ChildPropertyTypes, index: number, oldValue: AllTypes) : void {
     if (this.nodes.has(owner)) {
       this.removeItem(oldValue);
       this.onElementRemoved(owner, prop, index, oldValue);
@@ -2086,7 +2086,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.onChanged(change);
   }
   private onElementInserted(
-      owner: Functionchart, prop: ArrayPropertyTypes, index: number) :
+      owner: Functionchart, prop: ChildPropertyTypes, index: number) :
       Change {
     const change: Change =
         { type: 'elementInserted', item: owner, prop: prop, index: index, oldValue: undefined };
@@ -2094,7 +2094,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.onChanged(change);
   }
   private onElementRemoved(
-      owner: Functionchart, prop: ArrayPropertyTypes, index: number, oldValue: AllTypes ) :
+      owner: Functionchart, prop: ChildPropertyTypes, index: number, oldValue: AllTypes ) :
       Change {
     const change: Change =
         { type: 'elementRemoved', item: owner, prop: prop, index: index, oldValue: oldValue };
@@ -3234,7 +3234,7 @@ export class FunctionchartEditor implements CanvasLayer {
       }
       case 'elementInserted': {
         // Update item subtrees as they are inserted.
-        context.reverseVisitAll(prop.get(item).at(change.index), addItems);
+        context.reverseVisitAll(prop.get(item).get(change.index), addItems);
         break;
       }
     }
