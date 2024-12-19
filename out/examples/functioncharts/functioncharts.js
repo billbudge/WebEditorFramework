@@ -1126,8 +1126,8 @@ export class FunctionchartContext extends EventBase {
                 const instanceTypeString = instanceType.typeString;
                 // Update instances.
                 item.instances.forEach((instance) => {
-                    if (instance.typeString === Type.emptyTypeString)
-                        instance.typeString = instanceTypeString;
+                    // TODO handle varArgs when we have the pseudoelement.
+                    instance.typeString = instanceTypeString;
                 });
             }
         });
