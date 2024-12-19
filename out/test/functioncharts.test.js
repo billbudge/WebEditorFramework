@@ -316,7 +316,7 @@ describe('FunctionchartContext', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, '[vv,v]'), input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output'), wire1 = addWire(functionchart, input, 0, elem1, 1), wire2 = addWire(functionchart, elem1, 0, output, 0);
         // Replace concrete element with 'cond' element that has pass-throughs.  TODO passthroughs?
         const elem2 = addElement(functionchart, '[vvv,v]');
-        mutate(context, () => context.replaceElement(elem1, elem2));
+        mutate(context, () => context.replaceNode(elem1, elem2));
         expect(wire1.src).toBe(input);
         expect(wire1.dst).toBe(elem2);
         expect(wire2.src).toBe(elem2);
@@ -495,12 +495,12 @@ describe('FunctionchartContext', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, elem1 = addElement(functionchart, '[vvv,v]'), elem2 = addElement(functionchart, '[vvv,v]');
         let typeInfo = context.getFunctionchartTypeInfo(functionchart);
         // No inputs or outputs.
-        expect(typeInfo.typeString).toBe('[,]');
+        expect(typeInfo.instanceType.typeString).toBe('[,]');
         // expect(typeInfo.passThroughs.length).toBe(0);
         const wire1 = addWire(functionchart, elem1, 0, elem2, 2);
         mutate(context, () => context.completeNode([elem1, elem2]));
         typeInfo = context.getFunctionchartTypeInfo(functionchart);
-        expect(typeInfo.typeString).toBe('[vvvvv,v]');
+        expect(typeInfo.instanceType.typeString).toBe('[vvvvv,v]');
         expect(typeInfo.abstract).toBe(false);
         // expect(typeInfo.passThroughs.length).toBe(1);
         // arrayEquals(typeInfo.passThroughs[0], [1, 2, 4, 5]);
@@ -508,12 +508,12 @@ describe('FunctionchartContext', () => {
     test('getAbstractFunctionchartTypeInfo', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
         let typeInfo = context.getFunctionchartTypeInfo(functionchart);
-        expect(typeInfo.typeString).toBe('[v,v]');
+        expect(typeInfo.instanceType.typeString).toBe('[v,v]');
         expect(typeInfo.abstract).toBe(true);
         // expect(typeInfo.passThroughs.length).toBe(0);
         const wire1 = addWire(functionchart, input, 0, output, 0);
         typeInfo = context.getFunctionchartTypeInfo(functionchart);
-        expect(typeInfo.typeString).toBe('[v,v]');
+        expect(typeInfo.instanceType.typeString).toBe('[v,v]');
         expect(typeInfo.abstract).toBe(false);
         // expect(typeInfo.passThroughs.length).toBe(1);
         // arrayEquals(typeInfo.passThroughs[0], [0, 1]);

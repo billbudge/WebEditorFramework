@@ -464,7 +464,7 @@ export class Wire {
 }
 // This TypeInfo instance signals that the functionchart hasn't been initialized yet.
 const emptyTypeInfo = {
-    typeString: Type.emptyExporterTypeString,
+    instanceType: Type.emptyExporterType,
     closed: true,
     abstract: false,
     inputs: [],
@@ -476,7 +476,8 @@ export class Functionchart extends NodeBase {
     get height() { return this.template.height.get(this) || 0; }
     set height(value) { this.template.height.set(this, value); }
     get typeString() {
-        return this.template.typeString.get(this) || this.typeInfo.typeString; // TODO remove when files converted
+        return this.template.typeString.get(this) ||
+            this.typeInfo.instanceType.toExporterType().typeString; // TODO remove when files converted
     }
     set typeString(value) { this.template.typeString.set(this, value); }
     get name() { return this.template.name.get(this); }
@@ -1118,13 +1119,11 @@ export class FunctionchartContext extends EventBase {
         // Update Functionchart types. TODO InstancerElement types too?
         this.reverseVisitNodes(this.functionchart, item => {
             if (item instanceof Functionchart) {
-                const typeInfo = self.getFunctionchartTypeInfo(item), typeString = typeInfo.typeString;
-                item.typeString = typeString; // TODO fix
+                const typeInfo = self.getFunctionchartTypeInfo(item), instanceType = typeInfo.instanceType;
                 item.typeInfo = typeInfo;
-                const type = Type.fromString(typeString);
-                item.type = type.toExporterType();
-                item.instanceType = type;
-                const instanceTypeString = type.typeString; // TODO clean up
+                item.type = typeInfo.instanceType.toExporterType();
+                item.instanceType = instanceType;
+                const instanceTypeString = instanceType.typeString;
                 // Update instances.
                 item.instances.forEach((instance) => {
                     if (instance.typeString === Type.emptyTypeString)
@@ -1336,7 +1335,7 @@ export class FunctionchartContext extends EventBase {
             }
         });
     }
-    replaceElement(node, newNode) {
+    replaceNode(node, newNode) {
         const parent = node.parent, newType = newNode.type;
         // Add newNode so that both nodes are present as we rewire them.
         this.addItem(newNode, parent);
@@ -1427,7 +1426,7 @@ export class FunctionchartContext extends EventBase {
                 return;
             selection.delete(element);
             const newElement = self.importElement(element);
-            self.replaceElement(element, newElement);
+            self.replaceNode(element, newElement);
             selection.add(newElement);
         });
     }
@@ -1571,8 +1570,8 @@ export class FunctionchartContext extends EventBase {
         const outputPins = outputs.map(pinInfo => {
             return new Pin(pinInfo.type, pinInfo.name);
         });
-        const type = Type.fromInfo(inputPins, outputPins, name), typeString = type.typeString;
-        return { typeString, closed, abstract, inputs, outputs };
+        const type = Type.fromInfo(inputPins, outputPins, name);
+        return { instanceType: type, closed, abstract, inputs, outputs };
     }
     updateGlobalPosition(item) {
         this.derivedInfoNeedsUpdate = true;
@@ -3159,7 +3158,7 @@ export class FunctionchartEditor {
             if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase &&
                 lastSelected.type.canConnectTo(hitInfo.item.type)) {
                 if (!(lastSelected instanceof Functionchart)) // TODO support Functionchart somehow?
-                    context.replaceElement(hitInfo.item, lastSelected);
+                    context.replaceNode(hitInfo.item, lastSelected);
             }
             else {
                 let parent = functionchart;
