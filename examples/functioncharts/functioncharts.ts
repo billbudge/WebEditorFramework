@@ -15,7 +15,8 @@ import { ScalarProp, ChildListProp, ReferenceProp, IdProp, PropertyTypes,
          Change, ChangeEvents, CompoundOp, copyItems, Serialize, Deserialize,
          getLowestCommonAncestor, ancestorInSet, reduceToRoots,
          List, TransactionManager, TransactionEvent, HistoryManager, ScalarPropertyTypes,
-         ChildPropertyTypes } from '../../src/dataModels.js'
+         ChildPropertyTypes,
+         ChildSlotProp} from '../../src/dataModels.js'
 
 import { functionBuiltins } from '../../examples/functioncharts/functionBuiltins.js'
 
@@ -133,8 +134,8 @@ export class Type {
   toInstancerType() : Type {
     return Type.fromInfo([new Pin(this)], [], this.name);
   }
-  toExporterType() : Type {
-    return Type.fromInfo([], [new Pin(this, this.name)]);
+  toExporterType() : Type {  // TODO unit tests, this breaks if we name the pin.
+    return Type.fromInfo([], [new Pin(this)]);
   }
 
   private constructor(inputs: Pin[], outputs: Pin[], name?: string) {
@@ -205,16 +206,6 @@ export class Type {
     return Type.canConnect(this, dst);
   }
 }
-
-// export type TypeVisitor = (type: Type, parent: Type | undefined) => void;
-
-// export function forEachType(type: Type, callback: TypeVisitor) {
-//   callback(type, undefined);
-//   if (type.inputs)
-//     type.inputs.forEach(input => forEachType(input.type, callback));
-//   if (type.outputs)
-//     type.outputs.forEach(output => forEachType(output.type, callback));
-// }
 
 // not exported
 function parseTypeString(s: string) : Type {
@@ -326,6 +317,7 @@ const idProp = new IdProp('id'),
       nodesProp = new ChildListProp('nodes'),
       wiresProp = new ChildListProp('wires'),
       instancerProp = new ReferenceProp('instancer'),
+      innerElementProp = new ChildSlotProp('inner'),
       innerTypeStringProp = new ScalarProp('innerTypeString');
 
 type NodeType = ElementType | PseudoelementType | FunctionchartType;
@@ -362,9 +354,10 @@ class InstancerTemplate extends ElementTemplate {
 
 class ExporterTemplate extends ElementTemplate {
   readonly instancer = instancerProp;
+  readonly innerElement = innerElementProp;
   readonly innerTypeString = innerTypeStringProp;
   readonly properties: PropertyTypes[] = [this.id, this.typeString, this.x, this.y, this.name,
-                                          this.instancer, this.innerTypeString];
+                                          this.instancer, this.innerElement, this.innerTypeString];
   constructor(typeName: ElementType) {
     super(typeName);
   }
@@ -412,11 +405,11 @@ class FunctionchartTemplate extends NodeTemplate {
   }
 }
 
-const elementTemplate = new ElementTemplate('element'),      // built-in elements
-      instancerTemplate = new InstancerTemplate('instancer'),  // abstract element
-      exporterTemplate = new ExporterTemplate('exporter'),   // exporter element
-      inputTemplate = new PseudoelementTemplate('input'),    // input pseudoelement
-      outputTemplate = new PseudoelementTemplate('output'),  // output pseudoelement
+const elementTemplate = new ElementTemplate('element'),        // built-in elements
+      instancerTemplate = new InstancerTemplate('instancer'),  // instancing element
+      exporterTemplate = new ExporterTemplate('exporter'),     // exporter element
+      inputTemplate = new PseudoelementTemplate('input'),      // input pseudoelement
+      outputTemplate = new PseudoelementTemplate('output'),    // output pseudoelement
       useTemplate = new PseudoelementTemplate('use'),
       wireTemplate = new WireTemplate(),
       functionchartTemplate = new FunctionchartTemplate('functionchart'),
@@ -527,27 +520,11 @@ export class ExporterElement extends Element<ExporterTemplate> {
 
   get instancer() { return this.template.instancer.get(this) as InstancerTypes | undefined; }
   set instancer(value: InstancerTypes | undefined) { this.template.instancer.set(this, value); }
-  get innerTypeString() { return this.template.innerTypeString.get(this); }
-  set innerTypeString(value: string) { this.template.innerTypeString.set(this, value); }
+  get innerElement() { return this.template.innerElement.get(this).get(0) as ElementTypes | undefined; }
+  set innerElement(value: ElementTypes | undefined) { this.template.innerElement.get(this).set(0, value); }
 
   // Derived properties.
-  private _innerType: Type;
-  get innerType() : Type {
-    if (!this._innerType) {
-      const instancer = this.instancer;
-      if (instancer) {
-        this._innerType = instancer.instanceType;
-      } else {
-        const typeString = this.innerTypeString;
-        if (typeString) {
-          this._innerType = Type.fromString(typeString).flatType;
-        } else {
-          this._innerType = Type.emptyType;
-        }
-      }
-    }
-    return this._innerType;
-  }
+  get innerType() : Type { return this.innerElement? this.innerElement.type : Type.emptyType; }
 
   constructor(context: FunctionchartContext, id: number) {
     super(exporterTemplate, context,  id);
@@ -1729,7 +1706,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     } else if (element instanceof Element) {
       result.name = element.name;
     }
-    result.innerTypeString = element.type.typeString;
     return result;
   }
 
@@ -1748,10 +1724,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     elements.forEach(element => {
       if (element instanceof InstancerElement || element instanceof ExporterElement) return;
       if (element instanceof FunctionInstance && element.isAbstract) return;
+      const parent = element.parent!;
       selection.delete(element);
-      const newElement = self.exportElement(element);
-      self.replaceElement(element, newElement);
-      selection.add(newElement);
+      const exporter = self.exportElement(element),
+            index = parent.nodes.indexOf(element);
+      parent.nodes.remove(element);
+      exporter.innerElement = element;
+      parent.nodes.insert(exporter, index);
+      selection.add(exporter);
     });
   }
 
@@ -2501,7 +2481,7 @@ class Renderer implements ILayoutEngine {
           ctx.stroke();
           this.drawType(innerType, x + 2 * spacing, y + spacing);
         } else if (element instanceof ExporterElement) {
-          const innerType = element.innerType.flatType;
+          const innerType = element.innerElement!.type.flatType;
           ctx.beginPath();
           ctx.rect(x + spacing, y + spacing, innerType.width, innerType.height);
           ctx.stroke();

@@ -2,7 +2,7 @@ var _a;
 import { SelectionSet, Multimap } from '../../src/collections.js';
 import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, FileController } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
-import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
+import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager, ChildSlotProp } from '../../src/dataModels.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 //------------------------------------------------------------------------------
 // TODO Check validity of function instances during drag-n-drop.
@@ -72,7 +72,7 @@ export class Type {
         return Type.fromInfo([new Pin(this)], [], this.name);
     }
     toExporterType() {
-        return Type.fromInfo([], [new Pin(this, this.name)]);
+        return Type.fromInfo([], [new Pin(this)]);
     }
     constructor(inputs, outputs, name) {
         this.width = 0;
@@ -156,14 +156,6 @@ Type.atomizedTypes = new Map([
     [Type.emptyTypeString, Type.emptyType.initializeBaseType(Type.emptyTypeString)],
     [Type.emptyExporterTypeString, Type.emptyExporterType.initializeBaseType(Type.emptyExporterTypeString)],
 ]);
-// export type TypeVisitor = (type: Type, parent: Type | undefined) => void;
-// export function forEachType(type: Type, callback: TypeVisitor) {
-//   callback(type, undefined);
-//   if (type.inputs)
-//     type.inputs.forEach(input => forEachType(input.type, callback));
-//   if (type.outputs)
-//     type.outputs.forEach(output => forEachType(output.type, callback));
-// }
 // not exported
 function parseTypeString(s) {
     let j = 0;
@@ -254,7 +246,7 @@ function parseTypeString(s) {
 }
 //------------------------------------------------------------------------------
 // Properties and templates for the raw data interface for cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerTypeStringProp = new ScalarProp('innerTypeString');
+const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner'), innerTypeStringProp = new ScalarProp('innerTypeString');
 class NodeTemplate {
     constructor() {
         this.id = idProp;
@@ -284,9 +276,10 @@ class ExporterTemplate extends ElementTemplate {
     constructor(typeName) {
         super(typeName);
         this.instancer = instancerProp;
+        this.innerElement = innerElementProp;
         this.innerTypeString = innerTypeStringProp;
         this.properties = [this.id, this.typeString, this.x, this.y, this.name,
-            this.instancer, this.innerTypeString];
+            this.instancer, this.innerElement, this.innerTypeString];
     }
 }
 class FunctionInstanceTemplate extends ElementTemplate {
@@ -327,7 +320,7 @@ class FunctionchartTemplate extends NodeTemplate {
     }
 }
 const elementTemplate = new ElementTemplate('element'), // built-in elements
-instancerTemplate = new InstancerTemplate('instancer'), // abstract element
+instancerTemplate = new InstancerTemplate('instancer'), // instancing element
 exporterTemplate = new ExporterTemplate('exporter'), // exporter element
 inputTemplate = new PseudoelementTemplate('input'), // input pseudoelement
 outputTemplate = new PseudoelementTemplate('output'), // output pseudoelement
@@ -408,26 +401,10 @@ export class InstancerElement extends Element {
 export class ExporterElement extends Element {
     get instancer() { return this.template.instancer.get(this); }
     set instancer(value) { this.template.instancer.set(this, value); }
-    get innerTypeString() { return this.template.innerTypeString.get(this); }
-    set innerTypeString(value) { this.template.innerTypeString.set(this, value); }
-    get innerType() {
-        if (!this._innerType) {
-            const instancer = this.instancer;
-            if (instancer) {
-                this._innerType = instancer.instanceType;
-            }
-            else {
-                const typeString = this.innerTypeString;
-                if (typeString) {
-                    this._innerType = Type.fromString(typeString).flatType;
-                }
-                else {
-                    this._innerType = Type.emptyType;
-                }
-            }
-        }
-        return this._innerType;
-    }
+    get innerElement() { return this.template.innerElement.get(this).get(0); }
+    set innerElement(value) { this.template.innerElement.get(this).set(0, value); }
+    // Derived properties.
+    get innerType() { return this.innerElement ? this.innerElement.type : Type.emptyType; }
     constructor(context, id) {
         super(exporterTemplate, context, id);
     }
@@ -1416,7 +1393,6 @@ export class FunctionchartContext extends EventBase {
         else if (element instanceof Element) {
             result.name = element.name;
         }
-        result.innerTypeString = element.type.typeString;
         return result;
     }
     importElement(element) {
@@ -1432,10 +1408,13 @@ export class FunctionchartContext extends EventBase {
                 return;
             if (element instanceof FunctionInstance && element.isAbstract)
                 return;
+            const parent = element.parent;
             selection.delete(element);
-            const newElement = self.exportElement(element);
-            self.replaceElement(element, newElement);
-            selection.add(newElement);
+            const exporter = self.exportElement(element), index = parent.nodes.indexOf(element);
+            parent.nodes.remove(element);
+            exporter.innerElement = element;
+            parent.nodes.insert(exporter, index);
+            selection.add(exporter);
         });
     }
     importElements(elements) {
@@ -2057,7 +2036,7 @@ class Renderer {
                     this.drawType(innerType, x + 2 * spacing, y + spacing);
                 }
                 else if (element instanceof ExporterElement) {
-                    const innerType = element.innerType.flatType;
+                    const innerType = element.innerElement.type.flatType;
                     ctx.beginPath();
                     ctx.rect(x + spacing, y + spacing, innerType.width, innerType.height);
                     ctx.stroke();

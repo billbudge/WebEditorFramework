@@ -8,7 +8,7 @@
     {
       "type": "functionchart",
       "id": 3,
-      "typeString": "[v(x),[vv,v](linear)[vvv,v](quad)[vvvv,v](cubic)]",
+      "typeString": "[v(x),v(linear)v(quad)v(cubic)]",
       "x": 231.5546875,
       "y": 33.76171875,
       "width": 907.43359375,
@@ -332,33 +332,6 @@
           "typeString": "[v(linear),]",
           "x": 455.10235595703125,
           "y": 140.6179656982422
-        },
-        {
-          "type": "exporter",
-          "id": 30,
-          "typeString": "[,[vv,v]]",
-          "x": 409.91717529296875,
-          "y": 90.68905639648438,
-          "instancer": 5,
-          "innerTypeString": "[v(c)v(c0),v]"
-        },
-        {
-          "type": "exporter",
-          "id": 31,
-          "typeString": "[,[vvv,v]]",
-          "x": 452.477294921875,
-          "y": 206.19688415527344,
-          "instancer": 11,
-          "innerTypeString": "[v(a)v(b)v(c),v]"
-        },
-        {
-          "type": "exporter",
-          "id": 32,
-          "typeString": "[,[vvvv,v]]",
-          "x": 494.57342529296875,
-          "y": 342.0562744140625,
-          "instancer": 18,
-          "innerTypeString": "[v(a)v(b)v(c)v(d),v]"
         }
       ],
       "wires": [
@@ -368,27 +341,6 @@
           "srcPin": 0,
           "dst": 8,
           "dstPin": 1
-        },
-        {
-          "type": "wire",
-          "src": 30,
-          "srcPin": 0,
-          "dst": 29,
-          "dstPin": 0
-        },
-        {
-          "type": "wire",
-          "src": 31,
-          "srcPin": 0,
-          "dst": 27,
-          "dstPin": 0
-        },
-        {
-          "type": "wire",
-          "src": 32,
-          "srcPin": 0,
-          "dst": 28,
-          "dstPin": 0
         }
       ]
     },

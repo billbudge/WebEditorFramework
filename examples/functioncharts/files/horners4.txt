@@ -8,7 +8,7 @@
     {
       "type": "functionchart",
       "id": 3,
-      "typeString": "[v(x),[vv,v][vvv,v][vvvv,v]](poly)",
+      "typeString": "[v(x),](poly)",
       "x": 311.31634521484375,
       "y": 51.588294982910156,
       "width": 440.08453369140625,
@@ -376,33 +376,6 @@
               "dstPin": 1
             }
           ]
-        },
-        {
-          "type": "exporter",
-          "id": 32,
-          "typeString": "[,[vv,v]]",
-          "x": 260.4781494140625,
-          "y": 156.453125,
-          "instancer": 11,
-          "innerTypeString": "[vv,v]"
-        },
-        {
-          "type": "exporter",
-          "id": 33,
-          "typeString": "[,[vvv,v]]",
-          "x": 271.9561767578125,
-          "y": 260.73907470703125,
-          "instancer": 16,
-          "innerTypeString": "[vvv,v]"
-        },
-        {
-          "type": "exporter",
-          "id": 34,
-          "typeString": "[,[vvvv,v]]",
-          "x": 269.87200927734375,
-          "y": 394.40777587890625,
-          "instancer": 23,
-          "innerTypeString": "[vvvv,v]"
         }
       ],
       "wires": [

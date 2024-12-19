@@ -197,7 +197,7 @@ function isomorphicHelper(item1, item2, visited) {
     for (let p of item1.template.properties) {
         if (p instanceof IdProp)
             continue;
-        if (p instanceof ScalarProp && p.get(item1) !== p.get(item2)) {
+        if (p instanceof ScalarProp && p.get(item1) !== p.get(item2)) { // TODO move this onto the prop classes!
             return false;
         }
         else if (p instanceof ReferenceProp) {
@@ -216,6 +216,11 @@ function isomorphicHelper(item1, item2, visited) {
                     return false;
             }
         }
+        else if (p instanceof ChildSlotProp) {
+            const slot1 = p.get(item1), slot2 = p.get(item2);
+            if (!isomorphicHelper(slot1.get(0), slot2.get(0), visited))
+                return false;
+        }
     }
     return true;
 }
@@ -227,7 +232,7 @@ export function isomorphic(item1, item2) {
 function copyItem(original, context, map) {
     const copy = context.construct(original.template.typeName), properties = original.template.properties;
     for (let prop of properties) {
-        if (prop instanceof ScalarProp || prop instanceof ReferenceProp) {
+        if (prop instanceof ScalarProp || prop instanceof ReferenceProp) { // TODO move this onto the prop classes!
             prop.set(copy, prop.get(original));
         }
         else if (prop instanceof IdProp) {
@@ -240,15 +245,28 @@ function copyItem(original, context, map) {
                 copyList.append(copy);
             });
         }
+        else if (prop instanceof ChildSlotProp) {
+            const originalChild = prop.get(original).get(0), copySlot = prop.get(copy);
+            if (originalChild) {
+                const copyChild = copyItem(originalChild, context, map);
+                copySlot.set(0, copyChild);
+            }
+        }
     }
     return copy;
 }
 function remapItem(copy, map) {
     const properties = copy.template.properties;
     for (let prop of properties) {
-        if (prop instanceof ChildListProp) {
+        if (prop instanceof ChildListProp) { // TODO move this onto the prop classes!
             const list = prop.get(copy);
             list.forEach(copy => remapItem(copy, map));
+        }
+        else if (prop instanceof ChildSlotProp) {
+            const child = prop.get(copy).get(0);
+            if (child) {
+                remapItem(child, map);
+            }
         }
         else if (prop instanceof ReferenceProp) {
             const reference = prop.get(copy);
@@ -278,7 +296,7 @@ function serializeItem(original) {
         type: original.template.typeName,
     };
     for (let prop of original.template.properties) {
-        if (prop instanceof ScalarProp || prop instanceof IdProp) {
+        if (prop instanceof ScalarProp || prop instanceof IdProp) { // TODO move this onto the prop classes!
             const value = prop.get(original);
             if (value !== undefined)
                 result[prop.name] = value;
@@ -294,6 +312,12 @@ function serializeItem(original) {
                 copyList.push(serializeItem(child));
             });
         }
+        else if (prop instanceof ChildSlotProp) {
+            const child = prop.get(original).get(0);
+            if (child) {
+                result[prop.name] = serializeItem(child);
+            }
+        }
     }
     return result;
 }
@@ -304,7 +328,7 @@ export function Serialize(item) {
 function deserializeItem1(raw, map, context) {
     const type = raw.type, item = context.construct(type);
     for (let prop of item.template.properties) {
-        if (prop instanceof ScalarProp) {
+        if (prop instanceof ScalarProp) { // TODO move this onto the prop classes!
             const value = raw[prop.name];
             if (value !== undefined)
                 prop.set(item, value);
@@ -320,12 +344,19 @@ function deserializeItem1(raw, map, context) {
             prop.setId(item, id);
         }
         else if (prop instanceof ChildListProp) {
-            const rawList = raw[prop.name], list = prop.get(item);
-            if (rawList) {
-                for (let rawChild of rawList) {
+            const rawArray = raw[prop.name], list = prop.get(item);
+            if (rawArray) {
+                for (let rawChild of rawArray) {
                     const child = deserializeItem1(rawChild, map, context);
                     list.append(child);
                 }
+            }
+        }
+        else if (prop instanceof ChildSlotProp) {
+            const rawObject = raw[prop.name], slot = prop.get(item);
+            if (rawObject) {
+                const child = deserializeItem1(rawObject, map, context);
+                slot.set(0, child);
             }
         }
     }
@@ -334,13 +365,19 @@ function deserializeItem1(raw, map, context) {
 // Second pass; copy and remap references.
 function deserializeItem2(item, map, context) {
     for (let prop of item.template.properties) {
-        if (prop instanceof ReferenceProp) {
+        if (prop instanceof ReferenceProp) { // TODO move this onto the prop classes!
             const id = prop.getId(item);
             prop.set(item, map.get(id));
         }
         else if (prop instanceof ChildListProp) {
             const list = prop.get(item);
             list.forEach(child => deserializeItem2(child, map, context));
+        }
+        else if (prop instanceof ChildSlotProp) {
+            const child = prop.get(item).get(0);
+            if (child) {
+                deserializeItem2(child, map, context);
+            }
         }
     }
     return item;
@@ -456,19 +493,29 @@ class ChangeOp {
                 break;
             }
             case 'elementInserted': {
-                if (prop instanceof ChildListProp) {
+                if (prop instanceof ChildListProp) { // TODO move this onto the prop classes!
                     const list = prop.get(item), index = change.index;
                     change.oldValue = list.get(index);
                     list.removeAt(index);
                     change.type = 'elementRemoved';
                 }
+                else if (prop instanceof ChildSlotProp) {
+                    const slot = prop.get(item), index = change.index;
+                    change.oldValue = slot.set(index, change.oldValue);
+                    change.type = 'elementRemoved';
+                }
                 break;
             }
             case 'elementRemoved': {
-                if (prop instanceof ChildListProp) {
+                if (prop instanceof ChildListProp) { // TODO move this onto the prop classes!
                     const list = prop.get(item), index = change.index;
                     list.insert(change.oldValue, index);
                     change.type = 'elementInserted';
+                }
+                else if (prop instanceof ChildSlotProp) {
+                    const slot = prop.get(item), index = change.index;
+                    change.oldValue = slot.set(index, change.oldValue);
+                    change.type = 'elementRemoved';
                 }
                 break;
             }
