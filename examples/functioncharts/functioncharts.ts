@@ -473,6 +473,12 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
     return pin;
   }
 
+  onValueChanged(prop: PropertyTypes, oldValue: any) : void{
+    if (prop === typeStringProp) {
+      this.type = Type.fromString(this.typeString);
+    }
+  }
+
   constructor(template: T, context: FunctionchartContext, id: number) {
     this.template = template;
     this.context = context;
@@ -517,6 +523,13 @@ export class InstancerElement extends Element<InstancerTemplate> {  // TODO Chan
     return this.instanceType;
   }
 
+  onValueChanged(prop: PropertyTypes, oldValue: any): void {
+    super.onValueChanged(prop, oldValue);
+    if (prop === innerTypeStringProp) {
+      this.instanceType = Type.fromString(this.innerTypeString);
+    }
+  }
+
   constructor(context: FunctionchartContext, id: number) {
     super(instancerTemplate, context,  id);
   }
@@ -530,6 +543,12 @@ export class ExporterElement extends Element<ExporterTemplate> {
 
   // Derived properties.
   get innerType() : Type { return this.innerElement? this.innerElement.type : Type.emptyType; }
+
+  onValueChanged(prop: PropertyTypes, oldValue: any): void {
+    super.onValueChanged(prop, oldValue);
+    if (prop === nameProp) {
+    }
+  }
 
   constructor(context: FunctionchartContext, id: number) {
     super(exporterTemplate, context,  id);
@@ -598,6 +617,10 @@ export class Wire implements DataContextObject {
       return this.dst.type.inputs[this.dstPin].type;
     }
     return Type.valueType;
+  }
+
+  // TODO can we eliminate layout machinery in the Editor by maintaining a "needs layout" flag?
+  onValueChanged(prop: PropertyTypes, oldValue: any) : void{
   }
 
   constructor(context: FunctionchartContext) {
@@ -2002,20 +2025,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // DataContext interface implementation.
   valueChanged(owner: AllTypes, prop: ScalarPropertyTypes, oldValue: any) : void {
-    if (owner instanceof NodeBase && this.nodes.has(owner)) {
-      // TODO move this into the Node classes, with an onValueChanged method on DataContextObject.
-      if (owner instanceof InstancerElement) {
-        if (prop === innerTypeStringProp) {
-          owner.instanceType = Type.fromString(owner.innerTypeString);
-        }
-      } else if (owner instanceof ExporterElement) {
-        if (prop === nameProp) {
+    owner.onValueChanged(prop, oldValue);
 
-        }
-      } else if (prop === typeStringProp) {
-        owner.type = Type.fromString(owner.typeString);
-      }
-    }
     this.onValueChanged(owner, prop, oldValue);
     this.updateGlobalPosition(owner);  // Update any derived properties.
   }
@@ -3013,6 +3024,12 @@ export class FunctionchartEditor implements CanvasLayer {
         }
         case 'instancer': {
           const element =  item as InstancerElement,
+                innerType = element.innerType;
+          newType = Type.fromInfo(innerType.inputs, innerType.outputs, value);
+          break;
+        }
+        case 'exporter': {
+          const element =  item as ExporterElement,
                 innerType = element.innerType;
           newType = Type.fromInfo(innerType.inputs, innerType.outputs, value);
           break;

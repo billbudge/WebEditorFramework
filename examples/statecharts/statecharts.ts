@@ -121,6 +121,9 @@ abstract class StateBase {
   inTransitions = new Array<Transition>();
   outTransitions = new Array<Transition>();
 
+  onValueChanged(prop: PropertyTypes, oldValue: any) : void{
+  }
+
   constructor(id: number) {
     this.id = id;
   }
@@ -205,6 +208,9 @@ export class Transition implements DataContextObject {
   text = '';
   textWidth = 0;
 
+  onValueChanged(prop: PropertyTypes, oldValue: any) : void{
+  }
+
   constructor(context: StatechartContext) {
     this.context = context;
   }
@@ -231,6 +237,9 @@ export class Statechart implements DataContextObject {
   // Derived properties.
   parent: State | undefined;
   globalPosition = defaultPoint;
+
+  onValueChanged(prop: PropertyTypes, oldValue: any) : void{
+  }
 
   constructor(context: StatechartContext) {
     this.context = context;
@@ -1005,6 +1014,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
 
   // DataContext interface implementation.
   valueChanged(owner: AllTypes, prop: ScalarPropertyTypes, oldValue: any) : void {
+    // TODO update this ala FunctionchartContext, then move this code into Transition.
     if (owner instanceof Transition) {
       if (this.transitions.has(owner)) {
         // Remove and reinsert changed transitions.

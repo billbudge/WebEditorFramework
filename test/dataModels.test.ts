@@ -122,6 +122,9 @@ class TestDataContextObject implements Data.DataContextObject, Data.ReferencedOb
   set reference(value: TestDataContextObject) { this.template.reference.set(this, value); }
 
   parent: TestDataContextObject | undefined;
+
+  onValueChanged(prop: Data.PropertyTypes, oldValue: any) {
+  }
 }
 
 describe('DataContext', () => {
