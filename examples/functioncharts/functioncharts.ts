@@ -3028,12 +3028,6 @@ export class FunctionchartEditor implements CanvasLayer {
           newType = Type.fromInfo(innerType.inputs, innerType.outputs, value);
           break;
         }
-        case 'exporter': {
-          const element =  item as ExporterElement,
-                innerType = element.innerType;
-          newType = Type.fromInfo(innerType.inputs, innerType.outputs, value);
-          break;
-        }
       }
       if (newType) {
         const newValue = newType.typeString;
@@ -3122,9 +3116,9 @@ export class FunctionchartEditor implements CanvasLayer {
       {
         label: 'name',
         type: 'text',
-        getter: nodeLabelGetter,
-        setter: nodeLabelSetter,
-        prop: innerTypeStringProp,
+        getter: getter,
+        setter: setter,
+        prop: nameProp,
       },
     ]);
     this.propertyInfo.set('functionchart', [

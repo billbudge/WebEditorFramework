@@ -2476,11 +2476,6 @@ export class FunctionchartEditor {
                     newType = Type.fromInfo(innerType.inputs, innerType.outputs, value);
                     break;
                 }
-                case 'exporter': {
-                    const element = item, innerType = element.innerType;
-                    newType = Type.fromInfo(innerType.inputs, innerType.outputs, value);
-                    break;
-                }
             }
             if (newType) {
                 const newValue = newType.typeString;
@@ -2569,9 +2564,9 @@ export class FunctionchartEditor {
             {
                 label: 'name',
                 type: 'text',
-                getter: nodeLabelGetter,
-                setter: nodeLabelSetter,
-                prop: innerTypeStringProp,
+                getter: getter,
+                setter: setter,
+                prop: nameProp,
             },
         ]);
         this.propertyInfo.set('functionchart', [
