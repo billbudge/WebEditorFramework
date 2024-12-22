@@ -95,7 +95,7 @@ describe('Type', () => {
         expect(type1.typeString).toBe('[v,v]');
         expect(named.typeString).toBe('[v,v](type1)');
         expect(named.typeString).toBe('[v,v](type1)');
-        const labeled = FC.Type.fromString('[v(1)v(2),v(3)](foo)'), copyUnnamed = labeled.copyUnnamed();
+        const labeled = FC.Type.fromString('[v(1)v(2),v(3)](foo)'), copyUnnamed = labeled.rename();
         expect(copyUnnamed).not.toBe(labeled);
         expect(copyUnnamed.name).toBeUndefined();
         expect(copyUnnamed.typeString).toBe('[v(1)v(2),v(3)]');
@@ -150,7 +150,7 @@ describe('parseTypeString', () => {
             '[vv,v](+)',
             '[v(a)v(b),v(c)]',
             '[,[,v][v,v]](@)',
-            '[[v,vv(q)](a)v(b),v](foo)',
+            '[[v,vv(q)](a)v(b),v(c)](foo)',
             '[v(p(0))),](p(0))=1)', // labels with ')' in them (escaped).
         ];
         typeStrings.forEach(typeString => expect(FC.Type.fromString(typeString).typeString).toBe(typeString));
@@ -168,9 +168,26 @@ describe('parseTypeString', () => {
         expect(type2.outputs.length).toBe(2);
         expect(type2.outputs[0].toString()).toBe('[,v]');
         expect(type2.outputs[1].toString()).toBe('[v,v]');
-        // Make sure subtypes are present.
-        const subTypeStrings = ['[v,v]', '[,v]', '[v,vv(q)]'];
+        // Make sure some subtypes are atomized.
+        const subTypeStrings = ['[v,v]', '[,v]', '[v,vv(q)](a)'];
         subTypeStrings.forEach(typeString => expect(FC.Type.atomizedTypes.has(typeString)).toBe(true));
+    });
+    test('pinAndTypeNames', () => {
+        expect(FC.Type.fromString('[v,v]()').name).toBeUndefined();
+        const type1 = FC.Type.fromString('[[,](f),[,](g)(x)]'), input1 = type1.inputs[0], output1 = type1.outputs[0];
+        expect(type1.name).toBeUndefined();
+        expect(input1.name).toBeUndefined();
+        expect(input1.type.name).toBe('f');
+        expect(output1.name).toBe('x');
+        expect(output1.type.name).toBe('g');
+        expect(type1.typeString).toBe('[[,](f),[,](g)(x)]');
+        const type2 = FC.Type.fromString('[[,]()(f),[,](g)()]'), input2 = type2.inputs[0], output2 = type2.outputs[0];
+        expect(type2.name).toBeUndefined();
+        expect(input2.name).toBe('f');
+        expect(input2.type.name).toBeUndefined();
+        expect(output2.name).toBeUndefined();
+        expect(output2.type.name).toBe('g');
+        expect(type2.typeString).toBe('[[,]()(f),[,](g)]');
     });
 });
 describe('FunctionchartContext', () => {

@@ -29,9 +29,14 @@ export class Pin {
         return result;
     }
     toString() {
-        let s = this.type.typeString;
-        if (this.name)
+        const type = this.type;
+        let s = type.typeString;
+        if (this.name) {
+            // Insert an empty name, so the pin name doesn't get parsed as the type name.
+            if (type !== Type.valueType && type.name === undefined)
+                s += '()';
             s += '(' + escapeName(this.name) + ')';
+        }
         if (this.varArgs)
             s += '{' + this.varArgs.toString() + '}';
         return s;
@@ -65,8 +70,8 @@ export class Type {
         }
         return result;
     }
-    copyUnnamed() {
-        return Type.fromInfo(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()));
+    rename(name) {
+        return Type.fromInfo(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()), name);
     }
     toInstancerType() {
         return Type.fromInfo([new Pin(this)], []);
@@ -157,6 +162,7 @@ Type.emptyType = new Type(Type.emptyPins, Type.emptyPins);
 Type.emptyExporterTypeString = '[,' + _a.emptyTypeString + ']'; // export the empty type
 Type.emptyExporterType = new Type(Type.emptyPins, [new Pin(Type.emptyType)]);
 // Manually atomize the base types.
+// TODO make this private.
 Type.atomizedTypes = new Map([
     [Type.valueTypeString, Type.valueType.initializeBaseType(Type.valueTypeString)],
     [Type.emptyTypeString, Type.emptyType.initializeBaseType(Type.emptyTypeString)],
@@ -230,23 +236,16 @@ function parseTypeString(s) {
                 outputs.push(parsePin());
             }
             j++;
-            return Type.fromInfo(inputs, outputs);
+            // Parse the name if present.
+            const name = parseName();
+            return Type.fromInfo(inputs, outputs, name);
         }
         else {
             throw new Error('Invalid type string: ' + s);
         }
     }
-    let type = parseFunction();
-    if (type) {
-        const name = parseName();
-        if (name) {
-            // The top level function type includes the label, so duplicate
-            // type and pins.
-            const inputs = type.inputs.map(pin => new Pin(pin.type, pin.name)), outputs = type.outputs.map(pin => new Pin(pin.type, pin.name));
-            type = Type.fromInfo(inputs, outputs, name);
-        }
-    }
-    return type;
+    // TODO try catch here?
+    return parseFunction();
 }
 //------------------------------------------------------------------------------
 // Properties and templates for the raw data interface for cloning, serialization, etc.
@@ -1536,7 +1535,7 @@ export class FunctionchartContext extends EventBase {
             else { // instanceof ElementTypes
                 if (node instanceof Element && node.isAbstract && node.type !== Type.emptyType) {
                     // abstract elements become inputs.
-                    const type = node.type.copyUnnamed();
+                    const type = node.type.rename();
                     const name = node.type.name;
                     const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
                     inputs.push(pinInfo);
@@ -1549,12 +1548,12 @@ export class FunctionchartContext extends EventBase {
                 }
             }
         });
-        // Add disconnected instancer pins as input pins.
+        // Add disconnected instancers as inputs, and exporters as outputs.
         subgraphInfo.nodes.forEach(node => {
             if (node instanceof InstancerElement) {
                 const wire = node.inWires[0];
                 if (!wire) {
-                    const innerType = node.innerType, type = innerType.copyUnnamed(), name = innerType.name;
+                    const innerType = node.innerType, type = innerType.rename(), name = innerType.name;
                     const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
                     inputs.push(pinInfo);
                 }
@@ -1563,8 +1562,8 @@ export class FunctionchartContext extends EventBase {
             else if (node instanceof ExporterElement) {
                 const wires = node.outWires[0];
                 if (wires && wires.length === 0) { // Wires may be undefined.
-                    const type = node.innerType, name = type.name;
-                    const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                    const type = node.innerType.rename(node.type.name);
+                    const pinInfo = { element: node, index: 0, type, name: undefined, fcIndex: -1 };
                     outputs.push(pinInfo);
                 }
             }
@@ -2449,6 +2448,11 @@ export class FunctionchartEditor {
                     result = element.innerType.name;
                     break;
                 }
+                case 'exporter': {
+                    const element = item;
+                    result = element.type.name;
+                    break;
+                }
             }
             return result ? result : '';
         }
@@ -2474,6 +2478,11 @@ export class FunctionchartEditor {
                 case 'instancer': {
                     const element = item, innerType = element.innerType;
                     newType = Type.fromInfo(innerType.inputs, innerType.outputs, value);
+                    break;
+                }
+                case 'exporter': {
+                    const element = item, type = element.type;
+                    newType = type.rename(value);
                     break;
                 }
             }
@@ -2542,15 +2551,6 @@ export class FunctionchartEditor {
                 prop: typeStringProp,
             },
         ]);
-        this.propertyInfo.set('external', [
-            {
-                label: 'typeString',
-                type: 'text',
-                getter: getter,
-                setter: setter,
-                prop: typeStringProp,
-            },
-        ]);
         this.propertyInfo.set('instancer', [
             {
                 label: 'name',
@@ -2564,9 +2564,9 @@ export class FunctionchartEditor {
             {
                 label: 'name',
                 type: 'text',
-                getter: getter,
-                setter: setter,
-                prop: nameProp,
+                getter: nodeLabelGetter,
+                setter: nodeLabelSetter,
+                prop: typeStringProp,
             },
         ]);
         this.propertyInfo.set('functionchart', [
