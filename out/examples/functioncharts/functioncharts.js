@@ -1555,6 +1555,15 @@ export class FunctionchartContext extends EventBase {
                 }
                 ;
             }
+            else if (node instanceof ImporterElement) {
+                const wire = node.inWires[0];
+                if (!wire) {
+                    const instanceType = node.type.outputs[0].type, type = instanceType.rename(), name = instanceType.name;
+                    const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                    inputs.push(pinInfo);
+                }
+                ;
+            }
             else if (node instanceof ExporterElement) {
                 const wires = node.outWires[0];
                 if (wires && wires.length === 0) { // Wires may be undefined.
@@ -3162,11 +3171,11 @@ export class FunctionchartEditor {
             else if (dst === undefined) {
                 const p = wire.pDst, pin = src.type.outputs[wire.srcPin];
                 let output;
-                if (pin.type === Type.valueType) {
-                    output = context.newOutputForWire(wire, parent, p);
+                if (pin.type !== Type.valueType && src instanceof ImporterElement) { // TODO other instancer types.
+                    output = context.newInstanceForWire(wire, parent, p);
                 }
                 else {
-                    output = context.newInstanceForWire(wire, parent, p);
+                    output = context.newOutputForWire(wire, parent, p);
                 }
                 context.select(output);
             }
