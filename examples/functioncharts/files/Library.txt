@@ -175,20 +175,20 @@
       "typeString": "[,](Iterator)",
       "x": 171.6781520843506,
       "y": 745.774974822998,
-      "width": 402.5672550201416,
+      "width": 435.6688175201416,
       "height": 263.3163833618164,
       "name": "Iterator",
       "nodes": [
         {
           "type": "exporter",
           "id": 23,
-          "typeString": "[,[vv(v),[,v(?)v(v)]](return)]",
+          "typeString": "[,[vv(v),[,v(?)v(v)]()(res)](return)]",
           "x": 25.325830459594727,
           "y": 106.81869888305664,
           "instancer": 0,
           "inner": {
             "type": "instance",
-            "id": 97,
+            "id": 24,
             "typeString": "[vv(v),[,v(?)v(v)]()(res)](return)",
             "x": 235.14444732666016,
             "y": 861.9030570983887,
@@ -198,29 +198,29 @@
         {
           "type": "exporter",
           "id": 25,
-          "typeString": "[,[vv(e),[,v(?)v(v)]](throw)]",
+          "typeString": "[,[vv(e),[,v(?)v(v)]()(res)](throw)]",
           "x": 24.886804580688477,
           "y": 185.3163833618164,
           "instancer": 0,
           "inner": {
             "type": "instance",
-            "id": 98,
+            "id": 102,
             "typeString": "[vv(e),[,v(?)v(v)]()(res)](throw)",
-            "x": 213.59529876708984,
-            "y": 934.5873908996582,
+            "x": 208.91951751708984,
+            "y": 937.1147346496582,
             "instancer": 90
           }
         },
         {
           "type": "exporter",
           "id": 27,
-          "typeString": "[,[vv,[,v(?)v(v)]](next)]",
+          "typeString": "[,[vv,[,v(?)v(v)]()(res)](next)]",
           "x": 24.045297622680664,
           "y": 24.806217193603516,
           "instancer": 0,
           "inner": {
             "type": "instance",
-            "id": 96,
+            "id": 28,
             "typeString": "[vv,[,v(?)v(v)]()(res)](next)",
             "x": 208.45709228515625,
             "y": 780.6296195983887,
@@ -236,8 +236,8 @@
       "typeString": "[v,](entries)",
       "x": 838.4532958865166,
       "y": 1247.4500312805176,
-      "width": 501.0915496945381,
-      "height": 199.38124084472656,
+      "width": 613.0915496945381,
+      "height": 232.68202209472656,
       "name": "Array.entries",
       "nodes": [
         {
@@ -250,16 +250,16 @@
         {
           "type": "exporter",
           "id": 31,
-          "typeString": "[,[,[vv,[,v(?)v(v)]][vv(v),[,v(?)v(v)]][vv(e),[,v(?)v(v)]]](Iterator)](iter)",
-          "x": 45.07796937227249,
-          "y": 11.381240844726562,
+          "typeString": "[,[,[vv,[,v(?)v(v)]()(res)]()(next)[vv(v),[,v(?)v(v)]()(res)]()(return)[vv(e),[,v(?)v(v)]()(res)]()(throw)](Iterator)]( )",
+          "x": 15.234219372272491,
+          "y": 44.68202209472656,
           "instancer": 0,
           "inner": {
             "type": "instance",
-            "id": 100,
+            "id": 103,
             "typeString": "[,[vv,[,v(?)v(v)]()(res)]()(next)[vv(v),[,v(?)v(v)]()(res)]()(return)[vv(e),[,v(?)v(v)]()(res)]()(throw)](Iterator)",
-            "x": 867.9211883544922,
-            "y": 1280.3296394348145,
+            "x": 870.5227508544922,
+            "y": 1279.6343269348145,
             "instancer": 22
           }
         }
@@ -786,38 +786,6 @@
         }
       ],
       "wires": []
-    },
-    {
-      "type": "instance",
-      "id": 96,
-      "typeString": "[vv,[,v(?)v(v)]()(res)](next)",
-      "x": 208.45709228515625,
-      "y": 780.6296195983887,
-      "instancer": 80
-    },
-    {
-      "type": "instance",
-      "id": 97,
-      "typeString": "[vv(v),[,v(?)v(v)]()(res)](return)",
-      "x": 235.14444732666016,
-      "y": 861.9030570983887,
-      "instancer": 85
-    },
-    {
-      "type": "instance",
-      "id": 98,
-      "typeString": "[vv(e),[,v(?)v(v)]()(res)](throw)",
-      "x": 213.59529876708984,
-      "y": 934.5873908996582,
-      "instancer": 90
-    },
-    {
-      "type": "instance",
-      "id": 100,
-      "typeString": "[,[vv,[,v(?)v(v)]()(res)]()(next)[vv(v),[,v(?)v(v)]()(res)]()(return)[vv(e),[,v(?)v(v)]()(res)]()(throw)](Iterator)",
-      "x": 867.9211883544922,
-      "y": 1280.3296394348145,
-      "instancer": 22
     }
   ],
   "wires": []

@@ -670,11 +670,11 @@ export class FunctionchartContext extends EventBase {
     }
     getContainingFunctionchart(items) {
         let owner = getLowestCommonAncestor(...items);
-        if (!owner)
-            return this.functionchart; // |items| not in the functionchart yet.
-        if (!(owner instanceof Functionchart))
-            owner = owner.parent; // single item, not a functionchart.
-        return owner;
+        while (owner && !(owner instanceof Functionchart))
+            owner = owner.parent;
+        if (owner instanceof Functionchart)
+            return owner;
+        return this.functionchart;
     }
     forInWires(dst, visitor) {
         dst.inWires.forEach(wire => {
@@ -1086,8 +1086,10 @@ export class FunctionchartContext extends EventBase {
         return true;
     }
     isValidFunctionInstance(instance) {
-        const parent = instance.parent;
-        if (!parent)
+        let parent = instance.parent;
+        if (parent instanceof ExporterElement)
+            parent = parent.parent;
+        if (!parent || !(parent instanceof Functionchart))
             return false;
         return this.canAddItem(instance, parent);
     }
@@ -1623,19 +1625,23 @@ export class FunctionchartContext extends EventBase {
         this.derivedInfoNeedsUpdate = true; // Removal might break a cycle, making an unsortable graph sortable.
     }
     insertItem(item, parent) {
-        if (item instanceof Wire) {
-            if (parent && this.nodes.has(parent)) {
+        if (!this.nodes.has(parent))
+            return;
+        if (parent instanceof Functionchart) {
+            if (item instanceof Wire) {
                 this.insertWire(item, parent);
             }
-        }
-        else if (item instanceof Functionchart) {
-            if (parent && this.nodes.has(parent)) {
+            else if (item instanceof Functionchart) {
                 this.insertFunctionchart(item, parent);
             }
-        }
-        else {
-            if (parent && this.nodes.has(parent)) {
+            else {
                 this.insertElement(item, parent);
+            }
+        }
+        else if (parent instanceof ExporterElement) {
+            if (item instanceof Element) {
+                this.insertElement(item, parent);
+                parent.typeString = item.type.toExporterType().typeString;
             }
         }
     }

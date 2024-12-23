@@ -440,7 +440,7 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
   set y(value: number) { this.template.y.set(this, value); }
 
   // Derived properties, managed by the FunctionchartContext.
-  parent: Functionchart | undefined;
+  parent: ElementParentTypes | undefined;
   globalPosition = defaultPoint;
 
   private _type: Type;
@@ -664,6 +664,7 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> {
 }
 
 export type ElementTypes = Element | Pseudoelement;
+export type ElementParentTypes = Functionchart | ExporterElement;
 export type NodeTypes = ElementTypes | Functionchart;
 export type InstancerTypes = Functionchart | InstancerElement;
 export type AllTypes = NodeTypes | Wire;
@@ -877,11 +878,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   getContainingFunctionchart(items: AllTypes[]) : Functionchart {
     let owner = getLowestCommonAncestor<AllTypes>(...items);
-    if (!owner)
-      return this.functionchart;  // |items| not in the functionchart yet.
-    if (!(owner instanceof Functionchart))
-      owner = owner.parent;       // single item, not a functionchart.
-    return owner as Functionchart;
+    while (owner && !(owner instanceof Functionchart))
+      owner = owner.parent;
+    if (owner instanceof Functionchart)
+      return owner;
+
+    return this.functionchart;
   }
 
   forInWires(dst: NodeTypes, visitor: WireVisitor) {
@@ -1249,7 +1251,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   connectInput(node: NodeTypes, pin: number) {
-    const parent = node.parent!,
+    const parent = node.parent as Functionchart,
           p = this.layoutEngine.inputPinToPoint(node, pin),
           wire = this.newWire(undefined, 0, node, pin);
     p.x -= 32;
@@ -1287,7 +1289,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   connectOutput(node: NodeTypes, pin: number) {
-    const parent = node.parent!,
+    const parent = node.parent as Functionchart,
           p = this.layoutEngine.outputPinToPoint(node, pin),
           wire = this.newWire(node, pin, undefined, 0);
     p.x += 32;
@@ -1359,13 +1361,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       const scope = getLowestCommonAncestor<AllTypes>(item, definition);
       return scope === definition ||  // recursive
               scope === definitionScope;  // within scope of definition.
-      }
+    }
     return true;
   }
 
   isValidFunctionInstance(instance: FunctionInstance) : boolean {
-    const parent = instance.parent;
-    if (!parent)
+    let parent = instance.parent;
+    if (parent instanceof ExporterElement)
+      parent = parent.parent;
+    if (!parent || !(parent instanceof Functionchart))
       return false;
     return this.canAddItem(instance, parent);
   }
@@ -1653,7 +1657,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   replaceNode(node: NodeTypes, newNode: NodeTypes) {
-    const parent = node.parent,
+    const parent = node.parent as Functionchart,
           newType = newNode.type;
     // Add newNode so that both nodes are present as we rewire them.
     this.addItem(newNode, parent);
@@ -1721,7 +1725,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
     elements.forEach(element => {
       if (element instanceof InstancerElement || element instanceof ExporterElement) return;
-      const parent = element.parent!;
+      const parent = element.parent as Functionchart;
       selection.delete(element);
       const exporter = self.exportElement(element),
             index = parent.nodes.indexOf(element);
@@ -1917,7 +1921,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  private insertElement(element: ElementTypes, parent: Functionchart) {
+  private insertElement(element: ElementTypes, parent: ElementParentTypes) {
     this.nodes.add(element);
     element.parent = parent;
     this.updateGlobalPosition(element);
@@ -1971,18 +1975,20 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.derivedInfoNeedsUpdate = true;  // Removal might break a cycle, making an unsortable graph sortable.
   }
 
-  private insertItem(item: AllTypes, parent: Functionchart) {
-    if (item instanceof Wire) {
-      if (parent && this.nodes.has(parent)) {
-        this.insertWire(item, parent);
-      }
-    } else if (item instanceof Functionchart) {
-      if (parent && this.nodes.has(parent)) {
-        this.insertFunctionchart(item, parent);
-      }
-    } else {
-      if (parent && this.nodes.has(parent)) {
+  private insertItem(item: AllTypes, parent: ElementParentTypes) {
+    if (!this.nodes.has(parent)) return;
+    if (parent instanceof Functionchart) {
+      if (item instanceof Wire) {
+        this.insertWire(item, parent as Functionchart);
+      } else if (item instanceof Functionchart) {
+        this.insertFunctionchart(item, parent as Functionchart);
+      } else {
         this.insertElement(item, parent);
+      }
+    } else if (parent instanceof ExporterElement) {
+      if (item instanceof Element) {
+        this.insertElement(item, parent);
+        parent.typeString = item.type.toExporterType().typeString;
       }
     }
   }
@@ -2014,14 +2020,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.updateGlobalPosition(owner);  // Update any derived properties.
     this.derivedInfoNeedsUpdate = true;
   }
-  elementInserted(owner: Functionchart, prop: ChildPropertyTypes, index: number) : void {
+  elementInserted(owner: ElementParentTypes, prop: ChildPropertyTypes, index: number) : void {
     if (this.nodes.has(owner)) {
       const value: AllTypes = prop.get(owner).get(index) as AllTypes;
       this.insertItem(value, owner);
       this.onElementInserted(owner, prop, index);
     }
   }
-  elementRemoved(owner: Functionchart, prop: ChildPropertyTypes, index: number, oldValue: AllTypes) : void {
+  elementRemoved(owner: ElementParentTypes, prop: ChildPropertyTypes, index: number, oldValue: AllTypes) : void {
     if (this.nodes.has(owner)) {
       this.removeItem(oldValue);
       this.onElementRemoved(owner, prop, index, oldValue);
@@ -2065,7 +2071,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.onChanged(change);
   }
   private onElementInserted(
-      owner: Functionchart, prop: ChildPropertyTypes, index: number) :
+      owner: ElementParentTypes, prop: ChildPropertyTypes, index: number) :
       Change {
     const change: Change =
         { type: 'elementInserted', item: owner, prop: prop, index: index, oldValue: undefined };
@@ -2073,7 +2079,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.onChanged(change);
   }
   private onElementRemoved(
-      owner: Functionchart, prop: ChildPropertyTypes, index: number, oldValue: AllTypes ) :
+      owner: ElementParentTypes, prop: ChildPropertyTypes, index: number, oldValue: AllTypes ) :
       Change {
     const change: Change =
         { type: 'elementRemoved', item: owner, prop: prop, index: index, oldValue: oldValue };
