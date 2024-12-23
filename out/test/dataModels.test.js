@@ -85,8 +85,6 @@ class TestDataContextObject {
     get child() { return this.template.child.get(this); }
     get reference() { return this.template.reference.get(this); }
     set reference(value) { this.template.reference.set(this, value); }
-    onValueChanged(prop, oldValue) {
-    }
 }
 TestDataContextObject.nextId = 1;
 describe('DataContext', () => {

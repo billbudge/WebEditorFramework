@@ -77,7 +77,7 @@ export class Type {
         return Type.fromInfo([new Pin(this)], []);
     }
     toExporterType() {
-        return Type.fromInfo([], [new Pin(this)], this.name);
+        return Type.fromInfo([], [new Pin(this)]);
     }
     static outputType(pin) {
         const type = pin.type;
@@ -360,11 +360,6 @@ class NodeBase {
             type.outputs[index - firstOutput];
         return pin;
     }
-    onValueChanged(prop, oldValue) {
-        if (prop === typeStringProp) {
-            this.type = Type.fromString(this.typeString);
-        }
-    }
     constructor(template, context, id) {
         this.globalPosition = defaultPoint;
         this.inWires = new Array(); // one input per pin (no fan in).
@@ -402,12 +397,6 @@ export class InstancerElement extends Element {
     get innerType() {
         return this.instanceType;
     }
-    onValueChanged(prop, oldValue) {
-        super.onValueChanged(prop, oldValue);
-        if (prop === innerTypeStringProp) {
-            this.instanceType = Type.fromString(this.innerTypeString);
-        }
-    }
     constructor(context, id) {
         super(instancerTemplate, context, id);
         this.instances = new Set(); // TODO do we need this mapping to instances?
@@ -420,11 +409,6 @@ export class ExporterElement extends Element {
     set innerElement(value) { this.template.innerElement.get(this).set(0, value); }
     // Derived properties.
     get innerType() { return this.innerElement ? this.innerElement.type : Type.emptyType; }
-    onValueChanged(prop, oldValue) {
-        super.onValueChanged(prop, oldValue);
-        if (prop === nameProp) {
-        }
-    }
     constructor(context, id) {
         super(exporterTemplate, context, id);
     }
@@ -475,9 +459,6 @@ export class Wire {
             return this.dst.type.inputs[this.dstPin].type;
         }
         return Type.valueType;
-    }
-    // TODO can we eliminate layout machinery in the Editor by maintaining a "needs layout" flag?
-    onValueChanged(prop, oldValue) {
     }
     constructor(context) {
         this.template = wireTemplate;
@@ -1562,8 +1543,8 @@ export class FunctionchartContext extends EventBase {
             else if (node instanceof ExporterElement) {
                 const wires = node.outWires[0];
                 if (wires && wires.length === 0) { // Wires may be undefined.
-                    const type = node.innerType.rename(node.type.name);
-                    const pinInfo = { element: node, index: 0, type, name: undefined, fcIndex: -1 };
+                    const name = node.type.name || node.innerType.name, type = node.innerType.rename();
+                    const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
                     outputs.push(pinInfo);
                 }
             }
@@ -1591,7 +1572,6 @@ export class FunctionchartContext extends EventBase {
         return { instanceType: type, closed, abstract, inputs, outputs };
     }
     updateGlobalPosition(item) {
-        this.derivedInfoNeedsUpdate = true;
         if (item instanceof NodeBase) {
             this.visitNodes(item, item => this.setGlobalPosition(item));
         }
@@ -1600,19 +1580,19 @@ export class FunctionchartContext extends EventBase {
         this.nodes.add(element);
         element.parent = parent;
         this.updateGlobalPosition(element);
-        this.derivedInfoNeedsUpdate = true;
         if (element instanceof FunctionInstance) {
             const functionChart = element.instancer;
             functionChart.instances.add(element);
         }
+        this.derivedInfoNeedsUpdate = true;
     }
     removeElement(element) {
         this.nodes.delete(element);
-        this.derivedInfoNeedsUpdate = true;
         if (element instanceof FunctionInstance) {
             const functionChart = element.instancer;
             functionChart.instances.delete(element);
         }
+        this.derivedInfoNeedsUpdate = true;
     }
     // Parent can be undefined in the case of the root functionchart.
     insertFunctionchart(functionchart, parent) {
@@ -1624,17 +1604,18 @@ export class FunctionchartContext extends EventBase {
         // Update function chart after all descendants have been added and updated. We need that
         // in order to compute the type info for the functionchart.
         this.updateGlobalPosition(functionchart);
+        this.derivedInfoNeedsUpdate = true;
     }
     removeFunctionchart(functionchart) {
         this.nodes.delete(functionchart);
         const self = this;
         functionchart.wires.forEach(wire => self.removeWire(wire));
         functionchart.nodes.forEach(element => self.removeItem(element));
+        this.derivedInfoNeedsUpdate = true;
     }
     insertWire(wire, parent) {
         this.wires.add(wire);
         wire.parent = parent;
-        this.updateGlobalPosition(wire);
         this.derivedInfoNeedsUpdate = true;
     }
     removeWire(wire) {
@@ -1668,9 +1649,21 @@ export class FunctionchartContext extends EventBase {
     }
     // DataContext interface implementation.
     valueChanged(owner, prop, oldValue) {
-        owner.onValueChanged(prop, oldValue);
+        if (owner instanceof NodeBase) {
+            if (owner instanceof InstancerElement) {
+                if (prop === innerTypeStringProp) {
+                    owner.instanceType = Type.fromString(owner.innerTypeString);
+                }
+            }
+            if (prop === typeStringProp) {
+                owner.type = Type.fromString(owner.typeString);
+            }
+        }
+        else if (owner instanceof Wire) {
+        }
         this.onValueChanged(owner, prop, oldValue);
         this.updateGlobalPosition(owner); // Update any derived properties.
+        this.derivedInfoNeedsUpdate = true;
     }
     elementInserted(owner, prop, index) {
         if (this.nodes.has(owner)) {
@@ -3160,8 +3153,16 @@ export class FunctionchartEditor {
                 drag.kind === 'moveCopySelection' || drag.kind === 'newInstance')) {
             if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase &&
                 lastSelected.type.canConnectTo(hitInfo.item.type)) {
-                if (!(lastSelected instanceof Functionchart)) // TODO support Functionchart somehow?
-                    context.replaceNode(hitInfo.item, lastSelected);
+                const target = hitInfo.item;
+                if (!(lastSelected instanceof Functionchart)) {
+                    if (target instanceof ExporterElement && hitInfo.output === 0) {
+                        context.deleteItem(lastSelected);
+                        target.innerElement = lastSelected;
+                    }
+                    else {
+                        context.replaceNode(hitInfo.item, lastSelected);
+                    }
+                }
             }
             else {
                 let parent = functionchart;

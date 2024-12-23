@@ -18,7 +18,6 @@ export interface DataContext {
 export interface DataContextObject<T = any> {
   readonly template: DataObjectTemplate;
   readonly context: DataContext;
-  onValueChanged(prop: PropertyTypes, oldValue: any) : void;
 }
 
 export interface DataObjectTemplate {

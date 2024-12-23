@@ -140,8 +140,8 @@ export class Type {
   toInstancerType() : Type {
     return Type.fromInfo([new Pin(this)], []);
   }
-  toExporterType() : Type {  // TODO unit tests, this breaks if we name the pin.
-    return Type.fromInfo([], [new Pin(this)], this.name);
+  toExporterType() : Type {
+    return Type.fromInfo([], [new Pin(this)]);
   }
   static outputType(pin: Pin) : Type {
     const type = pin.type;
@@ -470,12 +470,6 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
     return pin;
   }
 
-  onValueChanged(prop: PropertyTypes, oldValue: any) : void{
-    if (prop === typeStringProp) {
-      this.type = Type.fromString(this.typeString);
-    }
-  }
-
   constructor(template: T, context: FunctionchartContext, id: number) {
     this.template = template;
     this.context = context;
@@ -520,13 +514,6 @@ export class InstancerElement extends Element<InstancerTemplate> {  // TODO Chan
     return this.instanceType;
   }
 
-  onValueChanged(prop: PropertyTypes, oldValue: any): void {
-    super.onValueChanged(prop, oldValue);
-    if (prop === innerTypeStringProp) {
-      this.instanceType = Type.fromString(this.innerTypeString);
-    }
-  }
-
   constructor(context: FunctionchartContext, id: number) {
     super(instancerTemplate, context,  id);
   }
@@ -540,12 +527,6 @@ export class ExporterElement extends Element<ExporterTemplate> {
 
   // Derived properties.
   get innerType() : Type { return this.innerElement? this.innerElement.type : Type.emptyType; }
-
-  onValueChanged(prop: PropertyTypes, oldValue: any): void {
-    super.onValueChanged(prop, oldValue);
-    if (prop === nameProp) {
-    }
-  }
 
   constructor(context: FunctionchartContext, id: number) {
     super(exporterTemplate, context,  id);
@@ -614,10 +595,6 @@ export class Wire implements DataContextObject {
       return this.dst.type.inputs[this.dstPin].type;
     }
     return Type.valueType;
-  }
-
-  // TODO can we eliminate layout machinery in the Editor by maintaining a "needs layout" flag?
-  onValueChanged(prop: PropertyTypes, oldValue: any) : void{
   }
 
   constructor(context: FunctionchartContext) {
@@ -1897,8 +1874,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       } else if (node instanceof ExporterElement) {
         const wires = node.outWires[0];
         if (wires && wires.length === 0) {  // Wires may be undefined.
-          const type = node.innerType.rename(node.type.name);
-          const pinInfo = { element: node, index: 0, type, name: undefined, fcIndex: -1 };
+          const name = node.type.name || node.innerType.name,
+                type = node.innerType.rename();
+          const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
           outputs.push(pinInfo);
         }
       }
@@ -1934,8 +1912,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   private updateGlobalPosition(item: AllTypes) {
-    this.derivedInfoNeedsUpdate = true;
-
     if (item instanceof NodeBase) {
       this.visitNodes(item, item => this.setGlobalPosition(item));
     }
@@ -1945,20 +1921,20 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.nodes.add(element);
     element.parent = parent;
     this.updateGlobalPosition(element);
-    this.derivedInfoNeedsUpdate = true;
     if (element instanceof FunctionInstance) {
       const functionChart = element.instancer;
       functionChart.instances.add(element);
     }
+    this.derivedInfoNeedsUpdate = true;
   }
 
   private removeElement(element: ElementTypes) {
     this.nodes.delete(element);
-    this.derivedInfoNeedsUpdate = true;
     if (element instanceof FunctionInstance) {
       const functionChart = element.instancer;
       functionChart.instances.delete(element);
     }
+    this.derivedInfoNeedsUpdate = true;
   }
 
   // Parent can be undefined in the case of the root functionchart.
@@ -1973,6 +1949,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // Update function chart after all descendants have been added and updated. We need that
     // in order to compute the type info for the functionchart.
     this.updateGlobalPosition(functionchart);
+    this.derivedInfoNeedsUpdate = true;
   }
 
   private removeFunctionchart(functionchart: Functionchart) {
@@ -1980,12 +1957,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const self = this;
     functionchart.wires.forEach(wire => self.removeWire(wire));
     functionchart.nodes.forEach(element => self.removeItem(element));
+    this.derivedInfoNeedsUpdate = true;
   }
 
   private insertWire(wire: Wire, parent: Functionchart) {
     this.wires.add(wire);
     wire.parent = parent;
-    this.updateGlobalPosition(wire);
     this.derivedInfoNeedsUpdate = true;
   }
 
@@ -2021,10 +1998,21 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // DataContext interface implementation.
   valueChanged(owner: AllTypes, prop: ScalarPropertyTypes, oldValue: any) : void {
-    owner.onValueChanged(prop, oldValue);
+    if (owner instanceof NodeBase) {
+      if (owner instanceof InstancerElement) {
+        if (prop === innerTypeStringProp) {
+          owner.instanceType = Type.fromString(owner.innerTypeString);
+        }
+      }
+      if (prop === typeStringProp) {
+        owner.type = Type.fromString(owner.typeString);
+      }
+      } else if (owner instanceof Wire) {
 
+    }
     this.onValueChanged(owner, prop, oldValue);
     this.updateGlobalPosition(owner);  // Update any derived properties.
+    this.derivedInfoNeedsUpdate = true;
   }
   elementInserted(owner: Functionchart, prop: ChildPropertyTypes, index: number) : void {
     if (this.nodes.has(owner)) {
@@ -2037,7 +2025,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (this.nodes.has(owner)) {
       this.removeItem(oldValue);
       this.onElementRemoved(owner, prop, index, oldValue);
-      }
+    }
   }
   resolveReference(owner: AllTypes, prop: ReferenceProp) : ReferencedObject | undefined {
     // Look up element id.
@@ -3779,8 +3767,15 @@ export class FunctionchartEditor implements CanvasLayer {
                drag.kind === 'moveCopySelection' || drag.kind === 'newInstance')) {
       if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase &&
           lastSelected.type.canConnectTo(hitInfo.item.type)) {
-        if (!(lastSelected instanceof Functionchart))  // TODO support Functionchart somehow?
-          context.replaceNode(hitInfo.item, lastSelected);
+        const target = hitInfo.item;
+        if (!(lastSelected instanceof Functionchart)) {
+          if (target instanceof ExporterElement && hitInfo.output === 0) {
+            context.deleteItem(lastSelected);
+            target.innerElement = lastSelected;
+          } else {
+            context.replaceNode(hitInfo.item, lastSelected);
+          }
+        }
       } else {
         let parent: Functionchart = functionchart;
         if (hitInfo instanceof FunctionchartHitResult) {

@@ -68,8 +68,6 @@ const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
 class StateBase {
-    onValueChanged(prop, oldValue) {
-    }
     constructor(id) {
         this.globalPosition = defaultPoint;
         this.inTransitions = new Array();
@@ -132,8 +130,6 @@ export class Transition {
     set action(value) { this.template.action.set(this, value); }
     get tText() { return this.template.tText.get(this) || 0; }
     set tText(value) { this.template.tText.set(this, value); }
-    onValueChanged(prop, oldValue) {
-    }
     constructor(context) {
         this.template = transitionTemplate;
         this.bezier = defaultBezierCurve;
@@ -156,8 +152,6 @@ export class Statechart {
     set name(value) { this.template.name.set(this, value); }
     get states() { return this.template.states.get(this); }
     get transitions() { return this.template.transitions.get(this); }
-    onValueChanged(prop, oldValue) {
-    }
     constructor(context) {
         this.template = statechartTemplate;
         this.globalPosition = defaultPoint;
@@ -838,7 +832,6 @@ export class StatechartContext extends EventBase {
     }
     // DataContext interface implementation.
     valueChanged(owner, prop, oldValue) {
-        // TODO update this ala FunctionchartContext, then move this code into Transition.
         if (owner instanceof Transition) {
             if (this.transitions.has(owner)) {
                 // Remove and reinsert changed transitions.
