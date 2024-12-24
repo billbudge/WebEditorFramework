@@ -373,6 +373,7 @@ export class Element extends NodeBase {
     set name(value) { this.template.name.set(this, value); }
     constructor(template, context, id) {
         super(template, context, id);
+        this.instances = new Set(); // TODO set for each output pin.
     }
 }
 export class ImporterElement extends Element {
@@ -387,7 +388,6 @@ export class ImporterElement extends Element {
     }
     constructor(context, id) {
         super(importerTemplate, context, id);
-        this.instances = new Set();
     }
 }
 export class ExporterElement extends Element {
@@ -405,7 +405,12 @@ export class FunctionInstance extends Element {
     get srcPin() { return this.template.srcPin.get(this) || 0; } // TODO remove default when files converted.
     set srcPin(value) { this.template.srcPin.set(this, value); }
     // Derived Properties
-    get isAbstract() { return this.instancer.isAbstract; }
+    get isAbstract() {
+        const instancer = this.instancer;
+        if (instancer instanceof Functionchart)
+            return instancer.isAbstract;
+        return false;
+    }
     constructor(context, id) {
         super(functionInstanceTemplate, context, id);
     }
@@ -1977,7 +1982,7 @@ class Renderer {
         }
     }
     drawElement(element, mode) {
-        const ctx = this.ctx, theme = this.theme, r = theme.knobbyRadius, d = r * 2, rect = this.getBounds(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
+        const ctx = this.ctx, theme = this.theme, rect = this.getBounds(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
         ctx.beginPath();
         ctx.rect(x, y, w, h);
         switch (mode) {
@@ -1995,15 +2000,29 @@ class Renderer {
                 else {
                     ctx.stroke();
                 }
-                if (element instanceof ImporterElement) {
-                    const pinRect = this.instancerBounds(element, 0);
-                    ctx.beginPath();
-                    ctx.rect(pinRect.x, pinRect.y, pinRect.width, pinRect.height);
-                    ctx.fillStyle = theme.altBgColor;
-                    ctx.fill();
-                    ctx.fillStyle = theme.bgColor;
-                }
+                // Shade function type outputs.
+                ctx.fillStyle = theme.altBgColor;
+                const right = x + w;
+                element.type.outputs.forEach(pin => {
+                    const type = pin.type;
+                    if (type !== Type.valueType) {
+                        ctx.beginPath();
+                        ctx.rect(right - type.width, y + pin.y, type.width, type.height);
+                        ctx.fillStyle = theme.altBgColor;
+                        ctx.fill();
+                    }
+                });
                 this.drawType(element.type.flatType, x, y);
+                if (element instanceof FunctionInstance) {
+                    // draw curve.
+                    const p1 = this.outputPinToPoint(element.instancer, 0), p2 = { x, y: y + h / 2, nx: -1, ny: 0 }, bezier = getEdgeBezier(p1, p2, 24);
+                    ctx.beginPath();
+                    bezierEdgePath(bezier, ctx, 0);
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = theme.dimColor;
+                    ctx.stroke();
+                    ctx.lineWidth = 0.5;
+                }
                 break;
             }
             case RenderMode.Highlight:
@@ -3080,8 +3099,7 @@ export class FunctionchartEditor {
             else if (dst === undefined) {
                 const p = wire.pDst, pin = src.type.outputs[wire.srcPin];
                 let output;
-                if (pin.type !== Type.valueType &&
-                    (src instanceof ImporterElement || src instanceof Functionchart)) { // TODO other instancer types.
+                if (pin.type !== Type.valueType) {
                     output = context.newInstanceForWire(wire, parent, p);
                 }
                 else {
