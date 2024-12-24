@@ -25,9 +25,12 @@ import { isElementAccessChain } from 'typescript';
 
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
-//------------------------------------------------------------------------------
-
 // TODO Check validity of function instances during drag-n-drop.
+// TODO Functionchart instancing off pin.
+// TODO Element instancing off pin.
+// TODO remove InstancerElement and update files.
+
+//------------------------------------------------------------------------------
 
 // Value and Function type descriptions.
 
@@ -1295,10 +1298,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           type = src.type.outputs[wire.srcPin].type,
           element = this.newElement('instance') as FunctionInstance;
     element.typeString = type.typeString;
-    element.instancer = src as InstancerTypes;  // TODO add srcPin property.
-    const offset = this.layoutEngine.inputPinToPoint(element, 0);
-    element.x = p.x - offset.x;
-    element.y = p.y - offset.y;
+    element.instancer = src as InstancerTypes;
+    element.srcPin = wire.srcPin;
+    element.x = p.x;
+    element.y = p.y - type.height / 2;
     this.deleteItem(wire);
     this.addItem(element, parent);
     return element;
@@ -2146,7 +2149,6 @@ class ElementHitResult {
   inner: RectHitResult;
   input: number = -1;
   output: number = -1;
-  instancer: boolean = false;
   constructor(item: ElementTypes, inner: RectHitResult) {
     this.item = item;
     this.inner = inner;
@@ -2165,12 +2167,10 @@ class WireHitResult {
 class FunctionchartHitResult {
   item: Functionchart;
   inner: RectHitResult;
-  instancer: boolean;
   output: number;
-  constructor(item: Functionchart, inner: RectHitResult, instancer: boolean, output: number) {
+  constructor(item: Functionchart, inner: RectHitResult, output: number) {
     this.item = item;
     this.inner = inner;
-    this.instancer = instancer;
     this.output = output;
   }
 }
@@ -2238,9 +2238,12 @@ class Renderer implements ILayoutEngine {
     const rect = this.getBounds(node),
           type = node.type.flatType,
           pin = type.outputs[index];
-    // Handle special case of 'export' functionchart's output.
+    // Handle special case of functionchart's output.
     if (node instanceof Functionchart) {
-      return { x: rect.x + rect.width, y: rect.y + rect.height / 2, nx: 1, ny: 0 };
+      const type = node.instanceType,
+            r = Functionchart.radius,
+            right = rect.x + rect.width;
+      return { x: right, y: rect.y + r + type.height / 2, nx: 1, ny: 0 };
     }
     return { x: rect.x + rect.width, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 }
   }
@@ -2429,7 +2432,7 @@ class Renderer implements ILayoutEngine {
         ctx.textAlign = 'right';
         ctx.fillText(name, pinLeft - spacing, y + pin.baseline);
       }
-          }
+    }
   }
   drawType(type: Type, x: number, y: number) {
     const ctx = this.ctx, theme = this.theme,
@@ -2467,18 +2470,6 @@ class Renderer implements ILayoutEngine {
       ctx.stroke();
       this.drawType(type, x, y);
     }
-  }
-
-  drawValuePin(x: number, y: number) {
-    const ctx = this.ctx,
-          theme = this.theme,
-          r = theme.knobbyRadius,
-          d = r + r;
-    ctx.strokeStyle = theme.strokeColor;
-    ctx.beginPath();
-    ctx.rect(x, y, d, d);
-    // ctx.arc(x + r, y + r, r, 0, Math.PI * 2, true);
-    ctx.stroke();
   }
 
   drawElement(element: ElementTypes, mode: RenderMode) {
@@ -2597,10 +2588,10 @@ class Renderer implements ILayoutEngine {
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
         ctx.stroke();
-        const instanceType = functionchart.instanceType.flatType,
-              instancerRect = this.instancerBounds(functionchart);
+        const type = functionchart.type,
+              pinRect = this.pinToRect(type.outputs[0], this.outputPinToPoint(functionchart, 0));
         ctx.beginPath();
-        ctx.rect(instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height);
+        ctx.rect(pinRect.x, pinRect.y, pinRect.width, pinRect.height);
         ctx.fillStyle = theme.altBgColor;
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
@@ -2612,13 +2603,8 @@ class Renderer implements ILayoutEngine {
         } else {
           ctx.stroke();
         }
-        // Draw the single output pin.
-        if (!functionchart.isAbstract) {
-          const r = this.theme.knobbyRadius;
-          this.drawValuePin(x + w - 2 * r, y + h / 2 - r);
-        }
-
-        this.drawType(instanceType, instancerRect.x, instancerRect.y);
+        const instanceType = functionchart.instanceType;
+        this.drawType(instanceType, x + w - instanceType.width, y + r);
         break;
       case RenderMode.Highlight:
       case RenderMode.HotTrack:
@@ -2658,10 +2644,6 @@ class Renderer implements ILayoutEngine {
         }
       }
     }
-    if (element instanceof InstancerElement) {
-      const rect = this.instancerBounds(element);
-      result.instancer = !!hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0);
-    }
     return result;
   }
   hitTestFunctionchart(
@@ -2673,19 +2655,12 @@ class Renderer implements ILayoutEngine {
       return;
     const r = this.theme.knobbyRadius;
     let output = -1;
-    if (!functionchart.isAbstract) {
-      const pinPt = this.outputPinToPoint(functionchart, 0);
-      if (hitTestRect(pinPt.x - 2 * r, pinPt.y - r, 2 * r, 2 * r, p, 0)) {
-        output = 0;
-      }
+    const type = functionchart.type,
+          pinRect = this.pinToRect(type.outputs[0], this.outputPinToPoint(functionchart, 0));
+    if (hitTestRect(pinRect.x, pinRect.y, pinRect.width, pinRect.height, p, 0)) {
+      output = 0;
     }
-    let instancer = false;
-    if (output < 0) {
-      const instancerRect = this.instancerBounds(functionchart);
-      instancer = hitTestRect(
-            instancerRect.x, instancerRect.y, instancerRect.width, instancerRect.height, p, tol) !== undefined;
-    }
-    return new FunctionchartHitResult(functionchart, inner, instancer, output);
+    return new FunctionchartHitResult(functionchart, inner, output);
   }
 
   drawWire(wire: Wire, mode: RenderMode) {
@@ -2794,9 +2769,7 @@ class Renderer implements ILayoutEngine {
     } else if (info instanceof WireHitResult) {
       type = info.item.type;  // Wire type is src or dst pin type.
     } else if (info instanceof FunctionchartHitResult) {
-      if (info.instancer || info.output >= 0) {
-        type = info.item.instanceType;
-      }
+      type = info.item.instanceType;
     }
     const w = type.width, h = type.height;
     ctx.beginPath();
@@ -2826,7 +2799,7 @@ function isDropTarget(hitInfo: HitResultTypes) : boolean {
   const lastSelected = selection.lastSelected;
   if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase) {
     // Drop onto an element requires type compatibility.
-    return lastSelected.type.canConnectTo(hitInfo.item.type);
+    return true;//lastSelected.type.canConnectTo(hitInfo.item.type);
   }
   return false;
 }
@@ -3578,11 +3551,9 @@ export class FunctionchartEditor implements CanvasLayer {
         newWire: Wire | undefined;
     // First check for a drag that creates a new wire.
     if ((pointerHitInfo instanceof ElementHitResult &&
-        (pointerHitInfo.input >= 0 || pointerHitInfo.output >= 0 || pointerHitInfo.instancer))) {
+        (pointerHitInfo.input >= 0 || pointerHitInfo.output >= 0))) {
       const cp0 = this.getCanvasPosition(canvasController, p0);
-      if (pointerHitInfo.instancer) {
-        drag = new NonWireDrag([pointerHitInfo.item], 'newInstance', 'Create new instance of instancer');
-      } else if (pointerHitInfo.input >= 0) {
+      if (pointerHitInfo.input >= 0) {
         const dst = dragItem as NodeTypes;
         newWire = context.newWire(undefined, -1, dst, pointerHitInfo.input);
         newWire.pSrc = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };
@@ -3618,8 +3589,6 @@ export class FunctionchartEditor implements CanvasLayer {
           if (pointerHitInfo instanceof FunctionchartHitResult) {
             if (pointerHitInfo.inner.border) {
               drag = new NonWireDrag([pointerHitInfo.item], 'resizeFunctionchart', 'Resize functionchart');
-            } else if (pointerHitInfo.instancer) {
-              drag = new NonWireDrag([pointerHitInfo.item], 'newInstance', 'Create new instance of functionchart');
             } else {
               drag = new NonWireDrag(context.selectedNodes(), 'moveSelection', 'Move selection');
             }
@@ -3792,7 +3761,8 @@ export class FunctionchartEditor implements CanvasLayer {
         const p = wire.pDst!,
               pin = src.type.outputs[wire.srcPin];
         let output;
-        if (pin.type !== Type.valueType && src instanceof ImporterElement) {  // TODO other instancer types.
+        if (pin.type !== Type.valueType &&
+            (src instanceof ImporterElement || src instanceof Functionchart)) {  // TODO other instancer types.
           output = context.newInstanceForWire(wire, parent, p);
         } else {
           output = context.newOutputForWire(wire, parent, p);
