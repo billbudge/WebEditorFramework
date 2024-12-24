@@ -273,7 +273,7 @@ class ElementTemplate extends NodeTemplate {
 class ImporterTemplate extends ElementTemplate {
     constructor(typeName) {
         super(typeName);
-        this.innerTypeString = innerTypeStringProp;
+        this.innerTypeString = innerTypeStringProp; // TODO remove when InstancerElement removed.
         this.properties = [this.id, this.typeString, this.x, this.y, this.name,
             this.innerTypeString];
     }
@@ -283,9 +283,8 @@ class ExporterTemplate extends ElementTemplate {
         super(typeName);
         this.instancer = instancerProp;
         this.innerElement = innerElementProp;
-        this.innerTypeString = innerTypeStringProp;
         this.properties = [this.id, this.typeString, this.x, this.y, this.name,
-            this.instancer, this.innerElement, this.innerTypeString];
+            this.instancer, this.innerElement];
     }
 }
 class FunctionInstanceTemplate extends ElementTemplate {
@@ -406,10 +405,14 @@ export class InstancerElement extends Element {
     }
 }
 export class ImporterElement extends Element {
-    get innerTypeString() { return this.template.innerTypeString.get(this) || Type.emptyTypeString; }
-    set innerTypeString(value) { this.template.innerTypeString.set(this, value); }
+    // Derived properties.
     get instanceType() {
-        return this._instanceType ? this._instanceType : Type.fromString(this.innerTypeString);
+        if (this.type) {
+            const outputs = this.type.outputs;
+            if (outputs.length > 0)
+                return outputs[0].type;
+        }
+        return Type.emptyType;
     }
     constructor(context, id) {
         super(importerTemplate, context, id);
@@ -1416,7 +1419,6 @@ export class FunctionchartContext extends EventBase {
         result.x = element.x;
         result.y = element.y;
         result.typeString = importerType.typeString;
-        result.innerTypeString = element.type.typeString;
         return result;
     }
     exportElements(elements) {
@@ -1776,7 +1778,6 @@ class ElementHitResult {
     constructor(item, inner) {
         this.input = -1;
         this.output = -1;
-        this.instancer = false;
         this.item = item;
         this.inner = inner;
     }
@@ -1787,11 +1788,13 @@ class WireHitResult {
         this.inner = inner;
     }
 }
+// TODO merge with ElementHitResult, as NodeHitResult.
 class FunctionchartHitResult {
-    constructor(item, inner, output) {
+    constructor(item, inner) {
+        this.input = -1;
+        this.output = -1;
         this.item = item;
         this.inner = inner;
-        this.output = output;
     }
 }
 var RenderMode;
@@ -1859,15 +1862,13 @@ class Renderer {
         const width = pin.type.width, height = pin.type.height, x = pinPt.x - (pinPt.nx + 1) * width / 2, y = pinPt.y - (pinPt.ny + 1) * height / 2;
         return { x, y, width, height };
     }
-    instancerBounds(instancer) {
+    instancerBounds(instancer, srcPin = 0) {
         const spacing = this.theme.spacing, rect = this.getBounds(instancer), right = rect.x + rect.width, bottom = rect.y + rect.height, type = instancer.instanceType.flatType, width = type.width, height = type.height;
         if (instancer instanceof InstancerElement) {
             return { x: rect.x, y: rect.y + spacing, width, height }; // TODO clean up
         }
-        else if (instancer instanceof ImporterElement) {
-            return { x: right - width, y: rect.y + instancer.type.outputs[0].y, width, height };
-        }
-        return { x: right - width - 2 * spacing, y: bottom - height - spacing, width, height };
+        const pinPt = this.outputPinToPoint(instancer, srcPin), pinRect = this.pinToRect(instancer.type.outputs[srcPin], pinPt);
+        return pinRect;
     }
     sumBounds(items) {
         let xMin = Number.POSITIVE_INFINITY, yMin = Number.POSITIVE_INFINITY, xMax = -Number.POSITIVE_INFINITY, yMax = -Number.POSITIVE_INFINITY;
@@ -2031,7 +2032,7 @@ class Renderer {
         }
     }
     drawElement(element, mode) {
-        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing, r = theme.knobbyRadius, d = r * 2, rect = this.getBounds(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
+        const ctx = this.ctx, theme = this.theme, r = theme.knobbyRadius, d = r * 2, rect = this.getBounds(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
         ctx.beginPath();
         ctx.rect(x, y, w, h);
         switch (mode) {
@@ -2058,9 +2059,9 @@ class Renderer {
                     ctx.fillStyle = theme.bgColor;
                 }
                 else if (element instanceof ImporterElement) {
-                    const bounds = this.instancerBounds(element);
+                    const pinRect = this.instancerBounds(element, 0);
                     ctx.beginPath();
-                    ctx.rect(bounds.x, bounds.y, bounds.width, bounds.height);
+                    ctx.rect(pinRect.x, pinRect.y, pinRect.width, pinRect.height);
                     ctx.fillStyle = theme.altBgColor;
                     ctx.fill();
                     ctx.fillStyle = theme.bgColor;
@@ -2127,7 +2128,7 @@ class Renderer {
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
-                const type = functionchart.type, pinRect = this.pinToRect(type.outputs[0], this.outputPinToPoint(functionchart, 0));
+                const pinRect = this.instancerBounds(functionchart, 0);
                 ctx.beginPath();
                 ctx.rect(pinRect.x, pinRect.y, pinRect.width, pinRect.height);
                 ctx.fillStyle = theme.altBgColor;
@@ -2175,23 +2176,18 @@ class Renderer {
                 }
             }
         }
-        if (element instanceof InstancerElement) {
-            const rect = this.instancerBounds(element);
-            result.instancer = !!hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0);
-        }
         return result;
     }
     hitTestFunctionchart(functionchart, p, tol, mode) {
         const rect = this.getBounds(functionchart), x = rect.x, y = rect.y, w = rect.width, h = rect.height, inner = hitTestRect(x, y, w, h, p, tol);
         if (!inner)
             return;
-        const r = this.theme.knobbyRadius;
-        let output = -1;
-        const type = functionchart.type, pinRect = this.pinToRect(type.outputs[0], this.outputPinToPoint(functionchart, 0));
+        const result = new FunctionchartHitResult(functionchart, inner);
+        const pinRect = this.instancerBounds(functionchart, 0);
         if (hitTestRect(pinRect.x, pinRect.y, pinRect.width, pinRect.height, p, 0)) {
-            output = 0;
+            result.output = 0;
         }
-        return new FunctionchartHitResult(functionchart, inner, output);
+        return result;
     }
     drawWire(wire, mode) {
         const theme = this.theme, ctx = this.ctx;
@@ -2458,9 +2454,9 @@ export class FunctionchartEditor {
                         result = item.type.name;
                     break;
                 }
-                case 'instancer': { // [,[...]]
+                case 'importer': { // [,[...]]
                     const element = item;
-                    result = element.innerType.name;
+                    result = element.type.name;
                     break;
                 }
                 case 'exporter': {
@@ -2490,9 +2486,9 @@ export class FunctionchartEditor {
                     }
                     break;
                 }
-                case 'instancer': {
-                    const element = item, innerType = element.innerType;
-                    newType = Type.fromInfo(innerType.inputs, innerType.outputs, value);
+                case 'importer': {
+                    const element = item;
+                    newType = element.instanceType.rename(value).toImportExportType();
                     break;
                 }
                 case 'exporter': {
@@ -2566,13 +2562,13 @@ export class FunctionchartEditor {
                 prop: typeStringProp,
             },
         ]);
-        this.propertyInfo.set('instancer', [
+        this.propertyInfo.set('importer', [
             {
                 label: 'name',
                 type: 'text',
                 getter: nodeLabelGetter,
                 setter: nodeLabelSetter,
-                prop: innerTypeStringProp,
+                prop: typeStringProp,
             },
         ]);
         this.propertyInfo.set('exporter', [
@@ -2895,7 +2891,7 @@ export class FunctionchartEditor {
         const context = this.context, item = context.selection.lastSelected;
         let type = undefined;
         if (item instanceof Element) {
-            if (item instanceof InstancerElement || item instanceof ExporterElement) {
+            if (item instanceof ImporterElement || item instanceof ExporterElement) {
                 type = item.template.typeName;
             }
             else {
@@ -2955,12 +2951,9 @@ export class FunctionchartEditor {
         let drag, newWire;
         // First check for a drag that creates a new wire.
         if ((pointerHitInfo instanceof ElementHitResult &&
-            (pointerHitInfo.input >= 0 || pointerHitInfo.output >= 0 || pointerHitInfo.instancer))) {
+            (pointerHitInfo.input >= 0 || pointerHitInfo.output >= 0))) {
             const cp0 = this.getCanvasPosition(canvasController, p0);
-            if (pointerHitInfo.instancer) {
-                drag = new NonWireDrag([pointerHitInfo.item], 'newInstance', 'Create new instance of instancer');
-            }
-            else if (pointerHitInfo.input >= 0) {
+            if (pointerHitInfo.input >= 0) {
                 const dst = dragItem;
                 newWire = context.newWire(undefined, -1, dst, pointerHitInfo.input);
                 newWire.pSrc = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };

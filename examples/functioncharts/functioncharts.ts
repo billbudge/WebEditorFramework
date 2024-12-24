@@ -348,7 +348,7 @@ class ElementTemplate extends NodeTemplate {
 }
 
 class ImporterTemplate extends ElementTemplate {
-  readonly innerTypeString = innerTypeStringProp;
+  readonly innerTypeString = innerTypeStringProp;  // TODO remove when InstancerElement removed.
   readonly properties: PropertyTypes[] = [this.id, this.typeString, this.x, this.y, this.name,
                                           this.innerTypeString];
   constructor(typeName: ElementType) {
@@ -359,9 +359,8 @@ class ImporterTemplate extends ElementTemplate {
 class ExporterTemplate extends ElementTemplate {
   readonly instancer = instancerProp;
   readonly innerElement = innerElementProp;
-  readonly innerTypeString = innerTypeStringProp;
   readonly properties: PropertyTypes[] = [this.id, this.typeString, this.x, this.y, this.name,
-                                          this.instancer, this.innerElement, this.innerTypeString];
+                                          this.instancer, this.innerElement];
   constructor(typeName: ElementType) {
     super(typeName);
   }
@@ -523,13 +522,14 @@ export class InstancerElement extends Element<ImporterTemplate> {
 }
 
 export class ImporterElement extends Element<ImporterTemplate> {
-  get innerTypeString() { return this.template.innerTypeString.get(this) || Type.emptyTypeString; }
-  set innerTypeString(value: string) { this.template.innerTypeString.set(this, value); }
-
   // Derived properties.
-  private _instanceType: Type | undefined;
   get instanceType() : Type {
-    return this._instanceType? this._instanceType : Type.fromString(this.innerTypeString);
+    if (this.type) {
+      const outputs = this.type.outputs;
+      if (outputs.length > 0)
+        return outputs[0].type;
+    }
+    return Type.emptyType;
   }
 
   instances = new Set<FunctionInstance>();
@@ -1736,7 +1736,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     result.x = element.x;
     result.y = element.y;
     result.typeString = importerType.typeString;
-    result.innerTypeString = element.type.typeString;
     return result;
   }
 
@@ -2164,14 +2163,15 @@ class WireHitResult {
   }
 }
 
+// TODO merge with ElementHitResult, as NodeHitResult.
 class FunctionchartHitResult {
   item: Functionchart;
   inner: RectHitResult;
-  output: number;
-  constructor(item: Functionchart, inner: RectHitResult, output: number) {
+  input: number = -1;
+  output: number = -1;
+  constructor(item: Functionchart, inner: RectHitResult) {
     this.item = item;
     this.inner = inner;
-    this.output = output;
   }
 }
 
@@ -2255,7 +2255,7 @@ class Renderer implements ILayoutEngine {
     return { x, y, width, height }
   }
 
-  instancerBounds(instancer: InstancerTypes) : Rect {
+  instancerBounds(instancer: InstancerTypes, srcPin: number = 0) : Rect {
     const spacing = this.theme.spacing,
           rect = this.getBounds(instancer),
           right = rect.x + rect.width,
@@ -2265,10 +2265,11 @@ class Renderer implements ILayoutEngine {
           height = type.height;
     if (instancer instanceof InstancerElement) {
       return { x: rect.x, y: rect.y + spacing, width, height };  // TODO clean up
-    } else if (instancer instanceof ImporterElement) {
-      return { x: right - width, y: rect.y + instancer.type.outputs[0].y, width, height };
     }
-    return { x: right - width - 2 * spacing, y: bottom - height - spacing, width, height };
+    const pinPt = this.outputPinToPoint(instancer, srcPin),
+          pinRect = this.pinToRect(instancer.type.outputs[srcPin], pinPt);
+
+    return pinRect;
 }
 
   sumBounds(items: AllTypes[]) : Rect {
@@ -2475,7 +2476,6 @@ class Renderer implements ILayoutEngine {
   drawElement(element: ElementTypes, mode: RenderMode) {
     const ctx = this.ctx,
           theme = this.theme,
-          spacing = theme.spacing,
           r = theme.knobbyRadius,
           d = r * 2,
           rect = this.getBounds(element),
@@ -2507,9 +2507,9 @@ class Renderer implements ILayoutEngine {
           ctx.fill();
           ctx.fillStyle = theme.bgColor
         } else if (element instanceof ImporterElement) {
-          const bounds = this.instancerBounds(element);
+          const pinRect = this.instancerBounds(element, 0);
           ctx.beginPath();
-          ctx.rect(bounds.x, bounds.y, bounds.width, bounds.height);
+          ctx.rect(pinRect.x, pinRect.y, pinRect.width, pinRect.height);
           ctx.fillStyle = theme.altBgColor;
           ctx.fill();
           ctx.fillStyle = theme.bgColor
@@ -2588,8 +2588,7 @@ class Renderer implements ILayoutEngine {
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
         ctx.stroke();
-        const type = functionchart.type,
-              pinRect = this.pinToRect(type.outputs[0], this.outputPinToPoint(functionchart, 0));
+        const pinRect = this.instancerBounds(functionchart, 0);
         ctx.beginPath();
         ctx.rect(pinRect.x, pinRect.y, pinRect.width, pinRect.height);
         ctx.fillStyle = theme.altBgColor;
@@ -2653,14 +2652,12 @@ class Renderer implements ILayoutEngine {
           inner = hitTestRect(x, y, w, h, p, tol);
     if (!inner)
       return;
-    const r = this.theme.knobbyRadius;
-    let output = -1;
-    const type = functionchart.type,
-          pinRect = this.pinToRect(type.outputs[0], this.outputPinToPoint(functionchart, 0));
+    const result = new FunctionchartHitResult(functionchart, inner);
+    const pinRect = this.instancerBounds(functionchart, 0);
     if (hitTestRect(pinRect.x, pinRect.y, pinRect.width, pinRect.height, p, 0)) {
-      output = 0;
+      result.output = 0;
     }
-    return new FunctionchartHitResult(functionchart, inner, output);
+    return result;
   }
 
   drawWire(wire: Wire, mode: RenderMode) {
@@ -2996,9 +2993,9 @@ export class FunctionchartEditor implements CanvasLayer {
             result = item.type.name;
           break;
         }
-        case 'instancer': { // [,[...]]
-          const element =  item as InstancerElement;
-          result = element.innerType.name;
+        case 'importer': { // [,[...]]
+          const element =  item as ImporterElement;
+          result = element.type.name;
           break;
         }
         case 'exporter': {
@@ -3028,10 +3025,9 @@ export class FunctionchartEditor implements CanvasLayer {
           }
           break;
         }
-        case 'instancer': {
-          const element =  item as InstancerElement,
-                innerType = element.innerType;
-          newType = Type.fromInfo(innerType.inputs, innerType.outputs, value);
+        case 'importer': {
+          const element =  item as ImporterElement;
+          newType = element.instanceType.rename(value).toImportExportType();
           break;
         }
         case 'exporter': {
@@ -3106,13 +3102,13 @@ export class FunctionchartEditor implements CanvasLayer {
         prop: typeStringProp,
       },
     ]);
-    this.propertyInfo.set('instancer', [
+    this.propertyInfo.set('importer', [
       {
         label: 'name',
         type: 'text',
         getter: nodeLabelGetter,
         setter: nodeLabelSetter,
-        prop: innerTypeStringProp,
+        prop: typeStringProp,
       },
     ]);
     this.propertyInfo.set('exporter', [
@@ -3490,7 +3486,7 @@ export class FunctionchartEditor implements CanvasLayer {
           item = context.selection.lastSelected;
     let type = undefined;
     if (item instanceof Element) {
-      if (item instanceof InstancerElement || item instanceof ExporterElement) {
+      if (item instanceof ImporterElement || item instanceof ExporterElement) {
         type = item.template.typeName;
       } else {
         type = item.name;  // 'binop', 'unop', 'cond', 'literal', 'var'
