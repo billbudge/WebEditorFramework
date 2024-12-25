@@ -363,6 +363,7 @@ class NodeBase {
         this.globalPosition = defaultPoint;
         this.inWires = new Array(); // one input per pin (no fan in).
         this.outWires = new Array(); // multiple outputs per pin (fan out).
+        this.instances = new Array(); // each output pin potentially has multiple instances.
         this.template = template;
         this.context = context;
         this.id = id;
@@ -373,7 +374,6 @@ export class Element extends NodeBase {
     set name(value) { this.template.name.set(this, value); }
     constructor(template, context, id) {
         super(template, context, id);
-        this.instances = new Set(); // TODO set for each output pin.
     }
 }
 export class ImporterElement extends Element {
@@ -486,7 +486,6 @@ export class Functionchart extends NodeBase {
     constructor(context, template, id) {
         super(template, context, id);
         this.typeInfo = emptyTypeInfo;
-        this.instances = new Set();
         this.instanceType = Type.emptyType;
     }
 }
@@ -541,7 +540,7 @@ export class FunctionchartContext extends EventBase {
         this.functionchart = root;
         this.insertFunctionchart(root, undefined);
         this.derivedInfoNeedsUpdate = true;
-        this.updateWireLists(); // TODO needed?
+        this.updateReferenceLists(); // TODO needed?
         this.updateDerivedInfo();
     }
     newElement(typeName) {
@@ -1084,15 +1083,18 @@ export class FunctionchartContext extends EventBase {
         return this.canAddItem(instance, parent);
     }
     // Update wire lists. Returns true iff wires don't fan-in to any input pins.
-    updateWireLists() {
+    updateReferenceLists() {
         const invalidWires = new Array(), graphInfo = this.getGraphInfo();
-        // Initialize the element inWires and outWires arrays.
+        // Initialize the element inWires, outWires, and instances arrays.
         graphInfo.nodes.forEach(node => {
             const type = node.type;
             node.inWires = new Array(type.inputs.length);
             node.outWires = new Array(type.outputs.length);
             for (let i = 0; i < type.outputs.length; i++)
                 node.outWires[i] = new Array();
+            node.instances = new Array(type.outputs.length);
+            for (let i = 0; i < type.outputs.length; i++)
+                node.instances[i] = new Array();
         });
         // Push wires onto the corresponding wire arrays on the elements.
         graphInfo.wires.forEach(wire => {
@@ -1110,9 +1112,15 @@ export class FunctionchartContext extends EventBase {
             }
             dst.inWires[dstPin] = wire;
         });
+        graphInfo.nodes.forEach(node => {
+            if (node instanceof FunctionInstance) {
+                const instancer = node.instancer, srcPin = node.srcPin;
+                instancer.instances[srcPin].push(node);
+            }
+        });
         return invalidWires;
     }
-    updateFunctionchartTypes() {
+    updateInstanceTypes() {
         const self = this;
         // Update Functionchart types. TODO ImporterElement types too?
         this.reverseVisitNodes(this.functionchart, item => {
@@ -1121,12 +1129,12 @@ export class FunctionchartContext extends EventBase {
                 item.typeInfo = typeInfo;
                 item.type = typeInfo.instanceType.toImportExportType();
                 item.instanceType = instanceType;
-                const instanceTypeString = instanceType.typeString;
-                // Update instances.
-                item.instances.forEach((instance) => {
-                    // TODO handle varArgs when we have the pseudoelement.
-                    instance.typeString = instanceTypeString;
-                });
+            }
+        });
+        this.visitNodes(this.functionchart, node => {
+            if (node instanceof FunctionInstance) {
+                const instancer = node.instancer, srcPin = node.srcPin, type = instancer.type.outputs[srcPin].type;
+                node.typeString = type.typeString;
             }
         });
     }
@@ -1166,8 +1174,8 @@ export class FunctionchartContext extends EventBase {
             // we're here.
             this.derivedInfoNeedsUpdate = false;
             if (updateInstancers)
-                this.updateFunctionchartTypes();
-            this.invalidWires = this.updateWireLists();
+                this.updateInstanceTypes();
+            this.invalidWires = this.updateReferenceLists();
             this.sorted = this.topologicalSort();
         }
     }
@@ -1259,7 +1267,7 @@ export class FunctionchartContext extends EventBase {
         });
         // Generate next type info.
         this.updateDerivedInfo(false);
-        this.updateFunctionchartTypes();
+        this.updateInstanceTypes();
         // Generate pin maps for updating wired instances.
         this.nodes.forEach(node => {
             if (node instanceof Functionchart) {
@@ -1571,18 +1579,10 @@ export class FunctionchartContext extends EventBase {
         this.nodes.add(element);
         element.parent = parent;
         this.updateGlobalPosition(element);
-        if (element instanceof FunctionInstance) {
-            const instancer = element.instancer;
-            instancer.instances.add(element);
-        }
         this.derivedInfoNeedsUpdate = true;
     }
     removeElement(element) {
         this.nodes.delete(element);
-        if (element instanceof FunctionInstance) {
-            const instancer = element.instancer;
-            instancer.instances.delete(element);
-        }
         this.derivedInfoNeedsUpdate = true;
     }
     // Parent can be undefined in the case of the root functionchart.
