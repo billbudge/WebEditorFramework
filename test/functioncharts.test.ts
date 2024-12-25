@@ -166,13 +166,15 @@ describe('Type' , () => {
     expect(t.inputs.length).toBe(2);
     expect(t.inputs[0].varArgs).toBe(1);
     expect(t.inputs[1].varArgs).toBe(2);
-    t = FC.Type.fromString('[vv(name){2}v{2},v]');
+    t = FC.Type.fromString('[vv(name){2}[v,v]{2},v]');
     expect(t.varArgs).toBe(true);
     expect(t.inputs.length).toBe(5);
     expect(t.inputs[0].varArgs).toBe(0);
+    expect(t.inputs[0].type).toBe(FC.Type.valueType);
     expect(t.inputs[1].varArgs).toBe(1);
     expect(t.inputs[2].varArgs).toBe(2);
     expect(t.inputs[3].varArgs).toBe(1);
+    expect(t.inputs[3].type.typeString).toBe('[v,v]');
     expect(t.inputs[4].varArgs).toBe(2);
   });
   // TODO new Type methods

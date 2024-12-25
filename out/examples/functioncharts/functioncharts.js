@@ -52,11 +52,6 @@ export class Type {
         this._typeString = value;
         return this;
     }
-    get flatType() {
-        if (!this._flatType)
-            this._flatType = this.toFlatType();
-        return this; //._flatType;
-    }
     get needsLayout() {
         return this.height === 0; // width may be 0 in the case of spacer type.
     }
@@ -74,9 +69,6 @@ export class Type {
     }
     rename(name) {
         return Type.fromInfo(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()), name);
-    }
-    toInstancerType() {
-        return Type.fromInfo([new Pin(this)], []);
     }
     toImportExportType() {
         return Type.fromInfo([], [new Pin(this)]);
@@ -119,10 +111,11 @@ export class Type {
             s += '(' + escapeName(this.name) + ')';
         return s;
     }
-    toFlatType() {
-        const inputs = this.inputs.map(pin => new Pin(Type.valueType, pin.name)), outputs = this.outputs.map(pin => new Pin(Type.valueType, pin.name));
-        return Type.fromInfo(inputs, outputs, this.name);
-    }
+    // private toFlatType(): Type {
+    //   const inputs = this.inputs.map(pin => new Pin(Type.valueType, pin.name)),
+    //         outputs = this.outputs.map(pin => new Pin(Type.valueType, pin.name));
+    //   return Type.fromInfo(inputs, outputs, this.name);
+    // }
     atomized() {
         let s = this.toString();
         let atomizedType = Type.atomizedTypes.get(s);
@@ -191,29 +184,32 @@ function parseTypeString(s) {
         return name;
     }
     function parsePin() {
-        // value type
+        let result;
         if (s[j] === Type.valueTypeString) {
+            // value type
             j++;
-            const result = new Pin(Type.valueType, parseName());
-            // TODO varArgs should apply to function pins too!
-            let varArgs = 0;
-            if (s[j] === '{') {
-                j++;
-                const k = s.indexOf('}', j);
-                if (k < 0)
-                    throw new Error('Invalid type string: ' + s);
-                const varArgsString = s.substring(j, k);
-                varArgs = parseInt(varArgsString);
-                if (isNaN(varArgs))
-                    throw new Error('Bad varArgs count in type string: ' + s);
-                j = k + 1;
-            }
-            result.varArgs = varArgs;
-            return result;
+            result = new Pin(Type.valueType, parseName());
         }
-        // function types
-        const type = parseFunction(), name = parseName();
-        return new Pin(type, name);
+        else {
+            // function types
+            const type = parseFunction(), name = parseName();
+            result = new Pin(type, name);
+        }
+        // optional var args modifier
+        let varArgs = 0;
+        if (s[j] === '{') {
+            j++;
+            const k = s.indexOf('}', j);
+            if (k < 0)
+                throw new Error('Invalid type string: ' + s);
+            const varArgsString = s.substring(j, k);
+            varArgs = parseInt(varArgsString);
+            if (isNaN(varArgs))
+                throw new Error('Bad varArgs count in type string: ' + s);
+            j = k + 1;
+        }
+        result.varArgs = varArgs;
+        return result;
     }
     function parseFunction() {
         if (s[j] === Type.valueTypeString) {
@@ -1793,7 +1789,7 @@ class Renderer {
             }
             else {
                 // All element types.
-                const type = item.type.flatType;
+                const type = item.type;
                 width = type.width;
                 height = type.height;
             }
@@ -1802,11 +1798,11 @@ class Renderer {
     }
     // Get wire attachment point for element input/output pins.
     inputPinToPoint(node, index) {
-        const rect = this.getBounds(node), type = node.type.flatType, pin = type.inputs[index];
+        const rect = this.getBounds(node), type = node.type, pin = type.inputs[index];
         return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 };
     }
     outputPinToPoint(node, index) {
-        const rect = this.getBounds(node), type = node.type.flatType, pin = type.outputs[index];
+        const rect = this.getBounds(node), type = node.type, pin = type.outputs[index];
         // Handle special case of functionchart's output.
         if (node instanceof Functionchart) {
             const type = node.instanceType, r = Functionchart.radius, right = rect.x + rect.width;
@@ -1870,9 +1866,6 @@ class Renderer {
         wOut += spacing;
         type.width = Math.round(Math.max(width, wIn + wOut, theme.minTypeWidth));
         type.height = Math.round(Math.max(yIn, yOut, theme.minTypeHeight) + spacing / 2);
-        if (type.flatType.needsLayout) {
-            this.layoutType(type.flatType);
-        }
     }
     layoutPin(pin) {
         const type = pin.type;
@@ -1918,8 +1911,8 @@ class Renderer {
             width = extents.x + extents.width - x + margin;
             height = extents.y + extents.height - y + margin;
             // Make sure instancer fits. It may overlap with the contents at the bottom right.
-            width = Math.max(width, type.flatType.width + margin);
-            height = Math.max(height, type.flatType.height + margin);
+            width = Math.max(width, type.width + margin);
+            height = Math.max(height, type.height + margin);
         }
         width = Math.max(width, functionchart.width);
         height = Math.max(height, functionchart.height);
@@ -2012,7 +2005,7 @@ class Renderer {
                         ctx.fill();
                     }
                 });
-                this.drawType(element.type.flatType, x, y);
+                this.drawType(element.type, x, y);
                 if (element instanceof FunctionInstance) {
                     // draw curve.
                     const p1 = this.outputPinToPoint(element.instancer, 0), p2 = { x, y: y + h / 2, nx: -1, ny: 0 }, bezier = getEdgeBezier(p1, p2, 24);
@@ -2059,7 +2052,7 @@ class Renderer {
                 ctx.fill();
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
-                this.drawType(element.type.flatType, x, y);
+                this.drawType(element.type, x, y);
                 break;
             }
             case RenderMode.Highlight:
@@ -2114,7 +2107,7 @@ class Renderer {
         const rect = this.getBounds(element), x = rect.x, y = rect.y, width = rect.width, height = rect.height, hitInfo = hitTestRect(x, y, width, height, p, tol);
         if (!hitInfo)
             return;
-        const self = this, result = new ElementHitResult(element, hitInfo), type = element.type.flatType;
+        const self = this, result = new ElementHitResult(element, hitInfo), type = element.type;
         if (mode !== RenderMode.Palette) {
             if (!element.isAbstract) {
                 for (let i = 0; i < type.inputs.length; i++) {

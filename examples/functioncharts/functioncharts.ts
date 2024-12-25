@@ -118,6 +118,7 @@ export class Type {
     const type = new Type(inputs.map(pin => pin.copy()), outputs.map(pin => pin.copy()), name);
     return type.atomized();
   }
+
   static fromString(typeString: string) : Type {
     let result = this.atomizedTypes.get(typeString);
     if (!result) {
@@ -127,15 +128,14 @@ export class Type {
   }
 
   rename(name?: string) : Type {
-    return Type.fromInfo(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()), name);
+    return Type.fromInfo(this.inputs.map(pin => pin.copy()),
+                         this.outputs.map(pin => pin.copy()), name);
   }
 
-  toInstancerType() : Type {
-    return Type.fromInfo([new Pin(this)], []);
-  }
   toImportExportType() : Type {
     return Type.fromInfo([], [new Pin(this)]);
   }
+
   static outputType(pin: Pin) : Type {
     const type = pin.type;
     if (type === Type.valueType)
@@ -190,6 +190,7 @@ export class Type {
     }
     return atomizedType;
   }
+
   // private static equals(src: Type, dst: Type) : boolean {
   //   if (src === dst)
   //     return true;
@@ -206,9 +207,11 @@ export class Type {
   // equals(dst: Type) : boolean {
   //   return Type.equals(this, dst);
   // }
+
   private static canConnect(src: Type, dst: Type) : boolean {
     return true;
   }
+
   canConnectTo(dst: Type) : boolean {
     return Type.canConnect(this, dst);
   }
@@ -236,30 +239,32 @@ function parseTypeString(s: string) : Type {
     return name;
   }
   function parsePin() : Pin {
-    // value type
+    let result: Pin;
     if (s[j] === Type.valueTypeString) {
+      // value type
       j++;
-      const result = new Pin(Type.valueType, parseName());
-      // TODO varArgs should apply to function pins too!
-      let varArgs = 0;
-      if (s[j] === '{') {
-        j++;
-        const k = s.indexOf('}', j);
-        if (k < 0)
-          throw new Error('Invalid type string: ' + s);
-        const varArgsString = s.substring(j, k);
-        varArgs = parseInt(varArgsString);
-        if (isNaN(varArgs))
-          throw new Error('Bad varArgs count in type string: ' + s);
-        j = k + 1;
-      }
-      result.varArgs = varArgs;
-      return result;
+      result = new Pin(Type.valueType, parseName());
+    } else {
+      // function types
+      const type = parseFunction(),
+            name = parseName();
+      result = new Pin(type, name);
     }
-    // function types
-    const type = parseFunction(),
-          name = parseName();
-    return new Pin(type, name);
+    // optional var args modifier
+    let varArgs = 0;
+    if (s[j] === '{') {
+      j++;
+      const k = s.indexOf('}', j);
+      if (k < 0)
+        throw new Error('Invalid type string: ' + s);
+      const varArgsString = s.substring(j, k);
+      varArgs = parseInt(varArgsString);
+      if (isNaN(varArgs))
+        throw new Error('Bad varArgs count in type string: ' + s);
+      j = k + 1;
+    }
+    result.varArgs = varArgs;
+    return result;
   }
   function parseFunction() : Type {
     if (s[j] === Type.valueTypeString) {
