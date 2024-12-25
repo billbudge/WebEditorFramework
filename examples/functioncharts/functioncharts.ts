@@ -109,15 +109,6 @@ export class Type {
     return this;
   }
 
-  // Flat type has the same number of pins as type, but all pins are value type.
-  // The flat type is more compact, and is only used for rendering.
-  private _flatType: Type;
-  get flatType() {
-    if (!this._flatType)
-      this._flatType = this.toFlatType();
-    return this;//._flatType;
-  }
-
   get needsLayout() {
     return this.height === 0;  // width may be 0 in the case of spacer type.
   }
@@ -182,11 +173,13 @@ export class Type {
       s += '(' + escapeName(this.name) + ')';
     return s;
   }
-  private toFlatType(): Type {
-    const inputs = this.inputs.map(pin => new Pin(Type.valueType, pin.name)),
-          outputs = this.outputs.map(pin => new Pin(Type.valueType, pin.name));
-    return Type.fromInfo(inputs, outputs, this.name);
-  }
+
+  // private toFlatType(): Type {
+  //   const inputs = this.inputs.map(pin => new Pin(Type.valueType, pin.name)),
+  //         outputs = this.outputs.map(pin => new Pin(Type.valueType, pin.name));
+  //   return Type.fromInfo(inputs, outputs, this.name);
+  // }
+
   private atomized() : Type {
     let s = this.toString();
     let atomizedType = Type.atomizedTypes.get(s);
@@ -2170,7 +2163,7 @@ class Renderer implements ILayoutEngine {
         height = item.height;
       } else {
         // All element types.
-        const type = item.type.flatType;
+        const type = item.type;
         width = type.width;
         height = type.height;
       }
@@ -2180,13 +2173,13 @@ class Renderer implements ILayoutEngine {
   // Get wire attachment point for element input/output pins.
   inputPinToPoint(node: NodeTypes, index: number) : PointWithNormal {
     const rect = this.getBounds(node),
-          type = node.type.flatType,
+          type = node.type,
           pin = type.inputs[index];
     return { x: rect.x, y: rect.y + pin.y + pin.type.height / 2, nx: -1, ny: 0 };
   }
   outputPinToPoint(node: NodeTypes, index: number) : PointWithNormal {
     const rect = this.getBounds(node),
-          type = node.type.flatType,
+          type = node.type,
           pin = type.outputs[index];
     // Handle special case of functionchart's output.
     if (node instanceof Functionchart) {
@@ -2272,10 +2265,6 @@ class Renderer implements ILayoutEngine {
 
     type.width = Math.round(Math.max(width, wIn + wOut, theme.minTypeWidth));
     type.height = Math.round(Math.max(yIn, yOut, theme.minTypeHeight) + spacing / 2);
-
-    if (type.flatType.needsLayout) {
-      this.layoutType(type.flatType);
-    }
   }
 
   layoutPin(pin: Pin) {
@@ -2334,8 +2323,8 @@ class Renderer implements ILayoutEngine {
       width = extents.x + extents.width - x + margin;
       height = extents.y + extents.height - y + margin;
       // Make sure instancer fits. It may overlap with the contents at the bottom right.
-      width = Math.max(width, type.flatType.width + margin);
-      height = Math.max(height, type.flatType.height + margin);
+      width = Math.max(width, type.width + margin);
+      height = Math.max(height, type.height + margin);
     }
     width = Math.max(width, functionchart.width);
     height = Math.max(height, functionchart.height);
@@ -2446,7 +2435,7 @@ class Renderer implements ILayoutEngine {
             ctx.fill();
           }
         });
-        this.drawType(element.type.flatType, x, y);
+        this.drawType(element.type, x, y);
         if (element instanceof FunctionInstance) {
           // draw curve.
           const p1 = this.outputPinToPoint(element.instancer, 0),
@@ -2502,7 +2491,7 @@ class Renderer implements ILayoutEngine {
         ctx.fill();
         ctx.lineWidth = 0.5;
         ctx.stroke();
-        this.drawType(element.type.flatType, x, y);
+        this.drawType(element.type, x, y);
         break;
       }
       case RenderMode.Highlight:
@@ -2567,7 +2556,7 @@ class Renderer implements ILayoutEngine {
       return;
     const self = this,
           result = new ElementHitResult(element, hitInfo),
-          type = element.type.flatType;
+          type = element.type;
     if (mode !== RenderMode.Palette) {
       if (!element.isAbstract) {
         for (let i = 0; i < type.inputs.length; i++) {
