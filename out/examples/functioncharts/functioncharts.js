@@ -5,8 +5,7 @@ import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager, ChildSlotProp } from '../../src/dataModels.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 // TODO Check validity of function instances during drag-n-drop.
-// TODO Functionchart instancing off pin.
-// TODO Element instancing off pin.
+// TODO Refine the isAbstract property to reflect incompleteness of implementation.
 //------------------------------------------------------------------------------
 // Value and Function type descriptions.
 function escapeName(name) {
@@ -487,6 +486,15 @@ export class Functionchart extends NodeBase {
 }
 // Radius of rounded corners. This isn't themeable, as it's conceptually part of the notation.
 Functionchart.radius = 8;
+function isInstancerType(item) {
+    return item instanceof Functionchart || item instanceof ImporterElement;
+}
+function isParentType(item) {
+    return item instanceof Functionchart || item instanceof ExporterElement;
+}
+function isElement(item) {
+    return item instanceof Element || item instanceof Pseudoelement;
+}
 export class FunctionchartContext extends EventBase {
     constructor(layoutEngine = new Renderer()) {
         super();
@@ -1974,6 +1982,15 @@ class Renderer {
             this.drawType(type, x, y);
         }
     }
+    drawFunctionInstanceLink(instance) {
+        const ctx = this.ctx, theme = this.theme, rect = this.getBounds(instance), x = rect.x, y = rect.y, w = rect.width, h = rect.height, p1 = this.outputPinToPoint(instance.instancer, instance.srcPin), p2 = { x, y: y + h / 2, nx: -1, ny: 0 }, bezier = getEdgeBezier(p1, p2, 24);
+        ctx.beginPath();
+        bezierEdgePath(bezier, ctx, 0);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = theme.hoverColor;
+        ctx.stroke();
+        ctx.lineWidth = 0.5;
+    }
     drawElement(element, mode) {
         const ctx = this.ctx, theme = this.theme, rect = this.getBounds(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
         ctx.beginPath();
@@ -2006,16 +2023,6 @@ class Renderer {
                     }
                 });
                 this.drawType(element.type, x, y);
-                if (element instanceof FunctionInstance) {
-                    // draw curve.
-                    const p1 = this.outputPinToPoint(element.instancer, 0), p2 = { x, y: y + h / 2, nx: -1, ny: 0 }, bezier = getEdgeBezier(p1, p2, 24);
-                    ctx.beginPath();
-                    bezierEdgePath(bezier, ctx, 0);
-                    ctx.lineWidth = 3;
-                    ctx.strokeStyle = theme.dimColor;
-                    ctx.stroke();
-                    ctx.lineWidth = 0.5;
-                }
                 break;
             }
             case RenderMode.Highlight:
@@ -2223,34 +2230,46 @@ class Renderer {
     }
     drawHoverInfo(info, p) {
         const theme = this.theme, ctx = this.ctx, x = p.x, y = p.y;
-        let type = Type.emptyType; // When no type is available.
+        let displayType;
         if (info instanceof ElementHitResult) {
-            type = info.item.type;
+            const element = info.item, type = element.type;
+            displayType = type;
             if (info.input >= 0) {
-                type = type.inputs[info.input].type;
+                displayType = type.inputs[info.input].type;
             }
             else if (info.output >= 0) {
-                type = type.outputs[info.output].type;
+                const pinIndex = info.output, pin = type.outputs[pinIndex];
+                displayType = pin.type;
+                // Show link to instances.
+                if (pin.type !== Type.valueType) {
+                    element.instances[pinIndex].forEach(instance => this.drawFunctionInstanceLink(instance));
+                }
             }
-            if (type === Type.valueType) {
-                // TODO draw primitive type 'number' or 'string' etc.
+            if (element instanceof FunctionInstance) {
+                this.drawFunctionInstanceLink(element);
+            }
+        }
+        else if (info instanceof FunctionchartHitResult) {
+            const functionchart = info.item;
+            displayType = info.item.instanceType;
+            if (info.output === 0) {
+                functionchart.instances[0].forEach(instance => this.drawFunctionInstanceLink(instance));
             }
         }
         else if (info instanceof WireHitResult) {
-            type = info.item.type; // Wire type is src or dst pin type.
+            displayType = info.item.type; // Wire type is src or dst pin type.
         }
-        else if (info instanceof FunctionchartHitResult) {
-            type = info.item.instanceType;
+        if (displayType) {
+            const w = displayType.width, h = displayType.height;
+            ctx.beginPath();
+            ctx.rect(x, y, w, h);
+            ctx.fillStyle = theme.hoverColor;
+            ctx.fill();
+            ctx.strokeStyle = theme.strokeColor;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+            this.drawType(displayType, x, y);
         }
-        const w = type.width, h = type.height;
-        ctx.beginPath();
-        ctx.rect(x, y, w, h);
-        ctx.fillStyle = theme.hoverColor;
-        ctx.fill();
-        ctx.strokeStyle = theme.strokeColor;
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
-        this.drawType(type, x, y);
     }
 }
 // --------------------------------------------------------------------------------------------
