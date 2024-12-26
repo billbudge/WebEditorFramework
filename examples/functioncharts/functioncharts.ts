@@ -1349,7 +1349,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return true;
   }
 
-  isUnwired(node: NodeTypes) : boolean {
+  isIsolated(node: NodeTypes) : boolean {
     const type = node.type,
           nInputs = type.inputs.length,
           nOutputs = type.outputs.length,
@@ -1362,6 +1362,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     for (let i = 0; i < nOutputs; i++) {
       if (outputs[i].length !== 0)
         return false;
+    }
+    if (isInstancerType(node)) {
+      const instances = node.instances;
+      for (let i = 0; i < nOutputs; i++) {
+        if (instances[i].length !== 0)
+          return false;
+      }
     }
     return true;
   }
@@ -1408,11 +1415,19 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
       dst.inWires[dstPin] = wire;
     });
+    function addInstance(instance: FunctionInstance) {
+      const instancer = instance.instancer,
+            srcPin = instance.srcPin;
+      instancer.instances[srcPin].push(instance);
+    }
     graphInfo.nodes.forEach(node => {
       if (node instanceof FunctionInstance) {
-        const instancer = node.instancer,
-              srcPin = node.srcPin;
-        instancer.instances[srcPin].push(node);
+        addInstance(node);
+      } else if (node instanceof ExporterElement) {
+        const innerElement = node.innerElement;
+        if (innerElement instanceof FunctionInstance) {
+          addInstance(innerElement);
+        }
       }
     });
     return invalidWires;
@@ -1877,17 +1892,23 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         }
       }
     });
-    // Add disconnected instancers as inputs, and exporters as outputs.
+    // Add disconnected instancers as inputs, and functionharts and exporters as outputs.
     subgraphInfo.nodes.forEach(node => {
-      if (node instanceof ImporterElement && self.isUnwired(node)) {
-        const instanceType = node.type.outputs[0].type,
-              type = instanceType.rename(),
-              name = instanceType.name;
+      if (node instanceof ImporterElement) {
+        const instanceType = node.instanceType,
+              name = instanceType.name,
+              type = instanceType.rename();
         const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
         inputs.push(pinInfo);
-      } else if (node instanceof ExporterElement && self.isUnwired(node)) {
+      } else if (node instanceof ExporterElement && self.isIsolated(node)) {
         const name = node.type.name,
               type = node.innerType.rename();
+        const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+        outputs.push(pinInfo);
+      } else if (node instanceof Functionchart && self.isIsolated(node)) {
+        const instanceType = node.instanceType,
+              name = instanceType.name,
+              type = instanceType.rename();
         const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
         outputs.push(pinInfo);
       }
@@ -3069,6 +3090,15 @@ export class FunctionchartEditor implements CanvasLayer {
         values: unaryOps.join(','),
         getter: nodeLabelGetter,
         setter: nodeLabelSetter,
+        prop: typeStringProp,
+      },
+    ]);
+    this.propertyInfo.set('external', [
+      {
+        label: 'type string',
+        type: 'text',
+        getter: getter,
+        setter: setter,
         prop: typeStringProp,
       },
     ]);
