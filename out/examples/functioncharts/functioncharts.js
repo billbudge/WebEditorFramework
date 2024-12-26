@@ -2010,18 +2010,20 @@ class Renderer {
                 else {
                     ctx.stroke();
                 }
-                // Shade function type outputs.
-                ctx.fillStyle = theme.altBgColor;
-                const right = x + w;
-                element.type.outputs.forEach(pin => {
-                    const type = pin.type;
-                    if (type !== Type.valueType) {
-                        ctx.beginPath();
-                        ctx.rect(right - type.width, y + pin.y, type.width, type.height);
-                        ctx.fillStyle = theme.altBgColor;
-                        ctx.fill();
-                    }
-                });
+                if (!(element instanceof ExporterElement)) {
+                    // Shade function outputs to indicate they can be instanced.
+                    ctx.fillStyle = theme.altBgColor;
+                    const right = x + w;
+                    element.type.outputs.forEach(pin => {
+                        const type = pin.type;
+                        if (type !== Type.valueType) {
+                            ctx.beginPath();
+                            ctx.rect(right - type.width, y + pin.y, type.width, type.height);
+                            ctx.fillStyle = theme.altBgColor;
+                            ctx.fill();
+                        }
+                    });
+                }
                 this.drawType(element.type, x, y);
                 break;
             }
@@ -3111,7 +3113,7 @@ export class FunctionchartEditor {
             else if (dst === undefined) {
                 const p = wire.pDst, pin = src.type.outputs[wire.srcPin];
                 let output;
-                if (pin.type !== Type.valueType) {
+                if (!(src instanceof ExporterElement) && pin.type !== Type.valueType) {
                     output = context.newInstanceForWire(wire, parent, p);
                 }
                 else {
