@@ -400,12 +400,7 @@ export class FunctionInstance extends Element {
     get srcPin() { return this.template.srcPin.get(this) || 0; } // TODO remove default when files converted.
     set srcPin(value) { this.template.srcPin.set(this, value); }
     // Derived Properties
-    get isAbstract() {
-        const instancer = this.instancer;
-        if (instancer instanceof Functionchart)
-            return instancer.isAbstract;
-        return false;
-    }
+    get isAbstract() { return this.instancer.isAbstract; }
     constructor(context, id) {
         super(functionInstanceTemplate, context, id);
     }
@@ -1078,6 +1073,18 @@ export class FunctionchartContext extends EventBase {
         }
         return true;
     }
+    isUnwired(node) {
+        const type = node.type, nInputs = type.inputs.length, nOutputs = type.outputs.length, inputs = node.inWires, outputs = node.outWires;
+        for (let i = 0; i < nInputs; i++) {
+            if (inputs[i] !== undefined)
+                return false;
+        }
+        for (let i = 0; i < nOutputs; i++) {
+            if (outputs[i].length !== 0)
+                return false;
+        }
+        return true;
+    }
     isValidFunctionInstance(instance) {
         let parent = instance.parent;
         if (parent instanceof ExporterElement)
@@ -1517,7 +1524,7 @@ export class FunctionchartContext extends EventBase {
                 }
             }
             else { // instanceof ElementTypes
-                if (node instanceof Element && node.isAbstract && node.type !== Type.emptyType) {
+                if (node instanceof Element && node.isAbstract) {
                     // abstract elements become inputs.
                     const type = node.type.rename();
                     const name = node.type.name;
@@ -1534,22 +1541,15 @@ export class FunctionchartContext extends EventBase {
         });
         // Add disconnected instancers as inputs, and exporters as outputs.
         subgraphInfo.nodes.forEach(node => {
-            if (node instanceof ImporterElement) {
-                const wire = node.inWires[0];
-                if (!wire) {
-                    const instanceType = node.type.outputs[0].type, type = instanceType.rename(), name = instanceType.name;
-                    const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-                    inputs.push(pinInfo);
-                }
-                ;
+            if (node instanceof ImporterElement && self.isUnwired(node)) {
+                const instanceType = node.type.outputs[0].type, type = instanceType.rename(), name = instanceType.name;
+                const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                inputs.push(pinInfo);
             }
-            else if (node instanceof ExporterElement) {
-                const wires = node.outWires[0];
-                if (wires && wires.length === 0) { // Wires may be undefined.
-                    const name = node.type.name, type = node.innerType.rename();
-                    const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-                    outputs.push(pinInfo);
-                }
+            else if (node instanceof ExporterElement && self.isUnwired(node)) {
+                const name = node.type.name, type = node.innerType.rename();
+                const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                outputs.push(pinInfo);
             }
         });
         // Sort pins in increasing y-order. This lets users arrange the pins of the
@@ -2011,7 +2011,7 @@ class Renderer {
                     ctx.stroke();
                 }
                 if (!(element instanceof ExporterElement)) {
-                    // Shade function outputs to indicate they can be instanced.
+                    // Shade function outputs that can be instanced.
                     ctx.fillStyle = theme.altBgColor;
                     const right = x + w;
                     element.type.outputs.forEach(pin => {
@@ -2235,13 +2235,10 @@ class Renderer {
         let displayType;
         if (info instanceof ElementHitResult) {
             const element = info.item, type = element.type;
-            displayType = type;
             if (info.input >= 0) {
-                displayType = type.inputs[info.input].type;
             }
             else if (info.output >= 0) {
                 const pinIndex = info.output, pin = type.outputs[pinIndex];
-                displayType = pin.type;
                 // Show link to instances.
                 if (pin.type !== Type.valueType) {
                     element.instances[pinIndex].forEach(instance => this.drawFunctionInstanceLink(instance));
@@ -2253,7 +2250,6 @@ class Renderer {
         }
         else if (info instanceof FunctionchartHitResult) {
             const functionchart = info.item;
-            displayType = info.item.instanceType;
             if (info.output === 0) {
                 functionchart.instances[0].forEach(instance => this.drawFunctionInstanceLink(instance));
             }
