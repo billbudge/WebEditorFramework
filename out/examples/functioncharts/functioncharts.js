@@ -4,6 +4,8 @@ import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTe
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager, ChildSlotProp } from '../../src/dataModels.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
+// TODO Functionchart imports.
+// TODO Root functionchart type display.
 // TODO Check validity of function instances during drag-n-drop.
 // TODO Refine the isAbstract property to reflect incompleteness of implementation.
 //------------------------------------------------------------------------------
@@ -282,10 +284,10 @@ class ExporterTemplate extends ElementTemplate {
 class FunctionInstanceTemplate extends ElementTemplate {
     constructor() {
         super(...arguments);
-        this.instancer = instancerProp;
+        this.src = instancerProp;
         this.srcPin = srcPinProp;
         this.properties = [this.id, this.typeString, this.x, this.y,
-            this.instancer, this.srcPin]; // no 'name' property
+            this.src, this.srcPin]; // no 'name' property
     }
 }
 class PseudoelementTemplate extends NodeTemplate {
@@ -395,12 +397,18 @@ export class ExporterElement extends Element {
     }
 }
 export class FunctionInstance extends Element {
-    get instancer() { return this.template.instancer.get(this); }
-    set instancer(value) { this.template.instancer.set(this, value); }
+    get src() { return this.template.src.get(this); }
+    set src(value) { this.template.src.set(this, value); }
     get srcPin() { return this.template.srcPin.get(this) || 0; } // TODO remove default when files converted.
     set srcPin(value) { this.template.srcPin.set(this, value); }
     // Derived Properties
-    get isAbstract() { return this.instancer.isAbstract; }
+    get isAbstract() {
+        const src = this.src;
+        return src instanceof Functionchart && src.isAbstract;
+    }
+    getSrcType() {
+        return this.src.type.outputs[this.srcPin].type;
+    }
     constructor(context, id) {
         super(functionInstanceTemplate, context, id);
     }
@@ -482,7 +490,7 @@ export class Functionchart extends NodeBase {
 // Radius of rounded corners. This isn't themeable, as it's conceptually part of the notation.
 Functionchart.radius = 8;
 function isInstancerType(item) {
-    return item instanceof Functionchart || item instanceof ImporterElement;
+    return item instanceof Functionchart || item instanceof Element;
 }
 function isParentType(item) {
     return item instanceof Functionchart || item instanceof ExporterElement;
@@ -538,9 +546,8 @@ export class FunctionchartContext extends EventBase {
         }
         this.functionchart = root;
         this.insertFunctionchart(root, undefined);
-        this.derivedInfoNeedsUpdate = true;
-        this.updateReferenceLists(); // TODO needed?
         this.updateDerivedInfo();
+        this.makeConsistent(); // TODO separate function to calculate typeinfo.
     }
     newElement(typeName) {
         const nextId = ++this.highestId;
@@ -999,7 +1006,7 @@ export class FunctionchartContext extends EventBase {
     newInstanceForWire(wire, parent, p) {
         const src = wire.src, type = src.type.outputs[wire.srcPin].type, element = this.newElement('instance');
         element.typeString = type.typeString;
-        element.instancer = src;
+        element.src = src;
         element.srcPin = wire.srcPin;
         element.x = p.x;
         element.y = p.y - type.height / 2;
@@ -1058,10 +1065,10 @@ export class FunctionchartContext extends EventBase {
     }
     canAddItem(item, parent) {
         if (item instanceof FunctionInstance) {
-            const definition = item.instancer;
+            const definition = item.src;
             // Closed functioncharts can be instantiated anywhere.
             if (definition instanceof Functionchart && definition.typeInfo.closed)
-                return true;
+                return true; // TODO other instancer types
             const definitionScope = definition.parent;
             // TODO Top level functionchart, we can't currently instantiate it but it should be possible.
             if (!definitionScope)
@@ -1131,7 +1138,7 @@ export class FunctionchartContext extends EventBase {
             dst.inWires[dstPin] = wire;
         });
         function addInstance(instance) {
-            const instancer = instance.instancer, srcPin = instance.srcPin;
+            const instancer = instance.src, srcPin = instance.srcPin;
             instancer.instances[srcPin].push(instance);
         }
         graphInfo.nodes.forEach(node => {
@@ -1146,24 +1153,6 @@ export class FunctionchartContext extends EventBase {
             }
         });
         return invalidWires;
-    }
-    updateInstanceTypes() {
-        const self = this;
-        // Update Functionchart types. TODO ImporterElement types too?
-        this.reverseVisitNodes(this.functionchart, item => {
-            if (item instanceof Functionchart) {
-                const typeInfo = self.getFunctionchartTypeInfo(item), instanceType = typeInfo.instanceType;
-                item.typeInfo = typeInfo;
-                item.type = typeInfo.instanceType.toImportExportType();
-                item.instanceType = instanceType;
-            }
-        });
-        this.visitNodes(this.functionchart, node => {
-            if (node instanceof FunctionInstance) {
-                const instancer = node.instancer, srcPin = node.srcPin, type = instancer.type.outputs[srcPin].type;
-                node.typeString = type.typeString;
-            }
-        });
     }
     // Topological sort of elements for update and validation. The circuit should form a DAG.
     // All wires should be valid.
@@ -1195,15 +1184,26 @@ export class FunctionchartContext extends EventBase {
         });
         return sorted;
     }
-    updateDerivedInfo(updateInstancers = true) {
+    updateFunctioncharts() {
+        const self = this;
+        // Update Functionchart types.
+        this.reverseVisitNodes(this.functionchart, item => {
+            if (item instanceof Functionchart) {
+                const typeInfo = self.getFunctionchartTypeInfo(item), instanceType = typeInfo.instanceType;
+                item.typeInfo = typeInfo;
+                item.type = typeInfo.instanceType.toImportExportType();
+                item.instanceType = instanceType;
+            }
+        });
+    }
+    updateDerivedInfo() {
         if (this.derivedInfoNeedsUpdate) {
-            // Clear the update flag to avoid re-entering. No mutation should happen while
-            // we're here.
+            // Clear the update flag to avoid re-entering. No changes to the primary data should
+            // be made while we're here.
             this.derivedInfoNeedsUpdate = false;
-            if (updateInstancers)
-                this.updateInstanceTypes();
             this.invalidWires = this.updateReferenceLists();
             this.sorted = this.topologicalSort();
+            this.updateFunctioncharts();
         }
     }
     isValidFunctionchart() {
@@ -1293,8 +1293,21 @@ export class FunctionchartContext extends EventBase {
                 node.lastTypeInfo = node.typeInfo;
         });
         // Generate next type info.
-        this.updateDerivedInfo(false);
-        this.updateInstanceTypes();
+        this.updateDerivedInfo();
+        // Update type strings for all functioncharts and instances.
+        this.visitNodes(this.functionchart, node => {
+            if (node instanceof Functionchart) {
+                const typeInfo = node.typeInfo, instanceType = typeInfo.instanceType, type = instanceType.toImportExportType();
+                if (node.typeString !== type.typeString) {
+                    node.typeString = type.typeString;
+                }
+            }
+            else if (node instanceof FunctionInstance) {
+                const type = node.getSrcType();
+                // TODO varArgs merging.
+                node.typeString = type.typeString;
+            }
+        });
         // Generate pin maps for updating wired instances.
         this.nodes.forEach(node => {
             if (node instanceof Functionchart) {
@@ -1338,18 +1351,19 @@ export class FunctionchartContext extends EventBase {
         // Delete unsupported FunctionInstances. Update the rest.
         Array.from(this.nodes).forEach(node => {
             if (node instanceof FunctionInstance) {
-                const instancer = node.instancer, supported = self.nodes.has(instancer);
+                const instancer = node.src, supported = self.nodes.has(instancer);
                 if (!supported) {
                     self.disconnectNode(node);
                     self.deleteItem(node);
                 }
                 else {
-                    const instancer = node.instancer;
+                    const instancer = node.src;
                     if (instancer instanceof Functionchart) {
                         self.remapFunctionInstance(node, instancer);
                     }
-                    else if (instancer instanceof ImporterElement) {
-                        node.type = instancer.instanceType;
+                    else {
+                        const type = node.getSrcType();
+                        node.type = type;
                     }
                 }
             }
@@ -1423,7 +1437,7 @@ export class FunctionchartContext extends EventBase {
         return result;
     }
     importElement(element) {
-        const result = this.newElement('importer'), importerType = element.type.toImportExportType(); // TODO merge with exportElement?
+        const result = this.newElement('importer'), importerType = element.type.toImportExportType();
         result.x = element.x;
         result.y = element.y;
         result.typeString = importerType.typeString;
@@ -1603,6 +1617,7 @@ export class FunctionchartContext extends EventBase {
     insertElement(element, parent) {
         this.nodes.add(element);
         element.parent = parent;
+        element.type = Type.fromString(element.typeString);
         this.updateGlobalPosition(element);
         this.derivedInfoNeedsUpdate = true;
     }
@@ -1614,6 +1629,7 @@ export class FunctionchartContext extends EventBase {
     insertFunctionchart(functionchart, parent) {
         this.nodes.add(functionchart);
         functionchart.parent = parent;
+        functionchart.type = Type.fromString(functionchart.typeString).toImportExportType();
         const self = this;
         functionchart.nodes.forEach(item => self.insertItem(item, functionchart));
         functionchart.wires.forEach(wire => self.insertWire(wire, functionchart));
@@ -1640,7 +1656,7 @@ export class FunctionchartContext extends EventBase {
     }
     insertItem(item, parent) {
         if (!this.nodes.has(parent))
-            return;
+            return; // Ignore changes while object graphs are constructed.
         if (parent instanceof Functionchart) {
             if (item instanceof Wire) {
                 this.insertWire(item, parent);
@@ -2004,7 +2020,7 @@ class Renderer {
         }
     }
     drawFunctionInstanceLink(instance) {
-        const ctx = this.ctx, theme = this.theme, rect = this.getBounds(instance), x = rect.x, y = rect.y, w = rect.width, h = rect.height, p1 = this.outputPinToPoint(instance.instancer, instance.srcPin), p2 = { x, y: y + h / 2, nx: -1, ny: 0 }, bezier = getEdgeBezier(p1, p2, 24);
+        const ctx = this.ctx, theme = this.theme, rect = this.getBounds(instance), x = rect.x, y = rect.y, w = rect.width, h = rect.height, p1 = this.outputPinToPoint(instance.src, instance.srcPin), p2 = { x, y: y + h / 2, nx: -1, ny: 0 }, bezier = getEdgeBezier(p1, p2, 24);
         ctx.beginPath();
         bezierEdgePath(bezier, ctx, 0);
         ctx.lineWidth = 3;
@@ -2609,7 +2625,7 @@ export class FunctionchartEditor {
         this.scrap.forEach(item => {
             context.visitAll(item, item => {
                 if (item instanceof FunctionInstance) {
-                    instancers.add(item.instancer); // prepend so they precede instances.
+                    instancers.add(item.src); // prepend so they precede instances.
                 }
             });
         });
@@ -3023,22 +3039,13 @@ export class FunctionchartEditor {
                 const copies = context.copy(); // TODO fix
                 drag.items = copies;
             }
-            else if (drag.kind === 'newInstance') {
-                const instancer = drag.items[0], newInstance = context.newElement('instance'), instancerRect = this.renderer.instancerBounds(instancer);
-                newInstance.instancer = instancer;
-                newInstance.typeString = instancer.instanceType.typeString; // TODO fixme
-                newInstance.x = instancerRect.x;
-                newInstance.y = instancerRect.y;
-                drag.items = [newInstance];
-            }
             context.beginTransaction(drag.description);
             if (newWire) {
                 context.addItem(newWire, this.functionchart); // makeConsistent will canonicalize the parent functionchart.
                 selection.set(newWire);
             }
             else {
-                if (drag.kind == 'copyPalette' || drag.kind == 'moveCopySelection' ||
-                    drag.kind === 'newInstance') {
+                if (drag.kind == 'copyPalette' || drag.kind == 'moveCopySelection') {
                     context.addItems(drag.items, this.functionchart);
                     selection.set(drag.items);
                 }
@@ -3055,8 +3062,7 @@ export class FunctionchartEditor {
             switch (drag.kind) {
                 case 'copyPalette':
                 case 'moveCopySelection':
-                case 'moveSelection':
-                case 'newInstance': {
+                case 'moveSelection': {
                     hitInfo = this.getFirstHit(hitList, isDropTarget);
                     context.selection.forEach(item => {
                         if (item instanceof Wire)
@@ -3158,7 +3164,7 @@ export class FunctionchartEditor {
         }
         else if (drag instanceof NonWireDrag &&
             (drag.kind == 'copyPalette' || drag.kind === 'moveSelection' ||
-                drag.kind === 'moveCopySelection' || drag.kind === 'newInstance')) {
+                drag.kind === 'moveCopySelection')) {
             if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase &&
                 lastSelected.type.canConnectTo(hitInfo.item.type)) {
                 const target = hitInfo.item;

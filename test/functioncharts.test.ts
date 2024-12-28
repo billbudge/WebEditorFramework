@@ -32,7 +32,7 @@ function addFunctionInstance(
     functionchart: FC.Functionchart, definition: FC.Functionchart) : FC.FunctionInstance {
   const context = functionchart.context,
         functionInstance = context.newElement('instance') as FC.FunctionInstance;
-  functionInstance.instancer = definition;
+  functionInstance.src = definition;
   mutate(context, () => context.addItem(functionInstance, functionchart));
   return functionInstance;
 }
