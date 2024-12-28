@@ -1523,6 +1523,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (node instanceof FunctionInstance) {
         if (!self.isValidFunctionInstance(node))
             invalidInstances.push(node);
+      } else if (node instanceof ExporterElement) {
+        const innerElement = node.innerElement;
+        if (innerElement instanceof FunctionInstance) {
+          if (!self.isValidFunctionInstance(innerElement))
+            invalidInstances.push(innerElement);
+        }
       }
     });
 
@@ -1893,12 +1899,33 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         } else if (node.template === useTemplate) {
           // TODO
         }
-      } else {  // instanceof ElementTypes
-        if (node instanceof Element && node.isAbstract) {
-          // abstract elements become inputs.
-          const type = node.type.rename();
-          const name = node.type.name;
-          const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+      } else {
+        if (node instanceof ImporterElement) {
+          const instanceType = node.instanceType,
+                name = instanceType.name,
+                type = instanceType.rename(),
+                pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+          inputs.push(pinInfo);
+        } else if (node instanceof ExporterElement) {
+          if (self.isIsolated(node)) {
+            const name = node.type.name,
+                  type = node.innerType.rename(),
+                  pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+            outputs.push(pinInfo);
+          }
+        } else if (node instanceof Functionchart) {
+          if (self.isIsolated(node)) {
+            const instanceType = node.instanceType,
+                  name = instanceType.name,
+                  type = instanceType.rename(),
+                  pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+            outputs.push(pinInfo);
+          }
+        } else if (node instanceof Element && node.isAbstract) {
+          // Abstract elements must inputs.
+          const type = node.type.rename(),
+                name = node.type.name,
+                pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
           inputs.push(pinInfo);
         }
         if (abstract) {
@@ -1911,24 +1938,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
     // Add disconnected instancers as inputs, and functionharts and exporters as outputs.
     subgraphInfo.nodes.forEach(node => {
-      if (node instanceof ImporterElement) {
-        const instanceType = node.instanceType,
-              name = instanceType.name,
-              type = instanceType.rename();
-        const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-        inputs.push(pinInfo);
-      } else if (node instanceof ExporterElement && self.isIsolated(node)) {
-        const name = node.type.name,
-              type = node.innerType.rename();
-        const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-        outputs.push(pinInfo);
-      } else if (node instanceof Functionchart && self.isIsolated(node)) {
-        const instanceType = node.instanceType,
-              name = instanceType.name,
-              type = instanceType.rename();
-        const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-        outputs.push(pinInfo);
-      }
+
     });
     // Sort pins in increasing y-order. This lets users arrange the pins of the
     // new type in an intuitive way.
@@ -1969,6 +1979,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   private insertElement(element: ElementTypes, parent: ElementParentTypes) {
     this.nodes.add(element);
     element.parent = parent;
+    if (element instanceof ExporterElement && element.innerElement) {
+      element.innerElement.parent = element;
+    }
     element.type = Type.fromString(element.typeString);
     this.updateGlobalPosition(element);
     this.derivedInfoNeedsUpdate = true;
@@ -2449,10 +2462,9 @@ class Renderer implements ILayoutEngine {
       ctx.rect(x, y, d, d);
       // ctx.arc(x + r, y + r, r, 0, Math.PI * 2, true);
       ctx.stroke();
-    } else if (pin.type) {
+    } else {
       const type = pin.type,
             width = type.width, height = type.height;
-
       ctx.beginPath();
       ctx.rect(x, y, width, height);
       ctx.stroke();
@@ -2483,7 +2495,14 @@ class Renderer implements ILayoutEngine {
           x = rect.x, y = rect.y, w = rect.width, h = rect.height;
 
     ctx.beginPath();
-    ctx.rect(x, y, w, h);
+    // Importers and abstract instances define function inputs, so use the input shape.
+    if (element instanceof ImporterElement || element.isAbstract) {
+      const d = theme.knobbyRadius * 2;
+      inFlagPath(x - d, y, w + d, h, d, ctx);
+    }
+    else {
+      ctx.rect(x, y, w, h);
+    }
 
     switch (mode) {
       case RenderMode.Normal:
@@ -2492,14 +2511,8 @@ class Renderer implements ILayoutEngine {
         ctx.fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
-        if (element.isAbstract) {
-          ctx.setLineDash([6, 3]);
-          ctx.stroke();
-          ctx.setLineDash([0]);
-        } else {
-          ctx.stroke();
-        }
-        if (!(element instanceof ExporterElement)) {
+        ctx.stroke();
+        if (!(element instanceof ExporterElement) && !element.isAbstract) {
           // Shade function outputs that can be instanced.
           ctx.fillStyle = theme.altBgColor;
           const right = x + w;
