@@ -4,6 +4,7 @@ import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTe
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager, ChildSlotProp } from '../../src/dataModels.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
+// TODO rework wire/transition drawing - short paths should be more flat, long paths can be more curvy.
 // TODO Functionchart imports.
 // TODO Root functionchart type display.
 // TODO Check validity of function instances during drag-n-drop.
@@ -1946,7 +1947,7 @@ class Renderer {
             p2 = this.inputPinToPoint(dst, wire.dstPin);
         }
         if (p1 && p2) {
-            wire.bezier = getEdgeBezier(p1, p2, 24);
+            wire.bezier = getEdgeBezier(p1, p2, 0);
         }
     }
     // Make sure a functionchart is big enough to enclose its contents.
@@ -2039,7 +2040,7 @@ class Renderer {
         ctx.stroke();
         p1.x += spacing;
         p2.x -= spacing;
-        const bezier = getEdgeBezier(p1, p2, 24);
+        const bezier = getEdgeBezier(p1, p2, 0);
         ctx.beginPath();
         bezierEdgePath(bezier, ctx, 0);
         ctx.lineWidth = 2;

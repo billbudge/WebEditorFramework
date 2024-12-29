@@ -2370,7 +2370,7 @@ class Renderer implements ILayoutEngine {
       p2 = this.inputPinToPoint(dst, wire.dstPin);
     }
     if (p1 && p2) {
-      wire.bezier = getEdgeBezier(p1, p2, 24);
+      wire.bezier = getEdgeBezier(p1, p2, 0);
     }
   }
 
@@ -2493,7 +2493,7 @@ class Renderer implements ILayoutEngine {
     p1.x += spacing;
     p2.x -= spacing;
 
-    const bezier = getEdgeBezier(p1, p2, 24)
+    const bezier = getEdgeBezier(p1, p2, 0);
     ctx.beginPath();
     bezierEdgePath(bezier, ctx, 0);
     ctx.lineWidth = 2;
