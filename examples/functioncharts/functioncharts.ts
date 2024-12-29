@@ -2455,6 +2455,7 @@ class Renderer implements ILayoutEngine {
     const ctx = this.ctx,
           theme = this.theme;
     ctx.strokeStyle = theme.strokeColor;
+    ctx.lineWidth = 0.5;
     if (pin.type === Type.valueType) {
       const r = theme.knobbyRadius;
       ctx.beginPath();
@@ -2472,20 +2473,32 @@ class Renderer implements ILayoutEngine {
     }
   }
 
-  drawFunctionInstanceLink(instance: FunctionInstance) {
+  drawFunctionInstanceLink(instance: FunctionInstance, color: string) {
     const ctx = this.ctx,
           theme = this.theme,
+          spacing = theme.spacing,
           rect = this.getBounds(instance),
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
+          type = instance.type,
           p1 = this.outputPinToPoint(instance.src, instance.srcPin),
-          p2 = { x, y: y + h / 2, nx : -1, ny: 0 },
-          bezier = getEdgeBezier(p1, p2, 24);
+          p2 = { x, y: y + h / 2, nx : -1, ny: 0 };
+    const x1 = p1.x + spacing,
+          x2 = p2.x - spacing,
+          barHeight = type.height / 2;
+    ctx.moveTo(x1, p1.y - barHeight);
+    ctx.lineTo(x1, p1.y + barHeight);
+    ctx.moveTo(x2, p2.y - barHeight);
+    ctx.lineTo(x2, p2.y + barHeight);
+    ctx.stroke();
+    p1.x += spacing;
+    p2.x -= spacing;
+
+    const bezier = getEdgeBezier(p1, p2, 24)
     ctx.beginPath();
     bezierEdgePath(bezier, ctx, 0);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = theme.hoverColor;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = color;
     ctx.stroke();
-    ctx.lineWidth = 0.5;
   }
 
   drawElement(element: ElementTypes, mode: RenderMode) {
@@ -2511,6 +2524,7 @@ class Renderer implements ILayoutEngine {
         ctx.fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
+        ctx.lineWidth = 0.5;
         ctx.stroke();
         if (!(element instanceof ExporterElement) && !element.isAbstract) {
           // Shade function outputs that can be instanced.
@@ -2527,6 +2541,9 @@ class Renderer implements ILayoutEngine {
           });
         }
         this.drawType(element.type, x, y);
+        if (element instanceof FunctionInstance && !element.isAbstract) {
+          this.drawFunctionInstanceLink(element, theme.dimColor);
+        }
         break;
       }
       case RenderMode.Highlight:
@@ -2606,7 +2623,6 @@ class Renderer implements ILayoutEngine {
         ctx.fillStyle = theme.altBgColor;
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
-        ctx.lineWidth = 0.5;
         if (functionchart.isAbstract) {
           ctx.setLineDash([6, 3]);
           ctx.stroke();
@@ -2699,14 +2715,12 @@ class Renderer implements ILayoutEngine {
             pinPos = wire.pDst!,
             pinX = pinPos.x,
             pinY = pinPos.y - pin.type.height / 2;
-      ctx.lineWidth = 0.5;
       this.drawPin(pin, pinX, pinY)
     } else if (wire.src === undefined) {
       const pin = wire.dst!.type.inputs[wire.dstPin],
             pinPos = wire.pSrc!,
             pinX = pinPos.x - pin.type.width,
             pinY = pinPos.y - pin.type.height / 2;
-      ctx.lineWidth = 0.5;
       this.drawPin(pin, pinX, pinY)
     }
   }
@@ -2762,6 +2776,7 @@ class Renderer implements ILayoutEngine {
 
   drawHoverInfo(info: HitResultTypes, p: Point) {
     const theme = this.theme,
+          strokeColor = theme.dimColor,
           ctx = this.ctx,
           x = p.x, y = p.y;
     let displayType;
@@ -2774,16 +2789,16 @@ class Renderer implements ILayoutEngine {
               pin = type.outputs[pinIndex];
         // Show link to instances.
         if (pin.type !== Type.valueType) {
-          element.instances[pinIndex].forEach(instance => this.drawFunctionInstanceLink(instance));
+          element.instances[pinIndex].forEach(instance => this.drawFunctionInstanceLink(instance, strokeColor));
         }
       }
       if (element instanceof FunctionInstance) {
-        this.drawFunctionInstanceLink(element);
+        this.drawFunctionInstanceLink(element, strokeColor);
       }
     } else if (info instanceof FunctionchartHitResult) {
       const functionchart = info.item;
       if (info.output === 0) {
-        functionchart.instances[0].forEach(instance => this.drawFunctionInstanceLink(instance));
+        functionchart.instances[0].forEach(instance => this.drawFunctionInstanceLink(instance, strokeColor));
       }
     } else if (info instanceof WireHitResult) {
       displayType = info.item.type;  // Wire type is src or dst pin type.
