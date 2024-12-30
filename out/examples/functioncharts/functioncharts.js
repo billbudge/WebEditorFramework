@@ -4,7 +4,7 @@ import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTe
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager, ChildSlotProp } from '../../src/dataModels.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
-// TODO rework wire/transition drawing - short paths should be more flat, long paths can be more curvy.
+// TODO Explicit function outputs?
 // TODO Functionchart imports.
 // TODO Root functionchart type display.
 // TODO Check validity of function instances during drag-n-drop.
@@ -2031,20 +2031,25 @@ class Renderer {
         }
     }
     drawFunctionInstanceLink(instance, color) {
-        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing, rect = this.getBounds(instance), x = rect.x, y = rect.y, w = rect.width, h = rect.height, type = instance.type, p1 = this.outputPinToPoint(instance.src, instance.srcPin), p2 = { x, y: y + h / 2, nx: -1, ny: 0 };
-        const x1 = p1.x + spacing, x2 = p2.x - spacing, barHeight = type.height / 2;
-        ctx.moveTo(x1, p1.y - barHeight);
-        ctx.lineTo(x1, p1.y + barHeight);
-        ctx.moveTo(x2, p2.y - barHeight);
-        ctx.lineTo(x2, p2.y + barHeight);
-        ctx.stroke();
+        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing, rect = this.getBounds(instance), x = rect.x, y = rect.y, w = rect.width, h = rect.height, type = instance.type, p1 = this.outputPinToPoint(instance.src, instance.srcPin), p2 = { x, y: y + h / 2, nx: -1, ny: 0 }, barHeight = type.height / 2;
+        ctx.fillStyle = color;
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(p1.x + spacing, p1.y);
+        ctx.lineTo(p1.x, p1.y - barHeight);
+        ctx.lineTo(p1.x, p1.y + barHeight);
+        ctx.closePath();
+        ctx.moveTo(p2.x - spacing, p2.y);
+        ctx.lineTo(p2.x, p2.y - barHeight);
+        ctx.lineTo(p2.x, p2.y + barHeight);
+        ctx.closePath();
+        ctx.fill();
         p1.x += spacing;
         p2.x -= spacing;
         const bezier = getEdgeBezier(p1, p2, 0);
         ctx.beginPath();
         bezierEdgePath(bezier, ctx, 0);
         ctx.lineWidth = 2;
-        ctx.strokeStyle = color;
         ctx.stroke();
     }
     drawElement(element, mode) {
@@ -2062,25 +2067,26 @@ class Renderer {
             case RenderMode.Normal:
             case RenderMode.Palette:
             case RenderMode.Print: {
-                ctx.fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
+                const fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
+                ctx.fillStyle = fillStyle;
                 ctx.fill();
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
                 if (!(element instanceof ExporterElement) && !element.isAbstract) {
                     // Shade function outputs that can be instanced.
-                    ctx.fillStyle = theme.altBgColor;
+                    ctx.beginPath();
                     const right = x + w;
                     element.type.outputs.forEach(pin => {
                         const type = pin.type;
                         if (type !== Type.valueType) {
-                            ctx.beginPath();
                             ctx.rect(right - type.width, y + pin.y, type.width, type.height);
-                            ctx.fillStyle = theme.altBgColor;
-                            ctx.fill();
                         }
                     });
+                    ctx.fillStyle = theme.altBgColor;
+                    ctx.fill();
                 }
+                ctx.fillStyle = fillStyle;
                 this.drawType(element.type, x, y);
                 if (element instanceof FunctionInstance && !element.isAbstract) {
                     this.drawFunctionInstanceLink(element, theme.dimColor);
@@ -2316,9 +2322,9 @@ class Renderer {
         }
         if (displayType) {
             const w = displayType.width, h = displayType.height;
+            ctx.fillStyle = theme.hoverColor;
             ctx.beginPath();
             ctx.rect(x, y, w, h);
-            ctx.fillStyle = theme.hoverColor;
             ctx.fill();
             ctx.strokeStyle = theme.strokeColor;
             ctx.lineWidth = 0.5;
