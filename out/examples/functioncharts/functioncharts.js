@@ -1557,9 +1557,6 @@ export class FunctionchartContext extends EventBase {
                     const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
                     outputs.push(pinInfo);
                 }
-                else if (node.template === useTemplate) {
-                    // TODO
-                }
             }
             else {
                 if (node instanceof ImporterElement) {
@@ -1768,7 +1765,7 @@ class FunctionchartTheme extends Theme {
         this.textIndent = 8;
         this.textLeading = 6;
         this.knobbyRadius = 4;
-        this.padding = 8;
+        this.padding = 4;
         this.spacing = 8;
         this.minTypeWidth = 8;
         this.minTypeHeight = 8;
@@ -1908,7 +1905,7 @@ class Renderer {
                     else {
                         pin.baseline += (ph - textSize) / 2;
                     }
-                    pw += 2 * spacing + ctx.measureText(name).width;
+                    pw += spacing + ctx.measureText(name).width;
                 }
                 y += ph;
                 w = Math.max(w, pw);
@@ -1917,9 +1914,7 @@ class Renderer {
         }
         let [yIn, wIn] = layoutPins(inputs);
         let [yOut, wOut] = layoutPins(outputs);
-        wIn += spacing;
-        wOut += spacing;
-        type.width = Math.round(Math.max(width, wIn + wOut, theme.minTypeWidth));
+        type.width = Math.round(Math.max(width, wIn + wOut + spacing, theme.minTypeWidth));
         type.height = Math.round(Math.max(yIn, yOut, theme.minTypeHeight) + spacing / 2);
     }
     layoutPin(pin) {
@@ -2120,8 +2115,7 @@ class Renderer {
                         break;
                     }
                     case 'use': {
-                        ctx.beginPath();
-                        ctx.rect(x, y, w, h);
+                        roundRectPath(x, y, w, h, 2 * r, ctx);
                     }
                 }
                 ctx.fill();

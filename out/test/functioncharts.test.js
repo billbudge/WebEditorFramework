@@ -534,7 +534,7 @@ describe('FunctionchartContext', () => {
         // expect(typeInfo.passThroughs.length).toBe(1);
         // arrayEquals(typeInfo.passThroughs[0], [0, 1]);
     });
-    const recursiveFuncionchart = {
+    const recursiveFuncionchartTest = {
         "type": "functionchart",
         "id": 2,
         "nodes": [
@@ -634,7 +634,7 @@ describe('FunctionchartContext', () => {
         "wires": []
     };
     test('recursiveFunctionchart', () => {
-        const context = new FC.FunctionchartContext(), functionchart = DataModels.Deserialize(recursiveFuncionchart, context);
+        const context = new FC.FunctionchartContext(), functionchart = DataModels.Deserialize(recursiveFuncionchartTest, context);
         context.root = functionchart;
         expect(functionchart.nodes.length).toBe(1);
         const fc = functionchart.nodes.get(0);
@@ -645,10 +645,10 @@ describe('FunctionchartContext', () => {
         expect(rfi2).toBeInstanceOf(FC.FunctionInstance);
         expect(fc.wires.length).toBe(6);
     });
-    const canAddFunctionchart = {
+    const isValidFunctionInstanceTest = {
         "type": "functionchart",
         "id": 2,
-        "width": 853.3439201116562,
+        "width": 941.9321769475937,
         "height": 479.58752822875977,
         "nodes": [
             {
@@ -656,7 +656,7 @@ describe('FunctionchartContext', () => {
                 "id": 3,
                 "x": 257.8312476873398,
                 "y": 207.09062957763672,
-                "width": 505.8917007446289,
+                "width": 668.1009292602539,
                 "height": 256.49689865112305,
                 "nodes": [
                     {
@@ -664,7 +664,7 @@ describe('FunctionchartContext', () => {
                         "id": 4,
                         "x": 19.175708770751953,
                         "y": 11.459365844726562,
-                        "width": 336.7667427062988,
+                        "width": 419.1364936828613,
                         "height": 228.80315780639648,
                         "nodes": [
                             {
@@ -785,6 +785,13 @@ describe('FunctionchartContext', () => {
                                 "typeString": "[,v]",
                                 "x": 16.878253936767578,
                                 "y": 130.32810592651367
+                            },
+                            {
+                                "type": "importer",
+                                "id": 18,
+                                "typeString": "[,[v,v](open)]",
+                                "x": 248.64843893051147,
+                                "y": 126.78422355651855
                             }
                         ],
                         "wires": [
@@ -804,9 +811,9 @@ describe('FunctionchartContext', () => {
         "wires": []
     };
     test('canAddNode', () => {
-        const context = new FC.FunctionchartContext(), functionchart = DataModels.Deserialize(canAddFunctionchart, context);
+        const context = new FC.FunctionchartContext(), functionchart = DataModels.Deserialize(isValidFunctionInstanceTest, context);
         context.root = functionchart;
-        const greatGrandparent = functionchart.nodes.get(0), grandparent = greatGrandparent.nodes.get(0), fc1 = grandparent.nodes.get(0), fc2 = grandparent.nodes.get(1), importer = grandparent.nodes.get(2);
+        const greatGrandparent = functionchart.nodes.get(0), grandparent = greatGrandparent.nodes.get(0), fc1 = grandparent.nodes.get(0), fc2 = grandparent.nodes.get(1), importer = grandparent.nodes.get(3);
         expect(greatGrandparent).toBeInstanceOf(FC.Functionchart);
         expect(grandparent).toBeInstanceOf(FC.Functionchart);
         expect(fc1).toBeInstanceOf(FC.Functionchart);
@@ -832,12 +839,13 @@ describe('FunctionchartContext', () => {
         const inst9 = addFunctionInstance(fc1, fc2); // open, sibling scope, valid.
         expect(context.isValidFunctionInstance(inst9)).toBe(true);
         // ImporterElement instances.
+        expect(importer instanceof FC.ImporterElement);
         const inst10 = addFunctionInstance(grandparent, importer); // instanced to importer scope.
         expect(context.isValidFunctionInstance(inst10)).toBe(true);
         const inst11 = addFunctionInstance(fc1, importer); // instanced to scope inside scope of importer.
         expect(context.isValidFunctionInstance(inst11)).toBe(true);
         const inst12 = addFunctionInstance(greatGrandparent, importer); // instanced outside importer scope.
-        expect(context.isValidFunctionInstance(inst12)).toBe(true);
+        expect(context.isValidFunctionInstance(inst12)).toBe(false);
     });
 });
 //# sourceMappingURL=functioncharts.test.js.map
