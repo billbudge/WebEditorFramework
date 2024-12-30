@@ -248,13 +248,14 @@ function parseTypeString(s) {
 }
 //------------------------------------------------------------------------------
 // Properties and templates for the raw data interface for cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner');
+const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner'), commentProp = new ScalarProp('comment');
 class NodeTemplate {
     constructor() {
         this.id = idProp;
         this.typeString = typeStringProp;
         this.x = xProp;
         this.y = yProp;
+        this.comment = commentProp;
         this.properties = [];
     }
 }
@@ -262,7 +263,7 @@ class ElementTemplate extends NodeTemplate {
     constructor(typeName) {
         super();
         this.name = nameProp;
-        this.properties = [this.id, this.typeString, this.x, this.y, this.name];
+        this.properties = [this.id, this.typeString, this.x, this.y, this.name, this.comment];
         this.typeName = typeName;
     }
 }
@@ -293,7 +294,7 @@ class FunctionInstanceTemplate extends ElementTemplate {
 class PseudoelementTemplate extends NodeTemplate {
     constructor(typeName) {
         super();
-        this.properties = [this.id, this.typeString, this.x, this.y];
+        this.properties = [this.id, this.typeString, this.x, this.y, this.comment];
         this.typeName = typeName;
     }
 }
@@ -316,7 +317,7 @@ class FunctionchartTemplate extends NodeTemplate {
         this.nodes = nodesProp;
         this.wires = wiresProp;
         this.properties = [this.id, this.typeString, this.x, this.y, this.width, this.height,
-            this.name, this.nodes, this.wires];
+            this.name, this.nodes, this.wires, this.comment];
         this.typeName = typeName;
     }
 }
@@ -338,6 +339,8 @@ class NodeBase {
     set x(value) { this.template.x.set(this, value); }
     get y() { return this.template.y.get(this) || 0; }
     set y(value) { this.template.y.set(this, value); }
+    get comment() { return this.template.comment.get(this); }
+    set comment(value) { this.template.comment.set(this, value); }
     get type() {
         if (!this._type) {
             this._type = Type.fromString(this.typeString);
@@ -2532,7 +2535,14 @@ export class FunctionchartEditor {
                 getter: nodeLabelGetter,
                 setter: nodeLabelSetter,
                 prop: typeStringProp,
-            }
+            },
+            {
+                label: 'comment',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: commentProp,
+            },
         ]);
         this.propertyInfo.set('output', [
             {
@@ -2541,7 +2551,14 @@ export class FunctionchartEditor {
                 getter: nodeLabelGetter,
                 setter: nodeLabelSetter,
                 prop: typeStringProp,
-            }
+            },
+            {
+                label: 'comment',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: commentProp,
+            },
         ]);
         const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
             '|', '&', '||', '&&'];
@@ -2573,7 +2590,14 @@ export class FunctionchartEditor {
                 getter: nodeLabelGetter,
                 setter: nodeLabelSetter,
                 prop: typeStringProp,
-            }
+            },
+            {
+                label: 'comment',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: commentProp,
+            },
         ]);
         this.propertyInfo.set('var', [
             {
@@ -2593,6 +2617,13 @@ export class FunctionchartEditor {
                 setter: setter,
                 prop: typeStringProp,
             },
+            {
+                label: 'comment',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: commentProp,
+            },
         ]);
         this.propertyInfo.set('importer', [
             {
@@ -2601,6 +2632,13 @@ export class FunctionchartEditor {
                 getter: nodeLabelGetter,
                 setter: nodeLabelSetter,
                 prop: typeStringProp,
+            },
+            {
+                label: 'comment',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: commentProp,
             },
         ]);
         this.propertyInfo.set('exporter', [
@@ -2611,6 +2649,13 @@ export class FunctionchartEditor {
                 setter: nodeLabelSetter,
                 prop: typeStringProp,
             },
+            {
+                label: 'comment',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: commentProp,
+            },
         ]);
         this.propertyInfo.set('functionchart', [
             {
@@ -2619,6 +2664,13 @@ export class FunctionchartEditor {
                 getter: getter,
                 setter: setter,
                 prop: nameProp,
+            },
+            {
+                label: 'comment',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: commentProp,
             },
         ]);
         this.propertyInfo.forEach((info, key) => {
