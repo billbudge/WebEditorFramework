@@ -1,14 +1,14 @@
 {
   "type": "functionchart",
   "id": 2,
-  "typeString": "[[,vv](x,y)[,vv](x,y)[,vv],]",
+  "typeString": "[,[,[[,vv]()(P)[,vv]()(P),v]()(Point.dot)[,[,vv][vv,vv]]()(Point.construct)[[,vv]()(P),v]()(Point.length)[[,vv]()(P),[,vv]()(P')]()(Point.conj)[[,vv]()(P),[,vv]()(P')]()(Point.perp)]]",
   "width": 1198.003222644329,
   "height": 681.8375106751919,
   "nodes": [
     {
       "type": "functionchart",
       "id": 3,
-      "typeString": "[,[,vv][vv,vv]](Point)",
+      "typeString": "[,[,[,vv][vv,vv]](Point.construct)]",
       "x": 329.27128905057907,
       "y": 98.89077147841454,
       "width": 331.1079406738281,
@@ -34,7 +34,7 @@
         {
           "type": "functionchart",
           "id": 6,
-          "typeString": "[,vv]",
+          "typeString": "[,[,vv]]",
           "x": 93.89849090576172,
           "y": 16.393165588378906,
           "width": 69.68252563476562,
@@ -60,7 +60,7 @@
         {
           "type": "functionchart",
           "id": 9,
-          "typeString": "[vv,vv]",
+          "typeString": "[,[vv,vv]]",
           "x": 91.70025634765625,
           "y": 94.55699157714844,
           "width": 161.40155029296875,
@@ -165,10 +165,10 @@
     {
       "type": "functionchart",
       "id": 16,
-      "typeString": "[[,vv](x,y)[,vv](x,y),v](Point.dot)",
+      "typeString": "[,[[,vv]()(P)[,vv]()(P),v](Point.dot)]",
       "x": 721.5865966677666,
       "y": 43.444882959127426,
-      "width": 262.41015625,
+      "width": 269.2567138671875,
       "height": 132.45224380493164,
       "name": "Point.dot",
       "nodes": [
@@ -176,47 +176,47 @@
           "type": "element",
           "id": 17,
           "typeString": "[vv,v](*)",
-          "x": 69.54439544677734,
-          "y": 55.99927520751953,
+          "x": 75.52803802490234,
+          "y": 61.045448303222656,
           "name": "binop"
         },
         {
           "type": "element",
           "id": 18,
           "typeString": "[vv,v](+)",
-          "x": 125.30062103271484,
-          "y": 13.580543518066406,
+          "x": 131.28426361083984,
+          "y": 18.62671661376953,
           "name": "binop"
         },
         {
           "type": "element",
           "id": 19,
           "typeString": "[vv,v](*)",
-          "x": 67.7912826538086,
-          "y": 3.4680404663085938,
+          "x": 73.7749252319336,
+          "y": 8.514213562011719,
           "name": "binop"
         },
         {
           "type": "output",
           "id": 20,
           "typeString": "[v,]",
-          "x": 147.04644775390625,
-          "y": 75.04928970336914
+          "x": 153.03009033203125,
+          "y": 80.09546279907227
         },
         {
           "type": "instance",
           "id": 21,
           "typeString": "[,vv](P)",
-          "x": 8.72503662109375,
-          "y": 3.2781333923339844,
+          "x": 14.70867919921875,
+          "y": 8.32430648803711,
           "instancer": 23
         },
         {
           "type": "instance",
           "id": 22,
           "typeString": "[,vv](P)",
-          "x": 8.72503662109375,
-          "y": 56.6093635559082,
+          "x": 14.70867919921875,
+          "y": 61.65553665161133,
           "instancer": 23
         }
       ],
@@ -275,7 +275,7 @@
     {
       "type": "functionchart",
       "id": 23,
-      "typeString": "[,vv](x,y)",
+      "typeString": "[,[,vv](P)]",
       "x": 157.98563307523727,
       "y": 183.6555343568325,
       "width": 104.63124084472656,
@@ -302,11 +302,11 @@
     {
       "type": "functionchart",
       "id": 26,
-      "typeString": "[[,vv](x,y),v](Point.length)",
+      "typeString": "[,[[,vv]()(P),v](Point.length)]",
       "x": 725.3671142458916,
       "y": 197.29247817397118,
-      "width": 287.15936279296875,
-      "height": 158.52185440063477,
+      "width": 270.8489990234375,
+      "height": 137.6095085144043,
       "name": "Point.length",
       "nodes": [
         {
@@ -419,9 +419,9 @@
     {
       "type": "functionchart",
       "id": 33,
-      "typeString": "[[,vv](x,y),[,v(-y)v(x)]](Point.perp)",
-      "x": 424.7263061404228,
-      "y": 385.4656501710415,
+      "typeString": "[,[[,vv]()(P),[,vv]()(P')](Point.perp)]",
+      "x": 426.10768431425095,
+      "y": 371.19361647963524,
       "width": 238.2139892578125,
       "height": 154.40693321824074,
       "name": "Point.perp",
@@ -445,7 +445,7 @@
         {
           "type": "functionchart",
           "id": 36,
-          "typeString": "[,v(-y)v(x)]",
+          "typeString": "[,[,vv](P')]",
           "x": 97.22971040010452,
           "y": 66.80378341674805,
           "width": 118.85006254911423,
@@ -497,9 +497,9 @@
     {
       "type": "functionchart",
       "id": 39,
-      "typeString": "[[,vv](x,y),[,v(-y)v(x)]](Point.perp)",
-      "x": 750.0310546755791,
-      "y": 383.6209541261196,
+      "typeString": "[,[[,vv]()(P),[,vv]()(P')](Point.conj)]",
+      "x": 743.6958495974541,
+      "y": 367.2182441651821,
       "width": 232.36175537109375,
       "height": 161.92072677612305,
       "name": "Point.conj",
@@ -523,7 +523,7 @@
         {
           "type": "functionchart",
           "id": 42,
-          "typeString": "[,v(-y)v(x)]",
+          "typeString": "[,[,vv](P')]",
           "x": 131.39902192354202,
           "y": 71.74885177612305,
           "width": 77.89693754911423,

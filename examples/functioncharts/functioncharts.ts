@@ -24,7 +24,6 @@ import { ScalarProp, ChildListProp, ReferenceProp, IdProp, PropertyTypes,
 // TODO Functionchart imports.
 // TODO Root functionchart type display.
 // TODO Check validity of function instances during drag-n-drop.
-// TODO Refine the isAbstract property to reflect incompleteness of implementation.
 
 //------------------------------------------------------------------------------
 
@@ -1336,20 +1335,26 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return srcType.canConnectTo(dstType);
   }
 
-  canAddItem(item: AllTypes, parent: Functionchart) : boolean {
-    if (item instanceof FunctionInstance) {
-      const definition = item.src;
-      // Closed functioncharts can be instantiated anywhere.
-      if (definition instanceof Functionchart && definition.typeInfo.closed)
-        return true;  // TODO other instancer types
-      const definitionScope = definition.parent;
-      // TODO Top level functionchart, we can't currently instantiate it but it should be possible.
-      if (!definitionScope)
-        return true;
-      // An open instancer can only be instantiated in its defining functionchart or the next outer scope.
-      const scope = getLowestCommonAncestor<AllTypes>(item, definition);
-      return scope === definition ||  // recursive
-              scope === definitionScope;  // within scope of definition.
+  canAddNode(node: NodeTypes, parent: Functionchart) : boolean {
+    if (node instanceof FunctionInstance) {
+      const definition = node.src,
+            definitionScope = definition.parent,
+            scope = getLowestCommonAncestor<NodeTypes>(node, definition, parent);
+      if (definition instanceof Functionchart) {
+        // Closed functioncharts can be instantiated anywhere.
+        if (definition.typeInfo.closed)
+            return true;
+
+        // Top level functionchart, we can't currently instantiate it. TODO it should be possible.
+        if (!definitionScope)
+          return true;
+        // An open functionchart can only be instantiated in its defining functionchart or the next outer scope.
+        return scope === definition ||  // recursive
+               scope === definitionScope;  // within scope of definition.
+      }
+      if (definition instanceof ImporterElement) {
+        return scope === definitionScope;
+      }
     }
     return true;
   }
@@ -1379,12 +1384,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   isValidFunctionInstance(instance: FunctionInstance) : boolean {
-    let parent = instance.parent;
-    if (parent instanceof ExporterElement)
-      parent = parent.parent;
-    if (!parent || !(parent instanceof Functionchart))
-      return false;
-    return this.canAddItem(instance, parent);
+    const parent = instance.parent;
+    if (parent instanceof Functionchart)
+      return this.canAddNode(instance, parent);
+    return false;
   }
 
   // Update wire lists. Returns true iff wires don't fan-in to any input pins.
@@ -1918,7 +1921,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
             outputs.push(pinInfo);
           }
         } else if (node instanceof Element && node.isAbstract) {
-          // Abstract elements must inputs.
+          // Abstract elements must be inputs.
           const type = node.type.rename(),
                 name = node.type.name,
                 pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
