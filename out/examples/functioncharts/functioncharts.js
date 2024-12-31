@@ -409,6 +409,17 @@ export class FunctionInstance extends Element {
         const src = this.src;
         return src instanceof Functionchart && src.isAbstract;
     }
+    get isStandAlone() {
+        const src = this.src;
+        if (src instanceof ImporterElement) {
+            return false;
+        }
+        if (src instanceof Functionchart) {
+            return src.isAbstract || src.isClosed;
+        }
+        // src instanceof Element
+        return false;
+    }
     getSrcType() {
         return this.src.type.outputs[this.srcPin].type;
     }
@@ -484,6 +495,7 @@ export class Functionchart extends NodeBase {
     get wires() { return this.template.wires.get(this); }
     // Derived properties.
     get isAbstract() { return this.typeInfo.abstract; }
+    get isClosed() { return this.typeInfo.closed; }
     constructor(context, template, id) {
         super(template, context, id);
         this.typeInfo = emptyTypeInfo;
@@ -2086,7 +2098,7 @@ class Renderer {
                 }
                 ctx.fillStyle = fillStyle;
                 this.drawType(element.type, x, y);
-                if (element instanceof FunctionInstance && !element.isAbstract) {
+                if (element instanceof FunctionInstance && !element.isStandAlone) {
                     this.drawFunctionInstanceLink(element, theme.dimColor);
                 }
                 break;
@@ -2291,7 +2303,7 @@ class Renderer {
         }
     }
     drawHoverInfo(info, p) {
-        const theme = this.theme, strokeColor = theme.dimColor, ctx = this.ctx, x = p.x, y = p.y;
+        const theme = this.theme, strokeColor = theme.hoverColor, ctx = this.ctx, x = p.x, y = p.y;
         let displayType;
         if (info instanceof ElementHitResult) {
             const element = info.item, type = element.type;

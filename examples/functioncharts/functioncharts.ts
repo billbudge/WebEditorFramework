@@ -457,7 +457,7 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
   outWires = new Array<Array<Wire>>();       // multiple outputs per pin (fan out).
   instances = new Array<Array<FunctionInstance>>();  // each output pin potentially has multiple instances.
 
-  get isAbstract() { return false; }
+  get isAbstract() : boolean { return false; }
 
   // Get the pin for the node type, given an index in the combined input/output format.
   getPin(index: number) : Pin {
@@ -519,9 +519,20 @@ export class FunctionInstance extends Element<FunctionInstanceTemplate>  {
   set srcPin(value: number) { this.template.srcPin.set(this, value); }
 
   // Derived Properties
-  get isAbstract() {
+  get isAbstract() : boolean {
     const src = this.src;
     return src instanceof Functionchart && src.isAbstract;
+  }
+  get isStandAlone() : boolean {
+    const src = this.src;
+    if (src instanceof ImporterElement) {
+      return false;
+    }
+    if (src instanceof Functionchart) {
+      return src.isAbstract || src.isClosed;
+    }
+    // src instanceof Element
+    return false;
   }
 
   getSrcType() : Type {
@@ -635,7 +646,8 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> {
   get wires() { return this.template.wires.get(this) as List<Wire>; }
 
   // Derived properties.
-  get isAbstract() { return this.typeInfo.abstract; }
+  get isAbstract() : boolean { return this.typeInfo.abstract; }
+  get isClosed() { return this.typeInfo.closed; }
 
   typeInfo = emptyTypeInfo;
   lastTypeInfo: TypeInfo | undefined;
@@ -2546,7 +2558,7 @@ class Renderer implements ILayoutEngine {
         }
         ctx.fillStyle = fillStyle;
         this.drawType(element.type, x, y);
-        if (element instanceof FunctionInstance && !element.isAbstract) {
+        if (element instanceof FunctionInstance && !element.isStandAlone) {
           this.drawFunctionInstanceLink(element, theme.dimColor);
         }
         break;
@@ -2780,7 +2792,7 @@ class Renderer implements ILayoutEngine {
 
   drawHoverInfo(info: HitResultTypes, p: Point) {
     const theme = this.theme,
-          strokeColor = theme.dimColor,
+          strokeColor = theme.hoverColor,
           ctx = this.ctx,
           x = p.x, y = p.y;
     let displayType;
