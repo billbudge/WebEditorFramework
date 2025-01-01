@@ -20,7 +20,6 @@ import { ScalarProp, ChildListProp, ReferenceProp, IdProp, PropertyTypes,
 
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
-// TODO Explicit function outputs?
 // TODO Functionchart imports.
 // TODO Root functionchart type display.
 // TODO Check validity of function instances during drag-n-drop.
@@ -506,6 +505,11 @@ export class ExporterElement extends Element<ExporterTemplate> {
 
   // Derived properties.
   get innerType() : Type { return this.innerElement? this.innerElement.type : Type.emptyType; }
+
+  get isAbstract() : boolean {
+    const innerElement = this.innerElement;
+    return !innerElement || innerElement.isAbstract;
+  }
 
   constructor(context: FunctionchartContext, id: number) {
     super(exporterTemplate, context,  id);
@@ -1012,13 +1016,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         const src = wire.src!;
         if (!result.has(src))
           nodes.push(src);
-    });
+      });
       this.forOutWires(element, wire => {
         if (!downstream(wire)) return;
         const dst = wire.dst!;
         if (!result.has(dst))
           nodes.push(dst);
-    });
+      });
     }
     return result;
   }
@@ -1135,7 +1139,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (oldParent === parent)
       return item;
 
-    // At this point we can add item to parent.
     if (oldParent)
       this.unparent(item);
 
@@ -1401,10 +1404,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   isValidFunctionInstance(instance: FunctionInstance) : boolean {
-    const parent = instance.parent;
-    if (parent instanceof Functionchart)
-      return this.canAddNode(instance, parent);
-    return false;
+    let parent = instance.parent;
+    // To be able to export an instance, the inner element must be valid in the containing functionchart.
+    if (parent instanceof ExporterElement)
+      parent = parent.parent;
+    return parent instanceof Functionchart && this.canAddNode(instance, parent);
   }
 
   // Update wire lists. Returns true iff wires don't fan-in to any input pins.
@@ -1943,10 +1947,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           inputs.push(pinInfo);
         }
         if (abstract) {
-          // Only importers, exporters, or functioncharts are allowed if abstract.
-          abstract = (node instanceof ImporterElement) ||
-                     (node instanceof ExporterElement) ||
-                     (node instanceof Functionchart);
+          // Abstract functioncharts can only hold importers, and abstract nodes.
+          abstract = (node instanceof ImporterElement) || node.isAbstract;
         }
       }
     });
@@ -2517,15 +2519,26 @@ class Renderer implements ILayoutEngine {
     ctx.stroke();
   }
 
+  abstractStroke(ctx: CanvasRenderingContext2D) {
+    ctx.setLineDash([6, 3]);
+    ctx.stroke();
+    ctx.setLineDash([0]);
+  }
+
   drawElement(element: ElementTypes, mode: RenderMode) {
+    this.drawElementAt(element, this.getBounds(element), mode);
+  }
+  // This method allows us to draw inner elements of ExporterElements, which aren't
+  // considered part of the functionchart and so aren't traversed normally.
+  // TODO maybe they should be?
+  drawElementAt(element: ElementTypes, rect: Rect, mode: RenderMode) {
     const ctx = this.ctx,
           theme = this.theme,
-          rect = this.getBounds(element),
           x = rect.x, y = rect.y, w = rect.width, h = rect.height;
 
     ctx.beginPath();
     // Importers and abstract instances define function inputs, so use the input shape.
-    if (element instanceof ImporterElement || element.isAbstract) {
+    if (element instanceof ImporterElement) {
       const d = theme.knobbyRadius * 2;
       inFlagPath(x - d, y, w + d, h, d, ctx);
     }
@@ -2542,8 +2555,12 @@ class Renderer implements ILayoutEngine {
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
-        ctx.stroke();
-        if (!(element instanceof ExporterElement) && !element.isAbstract) {
+        if (element.isAbstract) {
+          this.abstractStroke(ctx);
+        } else {
+          ctx.stroke();
+        }
+        if (!(element instanceof ExporterElement)) {
           // Shade function outputs that can be instanced.
           ctx.beginPath();
           const right = x + w;
@@ -2555,9 +2572,15 @@ class Renderer implements ILayoutEngine {
           });
           ctx.fillStyle = theme.altBgColor;
           ctx.fill();
+          ctx.fillStyle = fillStyle;
+          this.drawType(element.type, x, y);
+        } else {
+          const spacing = theme.spacing,
+                innerElement = element.innerElement!,
+                innerType = innerElement.type,
+                innerRect = { x: x + spacing, y: y + spacing / 2, width: innerType.width, height: innerType.height };
+          this.drawElementAt(innerElement, innerRect, mode);
         }
-        ctx.fillStyle = fillStyle;
-        this.drawType(element.type, x, y);
         if (element instanceof FunctionInstance && !element.isStandAlone) {
           this.drawFunctionInstanceLink(element, theme.dimColor);
         }
@@ -2640,9 +2663,7 @@ class Renderer implements ILayoutEngine {
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         if (functionchart.isAbstract) {
-          ctx.setLineDash([6, 3]);
-          ctx.stroke();
-          ctx.setLineDash([0]);
+          this.abstractStroke(ctx);
         } else {
           ctx.stroke();
         }
@@ -2669,16 +2690,13 @@ class Renderer implements ILayoutEngine {
           result = new ElementHitResult(element, hitInfo),
           type = element.type;
     if (mode !== RenderMode.Palette) {
-      if (!element.isAbstract) {
-        for (let i = 0; i < type.inputs.length; i++) {
-          const pinPt = self.inputPinToPoint(element, i),
-                rect = self.pinToRect(type.inputs[i], pinPt);
-          if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
-            result.input = i;
-          }
+      for (let i = 0; i < type.inputs.length; i++) {
+        const pinPt = self.inputPinToPoint(element, i),
+              rect = self.pinToRect(type.inputs[i], pinPt);
+        if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
+          result.input = i;
         }
       }
-      // Abstract element outputs can be wired.  // TODO we shouldn't be enforcing this here.
       for (let i = 0; i < type.outputs.length; i++) {
         const pinPt = self.outputPinToPoint(element, i),
               rect = self.pinToRect(type.outputs[i], pinPt);
@@ -3943,18 +3961,21 @@ export class FunctionchartEditor implements CanvasLayer {
           return true;
         }
         case 90: { // 'z'
-          if (context.getUndo()) {
-            context.undo();
-            self.canvasController.draw();
+          if (shiftKey) {
+            if (context.getRedo()) {
+              context.redo();
+              self.canvasController.draw();
+            }
+          } else {
+            if (context.getUndo()) {
+              context.undo();
+              self.canvasController.draw();
+            }
           }
           return true;
         }
         case 89: { // 'y'
-          if (context.getRedo()) {
-            context.redo();
-            self.canvasController.draw();
-          }
-          return true;
+          return true;  // TODO new command slot.
         }
         case 88: { // 'x'
           this.scrap = context.cut();
