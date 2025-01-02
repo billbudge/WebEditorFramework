@@ -17,6 +17,7 @@ import { ScalarProp, ChildListProp, ReferenceProp, IdProp, PropertyTypes,
          List, TransactionManager, TransactionEvent, HistoryManager, ScalarPropertyTypes,
          ChildPropertyTypes,
          ChildSlotProp} from '../../src/dataModels.js'
+import { ParentTypes } from '../statecharts/statecharts.js';
 
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
@@ -504,7 +505,7 @@ export class ExporterElement extends Element<ExporterTemplate> {
   set innerElement(value: ElementTypes | undefined) { this.template.innerElement.get(this).set(0, value); }
 
   // Derived properties.
-  get innerType() : Type { return this.innerElement? this.innerElement.type : Type.emptyType; }
+  get innerType() : Type { return this.innerElement ? this.innerElement.type : Type.emptyType; }
 
   get isAbstract() : boolean {
     const innerElement = this.innerElement;
@@ -846,6 +847,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (item instanceof Functionchart) {
       item.nodes.forEach(t => self.visitAll(t, visitor));
       item.wires.forEach(t => self.visitAll(t, visitor));
+    } else if (item instanceof ExporterElement) {
+      if (item.innerElement)
+        visitor(item.innerElement);
     }
   }
   reverseVisitAll(item: AllTypes, visitor: FunctionchartVisitor) : void {
@@ -853,6 +857,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (item instanceof Functionchart) {
       item.wires.forEachReverse(t => self.reverseVisitAll(t, visitor));
       item.nodes.forEachReverse(t => self.reverseVisitAll(t, visitor));
+    } else if (item instanceof ExporterElement) {
+      if (item.innerElement)
+        visitor(item.innerElement);
     }
     visitor(item);
   }
@@ -861,12 +868,20 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     visitor(item);
     if (item instanceof Functionchart) {
       item.nodes.forEach(item => self.visitNodes(item, visitor));
+    } else if (item instanceof ExporterElement) {
+      if (item.innerElement) {
+        this.visitNodes(item.innerElement, visitor);
+      }
     }
   }
   reverseVisitNodes(item: NodeTypes, visitor: NodeVisitor) : void {
     const self = this;
     if (item instanceof Functionchart) {
       item.nodes.forEachReverse(item => self.reverseVisitNodes(item, visitor));
+    } else if (item instanceof ExporterElement) {
+      if (item.innerElement) {
+        this.reverseVisitNodes(item.innerElement, visitor);
+      }
     }
     visitor(item);
   }
@@ -912,8 +927,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // Gets the translation to move an item from its current parent to
   // newParent.
-  getToParent(item: NodeTypes, newParent: Functionchart | undefined) {
-    const oldParent = item.parent;
+  getToParent(node: NodeTypes, newParent: ElementParentTypes | undefined) {
+    const oldParent = node.parent;
     let dx = 0, dy = 0;
     if (oldParent) {
       const global = oldParent.globalPosition;
@@ -927,20 +942,18 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
     return { x: dx, y: dy };
   }
-
-  private setGlobalPosition(item: NodeTypes) {
-    const x = item.x,
-          y = item.y,
-          parent = item.parent;
+  private setGlobalPosition(node: NodeTypes) {
+    const x = node.x,
+          y = node.y,
+          parent = node.parent;
 
     if (parent) {
-      // console.log(item.type, parent.type, parent.globalPosition);
       const global = parent.globalPosition;
       if (global) {
-        item.globalPosition = { x: x + global.x, y: y + global.y };
+        node.globalPosition = { x: x + global.x, y: y + global.y };
       }
     } else {
-      item.globalPosition = { x: x, y: y };
+      node.globalPosition = { x: x, y: y };
     }
   }
 
@@ -1121,19 +1134,20 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.selection.set(Array.from(connectedNodes));
   }
 
-  addItem(item: AllTypes, parent: Functionchart | undefined) : AllTypes {
+  addItem(item: AllTypes, parent: ElementParentTypes) : AllTypes {
     const oldParent = item.parent;
 
     if (!parent)
       parent = this.functionchart;
+
     if (!(item instanceof Wire)) {
       const translation = this.getToParent(item, parent),
             x = Math.max(0, item.x + translation.x),
             y = Math.max(0, item.y + translation.y);
       if (item.x != x)
-        item.x = x;
+      item.x = x;
       if (item.y != y)
-        item.y = y;
+      item.y = y;
     }
 
     if (oldParent === parent)
@@ -1142,10 +1156,18 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (oldParent)
       this.unparent(item);
 
-    if (item instanceof Wire) {
-      parent.wires.append(item);
-    } else {
-      parent.nodes.append(item);
+    if (parent instanceof Functionchart) {
+      if (item instanceof Wire) {
+        parent.wires.append(item);
+      } else {
+        parent.nodes.append(item);
+      }
+    } else if (parent instanceof ExporterElement && item instanceof Element) {
+      const inner = parent.innerElement;
+      if (inner) {
+        this.deleteItem(inner);
+      }
+      parent.innerElement = item;
     }
     return item;
   }
@@ -1774,21 +1796,22 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   exportElement(element: Element) : ExporterElement {
-    const result = this.newElement('exporter') as ExporterElement,
-          exporterType = element.type.toImportExportType();
-    result.x = element.x;
-    result.y = element.y;
-    result.typeString = exporterType.typeString;
-    return result;
+    const exporter = this.newElement('exporter') as ExporterElement,
+          exporterType = element.type.toImportExportType(),
+          rect = this.layoutEngine.getBounds(element);
+    exporter.x = rect.x - FunctionchartTheme.spacing;  // TODO something
+    exporter.y = rect.y - FunctionchartTheme.spacing / 2;
+    exporter.typeString = exporterType.typeString;
+    return exporter;
   }
 
   importElement(element: Element) : Element {
-    const result = this.newElement('importer') as ImporterElement,
+    const importer = this.newElement('importer') as ImporterElement,
           importerType = element.type.toImportExportType();
-    result.x = element.x;
-    result.y = element.y;
-    result.typeString = importerType.typeString;
-    return result;
+    importer.x = element.x;
+    importer.y = element.y;
+    importer.typeString = importerType.typeString;
+    return importer;
   }
 
   exportElements(elements: Element[]) {
@@ -1798,12 +1821,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     elements.forEach(element => {
       if (element instanceof ImporterElement || element instanceof ExporterElement) return;
       selection.delete(element);
-      const parent = element.parent as Functionchart,
-            exporter = self.exportElement(element),
-            index = parent.nodes.indexOf(element);
-      parent.nodes.remove(element);
-      exporter.innerElement = element;
-      parent.nodes.insert(exporter, index);
+      const exporter = self.exportElement(element),
+            parent = element.parent as Functionchart;
+      self.addItem(exporter, parent);
+      self.addItem(element, exporter);
       selection.add(exporter);
     });
   }
@@ -1986,17 +2007,18 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return { instanceType: type, closed, abstract, inputs, outputs };
   }
 
-  private updateGlobalPosition(item: AllTypes) {
-    if (item instanceof NodeBase) {
-      this.visitNodes(item, item => this.setGlobalPosition(item));
+  private updateGlobalPosition(node: NodeTypes) {
+    if (node instanceof NodeBase) {
+      this.visitNodes(node, item => this.setGlobalPosition(item));
     }
   }
 
   private insertElement(element: ElementTypes, parent: ElementParentTypes) {
     this.nodes.add(element);
     element.parent = parent;
-    if (element instanceof ExporterElement && element.innerElement) {
-      element.innerElement.parent = element;
+    if (element instanceof ExporterElement) {
+      if (element.innerElement)
+      this.insertElement(element.innerElement, element);
     }
     element.type = Type.fromString(element.typeString);
     this.updateGlobalPosition(element);
@@ -2053,11 +2075,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       } else {
         this.insertElement(item, parent);
       }
-    } else if (parent instanceof ExporterElement) {
-      if (item instanceof Element) {
-        this.insertElement(item, parent);
-        parent.typeString = item.type.toImportExportType().typeString;
-      }
+    } else if (parent instanceof ExporterElement && item instanceof Element) {
+      this.insertElement(item, parent);
     }
   }
 
@@ -2075,12 +2094,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (owner instanceof NodeBase) {
       if (prop === typeStringProp) {
         owner.type = Type.fromString(owner.typeString);
+      } else {
+        this.updateGlobalPosition(owner);
       }
-      } else if (owner instanceof Wire) {
-
     }
     this.onValueChanged(owner, prop, oldValue);
-    this.updateGlobalPosition(owner);  // Update any derived properties.
     this.derivedInfoNeedsUpdate = true;
   }
   elementInserted(owner: ElementParentTypes, prop: ChildPropertyTypes, index: number) : void {
@@ -2154,6 +2172,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 //------------------------------------------------------------------------------
 
 class FunctionchartTheme extends Theme {
+  static spacing = 8;
+
   textIndent = 8;
   textLeading = 6;
   knobbyRadius = 4;
@@ -2364,9 +2384,6 @@ class Renderer implements ILayoutEngine {
     if (type.needsLayout) {
       this.layoutType(type);
     }
-    if (element instanceof ExporterElement && element.innerElement) {
-      this.layoutElement(element.innerElement);
-    }
   }
 
   layoutWire(wire: Wire) {
@@ -2526,14 +2543,9 @@ class Renderer implements ILayoutEngine {
   }
 
   drawElement(element: ElementTypes, mode: RenderMode) {
-    this.drawElementAt(element, this.getBounds(element), mode);
-  }
-  // This method allows us to draw inner elements of ExporterElements, which aren't
-  // considered part of the functionchart and so aren't traversed normally.
-  // TODO maybe they should be?
-  drawElementAt(element: ElementTypes, rect: Rect, mode: RenderMode) {
     const ctx = this.ctx,
           theme = this.theme,
+          rect = this.getBounds(element),
           x = rect.x, y = rect.y, w = rect.width, h = rect.height;
 
     ctx.beginPath();
@@ -2574,12 +2586,6 @@ class Renderer implements ILayoutEngine {
           ctx.fill();
           ctx.fillStyle = fillStyle;
           this.drawType(element.type, x, y);
-        } else {
-          const spacing = theme.spacing,
-                innerElement = element.innerElement!,
-                innerType = innerElement.type,
-                innerRect = { x: x + spacing, y: y + spacing / 2, width: innerType.width, height: innerType.height };
-          this.drawElementAt(innerElement, innerRect, mode);
         }
         if (element instanceof FunctionInstance && !element.isStandAlone) {
           this.drawFunctionInstanceLink(element, theme.dimColor);
@@ -2681,6 +2687,9 @@ class Renderer implements ILayoutEngine {
 
   hitTestElement(element: ElementTypes, p: Point, tol: number, mode: RenderMode) :
                  ElementHitResult | undefined {
+    if (element.parent instanceof ExporterElement)  // TODO something better
+      return;
+
     const rect = this.getBounds(element),
           x = rect.x, y = rect.y, width = rect.width, height = rect.height,
           hitInfo = hitTestRect(x, y, width, height, p, tol);
@@ -3762,7 +3771,6 @@ export class FunctionchartEditor implements CanvasLayer {
     if (!drag)
       return;
     const context = this.context,
-          renderer = this.renderer,
           p0 = canvasController.getClickPointerPosition(),
           cp0 = this.getCanvasPosition(canvasController, p0),
           p = canvasController.getCurrentPointerPosition(),
@@ -3897,8 +3905,7 @@ export class FunctionchartEditor implements CanvasLayer {
         const target = hitInfo.item;
         if (!(lastSelected instanceof Functionchart)) {
           if (target instanceof ExporterElement && hitInfo.output === 0) {
-            context.deleteItem(lastSelected);
-            target.innerElement = lastSelected;
+            context.addItem(lastSelected, target);
           } else {
             context.replaceNode(hitInfo.item, lastSelected);
           }

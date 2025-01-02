@@ -643,12 +643,20 @@ export class FunctionchartContext extends EventBase {
             item.nodes.forEach(t => self.visitAll(t, visitor));
             item.wires.forEach(t => self.visitAll(t, visitor));
         }
+        else if (item instanceof ExporterElement) {
+            if (item.innerElement)
+                visitor(item.innerElement);
+        }
     }
     reverseVisitAll(item, visitor) {
         const self = this;
         if (item instanceof Functionchart) {
             item.wires.forEachReverse(t => self.reverseVisitAll(t, visitor));
             item.nodes.forEachReverse(t => self.reverseVisitAll(t, visitor));
+        }
+        else if (item instanceof ExporterElement) {
+            if (item.innerElement)
+                visitor(item.innerElement);
         }
         visitor(item);
     }
@@ -658,11 +666,21 @@ export class FunctionchartContext extends EventBase {
         if (item instanceof Functionchart) {
             item.nodes.forEach(item => self.visitNodes(item, visitor));
         }
+        else if (item instanceof ExporterElement) {
+            if (item.innerElement) {
+                this.visitNodes(item.innerElement, visitor);
+            }
+        }
     }
     reverseVisitNodes(item, visitor) {
         const self = this;
         if (item instanceof Functionchart) {
             item.nodes.forEachReverse(item => self.reverseVisitNodes(item, visitor));
+        }
+        else if (item instanceof ExporterElement) {
+            if (item.innerElement) {
+                this.reverseVisitNodes(item.innerElement, visitor);
+            }
         }
         visitor(item);
     }
@@ -703,8 +721,8 @@ export class FunctionchartContext extends EventBase {
     }
     // Gets the translation to move an item from its current parent to
     // newParent.
-    getToParent(item, newParent) {
-        const oldParent = item.parent;
+    getToParent(node, newParent) {
+        const oldParent = node.parent;
         let dx = 0, dy = 0;
         if (oldParent) {
             const global = oldParent.globalPosition;
@@ -718,17 +736,16 @@ export class FunctionchartContext extends EventBase {
         }
         return { x: dx, y: dy };
     }
-    setGlobalPosition(item) {
-        const x = item.x, y = item.y, parent = item.parent;
+    setGlobalPosition(node) {
+        const x = node.x, y = node.y, parent = node.parent;
         if (parent) {
-            // console.log(item.type, parent.type, parent.globalPosition);
             const global = parent.globalPosition;
             if (global) {
-                item.globalPosition = { x: x + global.x, y: y + global.y };
+                node.globalPosition = { x: x + global.x, y: y + global.y };
             }
         }
         else {
-            item.globalPosition = { x: x, y: y };
+            node.globalPosition = { x: x, y: y };
         }
     }
     getGraphInfo() {
@@ -903,11 +920,20 @@ export class FunctionchartContext extends EventBase {
             return item;
         if (oldParent)
             this.unparent(item);
-        if (item instanceof Wire) {
-            parent.wires.append(item);
+        if (parent instanceof Functionchart) {
+            if (item instanceof Wire) {
+                parent.wires.append(item);
+            }
+            else {
+                parent.nodes.append(item);
+            }
         }
-        else {
-            parent.nodes.append(item);
+        else if (parent instanceof ExporterElement && item instanceof Element) {
+            const inner = parent.innerElement;
+            if (inner) {
+                this.deleteItem(inner);
+            }
+            parent.innerElement = item;
         }
         return item;
     }
@@ -1121,6 +1147,7 @@ export class FunctionchartContext extends EventBase {
     }
     isValidFunctionInstance(instance) {
         let parent = instance.parent;
+        // To be able to export an instance, the inner element must be valid in the containing functionchart.
         if (parent instanceof ExporterElement)
             parent = parent.parent;
         return parent instanceof Functionchart && this.canAddNode(instance, parent);
@@ -1455,18 +1482,18 @@ export class FunctionchartContext extends EventBase {
         this.deleteItem(node);
     }
     exportElement(element) {
-        const result = this.newElement('exporter'), exporterType = element.type.toImportExportType();
-        result.x = element.x;
-        result.y = element.y;
-        result.typeString = exporterType.typeString;
-        return result;
+        const exporter = this.newElement('exporter'), exporterType = element.type.toImportExportType(), rect = this.layoutEngine.getBounds(element);
+        exporter.x = rect.x - FunctionchartTheme.spacing; // TODO something
+        exporter.y = rect.y - FunctionchartTheme.spacing / 2;
+        exporter.typeString = exporterType.typeString;
+        return exporter;
     }
     importElement(element) {
-        const result = this.newElement('importer'), importerType = element.type.toImportExportType();
-        result.x = element.x;
-        result.y = element.y;
-        result.typeString = importerType.typeString;
-        return result;
+        const importer = this.newElement('importer'), importerType = element.type.toImportExportType();
+        importer.x = element.x;
+        importer.y = element.y;
+        importer.typeString = importerType.typeString;
+        return importer;
     }
     exportElements(elements) {
         const self = this, selection = this.selection;
@@ -1474,10 +1501,9 @@ export class FunctionchartContext extends EventBase {
             if (element instanceof ImporterElement || element instanceof ExporterElement)
                 return;
             selection.delete(element);
-            const parent = element.parent, exporter = self.exportElement(element), index = parent.nodes.indexOf(element);
-            parent.nodes.remove(element);
-            exporter.innerElement = element;
-            parent.nodes.insert(exporter, index);
+            const exporter = self.exportElement(element), parent = element.parent;
+            self.addItem(exporter, parent);
+            self.addItem(element, exporter);
             selection.add(exporter);
         });
     }
@@ -1628,16 +1654,17 @@ export class FunctionchartContext extends EventBase {
         const type = Type.fromInfo(inputPins, outputPins, name);
         return { instanceType: type, closed, abstract, inputs, outputs };
     }
-    updateGlobalPosition(item) {
-        if (item instanceof NodeBase) {
-            this.visitNodes(item, item => this.setGlobalPosition(item));
+    updateGlobalPosition(node) {
+        if (node instanceof NodeBase) {
+            this.visitNodes(node, item => this.setGlobalPosition(item));
         }
     }
     insertElement(element, parent) {
         this.nodes.add(element);
         element.parent = parent;
-        if (element instanceof ExporterElement && element.innerElement) {
-            element.innerElement.parent = element;
+        if (element instanceof ExporterElement) {
+            if (element.innerElement)
+                this.insertElement(element.innerElement, element);
         }
         element.type = Type.fromString(element.typeString);
         this.updateGlobalPosition(element);
@@ -1690,11 +1717,8 @@ export class FunctionchartContext extends EventBase {
                 this.insertElement(item, parent);
             }
         }
-        else if (parent instanceof ExporterElement) {
-            if (item instanceof Element) {
-                this.insertElement(item, parent);
-                parent.typeString = item.type.toImportExportType().typeString;
-            }
+        else if (parent instanceof ExporterElement && item instanceof Element) {
+            this.insertElement(item, parent);
         }
     }
     removeItem(item) {
@@ -1711,11 +1735,11 @@ export class FunctionchartContext extends EventBase {
             if (prop === typeStringProp) {
                 owner.type = Type.fromString(owner.typeString);
             }
-        }
-        else if (owner instanceof Wire) {
+            else {
+                this.updateGlobalPosition(owner);
+            }
         }
         this.onValueChanged(owner, prop, oldValue);
-        this.updateGlobalPosition(owner); // Update any derived properties.
         this.derivedInfoNeedsUpdate = true;
     }
     elementInserted(owner, prop, index) {
@@ -1793,6 +1817,7 @@ class FunctionchartTheme extends Theme {
         Type.valueType.height = pinSize;
     }
 }
+FunctionchartTheme.spacing = 8;
 class ElementHitResult {
     constructor(item, inner) {
         this.input = -1;
@@ -1942,9 +1967,6 @@ class Renderer {
         if (type.needsLayout) {
             this.layoutType(type);
         }
-        if (element instanceof ExporterElement && element.innerElement) {
-            this.layoutElement(element.innerElement);
-        }
     }
     layoutWire(wire) {
         let src = wire.src, dst = wire.dst, p1 = wire.pSrc, p2 = wire.pDst;
@@ -2068,13 +2090,7 @@ class Renderer {
         ctx.setLineDash([0]);
     }
     drawElement(element, mode) {
-        this.drawElementAt(element, this.getBounds(element), mode);
-    }
-    // This method allows us to draw inner elements of ExporterElements, which aren't
-    // considered part of the functionchart and so aren't traversed normally.
-    // TODO maybe they should be?
-    drawElementAt(element, rect, mode) {
-        const ctx = this.ctx, theme = this.theme, x = rect.x, y = rect.y, w = rect.width, h = rect.height;
+        const ctx = this.ctx, theme = this.theme, rect = this.getBounds(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
         ctx.beginPath();
         // Importers and abstract instances define function inputs, so use the input shape.
         if (element instanceof ImporterElement) {
@@ -2113,10 +2129,6 @@ class Renderer {
                     ctx.fill();
                     ctx.fillStyle = fillStyle;
                     this.drawType(element.type, x, y);
-                }
-                else {
-                    const spacing = theme.spacing, innerElement = element.innerElement, innerType = innerElement.type, innerRect = { x: x + spacing, y: y + spacing / 2, width: innerType.width, height: innerType.height };
-                    this.drawElementAt(innerElement, innerRect, mode);
                 }
                 if (element instanceof FunctionInstance && !element.isStandAlone) {
                     this.drawFunctionInstanceLink(element, theme.dimColor);
@@ -2205,6 +2217,8 @@ class Renderer {
         }
     }
     hitTestElement(element, p, tol, mode) {
+        if (element.parent instanceof ExporterElement) // TODO something better
+            return;
         const rect = this.getBounds(element), x = rect.x, y = rect.y, width = rect.width, height = rect.height, hitInfo = hitTestRect(x, y, width, height, p, tol);
         if (!hitInfo)
             return;
@@ -3155,7 +3169,7 @@ export class FunctionchartEditor {
         const drag = this.dragInfo;
         if (!drag)
             return;
-        const context = this.context, renderer = this.renderer, p0 = canvasController.getClickPointerPosition(), cp0 = this.getCanvasPosition(canvasController, p0), p = canvasController.getCurrentPointerPosition(), cp = this.getCanvasPosition(canvasController, p), dx = cp.x - cp0.x, dy = cp.y - cp0.y, pointerHitInfo = this.pointerHitInfo, hitList = this.hitTestCanvas(cp);
+        const context = this.context, p0 = canvasController.getClickPointerPosition(), cp0 = this.getCanvasPosition(canvasController, p0), p = canvasController.getCurrentPointerPosition(), cp = this.getCanvasPosition(canvasController, p), dx = cp.x - cp0.x, dy = cp.y - cp0.y, pointerHitInfo = this.pointerHitInfo, hitList = this.hitTestCanvas(cp);
         let hitInfo;
         if (drag instanceof NonWireDrag) {
             switch (drag.kind) {
@@ -3269,8 +3283,7 @@ export class FunctionchartEditor {
                 const target = hitInfo.item;
                 if (!(lastSelected instanceof Functionchart)) {
                     if (target instanceof ExporterElement && hitInfo.output === 0) {
-                        context.deleteItem(lastSelected);
-                        target.innerElement = lastSelected;
+                        context.addItem(lastSelected, target);
                     }
                     else {
                         context.replaceNode(hitInfo.item, lastSelected);
