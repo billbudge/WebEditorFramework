@@ -530,9 +530,8 @@ export class FunctionInstance extends Element<FunctionInstanceTemplate>  {
   }
   get isStandAlone() : boolean {
     const src = this.src;
-    if (src instanceof ImporterElement) {
-      return false;
-    }
+    if (src.parent === this.parent)
+      return true;
     if (src instanceof Functionchart) {
       return src.isAbstract || src.isClosed;
     }
@@ -689,6 +688,7 @@ export type WirePredicate = (wire: Wire) => boolean;
 interface ILayoutEngine {
   // Get bounding box for elements, functioncharts, and wires.
   getBounds(items: AllTypes) : Rect;
+  getExporterBounds(element: ElementTypes) : Rect;
 
   // Get wire attachment point for node input/output pins.
   inputPinToPoint(item: NodeTypes, index: number) : PointWithNormal;
@@ -774,7 +774,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.insertFunctionchart(root, undefined);
 
     this.updateDerivedInfo();
-    this.makeConsistent();  // TODO separate function to calculate typeinfo.
   }
 
   newElement(typeName: ElementType) : Element {
@@ -1798,9 +1797,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   exportElement(element: Element) : ExporterElement {
     const exporter = this.newElement('exporter') as ExporterElement,
           exporterType = element.type.toImportExportType(),
-          rect = this.layoutEngine.getBounds(element);
-    exporter.x = rect.x - FunctionchartTheme.spacing;  // TODO something
-    exporter.y = rect.y - FunctionchartTheme.spacing / 2;
+          rect = this.layoutEngine.getExporterBounds(element);
+    exporter.x = rect.x;
+    exporter.y = rect.y;
     exporter.typeString = exporterType.typeString;
     return exporter;
   }
@@ -2093,7 +2092,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   valueChanged(owner: AllTypes, prop: ScalarPropertyTypes, oldValue: any) : void {
     if (owner instanceof NodeBase) {
       if (prop === typeStringProp) {
-        owner.type = Type.fromString(owner.typeString);
+        const newType = Type.fromString(owner.typeString)
+        owner.type = newType;
+        // if (owner.parent instanceof ExporterElement) {
+        //   owner.type = newType.toImportExportType();
+        // }
       } else {
         this.updateGlobalPosition(owner);
       }
@@ -2172,8 +2175,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 //------------------------------------------------------------------------------
 
 class FunctionchartTheme extends Theme {
-  static spacing = 8;
-
   textIndent = 8;
   textLeading = 6;
   knobbyRadius = 4;
@@ -2270,6 +2271,11 @@ class Renderer implements ILayoutEngine {
       if (item instanceof Functionchart) {
         width = item.width;
         height = item.height;
+      } else if (item instanceof ExporterElement && item.innerElement) {
+        const spacing = this.theme.spacing,
+              innerElement = item.innerElement;
+        width = innerElement.type.width + spacing;
+        height = innerElement.type.height + spacing;
       } else {
         // All element types.
         const type = item.type;
@@ -2278,6 +2284,11 @@ class Renderer implements ILayoutEngine {
       }
     }
     return { x, y, width, height };
+  }
+  getExporterBounds(element: ElementTypes): Rect {
+    const spacing = this.theme.spacing,
+          r = this.getBounds(element);
+    return { x: r.x - spacing, y: r.y - spacing / 2, width: r.width + spacing, height: r.height + spacing };
   }
   // Get wire attachment point for element input/output pins.
   inputPinToPoint(node: NodeTypes, index: number) : PointWithNormal {
@@ -2552,7 +2563,7 @@ class Renderer implements ILayoutEngine {
     // Importers and abstract instances define function inputs, so use the input shape.
     if (element instanceof ImporterElement) {
       const d = theme.knobbyRadius * 2;
-      inFlagPath(x - d, y, w + d, h, d, ctx);
+      inFlagPath(x - d, y, w + d, h, d, ctx);  // TODO unify with exporter rendering.
     }
     else {
       ctx.rect(x, y, w, h);

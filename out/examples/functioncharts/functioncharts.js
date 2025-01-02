@@ -414,9 +414,8 @@ export class FunctionInstance extends Element {
     }
     get isStandAlone() {
         const src = this.src;
-        if (src instanceof ImporterElement) {
-            return false;
-        }
+        if (src.parent === this.parent)
+            return true;
         if (src instanceof Functionchart) {
             return src.isAbstract || src.isClosed;
         }
@@ -565,7 +564,6 @@ export class FunctionchartContext extends EventBase {
         this.functionchart = root;
         this.insertFunctionchart(root, undefined);
         this.updateDerivedInfo();
-        this.makeConsistent(); // TODO separate function to calculate typeinfo.
     }
     newElement(typeName) {
         const nextId = ++this.highestId;
@@ -1482,9 +1480,9 @@ export class FunctionchartContext extends EventBase {
         this.deleteItem(node);
     }
     exportElement(element) {
-        const exporter = this.newElement('exporter'), exporterType = element.type.toImportExportType(), rect = this.layoutEngine.getBounds(element);
-        exporter.x = rect.x - FunctionchartTheme.spacing; // TODO something
-        exporter.y = rect.y - FunctionchartTheme.spacing / 2;
+        const exporter = this.newElement('exporter'), exporterType = element.type.toImportExportType(), rect = this.layoutEngine.getExporterBounds(element);
+        exporter.x = rect.x;
+        exporter.y = rect.y;
         exporter.typeString = exporterType.typeString;
         return exporter;
     }
@@ -1733,7 +1731,11 @@ export class FunctionchartContext extends EventBase {
     valueChanged(owner, prop, oldValue) {
         if (owner instanceof NodeBase) {
             if (prop === typeStringProp) {
-                owner.type = Type.fromString(owner.typeString);
+                const newType = Type.fromString(owner.typeString);
+                owner.type = newType;
+                // if (owner.parent instanceof ExporterElement) {
+                //   owner.type = newType.toImportExportType();
+                // }
             }
             else {
                 this.updateGlobalPosition(owner);
@@ -1817,7 +1819,6 @@ class FunctionchartTheme extends Theme {
         Type.valueType.height = pinSize;
     }
 }
-FunctionchartTheme.spacing = 8;
 class ElementHitResult {
     constructor(item, inner) {
         this.input = -1;
@@ -1879,6 +1880,11 @@ class Renderer {
                 width = item.width;
                 height = item.height;
             }
+            else if (item instanceof ExporterElement && item.innerElement) {
+                const spacing = this.theme.spacing, innerElement = item.innerElement;
+                width = innerElement.type.width + spacing;
+                height = innerElement.type.height + spacing;
+            }
             else {
                 // All element types.
                 const type = item.type;
@@ -1887,6 +1893,10 @@ class Renderer {
             }
         }
         return { x, y, width, height };
+    }
+    getExporterBounds(element) {
+        const spacing = this.theme.spacing, r = this.getBounds(element);
+        return { x: r.x - spacing, y: r.y - spacing / 2, width: r.width + spacing, height: r.height + spacing };
     }
     // Get wire attachment point for element input/output pins.
     inputPinToPoint(node, index) {
@@ -2095,7 +2105,7 @@ class Renderer {
         // Importers and abstract instances define function inputs, so use the input shape.
         if (element instanceof ImporterElement) {
             const d = theme.knobbyRadius * 2;
-            inFlagPath(x - d, y, w + d, h, d, ctx);
+            inFlagPath(x - d, y, w + d, h, d, ctx); // TODO unify with exporter rendering.
         }
         else {
             ctx.rect(x, y, w, h);
