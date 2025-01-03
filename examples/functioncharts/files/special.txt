@@ -1,0 +1,17 @@
+{
+  "type": "functionchart",
+  "id": 0,
+  "width": 405.9812345504761,
+  "height": 278.90937423706055,
+  "nodes": [
+    {
+      "type": "element",
+      "id": 2,
+      "typeString": "[,[v,v][vv,v]](this)",
+      "x": 347.9812345504761,
+      "y": 192.90937423706055,
+      "name": "external"
+    }
+  ],
+  "wires": []
+}
