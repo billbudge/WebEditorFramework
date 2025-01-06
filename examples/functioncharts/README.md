@@ -74,10 +74,10 @@ Our palette contains the built in elements and pseudoelements. On the top are th
 
 On the next are the unary and binary functions, and the only 3-ary function, the conditional operator.
 
-In addition there are "junction" elements, which are used to describe imports and exports.
+In addition there are Pseudoelements, which are used to add information to the graph, but which do not perform computation.
 
 <figure>
-  <img src="/resources/palette2.svg"  alt="" title="Primitive elements (junctions)">
+  <img src="/resources/palette2.svg"  alt="" title="Pseudo-elements">
 </figure>
 
 We can combine these primitive functions to compute simple expressions. In the diagrams below, we are creating:
@@ -86,10 +86,6 @@ We can combine these primitive functions to compute simple expressions. In the d
 1. A decrement by 1.
 1. A binary minimum and maximum using a relational operator and the conditional operator (note how input junctions are used to tie inputs together.)
 1. A 3-ary and 4-ary addition operation by cascading binary additions.
-
-<p align="center">
-  <img src="/resources/statechart.svg"  alt="" title="Statechart experiment">
-</p>
 
 Note that there is fan-out but no fan-in in our circuit graphs. There are no cycles, so the circuit is a DAG (directed acyclic graph). Each circuit element is conceptually a function and wires connect outputs of one function to inputs of another. Evaluation proceeds left-to-right, since inputs must be evaluated before producing outputs. The evaluation order of the graph is only partially ordered (by topologically sorting) so we have to take extra care when a specific sequential evaluation order is required.
 
@@ -102,53 +98,15 @@ To begin, let's start with simple types.
 
 Having a single kind of wire that can connect elements makes our circuits simpler, since we don't need any color or pattern scheme to give them a type. They acquire their type from their source and destination connections.
 
-<figure>
-  <img src="/resources/basic_grouping.png"  alt="" title="Basic Grouping">
-</figure>
-
-Here's another example, cascading conditional functions to create more complex conditionals, where the inputs are successive pairs of <condition, value> tuples.
-
-<figure>
-  <img src="/resources/basic_grouping2.png"  alt="" title="Basic Grouping">
-</figure>
-
 We can use these new functions just like the built in ones to create more complex functions. Here's the sgn function, which takes a single number as input and returns 1 if it's > 0, 0 if it's equal to 0, or -1 if it's less than 0. On the right, we build it from primitive functions. However, it's clearer if we create helper functions: "less than 0" and "greater than 0" functions, and a 5 input conditional.
-
-<figure>
-  <img src="/resources/basic_grouping3.png"  alt="" title="Basic Grouping">
-</figure>
 
 ## Function Abstraction
 We have to rebuild these graphs every time we want to create a similar function, for example cascading binary multiplication or logical operations. To make the graph representation more powerful, any function can be abstracted. This adds an input value, of the same type as the function, to indicate that the function is merely a "shell" and the function body is imported. This operation is called "opening" the function. This allows us to create functions that takes other functions as inputs. Here, we use have abstracted two binary addition operations and identified both function inputs to create a cascaded 3-ary operation that takes a single binary function as an additional input.
 
-<figure>
-  <img src="/resources/function_abstraction.png"  alt="" title="Function Abstraction">
-</figure>
-
 We can nest function definitions to avoid repetition definitions. Before we stated that any disconnected inputs and outputs become group inputs and outputs. One exception to this rule is when we add instances of the new function to its own context. This allows us to create many interesting things. Here, we create a single abstract binary operation, and then cascade it to create 3-ary, 4-ary, 5-ary, and 6-ary functions by grouping these into nested function definitions.
-
-<figure>
-  <img src="/resources/function_abstraction2.png"  alt="" title="Function Abstraction (nested)">
-</figure>
 
 ## Function Creation
 Now we need a way to create functions that can be imported. The mechanism is function closure. Any function element can be closed, which creates a function output whose type is all disconnected inputs, and all outputs. This is exactly analogous to function closure in regular programming languages. In the diagram below, we can create an incrementing function by grouping as before, or by partially applying addition to a literal 1 value and closing to get a unary incrementing function.
-
-<figure>
-  <img src="/resources/function_creation.png"  alt="" title="Function Creation">
-</figure>
-
-Using closure, we can take our abstract 3-ary cascading function from before, and specialize it for addition. We combine it with an addition with no inputs which we close to get a binary output function. We connect it and add pins for the 4 inputs and 1 output.
-
-<figure>
-  <img src="/resources/function_creation3.png"  alt="" title="Function Creation (continued)">
-</figure>
-
-We need one more special element to apply a function that has been imported, the Lambda element. This takes a function input and expands to an element with that functions inputs and outputs which can then be used in the graph like any other element.
-
-<figure>
-  <img src="/resources/function_application.png"  alt="" title="Function Application">
-</figure>
 
 Function closing is a powerful graph simplification mechanism. Imagine we wanted to apply our quadratic polynomial evaluation function to one polynomial at 4 different x values. Using the grouped expression 4 times leads to a complex graph that is becoming unwieldy. Applying the function to the polynomial coefficients and closing gives a simple unary function that we can apply 4 times, which is easier to understand.
 
@@ -166,22 +124,6 @@ Generic iteration with start, end, condition, and step configurable.
 <figure>
   <img src="./resources/iteration2.svg"  alt="" title="Generic iteration with start, end, condition, and step configurable.">
 </figure>
-
-### Factorial
-We can create most of this with simple operations, but we get stuck at the recursive part. We need to use the function that we're in the middle of creating. The solution is to provide a special proto-function operation. A part of the graph can be selected, and a proto-function element will be created that matches what would be created from the selection by the normal grouping operation. This proto-function element can then be used in the graph to represent recursion. This will also be our mechanism for iteration in a moment.
-
-<figure>
-  <img src="/resources/factorial.png"  alt="" title="Iteration with Factorials">
-</figure>
-
-### Fibonacci
-
-Similarly, we can implement a Fibonacci function that returns the i'th number in the sequence with a slightly more complex recursion.
-
-<figure>
-  <img src="/resources/fibonacci.png"  alt="" title="Iteration with Fibonacci Numbers">
-</figure>
-
 
 ### Generic iteration
 
@@ -213,33 +155,22 @@ Using this more generic function, we can easily create a factorial function.
 
 ## State
 
+<figure>
+  <img src="./resources/points.svg"  alt="" title="A simple 2d point library.">
+</figure>
+
 So far we haven't used the ability to pass functions as parameters very much. However, they make it possible to express many different things besides expressions. Let's introduce three new stateful elements, which allow us to hold state and "open" values as objects or arrays.
-
-1. On the left is the "let" element, which outputs a value and an assignment function. The value is the current value of the assignment, while the function takes an input and replaces the old value which is returned. This is convenient as we'll see in a moment.
-2. In the middle is the "object" adapter, which takes a value as input and returns two functions. The first is the "getter" which takes a key value as input and returns a value. The second is the "setter" which takes a key and value, updates that field of the object and returns the previous value.
-3. On the right is the "array" adapter, which takes an object and returns the length, a "getter" function which takes an index and returns the value at that index, and a setter function which takes an index and value, updates the array at that index and returns the previous value.
-
-<figure>
-  <img src="/resources/state.png"  alt="" title="Stateful objects">
-</figure>
-
-State allows us to perform more complex computations. Let's sum the elements of an array. To do this, we need to define a binary function similar to the one we created to sum integers in a range. This time, the function will use the iteration index to access the array value at the ith position. TODO update diagram.
-
-<figure>
-  <img src="/resources/state_and_iteration.png"  alt="" title="Iteration over stateful object">
-</figure>
 
 In the top left, we apply the array getter, and pass it as the first operand of an addition. We add pins for the inputs that come from the iteration. This can be grouped and closed to create a function import for our iteration. On the bottom we hook it up, set the range to [0..n-1] and pass an initial 'acc' of 0.
 
-Using state is tricky in a graphical program without the normal sequential evaluation of an imperative language. Let's make an element to swap two "let" values. We start with two let values, and invoke their assignments. This is tricky. We can't simply assign the values in parallel because one will be evaluated first, clobbering the other. Instead, we take advantage of the assignment which returns the old value. We feed that into the second assignment, which is thus guaranteed to be evaluated after by the graph topology. There are other ways to represent sequencing which we'll see later. TODO
-
+## Swap
 <figure>
-  <img src="/resources/state2.png"  alt="" title="Implementing swap of two lets">
+  <img src="./resources/swap.svg"  alt="" title="Swapping in many forms.">
 </figure>
 
 ## Quicksort
 
-Quicksort is challenging to implement graphically. Let's try. Here is the source for a Javascript implementation of Quicksort which does the partition step in place. We'll start by implementing the iterations which advance indices to a pair of out of place elements.
+Let's implement Quicksort graphically. Here is the source for a Javascript implementation of Quicksort which does the partition step in place. We'll start by implementing the iterations which advance indices to a pair of out of place elements.
 
 ```js
 function partition(a, i, j) {
