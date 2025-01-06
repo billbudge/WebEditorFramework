@@ -157,7 +157,15 @@ Function closing is a powerful graph simplification mechanism. Imagine we wanted
 </figure>
 
 ## Iteration
-Iteration can be challenging in a data flow system. Let's start with everyone's favorite toy example, the factorial function.
+Simple iteration over the range [0..n[.
+<figure>
+  <img src="./resources/iteration.svg"  alt="" title="Simple iteration over the range [0..n[.">
+</figure>
+
+Generic iteration with start, end, condition, and step configurable.
+<figure>
+  <img src="./resources/iteration2.svg"  alt="" title="Generic iteration with start, end, condition, and step configurable.">
+</figure>
 
 ### Factorial
 We can create most of this with simple operations, but we get stuck at the recursive part. We need to use the function that we're in the middle of creating. The solution is to provide a special proto-function operation. A part of the graph can be selected, and a proto-function element will be created that matches what would be created from the selection by the normal grouping operation. This proto-function element can then be used in the graph to represent recursion. This will also be our mechanism for iteration in a moment.
