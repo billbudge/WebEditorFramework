@@ -167,7 +167,6 @@ export class StatechartContext extends EventBase {
         this.statecharts = new Set;
         this.transitions = new Set;
         this.selection = new SelectionSet();
-        const self = this;
         this.transactionManager = new TransactionManager();
         this.addHandler('changed', this.transactionManager.onChanged.bind(this.transactionManager));
         this.historyManager = new HistoryManager(this.transactionManager, this.selection);

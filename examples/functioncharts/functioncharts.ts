@@ -746,16 +746,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.transactionManager.addHandler('didUndo', update);
     this.transactionManager.addHandler('didRedo', update);
 
-    function advance() {
-      // Make final adjustments to the functionchart to canonicalize. Derived info is updated.
-      self.makeConsistent();
-      if (!self.isValidFunctionchart()) {
-        // TODO some kind of error message.
-        self.transactionManager.cancelTransaction();
-      }
-    }
-    this.transactionManager.addHandler('transactionEnding', advance);
-
     this.historyManager = new HistoryManager(this.transactionManager, this.selection);
     const root = new Functionchart(this, functionchartTemplate, this.highestId++);
     this.functionchart = root;
@@ -1049,7 +1039,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.transactionManager.beginTransaction(name);
   }
   endTransaction() {
-    this.transactionManager.endTransaction();
+    this.makeConsistent();
+    if (!this.isValidFunctionchart()) {
+      // TODO some kind of error message.
+      this.transactionManager.cancelTransaction();
+    } else {
+      this.transactionManager.endTransaction();
+    }
   }
   cancelTransaction(name: string) {
     this.transactionManager.cancelTransaction();

@@ -281,7 +281,6 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
 
   constructor() {
     super();
-    const self = this;
     this.transactionManager = new TransactionManager();
     this.addHandler('changed',
         this.transactionManager.onChanged.bind(this.transactionManager));
