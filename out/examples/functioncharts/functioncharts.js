@@ -511,12 +511,6 @@ function isInstancerType(item) {
 function isExporter(element) {
     return element.template.typeName === 'exporter';
 }
-function isStructure(element) {
-    return element.template.typeName === 'structure';
-}
-function isDestructure(element) {
-    return element.template.typeName === 'destructure';
-}
 export class FunctionchartContext extends EventBase {
     constructor(layoutEngine = new Renderer()) {
         super();
@@ -1038,7 +1032,7 @@ export class FunctionchartContext extends EventBase {
     }
     connectInput(node, pin) {
         const parent = node.parent, p = this.layoutEngine.inputPinToPoint(node, pin), wire = this.newWire(undefined, 0, node, pin);
-        p.x -= 32;
+        p.x -= 16; // TODO layout engine?
         const input = this.newInputForWire(wire, parent, p);
         this.addItem(wire, parent);
         return { input, wire };
@@ -1065,7 +1059,7 @@ export class FunctionchartContext extends EventBase {
     }
     connectOutput(node, pin) {
         const parent = node.parent, p = this.layoutEngine.outputPinToPoint(node, pin), wire = this.newWire(node, pin, undefined, 0);
-        p.x += 32;
+        p.x += 16; // TODO layout engine?
         const output = this.newOutputForWire(wire, parent, p);
         this.addItem(wire, parent);
         return { output, wire };
@@ -1265,6 +1259,7 @@ export class FunctionchartContext extends EventBase {
         graphInfo.wires.forEach(wire => {
             if (!self.isValidWire(wire)) { // TODO incorporate in update graph info?
                 // console.log(wire, self.isValidWire(wire));
+                const foo = self.isValidWire(wire);
                 invalidWires.push(wire);
             }
         });
@@ -1514,6 +1509,30 @@ export class FunctionchartContext extends EventBase {
         });
     }
     importElements(elements) {
+        const self = this, selection = this.selection;
+        // Open each non-input/output element.
+        elements.forEach(element => {
+            if (element instanceof ImporterElement || element instanceof ContainerElement)
+                return;
+            selection.delete(element);
+            const newElement = self.importElement(element);
+            self.replaceNode(element, newElement);
+            selection.add(newElement);
+        });
+    }
+    structureElements(elements) {
+        const self = this, selection = this.selection;
+        // Open each non-input/output element.
+        elements.forEach(element => {
+            if (element instanceof ImporterElement || element instanceof ContainerElement)
+                return;
+            selection.delete(element);
+            const newElement = self.importElement(element);
+            self.replaceNode(element, newElement);
+            selection.add(newElement);
+        });
+    }
+    destructureElements(elements) {
         const self = this, selection = this.selection;
         // Open each non-input/output element.
         elements.forEach(element => {
@@ -3419,14 +3438,24 @@ export class FunctionchartEditor {
                     return true;
                 }
                 case 75: { // 'k'
-                    context.beginTransaction('export elements');
+                    context.beginTransaction('export element');
                     context.exportElements(context.selectedElements());
                     context.endTransaction();
                     return true;
                 }
                 case 76: // 'l'
-                    context.beginTransaction('open elements');
+                    context.beginTransaction('import element');
                     context.importElements(context.selectedElements());
+                    context.endTransaction();
+                    return true;
+                case 68: // 'd'
+                    context.beginTransaction('structure element');
+                    context.structureElements(context.selectedElements());
+                    context.endTransaction();
+                    return true;
+                case 70: // 'f'
+                    context.beginTransaction('destructure element');
+                    context.destructureElements(context.selectedElements());
                     context.endTransaction();
                     return true;
                 case 78: { // ctrl 'n'   // Can't intercept cmd n.

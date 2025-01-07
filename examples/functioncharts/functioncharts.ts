@@ -679,12 +679,6 @@ function isInstancerType(item: AllTypes): item is InstancerTypes {
 function isExporter(element: ElementTypes) {
   return element.template.typeName === 'exporter';
 }
-function isStructure(element: Element) {
-  return element.template.typeName === 'structure';
-}
-function isDestructure(element: Element) {
-  return element.template.typeName === 'destructure';
-}
 
 export type FunctionchartVisitor = (item: AllTypes) => void;
 export type NodeVisitor = (node: NodeTypes) => void;
@@ -1297,7 +1291,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const parent = node.parent as Functionchart,
           p = this.layoutEngine.inputPinToPoint(node, pin),
           wire = this.newWire(undefined, 0, node, pin);
-    p.x -= 32;
+    p.x -= 16;  // TODO layout engine?
     const input = this.newInputForWire(wire, parent, p);
     this.addItem(wire, parent);
     return { input, wire };
@@ -1333,7 +1327,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const parent = node.parent as Functionchart,
           p = this.layoutEngine.outputPinToPoint(node, pin),
           wire = this.newWire(node, pin, undefined, 0);
-    p.x += 32;
+    p.x += 16;  // TODO layout engine?
     const output = this.newOutputForWire(wire, parent, p);
     this.addItem(wire, parent);
     return { output, wire };
@@ -1565,6 +1559,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     graphInfo.wires.forEach(wire => {
       if (!self.isValidWire(wire)) {  // TODO incorporate in update graph info?
         // console.log(wire, self.isValidWire(wire));
+        const foo = self.isValidWire(wire);
         invalidWires.push(wire);
       }
     });

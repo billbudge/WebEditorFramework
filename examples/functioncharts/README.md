@@ -1,4 +1,4 @@
-# Functioncharts: A Graphical Representation for Functional Programs
+# Functioncharts: A Graphical Programming Language
 Functioncharts are an experimental graphical programming language. They are a "node and wire" representation for programs, with values flowing along wires, into elements that perform computation and pass results out along outgoing wires. This example defines an editor for building functioncharts. There is no support for executing and debugging these programs (yet).
 
 "Node and wire" programming systems are nothing new. The two principal innovations that Functioncharts have are:
@@ -37,7 +37,7 @@ This diagram is already a little hard to read. We can simplify by defining new e
   <img src="./resources/signum2.svg"  alt="" title="Signum function.">
 </figure>
 
-Similarly we can define useful functions like increment, decrement, maximum, minimum, and absolute value. Note the use of the "< 0" function in the abs functionchart.
+Similarly we can define useful functions like increment, decrement, maximum, minimum, and absolute value. Note the use of the "< 0" function in the abs functionchart. TODO default value adapter.
 
 <figure>
   <img src="./resources/simpleFns.svg"  alt="" title="Comparisons, maximum, minimum, and absolute value.">
