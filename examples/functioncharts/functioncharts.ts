@@ -21,6 +21,7 @@ import { ParentTypes } from '../statecharts/statecharts.js';
 
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
+// TODO abstract exporters can't be wired.
 // TODO Functionchart imports.
 // TODO Root functionchart type display.
 // TODO Check validity of function instances during drag-n-drop.
@@ -1969,22 +1970,25 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           outputs.push(pinInfo);
         }
       } else {
-        if (node instanceof Functionchart) {
-          if (self.isIsolated(node)) {
-            const instanceType = node.instanceType,
-                  name = instanceType.name,
-                  type = instanceType.rename(),
-                  pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-            outputs.push(pinInfo);
-          }
-        } else if (node instanceof ImporterElement) {
+        // TODO remove, don't do implicit inputs/outputs.
+        // if (node instanceof Functionchart) {
+        //   if (self.isIsolated(node)) {
+        //     const instanceType = node.instanceType,
+        //           name = instanceType.name,
+        //           type = instanceType.rename(),
+        //           pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+        //     outputs.push(pinInfo);
+        //   }
+
+        if (node instanceof ImporterElement) {
           const instanceType = node.instanceType,
                 name = instanceType.name,
                 type = instanceType.rename(),
                 pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
           inputs.push(pinInfo);
-        } else if (node instanceof ContainerElement) {
-          if (isExporter(node) && self.isIsolated(node)) {
+        } else if (node instanceof ContainerElement && node.isAbstract) {
+          // Abstract exporters must be outputs.
+          if (isExporter(node)) {
             const name = node.type.name,
                   type = node.innerType.rename(),
                   pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
@@ -1998,15 +2002,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           inputs.push(pinInfo);
         }
         if (abstract) {
-          // Abstract functioncharts can only hold importers, and abstract nodes.
-          abstract = (node instanceof ImporterElement) || node.isAbstract;
+          // Abstract functioncharts can only hold abstract nodes.
+          abstract = node.isAbstract;
         }
       }
     });
-    // Add disconnected instancers as inputs, and functionharts and exporters as outputs.
-    subgraphInfo.nodes.forEach(node => {
 
-    });
     // Sort pins in increasing y-order. This lets users arrange the pins of the
     // new type in an intuitive way.
     function compareYs(p1: PinInfo, p2: PinInfo) {
