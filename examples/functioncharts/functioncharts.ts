@@ -689,7 +689,7 @@ export type WirePredicate = (wire: Wire) => boolean;
 interface ILayoutEngine {
   // Get bounding box for elements, functioncharts, and wires.
   getBounds(items: AllTypes) : Rect;
-  getExporterBounds(element: ElementTypes) : Rect;
+  getInnerElementBounds(element: ElementTypes) : Rect;
 
   // Get wire attachment point for node input/output pins.
   inputPinToPoint(item: NodeTypes, index: number) : PointWithNormal;
@@ -1143,13 +1143,22 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       parent = this.functionchart;
 
     if (!(item instanceof Wire)) {
-      const translation = this.getToParent(item, parent),
-            x = Math.max(0, item.x + translation.x),
-            y = Math.max(0, item.y + translation.y);
+      const translation = this.getToParent(item, parent);
+      let x, y;
+      if (parent instanceof ContainerElement) {
+        const innerBounds = this.layoutEngine.getInnerElementBounds(parent);
+        x = innerBounds.x;
+        y = innerBounds.y;
+      } else {
+        x = item.x;
+        y = item.y;
+      }
+      x = Math.max(0, x + translation.x);
+      y = Math.max(0, y + translation.y);
       if (item.x != x)
-      item.x = x;
+        item.x = x;
       if (item.y != y)
-      item.y = y;
+        item.y = y;
     }
 
     if (oldParent === parent)
@@ -1801,7 +1810,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   exportElement(element: Element) : ContainerElement {
     const exporter = this.newElement('exporter') as ContainerElement,
           exporterType = element.type.toImportExportType(),
-          rect = this.layoutEngine.getExporterBounds(element);
+          rect = this.layoutEngine.getInnerElementBounds(element);
     exporter.x = rect.x;
     exporter.y = rect.y;
     exporter.typeString = exporterType.typeString;
@@ -2317,10 +2326,14 @@ class Renderer implements ILayoutEngine {
     }
     return { x, y, width, height };
   }
-  getExporterBounds(element: ElementTypes): Rect {
+  getInnerElementBounds(element: ElementTypes): Rect {
     const spacing = this.theme.spacing,
           r = this.getBounds(element);
-    return { x: r.x - spacing, y: r.y - spacing / 2, width: r.width + spacing, height: r.height + spacing };
+    switch (element.template.typeName) {
+      case 'exporter':
+      default:
+        return { x: r.x + spacing, y: r.y + spacing / 2, width: r.width - spacing, height: r.height - spacing / 2 };
+    }
   }
   // Get wire attachment point for element input/output pins.
   inputPinToPoint(node: NodeTypes, index: number) : PointWithNormal {
