@@ -267,12 +267,6 @@ class ElementTemplate extends NodeTemplate {
         this.typeName = typeName;
     }
 }
-class ImporterTemplate extends ElementTemplate {
-    constructor(typeName) {
-        super(typeName);
-        this.properties = [this.id, this.typeString, this.x, this.y, this.name];
-    }
-}
 class ContainerElementTemplate extends ElementTemplate {
     constructor(typeName) {
         super(typeName);
@@ -321,9 +315,8 @@ class FunctionchartTemplate extends NodeTemplate {
     }
 }
 const elementTemplate = new ElementTemplate('element'), // built-in elements
-importerTemplate = new ImporterTemplate('importer'), // instancing element
-exporterTemplate = new ContainerElementTemplate('exporter'), // container elements
-structureTemplate = new ContainerElementTemplate('structure'), destructureTemplate = new ContainerElementTemplate('destructure'), inputTemplate = new PseudoelementTemplate('input'), // input pseudoelement
+importerTemplate = new ContainerElementTemplate('importer'), // container elements
+exporterTemplate = new ContainerElementTemplate('exporter'), structureTemplate = new ContainerElementTemplate('structure'), destructureTemplate = new ContainerElementTemplate('destructure'), inputTemplate = new PseudoelementTemplate('input'), // input pseudoelement
 outputTemplate = new PseudoelementTemplate('output'), // output pseudoelement
 useTemplate = new PseudoelementTemplate('use'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate('functionchart'), functionInstanceTemplate = new FunctionInstanceTemplate('instance');
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
@@ -352,6 +345,15 @@ class NodeBase {
         }
     }
     get isAbstract() { return false; }
+    get isImporter() {
+        return this.template.typeName === 'importer';
+    }
+    get isExporter() {
+        return this.template.typeName === 'exporter';
+    }
+    get isInstancer() {
+        return !this.isExporter;
+    }
     // Get the pin for the node type, given an index in the combined input/output format.
     getPin(index) {
         const type = this.type, firstOutput = type.inputs.length, pin = index < firstOutput ? type.inputs[index] :
@@ -375,20 +377,20 @@ export class Element extends NodeBase {
         super(template, context, id);
     }
 }
-export class ImporterElement extends Element {
-    // Derived properties.
-    get instanceType() {
-        if (this.type) {
-            const outputs = this.type.outputs;
-            if (outputs.length > 0)
-                return outputs[0].type;
-        }
-        return Type.emptyType;
-    }
-    constructor(context, id) {
-        super(importerTemplate, context, id);
-    }
-}
+// export class ImporterElement extends Element<ImporterTemplate> {
+//   // Derived properties.
+//   get instanceType() : Type {
+//     if (this.type) {
+//       const outputs = this.type.outputs;
+//       if (outputs.length > 0)
+//         return outputs[0].type;
+//     }
+//     return Type.emptyType;
+//   }
+//   constructor(context: FunctionchartContext, id: number) {
+//     super(importerTemplate, context,  id);
+//   }
+// }
 export class ContainerElement extends Element {
     get innerElement() { return this.template.innerElement.get(this).get(0); }
     set innerElement(value) { this.template.innerElement.get(this).set(0, value); }
@@ -506,12 +508,6 @@ export class Functionchart extends NodeBase {
 }
 // Radius of rounded corners. This isn't themeable, as it's conceptually part of the notation.
 Functionchart.radius = 8;
-function isInstancerType(item) {
-    return item instanceof Functionchart || item instanceof Element;
-}
-function isExporter(element) {
-    return element.template.typeName === 'exporter';
-}
 export class FunctionchartContext extends EventBase {
     constructor(layoutEngine = new Renderer()) {
         super();
@@ -564,7 +560,7 @@ export class FunctionchartContext extends EventBase {
                 result = new FunctionInstance(this, nextId);
                 break;
             case 'importer':
-                result = new ImporterElement(this, nextId);
+                result = new ContainerElement(this, importerTemplate, nextId);
                 break;
             case 'exporter':
                 result = new ContainerElement(this, exporterTemplate, nextId);
@@ -1129,9 +1125,12 @@ export class FunctionchartContext extends EventBase {
                 return scope === definition || // recursive
                     scope === definitionScope; // within scope of definition.
             }
-            if (definition instanceof ImporterElement) {
+            if (definition.isImporter) {
                 return scope === definitionScope;
             }
+        }
+        else if (node instanceof ContainerElement) {
+            return !(parent instanceof ContainerElement); // A container can't be the inner element of another container.
         }
         return true;
     }
@@ -1145,7 +1144,7 @@ export class FunctionchartContext extends EventBase {
             if (outputs[i].length !== 0)
                 return false;
         }
-        if (isInstancerType(node)) {
+        if (node.isInstancer) {
             const instances = node.instances;
             for (let i = 0; i < nOutputs; i++) {
                 if (instances[i].length !== 0)
@@ -1499,16 +1498,16 @@ export class FunctionchartContext extends EventBase {
         return exporter;
     }
     importElement(element) {
-        const importer = this.newElement('importer'), importerType = element.type.toImportExportType();
-        importer.x = element.x;
-        importer.y = element.y;
+        const importer = this.newElement('importer'), importerType = element.type.toImportExportType(), bounds = this.layoutEngine.getBounds(element), innerOffset = this.layoutEngine.getInnerElementOffset(element);
+        importer.x = bounds.x - innerOffset.x;
+        importer.y = bounds.y - innerOffset.y;
         importer.typeString = importerType.typeString;
         return importer;
     }
     exportElements(elements) {
         const self = this, selection = this.selection;
         elements.forEach(element => {
-            if (element instanceof ImporterElement || element instanceof ContainerElement)
+            if (element instanceof ContainerElement)
                 return;
             selection.delete(element);
             const exporter = self.exportElement(element), parent = element.parent;
@@ -1521,19 +1520,20 @@ export class FunctionchartContext extends EventBase {
         const self = this, selection = this.selection;
         // Open each non-input/output element.
         elements.forEach(element => {
-            if (element instanceof ImporterElement || element instanceof ContainerElement)
+            if (element instanceof ContainerElement)
                 return;
             selection.delete(element);
-            const newElement = self.importElement(element);
-            self.replaceNode(element, newElement);
-            selection.add(newElement);
+            const importer = self.importElement(element), parent = element.parent;
+            self.addItem(importer, parent);
+            self.addItem(element, importer);
+            selection.add(importer);
         });
     }
     structureElements(elements) {
         const self = this, selection = this.selection;
         // Open each non-input/output element.
         elements.forEach(element => {
-            if (element instanceof ImporterElement || element instanceof ContainerElement)
+            if (element instanceof ContainerElement)
                 return;
             selection.delete(element);
             const newElement = self.importElement(element);
@@ -1545,7 +1545,7 @@ export class FunctionchartContext extends EventBase {
         const self = this, selection = this.selection;
         // Open each non-input/output element.
         elements.forEach(element => {
-            if (element instanceof ImporterElement || element instanceof ContainerElement)
+            if (element instanceof ContainerElement)
                 return;
             selection.delete(element);
             const newElement = self.importElement(element);
@@ -1645,15 +1645,17 @@ export class FunctionchartContext extends EventBase {
                 //           pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
                 //     outputs.push(pinInfo);
                 //   }
-                if (node instanceof ImporterElement) {
-                    const instanceType = node.instanceType, name = instanceType.name, type = instanceType.rename(), pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-                    inputs.push(pinInfo);
-                }
-                else if (node instanceof ContainerElement && node.isAbstract) {
-                    // Abstract exporters must be outputs.
-                    if (isExporter(node)) {
-                        const name = node.type.name, type = node.innerType.rename(), pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-                        outputs.push(pinInfo);
+                if (node instanceof ContainerElement) {
+                    if (node.isImporter) {
+                        const innerType = node.innerType, name = innerType.name, type = innerType.rename(), pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                        inputs.push(pinInfo);
+                    }
+                    else if (node.isExporter && node.isAbstract) {
+                        // Abstract exporters must be outputs.
+                        if (node.isExporter) {
+                            const name = node.type.name, type = node.innerType.rename(), pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                            outputs.push(pinInfo);
+                        }
                     }
                 }
                 else if (node instanceof Element && node.isAbstract) {
@@ -2144,9 +2146,14 @@ class Renderer {
         const ctx = this.ctx, theme = this.theme, rect = this.getBounds(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
         ctx.beginPath();
         // Importers and abstract instances define function inputs, so use the input shape.
-        if (element instanceof ImporterElement) {
+        if (element instanceof ContainerElement) {
             const d = theme.knobbyRadius * 2;
-            inFlagPath(x - d, y, w + d, h, d, ctx); // TODO unify with exporter rendering.
+            if (element.isImporter) {
+                inFlagPath(x - d, y, w + d, h, d, ctx);
+            }
+            else if (element.isExporter) {
+                outFlagPath(x, y, w + d, h, d, ctx);
+            }
         }
         else {
             ctx.rect(x, y, w, h);
@@ -2166,7 +2173,7 @@ class Renderer {
                 else {
                     ctx.stroke();
                 }
-                if (!isExporter(element)) {
+                if (!element.isExporter) {
                     // Shade function outputs that can be instanced.
                     ctx.beginPath();
                     const right = x + w;
@@ -2572,11 +2579,7 @@ export class FunctionchartEditor {
                         result = item.type.name;
                     break;
                 }
-                case 'importer': { // [,[...]]
-                    const element = item;
-                    result = element.type.name;
-                    break;
-                }
+                case 'importer':
                 case 'exporter': {
                     const element = item;
                     result = element.type.name;
@@ -2604,11 +2607,7 @@ export class FunctionchartEditor {
                     }
                     break;
                 }
-                case 'importer': {
-                    const element = item;
-                    newType = element.instanceType.rename(value).toImportExportType();
-                    break;
-                }
+                case 'importer':
                 case 'exporter': {
                     const element = item, type = element.type;
                     newType = type.rename(value);
@@ -3067,8 +3066,8 @@ export class FunctionchartEditor {
         const context = this.context, item = context.selection.lastSelected;
         let type = undefined;
         if (item instanceof Element) {
-            if (item instanceof ImporterElement || item instanceof ContainerElement) {
-                type = item.template.typeName;
+            if (item instanceof ContainerElement) {
+                type = item.template.typeName; // 'importer', 'exporter'...
             }
             else {
                 type = item.name; // 'binop', 'unop', 'cond', 'literal', 'var'
@@ -3309,7 +3308,7 @@ export class FunctionchartEditor {
             else if (dst === undefined) {
                 const p = wire.pDst, pin = src.type.outputs[wire.srcPin];
                 let output;
-                if (!(src instanceof ContainerElement) && pin.type !== Type.valueType) {
+                if (src.isInstancer && pin.type !== Type.valueType) {
                     output = context.newInstanceForWire(wire, parent, p);
                 }
                 else {
@@ -3333,7 +3332,7 @@ export class FunctionchartEditor {
                 lastSelected.type.canConnectTo(hitInfo.item.type)) {
                 const target = hitInfo.item;
                 if (!(lastSelected instanceof Functionchart)) {
-                    if (target instanceof ContainerElement) {
+                    if (target instanceof ContainerElement && context.canAddNode(lastSelected, target)) {
                         context.addItem(lastSelected, target);
                     }
                     else {

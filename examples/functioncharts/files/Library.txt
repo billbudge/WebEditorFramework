@@ -175,7 +175,7 @@
       "typeString": "[,[,[vv,[,v(?)v(v)]][vv(v),[,v(?)v(v)]][vv(e),[,v(?)v(v)]]](Iterator)]",
       "x": 248.69688987731934,
       "y": 682.9812126159668,
-      "width": 207.52565956115723,
+      "width": 212.9881534576416,
       "height": 250.76663970947266,
       "name": "Iterator",
       "nodes": [
@@ -233,7 +233,7 @@
     {
       "type": "functionchart",
       "id": 29,
-      "typeString": "[,[v,[,[vv,[,v(?)v(v)]][vv(v),[,v(?)v(v)]][vv(e),[,v(?)v(v)]]]](Array.entries)]",
+      "typeString": "[,[v,](Array.entries)]",
       "x": 836.3368408083916,
       "y": 1248.5615425109863,
       "width": 291.73431092500687,
@@ -358,7 +358,7 @@
     {
       "type": "functionchart",
       "id": 44,
-      "typeString": "[,[v[v(elem)v(i)v(array),v]()(callback)v(thisArg),v](Array.find)]",
+      "typeString": "[,[v[,]v(thisArg),v](Array.find)]",
       "x": 831.1593009829521,
       "y": 315.4000120162964,
       "width": 283.0250244140625,
@@ -399,7 +399,7 @@
     {
       "type": "functionchart",
       "id": 49,
-      "typeString": "[,[v[v(elem)v(i)v(array),v]()(callback)v(thisArg),v](Array.filter)]",
+      "typeString": "[,[v[,]v(thisArg),v](Array.filter)]",
       "x": 833.8281242251396,
       "y": 491.34065532684326,
       "width": 287.90625,
@@ -440,7 +440,7 @@
     {
       "type": "functionchart",
       "id": 54,
-      "typeString": "[,[v[v(elem)v(i)v(array),v]()(callback)v(thisArg),v](Array.forEach)]",
+      "typeString": "[,[v[,]v(thisArg),v](Array.forEach)]",
       "x": 833.6873771548271,
       "y": 661.1062955856323,
       "width": 292.39373779296875,
