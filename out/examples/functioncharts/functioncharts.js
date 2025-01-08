@@ -912,16 +912,14 @@ export class FunctionchartContext extends EventBase {
             const translation = this.getToParent(item, parent);
             let x, y;
             if (parent instanceof ContainerElement) {
-                const innerBounds = this.layoutEngine.getInnerElementBounds(parent);
-                x = innerBounds.x;
-                y = innerBounds.y;
+                const offset = this.layoutEngine.getInnerElementOffset(parent);
+                x = offset.x;
+                y = offset.y;
             }
             else {
-                x = item.x;
-                y = item.y;
+                x = Math.max(0, item.x + translation.x);
+                y = Math.max(0, item.y + translation.y);
             }
-            x = Math.max(0, x + translation.x);
-            y = Math.max(0, y + translation.y);
             if (item.x != x)
                 item.x = x;
             if (item.y != y)
@@ -1494,9 +1492,9 @@ export class FunctionchartContext extends EventBase {
         this.deleteItem(node);
     }
     exportElement(element) {
-        const exporter = this.newElement('exporter'), exporterType = element.type.toImportExportType(), rect = this.layoutEngine.getInnerElementBounds(element);
-        exporter.x = rect.x;
-        exporter.y = rect.y;
+        const exporter = this.newElement('exporter'), exporterType = element.type.toImportExportType(), bounds = this.layoutEngine.getBounds(element), innerOffset = this.layoutEngine.getInnerElementOffset(element);
+        exporter.x = bounds.x - innerOffset.x;
+        exporter.y = bounds.y - innerOffset.y;
         exporter.typeString = exporterType.typeString;
         return exporter;
     }
@@ -1922,7 +1920,7 @@ class Renderer {
             else if (item instanceof ContainerElement && item.innerElement) {
                 const spacing = this.theme.spacing, innerElement = item.innerElement;
                 width = innerElement.type.width + spacing;
-                height = innerElement.type.height + spacing;
+                height = innerElement.type.height + spacing; // TODO
             }
             else {
                 // All element types.
@@ -1933,12 +1931,12 @@ class Renderer {
         }
         return { x, y, width, height };
     }
-    getInnerElementBounds(element) {
+    getInnerElementOffset(element) {
         const spacing = this.theme.spacing, r = this.getBounds(element);
         switch (element.template.typeName) {
             case 'exporter':
             default:
-                return { x: r.x + spacing, y: r.y + spacing / 2, width: r.width - spacing, height: r.height - spacing / 2 };
+                return { x: spacing, y: spacing / 2 };
         }
     }
     // Get wire attachment point for element input/output pins.

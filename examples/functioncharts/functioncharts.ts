@@ -689,7 +689,7 @@ export type WirePredicate = (wire: Wire) => boolean;
 interface ILayoutEngine {
   // Get bounding box for elements, functioncharts, and wires.
   getBounds(items: AllTypes) : Rect;
-  getInnerElementBounds(element: ElementTypes) : Rect;
+  getInnerElementOffset(element: ElementTypes) : Point;
 
   // Get wire attachment point for node input/output pins.
   inputPinToPoint(item: NodeTypes, index: number) : PointWithNormal;
@@ -1146,15 +1146,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       const translation = this.getToParent(item, parent);
       let x, y;
       if (parent instanceof ContainerElement) {
-        const innerBounds = this.layoutEngine.getInnerElementBounds(parent);
-        x = innerBounds.x;
-        y = innerBounds.y;
+        const offset = this.layoutEngine.getInnerElementOffset(parent);
+        x = offset.x;
+        y = offset.y;
       } else {
-        x = item.x;
-        y = item.y;
-      }
-      x = Math.max(0, x + translation.x);
-      y = Math.max(0, y + translation.y);
+        x = Math.max(0, item.x + translation.x);
+        y = Math.max(0, item.y + translation.y);
+        }
       if (item.x != x)
         item.x = x;
       if (item.y != y)
@@ -1810,9 +1808,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   exportElement(element: Element) : ContainerElement {
     const exporter = this.newElement('exporter') as ContainerElement,
           exporterType = element.type.toImportExportType(),
-          rect = this.layoutEngine.getInnerElementBounds(element);
-    exporter.x = rect.x;
-    exporter.y = rect.y;
+          bounds = this.layoutEngine.getBounds(element),
+          innerOffset = this.layoutEngine.getInnerElementOffset(element);
+    exporter.x = bounds.x - innerOffset.x;
+    exporter.y = bounds.y - innerOffset.y;
     exporter.typeString = exporterType.typeString;
     return exporter;
   }
@@ -2316,7 +2315,7 @@ class Renderer implements ILayoutEngine {
         const spacing = this.theme.spacing,
               innerElement = item.innerElement;
         width = innerElement.type.width + spacing;
-        height = innerElement.type.height + spacing;
+        height = innerElement.type.height + spacing;  // TODO
       } else {
         // All element types.
         const type = item.type;
@@ -2326,13 +2325,13 @@ class Renderer implements ILayoutEngine {
     }
     return { x, y, width, height };
   }
-  getInnerElementBounds(element: ElementTypes): Rect {
+  getInnerElementOffset(element: ElementTypes): Point {
     const spacing = this.theme.spacing,
           r = this.getBounds(element);
     switch (element.template.typeName) {
       case 'exporter':
       default:
-        return { x: r.x + spacing, y: r.y + spacing / 2, width: r.width - spacing, height: r.height - spacing / 2 };
+        return { x: spacing, y: spacing / 2 };
     }
   }
   // Get wire attachment point for element input/output pins.
