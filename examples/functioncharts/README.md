@@ -55,18 +55,14 @@ Since functioncharts can contain instances of themselves, we can define a recurs
   <img src="./resources/factorial.svg"  alt="" title="Recursive definition of factorial function N!.">
 </figure>
 
+Similarly, we can define a [Fibonacci](#Fibonacci) functionchart.
+
 We can abstract this a bit by replacing the multiplication function with an abstract binary operation, represented by a function import. This is a stand-in for a function to be provided by the caller, and just defines the shape of the function. That makes this function look just like the "reduce" function. We can use this function to compute factorial by using an export function to pass the multiplication operator, and again passing 1 as the initial "acc" value.
 
 We can re-use our "Reduce" to sum an array though.
 
 <figure>
   <img src="./resources/factorial3.svg"  alt="" title="Factorial function defined with reduce function.">
-</figure>
-
-Similarly, we can define a Fibonacci function. We define a helper which takes 3 parameters, and then "call" it with n, 1, 1, to start the iteration.
-
-<figure>
-  <img src="./resources/fibonacci.svg"  alt="" title="Recursive definition of fibonacci function.">
 </figure>
 
 Our palette contains the built in functions and Pseudofunctions. On the top are the input, output, apply, and pass Pseudofunctions. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an function and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
@@ -230,6 +226,15 @@ function qsort(a, i, j) {
 
 ## Inspiration
 Functioncharts were inspired by Harel Statecharts, another graphical representation of programs, which employs hierarchy to give state-transition diagrams more expressive power.
+
+## Fibonacci
+
+Similarly to the recursion example, we can define a Fibonacci function. We define a helper which takes 3 parameters, and then "call" it with n, 1, 1, to start the iteration.
+
+<figure>
+  <img src="./resources/fibonacci.svg"  alt="" title="Recursive definition of fibonacci function.">
+</figure>
+
 
 [Live Demo](https://billbudge.github.io/WebEditorFramework/examples/functioncharts/)
 
