@@ -175,7 +175,7 @@
       "typeString": "[,[,[vv,[,v(?)v(v)]][vv(v),[,v(?)v(v)]][vv(e),[,v(?)v(v)]]](Iterator)]",
       "x": 248.69688987731934,
       "y": 682.9812126159668,
-      "width": 212.9881534576416,
+      "width": 210.25066566467285,
       "height": 250.76663970947266,
       "name": "Iterator",
       "nodes": [
@@ -233,7 +233,7 @@
     {
       "type": "functionchart",
       "id": 29,
-      "typeString": "[,[v,](Array.entries)]",
+      "typeString": "[,[v,[,[vv,[,v(?)v(v)]][vv(v),[,v(?)v(v)]][vv(e),[,v(?)v(v)]]]](Array.entries)]",
       "x": 836.3368408083916,
       "y": 1248.5615425109863,
       "width": 291.73431092500687,

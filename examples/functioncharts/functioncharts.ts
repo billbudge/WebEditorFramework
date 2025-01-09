@@ -464,6 +464,20 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
   get isInstancer(): boolean {
     return !this.isExporter;
   }
+  get isInstanced(): boolean {
+    return this instanceof FunctionInstance ||
+           this instanceof ContainerElement && this.innerElement instanceof FunctionInstance;
+  }
+
+  asInstance() : FunctionInstance | undefined {
+    if (this instanceof FunctionInstance)
+      return this;
+    if (this instanceof ContainerElement) {
+      const inner = this.innerElement;
+      if (inner instanceof FunctionInstance)
+        return inner;
+    }
+  }
 
   // Get the pin for the node type, given an index in the combined input/output format.
   getPin(index: number) : Pin {
@@ -489,22 +503,6 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
     super(template, context,  id);
   }
 }
-
-// export class ImporterElement extends Element<ImporterTemplate> {
-//   // Derived properties.
-//   get instanceType() : Type {
-//     if (this.type) {
-//       const outputs = this.type.outputs;
-//       if (outputs.length > 0)
-//         return outputs[0].type;
-//     }
-//     return Type.emptyType;
-//   }
-
-//   constructor(context: FunctionchartContext, id: number) {
-//     super(importerTemplate, context,  id);
-//   }
-// }
 
 export class ContainerElement extends Element<ContainerElementTemplate> {
   get innerElement() { return this.template.innerElement.get(this).get(0) as ElementTypes | undefined; }
@@ -759,6 +757,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.functionchart = root;
     this.insertFunctionchart(root, undefined);
 
+    this.updateFunctioncharts();  // Initialize TypeInfo for all functioncharts.
     this.updateDerivedInfo();
   }
 
@@ -1473,18 +1472,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       dst.inWires[dstPin] = wire;
     });
     function addInstance(instance: FunctionInstance) {
-      const instancer = instance.src,
+      const src = instance.src,
             srcPin = instance.srcPin;
-      instancer.instances[srcPin].push(instance);
+      src.instances[srcPin].push(instance);
     }
     graphInfo.nodes.forEach(node => {
-      if (node instanceof FunctionInstance) {
-        addInstance(node);
-      } else if (node instanceof ContainerElement) {
-        const innerElement = node.innerElement;
-        if (innerElement instanceof FunctionInstance) {
-          addInstance(innerElement);
-        }
+      const instance = node.asInstance();
+      if (instance) {
+        addInstance(instance);
       }
     });
     return invalidWires;
@@ -1569,15 +1564,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
     // Check function instances.
     graphInfo.nodes.forEach(node => {
-      if (node instanceof FunctionInstance) {
-        if (!self.isValidFunctionInstance(node))
-            invalidInstances.push(node);
-      } else if (node instanceof ContainerElement) {
-        const innerElement = node.innerElement;
-        if (innerElement instanceof FunctionInstance) {
-          if (!self.isValidFunctionInstance(innerElement))
-            invalidInstances.push(innerElement);
-        }
+      const instance = node.asInstance();
+      if (instance) {
+        if (!self.isValidFunctionInstance(instance))
+          invalidInstances.push(instance);
       }
     });
 
@@ -1666,10 +1656,15 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         if (node.typeString !== type.typeString) {
           node.typeString = type.typeString;
         }
-      } else if (node instanceof FunctionInstance) {
-        const type = node.getSrcType();
-        // TODO varArgs merging.
-        node.typeString = type.typeString;
+      } else {
+        const instance = node.asInstance();
+        if (instance) {
+          const type = instance.getSrcType(),
+                typeString = type.typeString;
+          // TODO varArgs merging.
+          if (instance.typeString !== typeString)
+            instance.typeString = typeString;
+        }
       }
     });
 
@@ -1714,6 +1709,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           node.typeString = newType.typeString;
         }
       }
+      // Update to the new types.
+      this.updateDerivedInfo();
     });
 
     // Delete unsupported FunctionInstances. Update the rest.
@@ -2137,9 +2134,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (prop === typeStringProp) {
         const newType = Type.fromString(owner.typeString)
         owner.type = newType;
-        // if (owner.parent instanceof ExporterElement) {
-        //   owner.type = newType.toImportExportType();
-        // }
       } else {
         this.updateGlobalPosition(owner);
       }
