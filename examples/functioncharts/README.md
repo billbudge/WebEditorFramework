@@ -1,58 +1,66 @@
 # Functioncharts: A Graphical Programming Language
-Functioncharts are an experimental graphical programming language. They are a "node and wire" representation for programs, with values flowing along wires, into elements that perform computation and pass results out along outgoing wires. This example defines an editor for building functioncharts. There is no support for executing and debugging these programs (yet).
+Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. In this graph, values flow along wires, into functions that perform some computation and then pass result values out along outgoing wires. This repository contains the source code for a Web Editor that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs (yet).
 
-"Node and wire" programming systems are nothing new. The two principal innovations that Functioncharts have are:
+Many "node and wire" programming systems have been built and are in use. However, most are either domain-specific, or are intended for non-programmers building small, simple programs. The audacious goal here is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages.
 
-1. Wires aren't limited to passing simple data types like numbers and strings, but may also pass functions. This gives the diagrams much greater expressive power, similar to a conventional functional programming language. Other programming paradigms like OOP can be expressed by higher order functional programs.
+The two principal innovations in Functioncharts are:
 
-2. Elements aren't limited to a fixed set of primitives like binary addition and multiplication, but may be defined by the user using sub-functioncharts which allow "live grouping" of subcircuits. The sub-functionchart is an editable representation of the new element, allowing us to use a function inside its own definition. This allows recursion, and when structured appropriately, iteration through tail call recursion. Functioncharts may define complete functions, or just partial functions, allowing us to express things like closures.
+1. Functionchart functions can accept other functions as inputs, and produce new functions as outputs. This gives the diagrams much greater expressive power as we can represent abstractions.
 
-Since functions can be created and instantiated, more complex programs can be built. This document shows how some common small programs can be built and discusses the potential of this approach for different languages and larger programs.
+2. New Functionchart functions may be defined by the user using nested Functioncharts. The nested Functionchart is an editable representation of the new function, and the new function can be used inside its own definition. This allows recursion, and as a special case, iteration through tail call recursion. Nested Functioncharts may define complete functions, or partial functions, allowing us to express things like closures.
 
-For our purposes here, we define a simple unitype language like Javascript. This simplifies our diagrams since there is then only one type of pin and wire for the connections.
+Both features serve to reduce the visual complexity of the diagrams, by having multiple scopes and by reducing the number of wires and organizing them.
 
-[Live Demo](https://billbudge.github.io/WebEditorFramework/examples/functioncharts/)
+This introduction shows how some illustrative programs can be built and discusses the potential of this approach for different languages and larger programs.
 
-## Simple expressions
-Circuit elements for built-in operations can be provided by the language, and combined to form useful expressions. Elements have input and output pins that can be wired together. Input pins can only accept one wire at a time, while an output pin may fan out to multiple elements.
+For our purposes here, we implement a simple uni-type language which looks a lot like Javascript. This simplifies our diagrams since we only have "simple" values (numbers, strings, etc.) and function values flowing along wires.
 
-Pseudoelements are used for various roles, but aren't true functions that calculate anything. For now, we have input and output pseudoelements. These specify and potentially assign a name to the inputs and outputs when defining a new element in a functionchart.
+## Simple Functions
+We start by using the built-in functions provided by the language to create a new function.
 
-Below is a simple example of an sub-functionchart to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x === 0, or -1 if x < 0. We use the following built in elements:
+Functions have input and output pins that can be wired to other functions. Input pins can only accept one wire at a time, while an output pin may fan out to multiple functions.
 
-1) Pseudoelements for the input, 'a', and the output, 'b'.
-3) literal elements (0, 1, -1), which have no inputs and output the literal value.
-3) binary operators (<, >), which take two input values and output a boolean value.
-4) the conditional operator (?), which takes an input value and two generic inputs and outputs the first if the value is true, and the second if the value is false.
+We will also use Pseudofunctions which look like functions in our diagrams, but don't calculate anything. One use of these is to allow us to specify inputs and outputs and name them.
 
-The input value x is represented by a pseudoelement, to feed the same value into several function elements. The literals and binary operations have values as inputs and outputs, while the conditional element is more generic, with a single (boolean) value input, and two generic inputs and an output, so it can operate on values or functions.
+The picture below is a simple example of a Functionchart to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x = 0, or -1 if x < 0. We use the following built in functions:
+
+1) Pseudofunctions to mark and name the input, 'a', and the output, 'b'.
+3) Literal functions (0, 1, -1), which have no inputs and output a literal value.
+3) Binary operators (<, >), which take two input values and output a boolean value.
+4) The conditional operator (?), which takes an input value and two inputs. It outputs the second input if the first input is true, or the third input if the first input is false.
+
+In addition to naming, the input pseudofunction 'a' allows us to specify that the same input is used by several different functions.
 
 <figure>
   <img src="./resources/signum.svg"  alt="" title="Signum function.">
 </figure>
 
-This diagram is already a little hard to read. We can simplify by defining new elements using child functioncharts to hold elements. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function much easier to read. Then we can use the new elements to represent the final signum function, which is also defined in a functionchart so we can use the new function.
+This diagram is already a little hard to read because of the wires. We can simplify by defining new functions using nested functioncharts to hold functions. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function much easier to read. Then we can use the new functions to represent the final signum function, which is also defined in a functionchart so we can use the new function.
 
 <figure>
   <img src="./resources/signum2.svg"  alt="" title="Signum function.">
 </figure>
 
-Similarly we can define useful functions like increment, decrement, maximum, minimum, and absolute value. Note the use of the "< 0" function in the abs functionchart. TODO default value adapter.
+Here are some more useful functions like increment, decrement, maximum, minimum, and absolute value. Note the use of the "< 0" function in the abs functionchart.
 
 <figure>
   <img src="./resources/simpleFns.svg"  alt="" title="Comparisons, maximum, minimum, and absolute value.">
 </figure>
 
-Since functioncharts can contain instances of themselves, we can define a recursive Factorial (N!) function. The recursion is equivalent to a simple iteration, and in fact this is how the graphs represent iteration.
+## Recursion and Iteration
+
+Since functioncharts can contain instances of themselves, we can define a recursive factorial (N!) function. The recursion is equivalent to a simple iteration, and in fact this is how the diagram can represent iteration. Reading left to right, we define a helper decrement function, a "facstep" helper function, carefully contrived to return the recursive function invocation as the last step to allow a "tail recursion" optimization, and finally an invocation of "facstep" with 1 passed to the "acc" input.
 
 <figure>
   <img src="./resources/factorial.svg"  alt="" title="Recursive definition of factorial function N!.">
 </figure>
 
-We can abstract this a bit by replacing the multiplication element with an abstract binary op. That makes this functionchart look like the a 'fold' or 'reduce' function.
+We can abstract this a bit by replacing the multiplication function with an abstract binary operation, represented by a function import. This is a stand-in for a function to be provided by the caller, and just defines the shape of the function. That makes this function look just like the "reduce" function. We can use this function to compute factorial by using an export function to pass the multiplication operator, and again passing 1 as the initial "acc" value.
+
+We can re-use our "Reduce" to sum an array though.
 
 <figure>
-  <img src="./resources/factorial2.svg"  alt="" title="Factorial function defined with fold or reduce function.">
+  <img src="./resources/factorial3.svg"  alt="" title="Factorial function defined with reduce function.">
 </figure>
 
 Similarly, we can define a Fibonacci function. We define a helper which takes 3 parameters, and then "call" it with n, 1, 1, to start the iteration.
@@ -61,23 +69,23 @@ Similarly, we can define a Fibonacci function. We define a helper which takes 3 
   <img src="./resources/fibonacci.svg"  alt="" title="Recursive definition of fibonacci function.">
 </figure>
 
-Our palette contains the built in elements and pseudoelements. On the top are the input, output, apply, and pass pseudoelements. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an element and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
+Our palette contains the built in functions and Pseudofunctions. On the top are the input, output, apply, and pass Pseudofunctions. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an function and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
 
 <figure>
-  <img src="./resources/palette.svg"  alt="" title="Palette (pseudoelements and primitive computational elements)">
+  <img src="./resources/palette.svg"  alt="" title="Palette (Pseudofunctions and primitive computational functions)">
 </figure>
 
 
-3. Function types, which take input values and produce output values. The primitive addition element has type [VV,V] for example, since it takes two inputs of scalar type and produces a sum with type V.
+3. Function types, which take input values and produce output values. The primitive addition function has type [VV,V] for example, since it takes two inputs of scalar type and produces a sum with type V.
 
 
 
 On the next are the unary and binary functions, and the only 3-ary function, the conditional operator.
 
-In addition there are Pseudoelements, which are used to add information to the graph, but which do not perform computation.
+In addition there are Pseudofunctions, which are used to add information to the graph, but which do not perform computation.
 
 <figure>
-  <img src="/resources/palette2.svg"  alt="" title="Pseudo-elements">
+  <img src="/resources/palette2.svg"  alt="" title="Pseudo-functions">
 </figure>
 
 We can combine these primitive functions to compute simple expressions. In the diagrams below, we are creating:
@@ -87,16 +95,16 @@ We can combine these primitive functions to compute simple expressions. In the d
 1. A binary minimum and maximum using a relational operator and the conditional operator (note how input junctions are used to tie inputs together.)
 1. A 3-ary and 4-ary addition operation by cascading binary additions.
 
-Note that there is fan-out but no fan-in in our circuit graphs. There are no cycles, so the circuit is a DAG (directed acyclic graph). Each circuit element is conceptually a function and wires connect outputs of one function to inputs of another. Evaluation proceeds left-to-right, since inputs must be evaluated before producing outputs. The evaluation order of the graph is only partially ordered (by topologically sorting) so we have to take extra care when a specific sequential evaluation order is required.
+Note that there is fan-out but no fan-in in our circuit graphs. There are no cycles, so the circuit is a DAG (directed acyclic graph). Each circuit function is conceptually a function and wires connect outputs of one function to inputs of another. Evaluation proceeds left-to-right, since inputs must be evaluated before producing outputs. The evaluation order of the graph is only partially ordered (by topologically sorting) so we have to take extra care when a specific sequential evaluation order is required.
 
-Expressions can be used to build more complex diagrams, but this quickly leads to large, unreadable graphs. A better way is to turn expressions into new functions, which allow us to program at a higher level of abstraction. Grouping is how we create new functions. In this diagram, we take the expressions above and group them to form new functions that we can use just like the primitive ones. Each group is a separate context, denoted by a dotted boundary. New elements an be dragged and dropped into the context. Disconnected inputs or outputs become the new function's inputs and outputs. Input and output junctions can be connected to inputs and outputs in order to assign names to them. They can also be used to identify common inputs, since ordinarily each disconnected input leads to a unique group input. The "min" and "max" functions use input junctions this way.
+Expressions can be used to build more complex diagrams, but this quickly leads to large, unreadable graphs. A better way is to turn expressions into new functions, which allow us to program at a higher level of abstraction. Grouping is how we create new functions. In this diagram, we take the expressions above and group them to form new functions that we can use just like the primitive ones. Each group is a separate context, denoted by a dotted boundary. New functions an be dragged and dropped into the context. Disconnected inputs or outputs become the new function's inputs and outputs. Input and output junctions can be connected to inputs and outputs in order to assign names to them. They can also be used to identify common inputs, since ordinarily each disconnected input leads to a unique group input. The "min" and "max" functions use input junctions this way.
 
 To begin, let's start with simple types.
 
 1. The scalar value type V, which can represent numbers, strings, arrays, or other pure data types.
-2. The wildcard type *, which is used by pseudoelements that can be wired to any type pin.
+2. The wildcard type *, which is used by Pseudofunctions that can be wired to any type pin.
 
-Having a single kind of wire that can connect elements makes our circuits simpler, since we don't need any color or pattern scheme to give them a type. They acquire their type from their source and destination connections.
+Having a single kind of wire that can connect functions makes our circuits simpler, since we don't need any color or pattern scheme to give them a type. They acquire their type from their source and destination connections.
 
 We can use these new functions just like the built in ones to create more complex functions. Here's the sgn function, which takes a single number as input and returns 1 if it's > 0, 0 if it's equal to 0, or -1 if it's less than 0. On the right, we build it from primitive functions. However, it's clearer if we create helper functions: "less than 0" and "greater than 0" functions, and a 5 input conditional.
 
@@ -106,7 +114,7 @@ We have to rebuild these graphs every time we want to create a similar function,
 We can nest function definitions to avoid repetition definitions. Before we stated that any disconnected inputs and outputs become group inputs and outputs. One exception to this rule is when we add instances of the new function to its own context. This allows us to create many interesting things. Here, we create a single abstract binary operation, and then cascade it to create 3-ary, 4-ary, 5-ary, and 6-ary functions by grouping these into nested function definitions.
 
 ## Function Creation
-Now we need a way to create functions that can be imported. The mechanism is function closure. Any function element can be closed, which creates a function output whose type is all disconnected inputs, and all outputs. This is exactly analogous to function closure in regular programming languages. In the diagram below, we can create an incrementing function by grouping as before, or by partially applying addition to a literal 1 value and closing to get a unary incrementing function.
+Now we need a way to create functions that can be imported. The mechanism is function closure. Any function function can be closed, which creates a function output whose type is all disconnected inputs, and all outputs. This is exactly analogous to function closure in regular programming languages. In the diagram below, we can create an incrementing function by grouping as before, or by partially applying addition to a literal 1 value and closing to get a unary incrementing function.
 
 Function closing is a powerful graph simplification mechanism. Imagine we wanted to apply our quadratic polynomial evaluation function to one polynomial at 4 different x values. Using the grouped expression 4 times leads to a complex graph that is becoming unwieldy. Applying the function to the polynomial coefficients and closing gives a simple unary function that we can apply 4 times, which is easier to understand.
 
@@ -154,12 +162,13 @@ Using this more generic function, we can easily create a factorial function.
 </figure>
 
 ## State
+While it might seem that Functioncharts are a purely higher-order functional language, we can define functions with side effects, which allow us to support programming paradigms like regular imperative programming and Object Oriented Programming.
 
 <figure>
   <img src="./resources/points.svg"  alt="" title="A simple 2d point library.">
 </figure>
 
-So far we haven't used the ability to pass functions as parameters very much. However, they make it possible to express many different things besides expressions. Let's introduce three new stateful elements, which allow us to hold state and "open" values as objects or arrays.
+So far we haven't used the ability to pass functions as parameters very much. However, they make it possible to express many different things besides expressions. Let's introduce three new stateful functions, which allow us to hold state and "open" values as objects or arrays.
 
 In the top left, we apply the array getter, and pass it as the first operand of an addition. We add pins for the inputs that come from the iteration. This can be grouped and closed to create a function import for our iteration. On the bottom we hook it up, set the range to [0..n-1] and pass an initial 'acc' of 0.
 
@@ -170,7 +179,7 @@ In the top left, we apply the array getter, and pass it as the first operand of 
 
 ## Quicksort
 
-Let's implement Quicksort graphically. Here is the source for a Javascript implementation of Quicksort which does the partition step in place. We'll start by implementing the iterations which advance indices to a pair of out of place elements.
+Let's implement Quicksort graphically. Here is the source for a Javascript implementation of Quicksort which does the partition step in place. We'll start by implementing the iterations which advance indices to a pair of out of place functions.
 
 ```js
 function partition(a, i, j) {
@@ -222,3 +231,6 @@ function qsort(a, i, j) {
 ## Inspiration
 Functioncharts were inspired by Harel Statecharts, another graphical representation of programs, which employs hierarchy to give state-transition diagrams more expressive power.
 
+[Live Demo](https://billbudge.github.io/WebEditorFramework/examples/functioncharts/)
+
+TODO default value adapter.
