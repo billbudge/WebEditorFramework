@@ -59,26 +59,53 @@ Similarly, we can define a [Fibonacci](#Fibonacci) functionchart.
 
 We can abstract this a bit by replacing the multiplication function with an abstract binary operation, represented by a function import. This is a stand-in for a function to be provided by the caller, and just defines the shape of the function. That makes this function look just like the "reduce" function. We can use this function to compute factorial by using an export function to pass the multiplication operator, and again passing 1 as the initial "acc" value.
 
-We can re-use our "Reduce" to sum an array though.
+We can re-use our "Reduce" to implement Factorial.
 
 <figure>
-  <img src="./resources/factorial3.svg"  alt="" title="Factorial function defined with reduce function.">
+  <img src="./resources/factorial2.svg"  alt="" title="Factorial function defined with reduce function.">
 </figure>
 
-Our palette contains the built in functions and Pseudofunctions. On the top are the input, output, apply, and pass Pseudofunctions. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an function and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
+## Iteration over a Numeric Range
+We can abstract our iteration even further. First we define an abstract "body" function, with 2 inputs and 1 output. The first input will represent the iteration index, the typical "i" in a for-loop. The second input is an auxiliary value, which the body can use. The output is the result of the body, and is passed on as the auxiliary input each time the body is run. Then we iterate over the range [0..n[, passing the index to the body function.
+<figure>
+  <img src="./resources/iteration.svg"  alt="" title="Simple iteration over the range [0..n[.">
+</figure>
+
+We can use the iteration to implement our factorial function.
+
+## More General Iteration over a Range
+Generic iteration with start, end, condition, and step configurable.
+<figure>
+  <img src="./resources/iteration2.svg"  alt="" title="Generic iteration with start, end, condition, and step configurable.">
+</figure>
+
+## Quicksort
+Let's implement Quicksort using these iteration primitives. Here is the source for a Javascript implementation of the classic Quicksort which does the partition step in place.
+
+We'll start by implementing the iterations which advance indices to a pair of out of place functions.
+
+```js
+function partition(a, i, j) {
+  let p = a[i];
+  while (1) {
+    while (i < j && a[i] <= p) i++;
+    while (j > i && a[j] >= p) j--;
+    if (i >= j) return j;
+    [a[i], a[j]] = [a[j], a[i]];
+    i++; j--;
+  }
+}
+function qsort(a, i, j) {
+  if (i >= j) return;
+  let k = partition(a, i, j);
+  qsort(a, i, k);
+  qsort(a, k + 1, j);
+}
+```
 
 <figure>
-  <img src="./resources/palette.svg"  alt="" title="Palette (Pseudofunctions and primitive computational functions)">
+  <img src="./resources/quicksort.svg"  alt="" title="Quicksort, partition in place.">
 </figure>
-
-
-3. Function types, which take input values and produce output values. The primitive addition function has type [VV,V] for example, since it takes two inputs of scalar type and produces a sum with type V.
-
-
-
-On the next are the unary and binary functions, and the only 3-ary function, the conditional operator.
-
-In addition there are Pseudofunctions, which are used to add information to the graph, but which do not perform computation.
 
 <figure>
   <img src="/resources/palette2.svg"  alt="" title="Pseudo-functions">
@@ -116,17 +143,6 @@ Function closing is a powerful graph simplification mechanism. Imagine we wanted
 
 <figure>
   <img src="/resources/function_creation2.png"  alt="" title="Function closing is a powerful graph simplification mechanism">
-</figure>
-
-## Iteration
-Simple iteration over the range [0..n[.
-<figure>
-  <img src="./resources/iteration.svg"  alt="" title="Simple iteration over the range [0..n[.">
-</figure>
-
-Generic iteration with start, end, condition, and step configurable.
-<figure>
-  <img src="./resources/iteration2.svg"  alt="" title="Generic iteration with start, end, condition, and step configurable.">
 </figure>
 
 ### Generic iteration
@@ -173,59 +189,9 @@ In the top left, we apply the array getter, and pass it as the first operand of 
   <img src="./resources/swap.svg"  alt="" title="Swapping in many forms.">
 </figure>
 
-## Quicksort
-
-Let's implement Quicksort graphically. Here is the source for a Javascript implementation of Quicksort which does the partition step in place. We'll start by implementing the iterations which advance indices to a pair of out of place functions.
-
-```js
-function partition(a, i, j) {
-  let p = a[i];
-  while (1) {
-    while (a[i] < p) i++;
-    while (a[j] > p) j--;
-    if (i >= j) return j;
-    [a[i], a[j]] = [a[j], a[i]];
-    i++; j--;
-  }
-}
-function qsort(a, i, j) {
-  if (i >= j) return;
-  let k = partition(a, i, j);
-  qsort(a, i, k);
-  qsort(a, k + 1, j);
-}
-```
-
-<figure>
-  <img src="/resources/quicksort.png"  alt="" title="Quicksort partition-in-place loop">
-</figure>
-
-<figure>
-  <img src="/resources/quicksort2.png"  alt="" title="TODO">
-</figure>
-
-<figure>
-  <img src="/resources/quicksort3.png"  alt="" title="TODO">
-</figure>
-
-<figure>
-  <img src="/resources/quicksort4.png"  alt="" title="TODO">
-</figure>
-
-<figure>
-  <img src="/resources/quicksort5.png"  alt="" title="TODO">
-</figure>
-
-<figure>
-  <img src="/resources/quicksort6.png"  alt="" title="TODO">
-</figure>
-
 ## Stateful Iteration Protocols
 
 ## Semantic Details
-
-## Inspiration
-Functioncharts were inspired by Harel Statecharts, another graphical representation of programs, which employs hierarchy to give state-transition diagrams more expressive power.
 
 ## Fibonacci
 
@@ -235,7 +201,16 @@ Similarly to the recursion example, we can define a Fibonacci function. We defin
   <img src="./resources/fibonacci.svg"  alt="" title="Recursive definition of fibonacci function.">
 </figure>
 
+## Live Demo Editor with Examples
+Our palette contains the built in functions and Pseudofunctions. On the top are the input, output, apply, and pass Pseudofunctions. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an function and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
+
+<figure>
+  <img src="./resources/palette.svg"  alt="" title="Palette (Pseudofunctions and primitive computational functions)">
+</figure>
 
 [Live Demo](https://billbudge.github.io/WebEditorFramework/examples/functioncharts/)
+
+## Inspiration
+Functioncharts were inspired by Harel Statecharts, another graphical representation of programs, which employs hierarchy to give state-transition diagrams more expressive power.
 
 TODO default value adapter.

@@ -1528,6 +1528,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
               instanceType = typeInfo.instanceType;
         item.typeInfo = typeInfo;
         item.type = typeInfo.instanceType.toImportExportType();
+        item.typeString = item.type.typeString;
         item.instanceType = instanceType;
       }
     });

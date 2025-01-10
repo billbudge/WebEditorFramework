@@ -358,7 +358,7 @@ class NodeBase {
         return this instanceof FunctionInstance ||
             this instanceof ContainerElement && this.innerElement instanceof FunctionInstance;
     }
-    asFunctionInstance() {
+    asInstance() {
         if (this instanceof FunctionInstance)
             return this;
         if (this instanceof ContainerElement) {
@@ -1195,7 +1195,7 @@ export class FunctionchartContext extends EventBase {
             src.instances[srcPin].push(instance);
         }
         graphInfo.nodes.forEach(node => {
-            const instance = node.asFunctionInstance();
+            const instance = node.asInstance();
             if (instance) {
                 addInstance(instance);
             }
@@ -1240,6 +1240,7 @@ export class FunctionchartContext extends EventBase {
                 const typeInfo = self.getFunctionchartTypeInfo(item), instanceType = typeInfo.instanceType;
                 item.typeInfo = typeInfo;
                 item.type = typeInfo.instanceType.toImportExportType();
+                item.typeString = item.type.typeString;
                 item.instanceType = instanceType;
             }
         });
@@ -1270,7 +1271,7 @@ export class FunctionchartContext extends EventBase {
             return false;
         // Check function instances.
         graphInfo.nodes.forEach(node => {
-            const instance = node.asFunctionInstance();
+            const instance = node.asInstance();
             if (instance) {
                 if (!self.isValidFunctionInstance(instance))
                     invalidInstances.push(instance);
@@ -1353,7 +1354,7 @@ export class FunctionchartContext extends EventBase {
                 }
             }
             else {
-                const instance = node.asFunctionInstance();
+                const instance = node.asInstance();
                 if (instance) {
                     const type = instance.getSrcType(), typeString = type.typeString;
                     // TODO varArgs merging.

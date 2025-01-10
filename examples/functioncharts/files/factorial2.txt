@@ -1,14 +1,14 @@
 {
   "type": "functionchart",
   "id": 2,
-  "typeString": "[,]",
+  "typeString": "[,[,]]",
   "width": 1212.1375732421875,
   "height": 508.3562812805176,
   "nodes": [
     {
       "type": "functionchart",
       "id": 3,
-      "typeString": "[v(n)v(acc)[vv,v](f),v](reduce)",
+      "typeString": "[,[v(n)v(acc)[vv,v]()(*),v](reduce)]",
       "x": 360.02825927734375,
       "y": 88.54065322875977,
       "width": 399.1930694580078,
@@ -27,8 +27,8 @@
           "type": "output",
           "id": 5,
           "typeString": "[v,]",
-          "x": 359.1930694580078,
-          "y": 123.68195724487305
+          "x": 357.9430694580078,
+          "y": 106.06321334838867
         },
         {
           "type": "input",
@@ -63,7 +63,7 @@
         {
           "type": "instance",
           "id": 10,
-          "typeString": "[v(n)v(acc)[vv,v]()(f),v](reduce)",
+          "typeString": "[v(n)v(acc)[vv,v]()(*),v](reduce)",
           "x": 211.94850158691406,
           "y": 132.4083709716797,
           "instancer": 3
@@ -78,18 +78,26 @@
         },
         {
           "type": "importer",
-          "id": 12,
-          "typeString": "[,[vv,v](f)]",
+          "id": 27,
+          "typeString": "[,[vv,v](*)]",
           "x": 18.838706970214844,
-          "y": 164.30667114257812
+          "y": 164.30667114257812,
+          "inner": {
+            "type": "element",
+            "id": 26,
+            "typeString": "[vv,v](*)",
+            "x": 8,
+            "y": 4,
+            "name": "binop"
+          }
         },
         {
           "type": "instance",
-          "id": 13,
-          "typeString": "[vv,v](f)",
-          "x": 138.5938138961792,
-          "y": 129.53243923187256,
-          "instancer": 12,
+          "id": 28,
+          "typeString": "[vv,v](*)",
+          "x": 123.13424071669579,
+          "y": 125.77810287475586,
+          "instancer": 27,
           "srcPin": 0
         }
       ],
@@ -152,38 +160,38 @@
         },
         {
           "type": "wire",
+          "src": 27,
+          "srcPin": 0,
+          "dst": 10,
+          "dstPin": 2
+        },
+        {
+          "type": "wire",
           "src": 7,
           "srcPin": 0,
-          "dst": 13,
+          "dst": 28,
           "dstPin": 0
         },
         {
           "type": "wire",
           "src": 6,
           "srcPin": 0,
-          "dst": 13,
+          "dst": 28,
           "dstPin": 1
         },
         {
           "type": "wire",
-          "src": 13,
+          "src": 28,
           "srcPin": 0,
           "dst": 10,
           "dstPin": 1
-        },
-        {
-          "type": "wire",
-          "src": 12,
-          "srcPin": 0,
-          "dst": 10,
-          "dstPin": 2
         }
       ]
     },
     {
       "type": "functionchart",
       "id": 14,
-      "typeString": "[v,v](-1)",
+      "typeString": "[,[v,v](-1)]",
       "x": 129.96252059936523,
       "y": 164.52190399169922,
       "width": 170.4375,
@@ -248,7 +256,7 @@
     {
       "type": "functionchart",
       "id": 19,
-      "typeString": "[v,v](n!)",
+      "typeString": "[,[v,v](n!)]",
       "x": 819.0938873291016,
       "y": 126.21248245239258,
       "width": 206.9471435546875,
@@ -258,7 +266,7 @@
         {
           "type": "instance",
           "id": 20,
-          "typeString": "[v(n)v(acc)[vv,v]()(f),v](reduce)",
+          "typeString": "[v(n)v(acc)[vv,v]()(*),v](reduce)",
           "x": 67.40313720703125,
           "y": 17.024993896484375,
           "instancer": 3
@@ -287,18 +295,16 @@
         },
         {
           "type": "exporter",
-          "id": 24,
+          "id": 30,
           "typeString": "[,[vv,v](*)]",
           "x": 9.296787977218628,
           "y": 83.47502517700195,
-          "name": "binop",
-          "instancer": 0,
           "inner": {
             "type": "element",
-            "id": 25,
+            "id": 29,
             "typeString": "[vv,v](*)",
-            "x": 803.0125014781952,
-            "y": 352.73438262939453,
+            "x": 8,
+            "y": 4,
             "name": "binop"
           }
         }
@@ -327,7 +333,7 @@
         },
         {
           "type": "wire",
-          "src": 24,
+          "src": 30,
           "srcPin": 0,
           "dst": 20,
           "dstPin": 2
