@@ -107,6 +107,48 @@ function qsort(a, i, j) {
   <img src="./resources/quicksort.svg"  alt="" title="Quicksort, partition in place.">
 </figure>
 
+## State
+While it might seem that Functioncharts are a purely higher-order functional language, we can define functions with side effects, which allow us to support programming paradigms like regular imperative programming and Object Oriented Programming.
+
+<figure>
+  <img src="./resources/points.svg"  alt="" title="A simple 2d point library.">
+</figure>
+
+So far we haven't used the ability to pass functions as parameters very much. However, they make it possible to express many different things besides expressions. Let's introduce three new stateful functions, which allow us to hold state and "open" values as objects or arrays.
+
+In the top left, we apply the array getter, and pass it as the first operand of an addition. We add pins for the inputs that come from the iteration. This can be grouped and closed to create a function import for our iteration. On the bottom we hook it up, set the range to [0..n-1] and pass an initial 'acc' of 0.
+
+## Swap
+<figure>
+  <img src="./resources/swap.svg"  alt="" title="Swapping in many forms.">
+</figure>
+
+## Stateful Iteration Protocols
+
+## Semantic Details
+
+## Fibonacci
+
+Similarly to the recursion example, we can define a Fibonacci function. We define a helper which takes 3 parameters, and then "call" it with n, 1, 1, to start the iteration.
+
+<figure>
+  <img src="./resources/fibonacci.svg"  alt="" title="Recursive definition of fibonacci function.">
+</figure>
+
+## Live Demo Editor with Examples
+Our palette contains the built in functions and Pseudofunctions. On the top are the input, output, apply, and pass Pseudofunctions. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an function and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
+
+<figure>
+  <img src="./resources/palette.svg"  alt="" title="Palette (Pseudofunctions and primitive computational functions)">
+</figure>
+
+[Live Demo](https://billbudge.github.io/WebEditorFramework/examples/functioncharts/)
+
+## Inspiration
+Functioncharts were inspired by Harel Statecharts, another graphical representation of programs, which employs hierarchy to give state-transition diagrams more expressive power.
+
+TODO default value adapter.
+
 <figure>
   <img src="/resources/palette2.svg"  alt="" title="Pseudo-functions">
 </figure>
@@ -172,45 +214,3 @@ Using this more generic function, we can easily create a factorial function.
 <figure>
   <img src="/resources/iteration3.png"  alt="" title="Iteration adapted to compute factorial">
 </figure>
-
-## State
-While it might seem that Functioncharts are a purely higher-order functional language, we can define functions with side effects, which allow us to support programming paradigms like regular imperative programming and Object Oriented Programming.
-
-<figure>
-  <img src="./resources/points.svg"  alt="" title="A simple 2d point library.">
-</figure>
-
-So far we haven't used the ability to pass functions as parameters very much. However, they make it possible to express many different things besides expressions. Let's introduce three new stateful functions, which allow us to hold state and "open" values as objects or arrays.
-
-In the top left, we apply the array getter, and pass it as the first operand of an addition. We add pins for the inputs that come from the iteration. This can be grouped and closed to create a function import for our iteration. On the bottom we hook it up, set the range to [0..n-1] and pass an initial 'acc' of 0.
-
-## Swap
-<figure>
-  <img src="./resources/swap.svg"  alt="" title="Swapping in many forms.">
-</figure>
-
-## Stateful Iteration Protocols
-
-## Semantic Details
-
-## Fibonacci
-
-Similarly to the recursion example, we can define a Fibonacci function. We define a helper which takes 3 parameters, and then "call" it with n, 1, 1, to start the iteration.
-
-<figure>
-  <img src="./resources/fibonacci.svg"  alt="" title="Recursive definition of fibonacci function.">
-</figure>
-
-## Live Demo Editor with Examples
-Our palette contains the built in functions and Pseudofunctions. On the top are the input, output, apply, and pass Pseudofunctions. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an function and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
-
-<figure>
-  <img src="./resources/palette.svg"  alt="" title="Palette (Pseudofunctions and primitive computational functions)">
-</figure>
-
-[Live Demo](https://billbudge.github.io/WebEditorFramework/examples/functioncharts/)
-
-## Inspiration
-Functioncharts were inspired by Harel Statecharts, another graphical representation of programs, which employs hierarchy to give state-transition diagrams more expressive power.
-
-TODO default value adapter.
