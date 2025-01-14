@@ -1,47 +1,47 @@
-# Functioncharts: The Shapes of Computation
-Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. In this graph, values flow along wires, into functions that perform some computation and then pass result values out along outgoing wires. This repository contains the source code for a Web Editor that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs (yet).
+# Functioncharts: Diagrams of Computation
+Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. This repository contains the source code for a Web Editor that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs (yet!)
 
-Many "node and wire" programming systems have been built and are in use. However, most are either domain-specific, or are intended for non-programmers building small, simple programs. The audacious goal here is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages.
+Many "node and wire" programming systems have been built. However, most are either domain-specific, or are intended for non-programmers building small, simple programs. Functioncharts are loosely patterned after Harel Statecharts, using hierarchy and abstraction to increase the power of the notation. The ambitious goal is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages.
 
-The two principal innovations in Functioncharts are:
+The two innovations in Functioncharts are:
 
-1. Functionchart functions can accept other functions as inputs, and produce new functions as outputs. This gives the diagrams much greater expressive power as we can represent abstractions.
+1. Functions can accept other functions as inputs, and produce new functions as outputs. This gives the diagrams much greater expressive power as we can represent abstractions.
 
-2. New Functionchart functions may be defined by the user using nested Functioncharts. The nested Functionchart is an editable representation of the new function, and the new function can be used inside its own definition. This allows recursion, and as a special case, iteration through tail call recursion. Nested Functioncharts may define complete functions, or partial functions, allowing us to express things like closures.
+2. Functions may be defined by the user using nested Functions. The nested Function can be edited live, so the new function can be used inside its own definition. This allows recursion, and as a special case, iteration through the tail call optimization. Nested Functioncharts may define complete functions, or partial functions, allowing us to express things like closures.
 
-Both features serve to reduce the visual complexity of the diagrams, by having multiple scopes and by reducing the number of wires and organizing them.
+Both features serve to reduce the visual complexity of the Functionchart diagrams, by having scopes, by reducing the number of wires, and by organizing them.
 
-This introduction shows how some illustrative programs can be built and discusses the potential of this approach for different languages and larger programs.
+This introduction shows how some illustrative programs can be built and discusses the advantages and potential of this approach.
 
-For our purposes here, we implement a simple uni-type language which looks a lot like Javascript. This simplifies our diagrams since we only have "simple" values (numbers, strings, etc.) and function values flowing along wires.
+For our purposes here, we implement a simple mono-type language which looks a lot like Javascript. This simplifies our diagrams since we only have "simple" values (numbers, strings, etc.) and function values flowing along wires.
 
 ## Simple Functions
 We start by using the built-in functions provided by the language to create a new function.
 
 Functions have input and output pins that can be wired to other functions. Input pins can only accept one wire at a time, while an output pin may fan out to multiple functions.
 
-We will also use Pseudofunctions which look like functions in our diagrams, but don't calculate anything. One use of these is to allow us to specify inputs and outputs and name them.
+We also have Pseudofunctions which look like functions in our diagrams, but don't calculate anything. One use of these is to allow us to specify inputs and outputs and name them.
 
 The picture below is a simple example of a Functionchart to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x = 0, or -1 if x < 0. We use the following built in functions:
 
-1) Pseudofunctions to mark and name the input, 'a', and the output, 'b'.
+1) Pseudofunctions to mark and name the input, 'a', and the output, 'b'. The 'a' input also allows us to indicate that the same value is used in two different places.
 3) Literal functions (0, 1, -1), which have no inputs and output a literal value.
 3) Binary operators (<, >), which take two input values and output a boolean value.
 4) The conditional operator (?), which takes an input value and two inputs. It outputs the second input if the first input is true, or the third input if the first input is false.
 
-In addition to naming, the input pseudofunction 'a' allows us to specify that the same input is used by several different functions.
+The Functionchart defines a function, which is displayed in the top right corner. It is shaded to indicate that it can be instanced in the diagram.
 
 <figure>
   <img src="./resources/signum.svg"  alt="" title="Signum function.">
 </figure>
 
-This diagram is already a little hard to read because of the wires. We can simplify by defining new functions using nested functioncharts to hold functions. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function much easier to read. Then we can use the new functions to represent the final signum function, which is also defined in a functionchart so we can use the new function.
+This diagram is already a little hard to read because of the wires. We can simplify by defining new functions using sibling functioncharts to define helper functions. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function easier to read. Then we use the new functions to represent the final signum function as before.
 
 <figure>
-  <img src="./resources/signum2.svg"  alt="" title="Signum function.">
+  <img src="./resources/signum2.svg"  alt="" title="Signum function using helper functions.">
 </figure>
 
-Here are some more useful functions like increment, decrement, maximum, minimum, and absolute value. Note the use of the "< 0" function in the abs functionchart.
+Similarly we can define other useful functions. In this Functionchart, the function instance links are visible. Note the use of the "< 0" function in the abs functionchart. We can hide these links when they're obvious in the context. For example, links to simple helpers may be hidden for clarity of the overall diagram.
 
 <figure>
   <img src="./resources/simpleFns.svg"  alt="" title="Comparisons, maximum, minimum, and absolute value.">
@@ -49,7 +49,7 @@ Here are some more useful functions like increment, decrement, maximum, minimum,
 
 ## Recursion and Iteration
 
-Since functioncharts can contain instances of themselves, we can define a recursive factorial (N!) function. The recursion is equivalent to a simple iteration, and in fact this is how the diagram can represent iteration. Reading left to right, we define a helper decrement function, a "facstep" helper function, carefully contrived to return the recursive function invocation as the last step to allow a "tail recursion" optimization, and finally an invocation of "facstep" with 1 passed to the "acc" input.
+Since functions can call instances of themselves, we can define a recursive factorial (N!) function. The recursion is equivalent to a simple iteration, and in fact this is how the diagram can represent iteration. Reading left to right, we define a helper decrement function, a "facstep" helper function, carefully arranged to return the recursive function invocation as the last step to allow the "tail recursion" optimization, and finally an invocation of "facstep" with an pseudofunction input and 1 passed to the "acc" input.
 
 <figure>
   <img src="./resources/factorial.svg"  alt="" title="Recursive definition of factorial function N!.">
