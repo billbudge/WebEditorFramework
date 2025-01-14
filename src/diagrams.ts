@@ -535,8 +535,13 @@ export class PropertyGridController {
       typeInfo.properties.forEach(function (propertyInfo, index) {
         const row = table.rows[index],
               cell = row.cells[1],
-              editingElement = cell.children[0] as HTMLInputElement;
-        editingElement.value = propertyInfo.getter(propertyInfo, item);
+              editingElement = cell.children[0] as HTMLInputElement,
+              value = propertyInfo.getter(propertyInfo, item);
+        if (propertyInfo.type === 'boolean') {
+          editingElement.checked = (value === true);
+        } else {
+          editingElement.value = value;
+        }
       });
       this.item = item;
       table.style.display = 'block';

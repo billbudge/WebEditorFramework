@@ -302,20 +302,21 @@ function parseTypeString(s: string) : Type {
 // Properties and templates for the raw data interface for cloning, serialization, etc.
 
 const idProp = new IdProp('id'),
-      xProp = new ScalarProp('x'),
-      yProp = new ScalarProp('y'),
-      nameProp = new ScalarProp('name'),
-      typeStringProp = new ScalarProp('typeString'),
-      widthProp = new ScalarProp('width'),
-      heightProp = new ScalarProp('height'),
+      xProp = new ScalarProp('x', 0),
+      yProp = new ScalarProp('y', 0),
+      nameProp = new ScalarProp('name', ''),
+      typeStringProp = new ScalarProp('typeString', Type.emptyTypeString),
+      widthProp = new ScalarProp('width', 0),
+      heightProp = new ScalarProp('height', 0),
       srcProp = new ReferenceProp('src'),
-      srcPinProp = new ScalarProp('srcPin'),
+      srcPinProp = new ScalarProp('srcPin', 0),
       dstProp = new ReferenceProp('dst'),
-      dstPinProp = new ScalarProp('dstPin'),
+      dstPinProp = new ScalarProp('dstPin', 0),
       nodesProp = new ChildListProp('nodes'),
       wiresProp = new ChildListProp('wires'),
       instancerProp = new ReferenceProp('instancer'),
       innerElementProp = new ChildSlotProp('inner'),
+      hideLinksProp = new ScalarProp('hideLinks', false),
       commentProp = new ScalarProp('comment');
 
 type NodeType = ElementType | PseudoelementType | FunctionchartType;
@@ -336,7 +337,9 @@ export type ElementType = 'element' | 'instance' | ContainerElementType;
 class ElementTemplate extends NodeTemplate {
   readonly typeName: ElementType;
   readonly name = nameProp;
-  readonly properties: PropertyTypes[] = [this.id, this.typeString, this.x, this.y, this.name, this.comment];
+  readonly hideLinks = hideLinksProp;
+  readonly properties: PropertyTypes[] = [this.id, this.typeString, this.x, this.y, this.name, this.hideLinks,
+                                          this.comment];
   constructor(typeName: ElementType) {
     super();
     this.typeName = typeName;
@@ -346,7 +349,7 @@ class ElementTemplate extends NodeTemplate {
 class ContainerElementTemplate extends ElementTemplate {
   readonly innerElement = innerElementProp;
   readonly properties: PropertyTypes[] = [this.id, this.typeString, this.x, this.y, this.name,
-                                          this.innerElement];
+                                          this.hideLinks, this.innerElement, this.comment];
   constructor(typeName: ElementType) {
     super(typeName);
   }
@@ -386,10 +389,11 @@ class FunctionchartTemplate extends NodeTemplate {
   readonly width = widthProp;
   readonly height = heightProp;
   readonly name = nameProp;
+  readonly hideLinks = hideLinksProp;
   readonly nodes = nodesProp;
   readonly wires = wiresProp;
   readonly properties = [this.id, this.typeString, this.x, this.y, this.width, this.height,
-                         this.name, this.nodes, this.wires, this.comment];
+                         this.name, this.hideLinks, this.nodes, this.wires, this.comment];
     constructor(typeName: FunctionchartType) {
       super();
       this.typeName = typeName;
@@ -421,12 +425,12 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
   readonly context: FunctionchartContext;
   readonly id: number;
 
-  get typeString() { return this.template.typeString.get(this) || Type.emptyTypeString; }
+  get typeString() { return this.template.typeString.get(this); }
   set typeString(value: string) { this.template.typeString.set(this, value); }
 
-  get x() { return this.template.x.get(this) || 0; }
+  get x() { return this.template.x.get(this); }
   set x(value: number) { this.template.x.set(this, value); }
-  get y() { return this.template.y.get(this) || 0; }
+  get y() { return this.template.y.get(this); }
   set y(value: number) { this.template.y.set(this, value); }
 
   get comment() { return this.template.comment.get(this); }
@@ -498,6 +502,8 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
 export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBase<T> {
   get name() { return this.template.name.get(this); }
   set name(value: string | undefined) { this.template.name.set(this, value); }
+  get hideLinks() { return this.template.hideLinks.get(this); }
+  set hideLinks(value: string) { this.template.hideLinks.set(this, value); }
 
   constructor(template: T, context: FunctionchartContext, id: number) {
     super(template, context,  id);
@@ -524,7 +530,7 @@ export class ContainerElement extends Element<ContainerElementTemplate> {
 export class FunctionInstance extends Element<FunctionInstanceTemplate>  {
   get src() { return this.template.src.get(this) as InstancerTypes; }
   set src(value: InstancerTypes) { this.template.src.set(this, value); }
-  get srcPin() { return this.template.srcPin.get(this) || 0; }  // TODO remove default when files converted.
+  get srcPin() { return this.template.srcPin.get(this); }
   set srcPin(value: number) { this.template.srcPin.set(this, value); }
 
   // Derived Properties
@@ -532,16 +538,16 @@ export class FunctionInstance extends Element<FunctionInstanceTemplate>  {
     const src = this.src;
     return src instanceof Functionchart && src.isAbstract;
   }
-  get isStandAlone() : boolean {
-    const src = this.src;
-    if (src.parent === this.parent)
-      return true;
-    if (src instanceof Functionchart) {
-      return src.isAbstract || src.isClosed;
-    }
-    // src instanceof Element
-    return false;
-  }
+  // get isStandAlone() : boolean {
+  //   const src = this.src;
+  //   if (src.parent === this.parent)
+  //     return true;
+  //   if (src instanceof Functionchart) {
+  //     return src.isAbstract || src.isClosed;
+  //   }
+  //   // src instanceof Element
+  //   return false;
+  // }
 
   getSrcType() : Type {
     return this.src.type.outputs[this.srcPin].type;
@@ -638,9 +644,9 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> {
   // Radius of rounded corners. This isn't themeable, as it's conceptually part of the notation.
   static radius: number = 8;
 
-  get width() { return this.template.width.get(this) || 0; }
+  get width() { return this.template.width.get(this); }
   set width(value: number) { this.template.width.set(this, value); }
-  get height() { return this.template.height.get(this) || 0; }
+  get height() { return this.template.height.get(this); }
   set height(value: number) { this.template.height.set(this, value); }
   get typeString() : string {
     return this.template.typeString.get(this) ||
@@ -649,6 +655,8 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> {
   set typeString(value: string) { this.template.typeString.set(this, value); }
   get name() { return this.template.name.get(this); }
   set name(value: string) { this.template.name.set(this, value); }
+  get hideLinks() { return this.template.hideLinks.get(this); }
+  set hideLinks(value: string) { this.template.hideLinks.set(this, value); }
 
   get nodes() { return this.template.nodes.get(this) as List<NodeTypes>; }
   get wires() { return this.template.wires.get(this) as List<Wire>; }
@@ -2643,7 +2651,7 @@ class Renderer implements ILayoutEngine {
           ctx.fillStyle = fillStyle;
           this.drawType(element.type, x, y);
         }
-        if (element instanceof FunctionInstance && !element.isStandAlone) {
+        if (element instanceof FunctionInstance && !element.src.hideLinks) {
           this.drawFunctionInstanceLink(element, theme.dimColor);
         }
         break;
@@ -3100,7 +3108,8 @@ export class FunctionchartEditor implements CanvasLayer {
 
     // Register property grid layouts.
     function getter(info: ItemInfo, item: AllTypes) {
-      return item ? info.prop.get(item) : '';
+      if (item)
+        return info.prop.get(item);
     }
     function setter(info: ItemInfo, item: AllTypes, value: any) {
       if (item && (info.prop instanceof ScalarProp || info.prop instanceof ReferenceProp)) {
@@ -3111,6 +3120,13 @@ export class FunctionchartEditor implements CanvasLayer {
         context.endTransaction();
         self.canvasController.draw();
       }
+    }
+    function boolSetter(info: ItemInfo, item: AllTypes, value: any) {
+      if (value === 'true')
+        value = true;
+      else if (value === 'false')
+        value = false;
+      setter(info, item, value);
     }
     function nodeLabelGetter(info: ItemInfo, item: NodeTypes) {
       let result;
@@ -3306,6 +3322,12 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
         prop: nameProp,
+      },{
+        label: 'hideLinks',
+        type: 'boolean',
+        getter: getter,
+        setter: setter,
+        prop: hideLinksProp,
       },
       {
         label: 'comment',

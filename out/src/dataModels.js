@@ -1,6 +1,9 @@
 export class ScalarProp {
     get(owner) {
-        return owner[this.internalName];
+        const value = owner[this.internalName];
+        if (value === undefined)
+            return this.defaultValue;
+        return value;
     }
     set(owner, value) {
         const oldValue = owner[this.internalName];
@@ -8,9 +11,10 @@ export class ScalarProp {
         owner.context.valueChanged(owner, this, oldValue);
         return oldValue;
     }
-    constructor(name) {
+    constructor(name, defaultValue = undefined) {
         this.name = name;
         this.internalName = '_' + name;
+        this.defaultValue = defaultValue;
     }
 }
 // Internal implementation of List<T>.

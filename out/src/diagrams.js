@@ -404,8 +404,13 @@ export class PropertyGridController {
             const table = typeInfo.table;
             // Initialize editing control values.
             typeInfo.properties.forEach(function (propertyInfo, index) {
-                const row = table.rows[index], cell = row.cells[1], editingElement = cell.children[0];
-                editingElement.value = propertyInfo.getter(propertyInfo, item);
+                const row = table.rows[index], cell = row.cells[1], editingElement = cell.children[0], value = propertyInfo.getter(propertyInfo, item);
+                if (propertyInfo.type === 'boolean') {
+                    editingElement.checked = (value === true);
+                }
+                else {
+                    editingElement.value = value;
+                }
             });
             this.item = item;
             table.style.display = 'block';

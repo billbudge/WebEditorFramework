@@ -41,9 +41,13 @@ export type PropertyTypes = ScalarPropertyTypes | ChildPropertyTypes | IdProp;
 export class ScalarProp {
   readonly name: string;
   readonly internalName: string;
+  readonly defaultValue: any;
 
   get(owner: DataContextObject) : any {
-    return (owner as any)[this.internalName];
+    const value = (owner as any)[this.internalName];
+    if (value === undefined)
+      return this.defaultValue;
+    return value;
   }
   set(owner: DataContextObject, value: any) : any {
     const oldValue = (owner as any)[this.internalName];
@@ -51,9 +55,10 @@ export class ScalarProp {
     owner.context.valueChanged(owner, this, oldValue);
     return oldValue;
   }
-  constructor(name: string) {
+  constructor(name: string, defaultValue: any = undefined) {
     this.name = name;
     this.internalName = '_' + name;
+    this.defaultValue = defaultValue;
   }
 }
 

@@ -248,7 +248,7 @@ function parseTypeString(s) {
 }
 //------------------------------------------------------------------------------
 // Properties and templates for the raw data interface for cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x'), yProp = new ScalarProp('y'), nameProp = new ScalarProp('name'), typeStringProp = new ScalarProp('typeString'), widthProp = new ScalarProp('width'), heightProp = new ScalarProp('height'), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin'), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin'), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner'), commentProp = new ScalarProp('comment');
+const idProp = new IdProp('id'), xProp = new ScalarProp('x', 0), yProp = new ScalarProp('y', 0), nameProp = new ScalarProp('name', ''), typeStringProp = new ScalarProp('typeString', Type.emptyTypeString), widthProp = new ScalarProp('width', 0), heightProp = new ScalarProp('height', 0), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin', 0), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin', 0), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner'), hideLinksProp = new ScalarProp('hideLinks', false), commentProp = new ScalarProp('comment');
 class NodeTemplate {
     constructor() {
         this.id = idProp;
@@ -263,7 +263,9 @@ class ElementTemplate extends NodeTemplate {
     constructor(typeName) {
         super();
         this.name = nameProp;
-        this.properties = [this.id, this.typeString, this.x, this.y, this.name, this.comment];
+        this.hideLinks = hideLinksProp;
+        this.properties = [this.id, this.typeString, this.x, this.y, this.name, this.hideLinks,
+            this.comment];
         this.typeName = typeName;
     }
 }
@@ -272,7 +274,7 @@ class ContainerElementTemplate extends ElementTemplate {
         super(typeName);
         this.innerElement = innerElementProp;
         this.properties = [this.id, this.typeString, this.x, this.y, this.name,
-            this.innerElement];
+            this.hideLinks, this.innerElement, this.comment];
     }
 }
 class FunctionInstanceTemplate extends ElementTemplate {
@@ -307,10 +309,11 @@ class FunctionchartTemplate extends NodeTemplate {
         this.width = widthProp;
         this.height = heightProp;
         this.name = nameProp;
+        this.hideLinks = hideLinksProp;
         this.nodes = nodesProp;
         this.wires = wiresProp;
         this.properties = [this.id, this.typeString, this.x, this.y, this.width, this.height,
-            this.name, this.nodes, this.wires, this.comment];
+            this.name, this.hideLinks, this.nodes, this.wires, this.comment];
         this.typeName = typeName;
     }
 }
@@ -325,11 +328,11 @@ const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 
 // Type safe interfaces over the raw templated data.
 // Base element class to implement type fields, and incoming/outgoing wire arrays.
 class NodeBase {
-    get typeString() { return this.template.typeString.get(this) || Type.emptyTypeString; }
+    get typeString() { return this.template.typeString.get(this); }
     set typeString(value) { this.template.typeString.set(this, value); }
-    get x() { return this.template.x.get(this) || 0; }
+    get x() { return this.template.x.get(this); }
     set x(value) { this.template.x.set(this, value); }
-    get y() { return this.template.y.get(this) || 0; }
+    get y() { return this.template.y.get(this); }
     set y(value) { this.template.y.set(this, value); }
     get comment() { return this.template.comment.get(this); }
     set comment(value) { this.template.comment.set(this, value); }
@@ -386,6 +389,8 @@ class NodeBase {
 export class Element extends NodeBase {
     get name() { return this.template.name.get(this); }
     set name(value) { this.template.name.set(this, value); }
+    get hideLinks() { return this.template.hideLinks.get(this); }
+    set hideLinks(value) { this.template.hideLinks.set(this, value); }
     constructor(template, context, id) {
         super(template, context, id);
     }
@@ -406,23 +411,23 @@ export class ContainerElement extends Element {
 export class FunctionInstance extends Element {
     get src() { return this.template.src.get(this); }
     set src(value) { this.template.src.set(this, value); }
-    get srcPin() { return this.template.srcPin.get(this) || 0; } // TODO remove default when files converted.
+    get srcPin() { return this.template.srcPin.get(this); }
     set srcPin(value) { this.template.srcPin.set(this, value); }
     // Derived Properties
     get isAbstract() {
         const src = this.src;
         return src instanceof Functionchart && src.isAbstract;
     }
-    get isStandAlone() {
-        const src = this.src;
-        if (src.parent === this.parent)
-            return true;
-        if (src instanceof Functionchart) {
-            return src.isAbstract || src.isClosed;
-        }
-        // src instanceof Element
-        return false;
-    }
+    // get isStandAlone() : boolean {
+    //   const src = this.src;
+    //   if (src.parent === this.parent)
+    //     return true;
+    //   if (src instanceof Functionchart) {
+    //     return src.isAbstract || src.isClosed;
+    //   }
+    //   // src instanceof Element
+    //   return false;
+    // }
     getSrcType() {
         return this.src.type.outputs[this.srcPin].type;
     }
@@ -483,9 +488,9 @@ const emptyTypeInfo = {
     outputs: [],
 };
 export class Functionchart extends NodeBase {
-    get width() { return this.template.width.get(this) || 0; }
+    get width() { return this.template.width.get(this); }
     set width(value) { this.template.width.set(this, value); }
-    get height() { return this.template.height.get(this) || 0; }
+    get height() { return this.template.height.get(this); }
     set height(value) { this.template.height.set(this, value); }
     get typeString() {
         return this.template.typeString.get(this) ||
@@ -494,6 +499,8 @@ export class Functionchart extends NodeBase {
     set typeString(value) { this.template.typeString.set(this, value); }
     get name() { return this.template.name.get(this); }
     set name(value) { this.template.name.set(this, value); }
+    get hideLinks() { return this.template.hideLinks.get(this); }
+    set hideLinks(value) { this.template.hideLinks.set(this, value); }
     get nodes() { return this.template.nodes.get(this); }
     get wires() { return this.template.wires.get(this); }
     // Derived properties.
@@ -2181,7 +2188,7 @@ class Renderer {
                     ctx.fillStyle = fillStyle;
                     this.drawType(element.type, x, y);
                 }
-                if (element instanceof FunctionInstance && !element.isStandAlone) {
+                if (element instanceof FunctionInstance && !element.src.hideLinks) {
                     this.drawFunctionInstanceLink(element, theme.dimColor);
                 }
                 break;
@@ -2544,7 +2551,8 @@ export class FunctionchartEditor {
         this.functionchart = this.context.root;
         // Register property grid layouts.
         function getter(info, item) {
-            return item ? info.prop.get(item) : '';
+            if (item)
+                return info.prop.get(item);
         }
         function setter(info, item, value) {
             if (item && (info.prop instanceof ScalarProp || info.prop instanceof ReferenceProp)) {
@@ -2554,6 +2562,13 @@ export class FunctionchartEditor {
                 context.endTransaction();
                 self.canvasController.draw();
             }
+        }
+        function boolSetter(info, item, value) {
+            if (value === 'true')
+                value = true;
+            else if (value === 'false')
+                value = false;
+            setter(info, item, value);
         }
         function nodeLabelGetter(info, item) {
             let result;
@@ -2748,6 +2763,12 @@ export class FunctionchartEditor {
                 getter: getter,
                 setter: setter,
                 prop: nameProp,
+            }, {
+                label: 'hideLinks',
+                type: 'boolean',
+                getter: getter,
+                setter: setter,
+                prop: hideLinksProp,
             },
             {
                 label: 'comment',
