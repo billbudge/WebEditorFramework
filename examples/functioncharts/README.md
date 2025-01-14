@@ -66,7 +66,7 @@ We can re-use our "Reduce" to implement Factorial.
 </figure>
 
 ## Iteration over a Numeric Range
-We can abstract our iteration even further. First we define an abstract "body" function, with 2 inputs and 1 output. The first input will represent the iteration index, the typical "i" in a for-loop. The second input is an auxiliary value, which the body can use. The output is the result of the body, and is passed on as the auxiliary input each time the body is run. Then we iterate over the range [0..n[, passing the index to the body function.
+We can make iteration more generic. First we define an abstract "body" function, with 1 input and 1 output. The first input is the iteration index, the typical "i" in a for-loop. The output is the result of the body, and is used by the iteration function to break. We choose "undefined" as the sentinel value to break. Then we iterate over the range [0..n[, passing the index to the body function and continuing as long as the body returns a defined value.
 <figure>
   <img src="./resources/iteration.svg"  alt="" title="Simple iteration over the range [0..n[.">
 </figure>
