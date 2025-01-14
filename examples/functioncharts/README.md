@@ -1,4 +1,4 @@
-# Functioncharts: A Graphical Programming Language
+# Functioncharts: The Shapes of Computation
 Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. In this graph, values flow along wires, into functions that perform some computation and then pass result values out along outgoing wires. This repository contains the source code for a Web Editor that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs (yet).
 
 Many "node and wire" programming systems have been built and are in use. However, most are either domain-specific, or are intended for non-programmers building small, simple programs. The audacious goal here is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages.
@@ -67,11 +67,11 @@ We can re-use our "Reduce" to implement Factorial.
 
 ## Iteration over a Numeric Range
 We can make iteration more generic. First we define an abstract "body" function, with 1 input and 1 output. The first input is the iteration index, the typical "i" in a for-loop. The output is the result of the body, and is used by the iteration function to break. We choose "undefined" as the sentinel value to break. Then we iterate over the range [0..n[, passing the index to the body function and continuing as long as the body returns a defined value.
+
+We can use the iteration to implement our factorial function. However, since we don't have an accumulator passed as a parameter to our body function, we must instead encapsulate that in the body function as a bit of state. We do this now by using a 'var' element, which has two outputs - the first returns the current value, and the second returns a function which changes the value, and returns the previous value. Then our body function multiplies the current value by the iteration index, then sets the var to the result. We also return the value, so we continue rather than breaking from the iteration.
 <figure>
   <img src="./resources/iteration.svg"  alt="" title="Simple iteration over the range [0..n[.">
 </figure>
-
-We can use the iteration to implement our factorial function.
 
 ## More General Iteration over a Range
 Generic iteration with start, end, condition, and step configurable.
