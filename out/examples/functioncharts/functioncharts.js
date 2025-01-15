@@ -246,6 +246,11 @@ function parseTypeString(s) {
     // TODO try catch here?
     return parseFunction();
 }
+export function visitType(type, visitor) {
+    visitor(type);
+    type.inputs.forEach(input => visitType(input.type, visitor));
+    type.outputs.forEach(output => visitType(output.type, visitor));
+}
 //------------------------------------------------------------------------------
 // Properties and templates for the raw data interface for cloning, serialization, etc.
 const idProp = new IdProp('id'), xProp = new ScalarProp('x', 0), yProp = new ScalarProp('y', 0), nameProp = new ScalarProp('name', ''), typeStringProp = new ScalarProp('typeString', Type.emptyTypeString), widthProp = new ScalarProp('width', 0), heightProp = new ScalarProp('height', 0), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin', 0), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin', 0), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner'), hideLinksProp = new ScalarProp('hideLinks', false), commentProp = new ScalarProp('comment');
@@ -319,7 +324,7 @@ class FunctionchartTemplate extends NodeTemplate {
 }
 const elementTemplate = new ElementTemplate('element'), // built-in elements
 importerTemplate = new ContainerElementTemplate('importer'), // container elements
-exporterTemplate = new ContainerElementTemplate('exporter'), structureTemplate = new ContainerElementTemplate('structure'), destructureTemplate = new ContainerElementTemplate('destructure'), inputTemplate = new PseudoelementTemplate('input'), // input pseudoelement
+exporterTemplate = new ContainerElementTemplate('exporter'), inputTemplate = new PseudoelementTemplate('input'), // input pseudoelement
 outputTemplate = new PseudoelementTemplate('output'), // output pseudoelement
 useTemplate = new PseudoelementTemplate('use'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate('functionchart'), functionInstanceTemplate = new FunctionInstanceTemplate('instance');
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
@@ -571,12 +576,6 @@ export class FunctionchartContext extends EventBase {
                 break;
             case 'exporter':
                 result = new ContainerElement(this, exporterTemplate, nextId);
-                break;
-            case 'structure':
-                result = new ContainerElement(this, structureTemplate, nextId);
-                break;
-            case 'destructure':
-                result = new ContainerElement(this, destructureTemplate, nextId);
                 break;
             default: throw new Error('Unknown element type: ' + typeName);
         }
@@ -856,6 +855,7 @@ export class FunctionchartContext extends EventBase {
     selectedAllTypes() {
         return this.selection.contents();
     }
+    // Excludes pseudo-elements.
     selectedElements() {
         const result = new Array();
         this.selection.forEach(item => {
@@ -1293,7 +1293,7 @@ export class FunctionchartContext extends EventBase {
     makePinMap(oldTypeInfo, typeInfo) {
         const result = new Array();
         function find(pins, element, index) {
-            return pins.find((pin) => pin.element === element && pin.index === index);
+            return pins.find(pin => pin.element === element && pin.index === index);
         }
         function makeMap(oldPins, pins) {
             for (let i = 0; i < oldPins.length; i++) {
@@ -1432,7 +1432,7 @@ export class FunctionchartContext extends EventBase {
                 }
             }
         });
-        this.nodes.forEach((node) => {
+        this.nodes.forEach(node => {
             if (node instanceof Functionchart) {
                 node.lastTypeInfo = node.pinMap = undefined;
             }
@@ -1507,6 +1507,99 @@ export class FunctionchartContext extends EventBase {
         importer.typeString = importerType.typeString;
         return importer;
     }
+    typeToFunctionchart(type) {
+        const self = this, layoutEngine = this.layoutEngine, functioncharts = new Map(), sorted = new Array();
+        // Create a key for each non-value type. Leave values undefined for the topological sort.
+        visitType(type, type => {
+            if (type !== Type.valueType && !functioncharts.has(type)) {
+                functioncharts.set(type, undefined);
+            }
+        });
+        // Recursively build the function chart. There can't be cycles in the type dependency graph.
+        function populate(type) {
+            const functionchart = self.newFunctionchart('functionchart');
+            let y;
+            y = 8;
+            type.inputs.forEach(pin => {
+                const pinType = pin.type;
+                if (pinType === Type.valueType) {
+                    const input = self.newPseudoelement('input');
+                    input.x = 8;
+                    input.y = y;
+                    y += layoutEngine.getBounds(input).height + 8;
+                    functionchart.nodes.append(input);
+                }
+                else {
+                    let subFunctionchart = functioncharts.get(pinType);
+                    if (!subFunctionchart) {
+                        subFunctionchart = populate(pinType);
+                    }
+                    const instance = self.newElement('instance');
+                    instance.src = subFunctionchart;
+                    instance.srcPin = 0;
+                    instance.typeString = pinType.typeString;
+                    instance.x = 8;
+                    instance.y = y;
+                    y += layoutEngine.getBounds(instance).height + 8;
+                    functionchart.nodes.append(instance);
+                }
+            });
+            y = 8;
+            type.outputs.forEach(pin => {
+                const pinType = pin.type;
+                if (pinType === Type.valueType) {
+                    const output = self.newPseudoelement('output');
+                    output.x = 40;
+                    output.y = y;
+                    y += layoutEngine.getBounds(output).height + 8;
+                    functionchart.nodes.append(output);
+                }
+                else {
+                    let subFunctionchart = functioncharts.get(pinType);
+                    if (!subFunctionchart) {
+                        subFunctionchart = populate(pinType);
+                    }
+                    const instance = self.newElement('instance');
+                    instance.src = subFunctionchart;
+                    instance.srcPin = 0;
+                    instance.typeString = pinType.typeString;
+                    const exporter = self.exportElement(instance), offset = layoutEngine.getInnerElementOffset(exporter);
+                    instance.x = offset.x;
+                    instance.y = offset.y;
+                    exporter.innerElement = instance;
+                    exporter.x = 40;
+                    exporter.y = y;
+                    y += layoutEngine.getBounds(exporter).height + 8;
+                    functionchart.nodes.append(exporter);
+                }
+            });
+            layoutEngine.layoutFunctionchart(functionchart);
+            functionchart.width += type.width;
+            functioncharts.set(type, functionchart);
+            sorted.push(functionchart);
+            return functionchart;
+        }
+        const root = populate(type);
+        let y = root.height;
+        sorted.forEach(functionchart => {
+            if (functionchart === root)
+                return;
+            functionchart.x = 8;
+            functionchart.y = y;
+            y += layoutEngine.getBounds(functionchart).height + 8;
+            root.nodes.append(functionchart);
+        });
+        layoutEngine.layoutFunctionchart(root);
+        return root;
+    }
+    abstractElement(element) {
+        const type = element.type, layoutEngine = this.layoutEngine, bounds = layoutEngine.getBounds(element);
+        const functionchart = this.typeToFunctionchart(element.type);
+        functionchart.x = bounds.x;
+        functionchart.y = bounds.y;
+        functionchart.typeString = type.typeString;
+        return functionchart;
+    }
     exportElements(elements) {
         const self = this, selection = this.selection;
         elements.forEach(element => {
@@ -1532,28 +1625,15 @@ export class FunctionchartContext extends EventBase {
             selection.add(importer);
         });
     }
-    structureElements(elements) {
+    abstractElements(elements) {
         const self = this, selection = this.selection;
-        // Open each non-input/output element.
+        // Abstract each non-input/output element.
         elements.forEach(element => {
-            if (element instanceof ContainerElement)
-                return;
             selection.delete(element);
-            const newElement = self.importElement(element);
-            self.replaceNode(element, newElement);
-            selection.add(newElement);
-        });
-    }
-    destructureElements(elements) {
-        const self = this, selection = this.selection;
-        // Open each non-input/output element.
-        elements.forEach(element => {
-            if (element instanceof ContainerElement)
-                return;
-            selection.delete(element);
-            const newElement = self.importElement(element);
-            self.replaceNode(element, newElement);
-            selection.add(newElement);
+            const functionchart = self.abstractElement(element);
+            self.addItem(functionchart, element.parent);
+            self.deleteItem(element);
+            selection.add(functionchart);
         });
     }
     group(items, grandparent, bounds) {
@@ -3038,12 +3118,12 @@ export class FunctionchartEditor {
         this.updateLayout();
         // TODO hit test selection first, in highlight, first.
         // Hit test wires first.
-        context.reverseVisitWires(functionchart, (wire) => {
+        context.reverseVisitWires(functionchart, wire => {
             pushInfo(renderer.hitTestWire(wire, cp, tol, RenderMode.Normal));
         });
         // Skip the root functionchart, as hits there should go to the underlying canvas controller.
         functionchart.nodes.forEachReverse(item => {
-            context.reverseVisitNodes(item, (item) => {
+            context.reverseVisitNodes(item, item => {
                 pushInfo(renderer.hitTest(item, cp, tol, RenderMode.Normal));
             });
         });
@@ -3244,14 +3324,14 @@ export class FunctionchartEditor {
                     context.selection.forEach(item => {
                         if (item instanceof Wire)
                             return;
-                        const oldX = context.getOldValue(item, 'x'), oldY = context.getOldValue(item, 'y');
+                        const oldX = context.getOldValue(item, 'x') || 0, oldY = context.getOldValue(item, 'y') || 0;
                         item.x = oldX + dx;
                         item.y = oldY + dy;
                     });
                     break;
                 }
                 case 'resizeFunctionchart': {
-                    const hitInfo = pointerHitInfo, item = drag.items[0], oldX = context.getOldValue(item, 'x'), oldY = context.getOldValue(item, 'y'), oldWidth = context.getOldValue(item, 'width'), oldHeight = context.getOldValue(item, 'height');
+                    const hitInfo = pointerHitInfo, item = drag.items[0], oldX = context.getOldValue(item, 'x') || 0, oldY = context.getOldValue(item, 'y') || 0, oldWidth = context.getOldValue(item, 'width') || 0, oldHeight = context.getOldValue(item, 'height') || 0;
                     if (hitInfo.inner.left) {
                         item.x = oldX + dx;
                         item.width = oldWidth - dx;
@@ -3442,7 +3522,7 @@ export class FunctionchartEditor {
                     const bounds = this.renderer.sumBounds(context.selectedNodes()), contents = context.selectedAllTypes();
                     let parent = context.getContainingFunctionchart(contents);
                     expandRect(bounds, Functionchart.radius, Functionchart.radius);
-                    context.group(context.selectedAllTypes(), parent, bounds);
+                    context.group(contents, parent, bounds);
                     context.endTransaction();
                     return true;
                 }
@@ -3476,15 +3556,15 @@ export class FunctionchartEditor {
                     context.endTransaction();
                     return true;
                 case 68: // 'd'
-                    context.beginTransaction('structure element');
-                    context.structureElements(context.selectedElements());
+                    context.beginTransaction('abstract element');
+                    context.abstractElements(context.selectedElements());
                     context.endTransaction();
                     return true;
-                case 70: // 'f'
-                    context.beginTransaction('destructure element');
-                    context.destructureElements(context.selectedElements());
-                    context.endTransaction();
-                    return true;
+                // case 70: // 'f'
+                //   context.beginTransaction('destructure element');
+                //   context.destructureElements(context.selectedElements());
+                //   context.endTransaction();
+                //   return true;
                 case 78: { // ctrl 'n'   // Can't intercept cmd n.
                     const context = new FunctionchartContext(this.renderer);
                     self.initializeContext(context);

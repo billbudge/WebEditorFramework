@@ -297,6 +297,14 @@ function parseTypeString(s: string) : Type {
   return parseFunction();
 }
 
+export type TypeVisitor = (type: Type) => void;
+
+export function visitType(type: Type, visitor: TypeVisitor) {
+  visitor(type);
+  type.inputs.forEach(input => visitType(input.type, visitor));
+  type.outputs.forEach(output => visitType(output.type, visitor));
+}
+
 //------------------------------------------------------------------------------
 
 // Properties and templates for the raw data interface for cloning, serialization, etc.
@@ -331,7 +339,7 @@ abstract class NodeTemplate {
   readonly properties: PropertyTypes[] = [];
 }
 
-export type ContainerElementType = 'importer' | 'exporter' | 'structure' | 'destructure';
+export type ContainerElementType = 'importer' | 'exporter';
 export type ElementType = 'element' | 'instance' | ContainerElementType;
 
 class ElementTemplate extends NodeTemplate {
@@ -403,8 +411,6 @@ class FunctionchartTemplate extends NodeTemplate {
 const elementTemplate = new ElementTemplate('element'),        // built-in elements
       importerTemplate = new ContainerElementTemplate('importer'),  // container elements
       exporterTemplate = new ContainerElementTemplate('exporter'),
-      structureTemplate = new ContainerElementTemplate('structure'),
-      destructureTemplate = new ContainerElementTemplate('destructure'),
       inputTemplate = new PseudoelementTemplate('input'),      // input pseudoelement
       outputTemplate = new PseudoelementTemplate('output'),    // output pseudoelement
       useTemplate = new PseudoelementTemplate('use'),
@@ -691,6 +697,7 @@ interface ILayoutEngine {
   // Get bounding box for elements, functioncharts, and wires.
   getBounds(items: AllTypes) : Rect;
   getInnerElementOffset(element: ElementTypes) : Point;
+  layoutFunctionchart(functionchart: Functionchart) : void;
 
   // Get wire attachment point for node input/output pins.
   inputPinToPoint(item: NodeTypes, index: number) : PointWithNormal;
@@ -784,12 +791,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         break;
       case 'exporter':
         result = new ContainerElement(this, exporterTemplate, nextId);
-        break;
-      case 'structure':
-        result = new ContainerElement(this, structureTemplate, nextId);
-        break;
-      case 'destructure':
-        result = new ContainerElement(this, destructureTemplate, nextId);
         break;
       default: throw new Error('Unknown element type: ' + typeName);
     }
@@ -1080,6 +1081,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.selection.contents();
   }
 
+  // Excludes pseudo-elements.
   selectedElements() : Element[] {
     const result = new Array<Element>();
     this.selection.forEach(item => {
@@ -1591,7 +1593,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const result = new Array<number>();
 
     function find(pins: Array<PinInfo>, element: NodeTypes, index: number) {
-      return pins.find((pin) => pin.element === element && pin.index === index);
+      return pins.find(pin => pin.element === element && pin.index === index);
     }
     function makeMap(oldPins: Array<PinInfo>, pins: Array<PinInfo>) {
       for (let i = 0; i < oldPins.length; i++) {
@@ -1741,7 +1743,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         }
       }
     });
-    this.nodes.forEach((node) => {
+    this.nodes.forEach(node => {
       if (node instanceof Functionchart) {
         node.lastTypeInfo = node.pinMap = undefined;
       }
@@ -1830,6 +1832,105 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return importer;
   }
 
+  typeToFunctionchart(type: Type) : Functionchart {
+    const self = this,
+          layoutEngine = this.layoutEngine,
+          functioncharts = new Map<Type, Functionchart | undefined>(),
+          sorted = new Array<Functionchart>();
+    // Create a key for each non-value type. Leave values undefined for the topological sort.
+    visitType(type, type => {
+      if (type !== Type.valueType && !functioncharts.has(type)) {
+        functioncharts.set(type, undefined);
+      }
+    });
+    // Recursively build the function chart. There can't be cycles in the type dependency graph.
+    function populate(type: Type) : Functionchart {
+      const functionchart = self.newFunctionchart('functionchart');
+      let y : number;
+      y = 8;
+      type.inputs.forEach(pin => {
+        const pinType = pin.type;
+        if (pinType === Type.valueType) {
+          const input = self.newPseudoelement('input');
+          input.x = 8;
+          input.y = y;
+          y += layoutEngine.getBounds(input).height + 8;
+          functionchart.nodes.append(input);
+        } else {
+          let subFunctionchart = functioncharts.get(pinType);
+          if (!subFunctionchart) {
+            subFunctionchart = populate(pinType);
+          }
+          const instance = self.newElement('instance') as FunctionInstance;
+          instance.src = subFunctionchart;
+          instance.srcPin = 0;
+          instance.typeString = pinType.typeString;
+          instance.x = 8;
+          instance.y = y;
+          y += layoutEngine.getBounds(instance).height + 8;
+          functionchart.nodes.append(instance);
+        }
+      });
+      y = 8;
+      type.outputs.forEach(pin => {
+        const pinType = pin.type;
+        if (pinType === Type.valueType) {
+          const output = self.newPseudoelement('output');
+          output.x = 40;
+          output.y = y;
+          y += layoutEngine.getBounds(output).height + 8;
+          functionchart.nodes.append(output);
+        } else {
+          let subFunctionchart = functioncharts.get(pinType);
+          if (!subFunctionchart) {
+            subFunctionchart = populate(pinType);
+          }
+          const instance = self.newElement('instance') as FunctionInstance;
+          instance.src = subFunctionchart;
+          instance.srcPin = 0;
+          instance.typeString = pinType.typeString;
+          const exporter = self.exportElement(instance),
+                offset = layoutEngine.getInnerElementOffset(exporter);
+          instance.x = offset.x;
+          instance.y = offset.y;
+          exporter.innerElement = instance;
+          exporter.x = 40;
+          exporter.y = y;
+
+          y += layoutEngine.getBounds(exporter).height + 8;
+          functionchart.nodes.append(exporter);
+        }
+      });
+      layoutEngine.layoutFunctionchart(functionchart);
+      functionchart.width += type.width;
+      functioncharts.set(type, functionchart);
+      sorted.push(functionchart);
+      return functionchart;
+    }
+    const root = populate(type);
+    let y = root.height;
+    sorted.forEach(functionchart => {
+      if (functionchart === root) return;
+      functionchart.x = 8;
+      functionchart.y = y;
+      y += layoutEngine.getBounds(functionchart).height + 8;
+      root.nodes.append(functionchart);
+    });
+    layoutEngine.layoutFunctionchart(root);
+    return root;
+  }
+
+  abstractElement(element: Element) : Functionchart {
+    const type = element.type,
+          layoutEngine = this.layoutEngine,
+          bounds = layoutEngine.getBounds(element);
+    const functionchart = this.typeToFunctionchart(element.type);
+    functionchart.x = bounds.x;
+    functionchart.y = bounds.y;
+    functionchart.typeString = type.typeString;
+    return functionchart;
+  }
+
   exportElements(elements: Element[]) {
     const self = this,
           selection = this.selection;
@@ -1861,31 +1962,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  structureElements(elements: Element[]) {
+  abstractElements(elements: Element[]) {
     const self = this,
           selection = this.selection;
 
-    // Open each non-input/output element.
+    // Abstract each non-input/output element.
     elements.forEach(element => {
-      if (element instanceof ContainerElement) return;
       selection.delete(element);
-      const newElement = self.importElement(element);
-      self.replaceNode(element, newElement);
-      selection.add(newElement);
-    });
-  }
-
-  destructureElements(elements: Element[]) {
-    const self = this,
-          selection = this.selection;
-
-    // Open each non-input/output element.
-    elements.forEach(element => {
-      if (element instanceof ContainerElement) return;
-      selection.delete(element);
-      const newElement = self.importElement(element);
-      self.replaceNode(element, newElement);
-      selection.add(newElement);
+      const functionchart = self.abstractElement(element);
+      self.addItem(functionchart, element.parent!);
+      self.deleteItem(element);
+      selection.add(functionchart);
     });
   }
 
@@ -3645,12 +3732,12 @@ export class FunctionchartEditor implements CanvasLayer {
     this.updateLayout();
     // TODO hit test selection first, in highlight, first.
     // Hit test wires first.
-    context.reverseVisitWires(functionchart, (wire: Wire) => {
+    context.reverseVisitWires(functionchart, wire => {
       pushInfo(renderer.hitTestWire(wire, cp, tol, RenderMode.Normal));
     });
     // Skip the root functionchart, as hits there should go to the underlying canvas controller.
     functionchart.nodes.forEachReverse(item => {
-      context.reverseVisitNodes(item, (item: NodeTypes) => {
+      context.reverseVisitNodes(item, item => {
         pushInfo(renderer.hitTest(item, cp, tol, RenderMode.Normal));
       });
     });
@@ -3859,8 +3946,8 @@ export class FunctionchartEditor implements CanvasLayer {
           context.selection.forEach(item => {
             if (item instanceof Wire)
               return;
-            const oldX = context.getOldValue(item, 'x'),
-                  oldY = context.getOldValue(item, 'y');
+            const oldX = context.getOldValue(item, 'x') || 0,
+                  oldY = context.getOldValue(item, 'y') || 0;
             item.x = oldX + dx;
             item.y = oldY + dy;
           });
@@ -3869,10 +3956,10 @@ export class FunctionchartEditor implements CanvasLayer {
         case 'resizeFunctionchart': {
           const hitInfo = pointerHitInfo as FunctionchartHitResult,
                 item = drag.items[0] as Functionchart,
-                oldX = context.getOldValue(item, 'x'),
-                oldY = context.getOldValue(item, 'y'),
-                oldWidth =  context.getOldValue(item, 'width'),
-                oldHeight =  context.getOldValue(item, 'height');
+                oldX = context.getOldValue(item, 'x') || 0,
+                oldY = context.getOldValue(item, 'y') || 0,
+                oldWidth =  context.getOldValue(item, 'width') || 0,
+                oldHeight =  context.getOldValue(item, 'height') || 0;
         if (hitInfo.inner.left) {
             item.x = oldX + dx;
             item.width = oldWidth - dx;
@@ -4080,7 +4167,7 @@ export class FunctionchartEditor implements CanvasLayer {
                 contents = context.selectedAllTypes();
           let parent = context.getContainingFunctionchart(contents);
           expandRect(bounds, Functionchart.radius, Functionchart.radius);
-          context.group(context.selectedAllTypes(), parent, bounds);
+          context.group(contents, parent, bounds);
           context.endTransaction();
           return true;
         }
@@ -4114,15 +4201,15 @@ export class FunctionchartEditor implements CanvasLayer {
           context.endTransaction();
           return true;
         case 68: // 'd'
-          context.beginTransaction('structure element');
-          context.structureElements(context.selectedElements());
+          context.beginTransaction('abstract element');
+          context.abstractElements(context.selectedElements());
           context.endTransaction();
           return true;
-        case 70: // 'f'
-          context.beginTransaction('destructure element');
-          context.destructureElements(context.selectedElements());
-          context.endTransaction();
-          return true;
+        // case 70: // 'f'
+        //   context.beginTransaction('destructure element');
+        //   context.destructureElements(context.selectedElements());
+        //   context.endTransaction();
+        //   return true;
         case 78: { // ctrl 'n'   // Can't intercept cmd n.
           const context = new FunctionchartContext(this.renderer);
           self.initializeContext(context);

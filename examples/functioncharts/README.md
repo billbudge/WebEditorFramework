@@ -127,12 +127,22 @@ In the top left, we apply the array getter, and pass it as the first operand of 
 
 ## Semantic Details
 
+# More Examples
+
 ## Fibonacci
 
 Similarly to the recursion example, we can define a Fibonacci function. We define a helper which takes 3 parameters, and then "call" it with n, 1, 1, to start the iteration.
 
 <figure>
   <img src="./resources/fibonacci.svg"  alt="" title="Recursive definition of fibonacci function.">
+</figure>
+
+## Exponentiation by Squaring
+
+We can define an efficient exponentiation function.
+
+<figure>
+  <img src="./resources/exp_by_squaring.svg"  alt="" title="Recursive implemention of exponentiation by squaring.">
 </figure>
 
 ## Live Demo Editor with Examples
