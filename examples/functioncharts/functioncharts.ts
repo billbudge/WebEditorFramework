@@ -18,6 +18,7 @@ import { ScalarProp, ChildListProp, ReferenceProp, IdProp, PropertyTypes,
          ChildPropertyTypes,
          ChildSlotProp} from '../../src/dataModels.js'
 import { ParentTypes } from '../statecharts/statecharts.js';
+import { types } from '@babel/core';
 
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
@@ -131,6 +132,9 @@ export class Type {
 
   toImportExportType() : Type {
     return Type.fromInfo([], [new Pin(this)]);
+  }
+  toCastType() : Type {
+    return Type.fromInfo([new Pin(Type.valueType)], [new Pin(Type.valueType), new Pin(this)]);
   }
 
   static outputType(pin: Pin) : Type {
@@ -339,7 +343,7 @@ abstract class NodeTemplate {
   readonly properties: PropertyTypes[] = [];
 }
 
-export type ContainerElementType = 'importer' | 'exporter' | 'new' | 'is-as';
+export type ContainerElementType = 'importer' | 'exporter' | 'new' | 'cast';
 export type ElementType = 'element' | 'instance' | ContainerElementType;
 
 class ElementTemplate extends NodeTemplate {
@@ -411,6 +415,7 @@ class FunctionchartTemplate extends NodeTemplate {
 const elementTemplate = new ElementTemplate('element'),        // built-in elements
       importerTemplate = new ContainerElementTemplate('importer'),  // container elements
       exporterTemplate = new ContainerElementTemplate('exporter'),
+      castTemplate = new ContainerElementTemplate('cast'),
       inputTemplate = new PseudoelementTemplate('input'),      // input pseudoelement
       outputTemplate = new PseudoelementTemplate('output'),    // output pseudoelement
       useTemplate = new PseudoelementTemplate('use'),
@@ -465,11 +470,15 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
 
   get isAbstract() : boolean { return false; }
 
+  // TODO move to Element or ContainerElement.
   get isImporter() : boolean {
     return this.template.typeName === 'importer';
   }
   get isExporter() {
     return this.template.typeName === 'exporter';
+  }
+  get isCast() {
+    return this.template.typeName === 'cast';
   }
   get isInstancer(): boolean {
     return !this.isExporter;
@@ -704,7 +713,7 @@ export type WirePredicate = (wire: Wire) => boolean;
 interface ILayoutEngine {
   // Get bounding box for elements, functioncharts, and wires.
   getBounds(items: AllTypes) : Rect;
-  getInnerElementOffset(element: ElementTypes) : Point;
+  getInnerElementOffset(container: ContainerElement) : Point;
   layoutFunctionchart(functionchart: Functionchart) : void;
 
   // Get wire attachment point for node input/output pins.
@@ -799,6 +808,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         break;
       case 'exporter':
         result = new ContainerElement(this, exporterTemplate, nextId);
+        break;
+      case 'cast':
+        result = new ContainerElement(this, castTemplate, nextId);
         break;
       default: throw new Error('Unknown element type: ' + typeName);
     }
@@ -1906,36 +1918,29 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   exportElement(element: Element) : ContainerElement {
     const exporter = this.newElement('exporter') as ContainerElement,
-          exporterType = element.type.toImportExportType(),
-          bounds = this.layoutEngine.getBounds(element),
-          innerOffset = this.layoutEngine.getInnerElementOffset(element);
-    exporter.x = bounds.x - innerOffset.x;
-    exporter.y = bounds.y - innerOffset.y;
+          exporterType = element.type.toImportExportType();
+    exporter.x = element.globalPosition.x;
+    exporter.y = element.globalPosition.y;
     exporter.typeString = exporterType.typeString;
     return exporter;
   }
 
   importElement(element: Element) : ContainerElement {
     const importer = this.newElement('importer') as ContainerElement,
-          importerType = element.type.toImportExportType(),
-          bounds = this.layoutEngine.getBounds(element),
-          innerOffset = this.layoutEngine.getInnerElementOffset(element);
-    importer.x = bounds.x - innerOffset.x;
-    importer.y = bounds.y - innerOffset.y;
+          importerType = element.type.toImportExportType();
+    importer.x = element.globalPosition.x;
+    importer.y = element.globalPosition.y;
     importer.typeString = importerType.typeString;
     return importer;
   }
 
-  abstractElement(element: Element) : Element {
-    const type = element.type,
-          layoutEngine = this.layoutEngine,
-          bounds = layoutEngine.getBounds(element);
-    const abstractElement = this.newElement('element');
-    abstractElement.name = 'abstract';
-    abstractElement.x = bounds.x;
-    abstractElement.y = bounds.y;
-    abstractElement.typeString = type.typeString;
-    return abstractElement;
+  castElement(element: Element) : ContainerElement {
+    const cast = this.newElement('cast') as ContainerElement,
+          castType = element.type.toCastType();
+    cast.x = element.globalPosition.x;
+    cast.y = element.globalPosition.y;
+    cast.typeString = castType.typeString;
+    return cast;
   }
 
   exportElements(elements: Element[]) {
@@ -1968,6 +1973,34 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       self.addItem(element, importer);
       selection.add(importer);
     });
+  }
+
+  castElements(elements: Element[]) {
+    const self = this,
+          selection = this.selection;
+
+    elements.forEach(element => {
+      if (element instanceof ContainerElement) return;
+      self.disconnectNode(element);
+      selection.delete(element);
+      const castElement = self.castElement(element),
+            parent = element.parent as Functionchart;
+      self.addItem(castElement, parent);
+      self.addItem(element, castElement);
+      selection.add(castElement);
+    });
+  }
+
+  abstractElement(element: Element) : Element {
+    const type = element.type,
+          layoutEngine = this.layoutEngine,
+          bounds = layoutEngine.getBounds(element);
+    const abstractElement = this.newElement('element');
+    abstractElement.name = 'abstract';
+    abstractElement.x = bounds.x;
+    abstractElement.y = bounds.y;
+    abstractElement.typeString = type.typeString;
+    return abstractElement;
   }
 
   abstractElements(elements: Element[]) {
@@ -2163,10 +2196,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
     } else if (parent instanceof ContainerElement) {
       if (parent.innerElement) {
-        parent.typeString = element.type.toImportExportType().typeString;
+        const innerType = element.type;
+        let containerType;
+        if (parent.isCast) {
+          containerType = innerType.toCastType();
+        } else {
+          containerType = innerType.toImportExportType();
+        }
+        parent.typeString = containerType.typeString;
       }
     }
-    element.type = Type.fromString(element.typeString);
+    element.type = Type.fromString(element.typeString);  // TODO necessary?
     this.updateGlobalPosition(element);
     this.derivedInfoNeedsUpdate = true;
   }
@@ -2273,6 +2313,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'element':
       case 'importer':
       case 'exporter':
+      case 'cast':
       case 'instance': return this.newElement(typeName);
 
       case 'input':
@@ -2415,7 +2456,7 @@ class Renderer implements ILayoutEngine {
       if (item instanceof Functionchart) {
         width = item.width;
         height = item.height;
-      } else if (item instanceof ContainerElement && item.innerElement) {
+      } else if (item instanceof ContainerElement && item.innerElement && (item.isImporter || item.isExporter)) {  // TODO
         const spacing = this.theme.spacing,
               innerElement = item.innerElement;
         width = innerElement.type.width + spacing;
@@ -2429,11 +2470,11 @@ class Renderer implements ILayoutEngine {
     }
     return { x, y, width, height };
   }
-  getInnerElementOffset(element: ElementTypes): Point {
-    const spacing = this.theme.spacing,
-          r = this.getBounds(element);
-    switch (element.template.typeName) {
-      case 'exporter':
+  getInnerElementOffset(container: ContainerElement): Point {
+    const spacing = this.theme.spacing;
+    switch (container.template.typeName) {  // TODO improve magic numbers.
+      case 'cast':
+        return { x: spacing + spacing, y: spacing + spacing }
       default:
         return { x: spacing, y: spacing / 2 };
     }
@@ -2702,6 +2743,9 @@ class Renderer implements ILayoutEngine {
   }
 
   drawElement(element: ElementTypes, mode: RenderMode) {
+    if (element.parent instanceof ContainerElement)  // TODO something better
+      return;
+
     const ctx = this.ctx,
           theme = this.theme,
           rect = this.getBounds(element),
@@ -2715,6 +2759,8 @@ class Renderer implements ILayoutEngine {
         inFlagPath(x - d, y, w + d, h, d, ctx);
       } else if (element.isExporter) {
         outFlagPath(x, y, w + d, h, d, ctx);
+      } else {
+        ctx.rect(x, y, w, h);
       }
     } else {
       ctx.rect(x, y, w, h);
@@ -2747,8 +2793,9 @@ class Renderer implements ILayoutEngine {
           ctx.fillStyle = theme.altBgColor;
           ctx.fill();
           ctx.fillStyle = fillStyle;
-          this.drawType(element.type, x, y);
         }
+        this.drawType(element.type, x, y);
+        
         if (element instanceof FunctionInstance && !element.src.hideLinks) {
           this.drawFunctionInstanceLink(element, theme.dimColor);
         }
@@ -3248,7 +3295,8 @@ export class FunctionchartEditor implements CanvasLayer {
           break;
         }
         case 'importer':
-        case 'exporter': {
+        case 'exporter':
+        case 'cast': {
           const element = item as ContainerElement;
           result = element.type.name;
           break;
@@ -3276,7 +3324,8 @@ export class FunctionchartEditor implements CanvasLayer {
           break;
         }
         case 'importer':
-        case 'exporter': {
+        case 'exporter':
+        case 'cast': {
           const element = item as ContainerElement,
                 type = element.type;
           newType = type.rename(value);
@@ -3418,6 +3467,22 @@ export class FunctionchartEditor implements CanvasLayer {
       },
     ]);
     this.propertyInfo.set('exporter', [
+      {
+        label: 'name',
+        type: 'text',
+        getter: nodeLabelGetter,
+        setter: nodeLabelSetter,
+        prop: typeStringProp,
+      },
+      {
+        label: 'comment',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+        prop: commentProp,
+      },
+    ]);
+    this.propertyInfo.set('cast', [
       {
         label: 'name',
         type: 'text',
@@ -4236,11 +4301,11 @@ export class FunctionchartEditor implements CanvasLayer {
           context.abstractElements(context.selectedElements());
           context.endTransaction();
           return true;
-        // case 70: // 'f'
-        //   context.beginTransaction('destructure element');
-        //   context.destructureElements(context.selectedElements());
-        //   context.endTransaction();
-        //   return true;
+        case 85: // 'u'
+          context.beginTransaction('cast element');
+          context.castElements(context.selectedElements());
+          context.endTransaction();
+          return true;
         case 78: { // ctrl 'n'   // Can't intercept cmd n.
           const context = new FunctionchartContext(this.renderer);
           self.initializeContext(context);
