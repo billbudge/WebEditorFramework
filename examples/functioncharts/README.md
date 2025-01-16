@@ -75,6 +75,7 @@ We can use the iteration to implement our factorial function. However, since we 
 
 ## More General Iteration over a Range
 Generic iteration with start, end, condition, and step configurable.
+TODO up/down, step 1, n, exotic step (binary search)
 <figure>
   <img src="./resources/iteration2.svg"  alt="" title="Generic iteration with start, end, condition, and step configurable.">
 </figure>
@@ -114,14 +115,13 @@ While it might seem that Functioncharts are a purely higher-order functional lan
   <img src="./resources/points.svg"  alt="" title="A simple 2d point library.">
 </figure>
 
-So far we haven't used the ability to pass functions as parameters very much. However, they make it possible to express many different things besides expressions. Let's introduce three new stateful functions, which allow us to hold state and "open" values as objects or arrays.
-
-In the top left, we apply the array getter, and pass it as the first operand of an addition. We add pins for the inputs that come from the iteration. This can be grouped and closed to create a function import for our iteration. On the bottom we hook it up, set the range to [0..n-1] and pass an initial 'acc' of 0.
-
 ## Swap
 <figure>
   <img src="./resources/swap.svg"  alt="" title="Swapping in many forms.">
 </figure>
+
+## Covariance (fewer inputs), Contravariance (more outputs)
+TODO
 
 ## Stateful Iteration Protocols
 
@@ -162,6 +162,10 @@ TODO default value adapter.
 <figure>
   <img src="/resources/palette2.svg"  alt="" title="Pseudo-functions">
 </figure>
+
+So far we haven't used the ability to pass functions as parameters very much. However, they make it possible to express many different things besides expressions. Let's introduce three new stateful functions, which allow us to hold state and "open" values as objects or arrays.
+
+In the top left, we apply the array getter, and pass it as the first operand of an addition. We add pins for the inputs that come from the iteration. This can be grouped and closed to create a function import for our iteration. On the bottom we hook it up, set the range to [0..n-1] and pass an initial 'acc' of 0.
 
 We can combine these primitive functions to compute simple expressions. In the diagrams below, we are creating:
 

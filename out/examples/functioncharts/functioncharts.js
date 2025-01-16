@@ -2124,7 +2124,7 @@ class Renderer {
                 if (name) {
                     pin.baseline = y + spacing / 2 + textSize;
                     if (textSize > ph) {
-                        pin.y += (textSize - ph) / 2;
+                        // pin.y += (textSize - ph) / 2;
                         ph = textSize;
                     }
                     else {
