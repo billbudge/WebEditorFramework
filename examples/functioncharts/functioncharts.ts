@@ -339,7 +339,7 @@ abstract class NodeTemplate {
   readonly properties: PropertyTypes[] = [];
 }
 
-export type ContainerElementType = 'importer' | 'exporter';
+export type ContainerElementType = 'importer' | 'exporter' | 'new' | 'is-as';
 export type ElementType = 'element' | 'instance' | ContainerElementType;
 
 class ElementTemplate extends NodeTemplate {
@@ -2158,8 +2158,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.nodes.add(element);
     element.parent = parent;
     if (element instanceof ContainerElement) {
-      if (element.innerElement)
-      this.insertElement(element.innerElement, element);
+      if (element.innerElement) {
+        this.insertElement(element.innerElement, element);
+      }
+    } else if (parent instanceof ContainerElement) {
+      if (parent.innerElement) {
+        parent.typeString = element.type.toImportExportType().typeString;
+      }
     }
     element.type = Type.fromString(element.typeString);
     this.updateGlobalPosition(element);

@@ -1789,8 +1789,14 @@ export class FunctionchartContext extends EventBase {
         this.nodes.add(element);
         element.parent = parent;
         if (element instanceof ContainerElement) {
-            if (element.innerElement)
+            if (element.innerElement) {
                 this.insertElement(element.innerElement, element);
+            }
+        }
+        else if (parent instanceof ContainerElement) {
+            if (parent.innerElement) {
+                parent.typeString = element.type.toImportExportType().typeString;
+            }
         }
         element.type = Type.fromString(element.typeString);
         this.updateGlobalPosition(element);
