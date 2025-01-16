@@ -2743,9 +2743,6 @@ class Renderer implements ILayoutEngine {
   }
 
   drawElement(element: ElementTypes, mode: RenderMode) {
-    if (element.parent instanceof ContainerElement)  // TODO something better
-      return;
-
     const ctx = this.ctx,
           theme = this.theme,
           rect = this.getBounds(element),
@@ -2772,7 +2769,8 @@ class Renderer implements ILayoutEngine {
       case RenderMode.Print: {
         const fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
         ctx.fillStyle = fillStyle;
-        ctx.fill();
+        if (!(element.parent instanceof ContainerElement))
+          ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
         if (element.isAbstract) {
@@ -2795,7 +2793,7 @@ class Renderer implements ILayoutEngine {
           ctx.fillStyle = fillStyle;
         }
         this.drawType(element.type, x, y);
-        
+
         if (element instanceof FunctionInstance && !element.src.hideLinks) {
           this.drawFunctionInstanceLink(element, theme.dimColor);
         }

@@ -2275,8 +2275,6 @@ class Renderer {
         ctx.setLineDash([0]);
     }
     drawElement(element, mode) {
-        if (element.parent instanceof ContainerElement) // TODO something better
-            return;
         const ctx = this.ctx, theme = this.theme, rect = this.getBounds(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
         ctx.beginPath();
         // Importers and abstract instances define function inputs, so use the input shape.
@@ -2301,7 +2299,8 @@ class Renderer {
             case RenderMode.Print: {
                 const fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
                 ctx.fillStyle = fillStyle;
-                ctx.fill();
+                if (!(element.parent instanceof ContainerElement))
+                    ctx.fill();
                 ctx.strokeStyle = theme.strokeColor;
                 ctx.lineWidth = 0.5;
                 if (element.isAbstract) {
