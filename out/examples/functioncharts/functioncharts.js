@@ -391,11 +391,18 @@ class NodeBase {
         this.id = id;
     }
 }
+// Base class, for Elements that are not user defined.
+// 'binop', 'unop', 'cond', 'var', are the built-in elements.
+// 'external' are library elements.
+// 'abstract' are abstractions created from other elements.
 export class Element extends NodeBase {
     get name() { return this.template.name.get(this); }
     set name(value) { this.template.name.set(this, value); }
     get hideLinks() { return this.template.hideLinks.get(this); }
     set hideLinks(value) { this.template.hideLinks.set(this, value); }
+    get isAbstract() {
+        return this.name === 'abstract';
+    }
     constructor(template, context, id) {
         super(template, context, id);
     }
@@ -911,6 +918,8 @@ export class FunctionchartContext extends EventBase {
         const oldParent = item.parent;
         if (!parent)
             parent = this.functionchart;
+        if (oldParent === parent)
+            return item;
         if (!(item instanceof Wire)) {
             const translation = this.getToParent(item, parent);
             let x, y;
@@ -928,8 +937,6 @@ export class FunctionchartContext extends EventBase {
             if (item.y != y)
                 item.y = y;
         }
-        if (oldParent === parent)
-            return item;
         if (oldParent)
             this.unparent(item);
         if (parent instanceof Functionchart) {
@@ -1034,7 +1041,7 @@ export class FunctionchartContext extends EventBase {
         this.endTransaction();
     }
     newInputForWire(wire, parent, p) {
-        const dst = wire.dst, input = this.newPseudoelement('input'), offset = this.layoutEngine.outputPinToPoint(input, 0);
+        const input = this.newPseudoelement('input'), offset = this.layoutEngine.outputPinToPoint(input, 0);
         input.x = p.x - offset.x;
         input.y = p.y - offset.y;
         wire.src = input;
@@ -1269,8 +1276,6 @@ export class FunctionchartContext extends EventBase {
         // Check wires.
         graphInfo.wires.forEach(wire => {
             if (!self.isValidWire(wire)) { // TODO incorporate in update graph info?
-                // console.log(wire, self.isValidWire(wire));
-                const foo = self.isValidWire(wire);
                 invalidWires.push(wire);
             }
         });
@@ -1493,20 +1498,7 @@ export class FunctionchartContext extends EventBase {
         });
         this.deleteItem(node);
     }
-    exportElement(element) {
-        const exporter = this.newElement('exporter'), exporterType = element.type.toImportExportType(), bounds = this.layoutEngine.getBounds(element), innerOffset = this.layoutEngine.getInnerElementOffset(element);
-        exporter.x = bounds.x - innerOffset.x;
-        exporter.y = bounds.y - innerOffset.y;
-        exporter.typeString = exporterType.typeString;
-        return exporter;
-    }
-    importElement(element) {
-        const importer = this.newElement('importer'), importerType = element.type.toImportExportType(), bounds = this.layoutEngine.getBounds(element), innerOffset = this.layoutEngine.getInnerElementOffset(element);
-        importer.x = bounds.x - innerOffset.x;
-        importer.y = bounds.y - innerOffset.y;
-        importer.typeString = importerType.typeString;
-        return importer;
-    }
+    // Create an abstract functionchart to represent the given type.
     typeToFunctionchart(type) {
         const self = this, layoutEngine = this.layoutEngine, functioncharts = new Map(), sorted = new Array();
         // Create a key for each non-value type. Leave values undefined for the topological sort.
@@ -1592,19 +1584,35 @@ export class FunctionchartContext extends EventBase {
         layoutEngine.layoutFunctionchart(root);
         return root;
     }
+    exportElement(element) {
+        const exporter = this.newElement('exporter'), exporterType = element.type.toImportExportType(), bounds = this.layoutEngine.getBounds(element), innerOffset = this.layoutEngine.getInnerElementOffset(element);
+        exporter.x = bounds.x - innerOffset.x;
+        exporter.y = bounds.y - innerOffset.y;
+        exporter.typeString = exporterType.typeString;
+        return exporter;
+    }
+    importElement(element) {
+        const importer = this.newElement('importer'), importerType = element.type.toImportExportType(), bounds = this.layoutEngine.getBounds(element), innerOffset = this.layoutEngine.getInnerElementOffset(element);
+        importer.x = bounds.x - innerOffset.x;
+        importer.y = bounds.y - innerOffset.y;
+        importer.typeString = importerType.typeString;
+        return importer;
+    }
     abstractElement(element) {
         const type = element.type, layoutEngine = this.layoutEngine, bounds = layoutEngine.getBounds(element);
-        const functionchart = this.typeToFunctionchart(element.type);
-        functionchart.x = bounds.x;
-        functionchart.y = bounds.y;
-        functionchart.typeString = type.typeString;
-        return functionchart;
+        const abstractElement = this.newElement('element');
+        abstractElement.name = 'abstract';
+        abstractElement.x = bounds.x;
+        abstractElement.y = bounds.y;
+        abstractElement.typeString = type.typeString;
+        return abstractElement;
     }
     exportElements(elements) {
         const self = this, selection = this.selection;
         elements.forEach(element => {
             if (element instanceof ContainerElement)
                 return;
+            self.disconnectNode(element);
             selection.delete(element);
             const exporter = self.exportElement(element), parent = element.parent;
             self.addItem(exporter, parent);
@@ -1614,10 +1622,10 @@ export class FunctionchartContext extends EventBase {
     }
     importElements(elements) {
         const self = this, selection = this.selection;
-        // Open each non-input/output element.
         elements.forEach(element => {
             if (element instanceof ContainerElement)
                 return;
+            self.disconnectNode(element);
             selection.delete(element);
             const importer = self.importElement(element), parent = element.parent;
             self.addItem(importer, parent);
@@ -1627,13 +1635,11 @@ export class FunctionchartContext extends EventBase {
     }
     abstractElements(elements) {
         const self = this, selection = this.selection;
-        // Abstract each non-input/output element.
         elements.forEach(element => {
             selection.delete(element);
-            const functionchart = self.abstractElement(element);
-            self.addItem(functionchart, element.parent);
-            self.deleteItem(element);
-            selection.add(functionchart);
+            const abstractElement = self.abstractElement(element);
+            self.replaceNode(element, abstractElement);
+            selection.add(abstractElement);
         });
     }
     group(items, grandparent, bounds) {
@@ -2278,7 +2284,12 @@ class Renderer {
                 ctx.strokeStyle = (mode === RenderMode.Highlight) ? theme.highlightColor : theme.hotTrackColor;
                 ctx.strokeStyle = theme.highlightColor;
                 ctx.lineWidth = 2;
-                ctx.stroke();
+                if (element.isAbstract) {
+                    this.abstractStroke(ctx);
+                }
+                else {
+                    ctx.stroke();
+                }
                 break;
         }
     }
@@ -2794,6 +2805,22 @@ export class FunctionchartEditor {
                 type: 'text',
                 getter: getter,
                 setter: setter,
+                prop: typeStringProp,
+            },
+            {
+                label: 'comment',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: commentProp,
+            },
+        ]);
+        this.propertyInfo.set('abstract', [
+            {
+                label: 'name',
+                type: 'text',
+                getter: nodeLabelGetter,
+                setter: nodeLabelSetter,
                 prop: typeStringProp,
             },
             {
@@ -3555,7 +3582,7 @@ export class FunctionchartEditor {
                     context.importElements(context.selectedElements());
                     context.endTransaction();
                     return true;
-                case 68: // 'd'
+                case 73: // 'i'
                     context.beginTransaction('abstract element');
                     context.abstractElements(context.selectedElements());
                     context.endTransaction();

@@ -505,11 +505,19 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
   }
 }
 
+// Base class, for Elements that are not user defined.
+// 'binop', 'unop', 'cond', 'var', are the built-in elements.
+// 'external' are library elements.
+// 'abstract' are abstractions created from other elements.
 export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBase<T> {
   get name() { return this.template.name.get(this); }
   set name(value: string | undefined) { this.template.name.set(this, value); }
   get hideLinks() { return this.template.hideLinks.get(this); }
   set hideLinks(value: string) { this.template.hideLinks.set(this, value); }
+
+  get isAbstract() : boolean {
+    return this.name === 'abstract';
+  }
 
   constructor(template: T, context: FunctionchartContext, id: number) {
     super(template, context,  id);
@@ -1140,11 +1148,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.selection.set(Array.from(connectedNodes));
   }
 
-  addItem(item: AllTypes, parent: ElementParentTypes) : AllTypes {
+  addItem(item: AllTypes, parent: ElementParentTypes | undefined) : AllTypes {
     const oldParent = item.parent;
 
     if (!parent)
       parent = this.functionchart;
+
+    if (oldParent === parent)
+      return item;
 
     if (!(item instanceof Wire)) {
       const translation = this.getToParent(item, parent);
@@ -1162,9 +1173,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (item.y != y)
         item.y = y;
     }
-
-    if (oldParent === parent)
-      return item;
 
     if (oldParent)
       this.unparent(item);
@@ -1284,8 +1292,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   newInputForWire(wire: Wire, parent: Functionchart, p: Point) {
-    const dst = wire.dst!,
-          input = this.newPseudoelement('input'),
+    const input = this.newPseudoelement('input'),
           offset = this.layoutEngine.outputPinToPoint(input, 0);
     input.x = p.x - offset.x;
     input.y = p.y - offset.y;
@@ -1565,8 +1572,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // Check wires.
     graphInfo.wires.forEach(wire => {
       if (!self.isValidWire(wire)) {  // TODO incorporate in update graph info?
-        // console.log(wire, self.isValidWire(wire));
-        const foo = self.isValidWire(wire);
         invalidWires.push(wire);
       }
     });
@@ -1810,28 +1815,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.deleteItem(node);
   }
 
-  exportElement(element: Element) : ContainerElement {
-    const exporter = this.newElement('exporter') as ContainerElement,
-          exporterType = element.type.toImportExportType(),
-          bounds = this.layoutEngine.getBounds(element),
-          innerOffset = this.layoutEngine.getInnerElementOffset(element);
-    exporter.x = bounds.x - innerOffset.x;
-    exporter.y = bounds.y - innerOffset.y;
-    exporter.typeString = exporterType.typeString;
-    return exporter;
-  }
-
-  importElement(element: Element) : ContainerElement {
-    const importer = this.newElement('importer') as ContainerElement,
-          importerType = element.type.toImportExportType(),
-          bounds = this.layoutEngine.getBounds(element),
-          innerOffset = this.layoutEngine.getInnerElementOffset(element);
-    importer.x = bounds.x - innerOffset.x;
-    importer.y = bounds.y - innerOffset.y;
-    importer.typeString = importerType.typeString;
-    return importer;
-  }
-
+  // Create an abstract functionchart to represent the given type.
   typeToFunctionchart(type: Type) : Functionchart {
     const self = this,
           layoutEngine = this.layoutEngine,
@@ -1920,15 +1904,38 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return root;
   }
 
-  abstractElement(element: Element) : Functionchart {
+  exportElement(element: Element) : ContainerElement {
+    const exporter = this.newElement('exporter') as ContainerElement,
+          exporterType = element.type.toImportExportType(),
+          bounds = this.layoutEngine.getBounds(element),
+          innerOffset = this.layoutEngine.getInnerElementOffset(element);
+    exporter.x = bounds.x - innerOffset.x;
+    exporter.y = bounds.y - innerOffset.y;
+    exporter.typeString = exporterType.typeString;
+    return exporter;
+  }
+
+  importElement(element: Element) : ContainerElement {
+    const importer = this.newElement('importer') as ContainerElement,
+          importerType = element.type.toImportExportType(),
+          bounds = this.layoutEngine.getBounds(element),
+          innerOffset = this.layoutEngine.getInnerElementOffset(element);
+    importer.x = bounds.x - innerOffset.x;
+    importer.y = bounds.y - innerOffset.y;
+    importer.typeString = importerType.typeString;
+    return importer;
+  }
+
+  abstractElement(element: Element) : Element {
     const type = element.type,
           layoutEngine = this.layoutEngine,
           bounds = layoutEngine.getBounds(element);
-    const functionchart = this.typeToFunctionchart(element.type);
-    functionchart.x = bounds.x;
-    functionchart.y = bounds.y;
-    functionchart.typeString = type.typeString;
-    return functionchart;
+    const abstractElement = this.newElement('element');
+    abstractElement.name = 'abstract';
+    abstractElement.x = bounds.x;
+    abstractElement.y = bounds.y;
+    abstractElement.typeString = type.typeString;
+    return abstractElement;
   }
 
   exportElements(elements: Element[]) {
@@ -1937,6 +1944,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
     elements.forEach(element => {
       if ( element instanceof ContainerElement) return;
+      self.disconnectNode(element);
       selection.delete(element);
       const exporter = self.exportElement(element),
             parent = element.parent as Functionchart;
@@ -1950,9 +1958,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const self = this,
           selection = this.selection;
 
-    // Open each non-input/output element.
     elements.forEach(element => {
       if (element instanceof ContainerElement) return;
+      self.disconnectNode(element);
       selection.delete(element);
       const importer = self.importElement(element),
             parent = element.parent as Functionchart;
@@ -1966,13 +1974,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const self = this,
           selection = this.selection;
 
-    // Abstract each non-input/output element.
     elements.forEach(element => {
       selection.delete(element);
-      const functionchart = self.abstractElement(element);
-      self.addItem(functionchart, element.parent!);
-      self.deleteItem(element);
-      selection.add(functionchart);
+      const abstractElement = self.abstractElement(element);
+      self.replaceNode(element, abstractElement);
+      selection.add(abstractElement);
     });
   }
 
@@ -2748,7 +2754,11 @@ class Renderer implements ILayoutEngine {
         ctx.strokeStyle = (mode === RenderMode.Highlight) ? theme.highlightColor : theme.hotTrackColor;
         ctx.strokeStyle = theme.highlightColor;
         ctx.lineWidth = 2;
-        ctx.stroke();
+        if (element.isAbstract) {
+          this.abstractStroke(ctx);
+        } else {
+          ctx.stroke();
+        }
         break;
     }
   }
@@ -3360,6 +3370,22 @@ export class FunctionchartEditor implements CanvasLayer {
         type: 'text',
         getter: getter,
         setter: setter,
+        prop: typeStringProp,
+      },
+      {
+        label: 'comment',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+        prop: commentProp,
+      },
+    ]);
+    this.propertyInfo.set('abstract', [
+      {
+        label: 'name',
+        type: 'text',
+        getter: nodeLabelGetter,
+        setter: nodeLabelSetter,
         prop: typeStringProp,
       },
       {
@@ -4200,7 +4226,7 @@ export class FunctionchartEditor implements CanvasLayer {
           context.importElements(context.selectedElements());
           context.endTransaction();
           return true;
-        case 68: // 'd'
+        case 73: // 'i'
           context.beginTransaction('abstract element');
           context.abstractElements(context.selectedElements());
           context.endTransaction();
