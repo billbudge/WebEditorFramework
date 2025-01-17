@@ -719,6 +719,20 @@ export class FunctionchartContext extends EventBase {
             return owner;
         return this.functionchart;
     }
+    getToFunctionchart(node) {
+        if (node instanceof Functionchart)
+            return node;
+        let result = node.parent;
+        while (result && !(result instanceof Functionchart))
+            result = result.parent;
+        return result;
+    }
+    // getToUncontainedNode(node: NodeTypes) : NodeTypes {
+    //   let result = node;
+    //   while (result.parent instanceof ContainerElement)
+    //     result = result.parent;
+    //   return result;
+    // }
     forInWires(dst, visitor) {
         dst.inWires.forEach(wire => {
             if (wire)
@@ -897,6 +911,8 @@ export class FunctionchartContext extends EventBase {
         selection.set(roots.reverse());
     }
     disconnectNode(node) {
+        if (node instanceof ContainerElement && node.innerElement)
+            this.disconnectNode(node.innerElement);
         const self = this;
         node.inWires.forEach(wire => {
             if (wire)
@@ -1115,14 +1131,6 @@ export class FunctionchartContext extends EventBase {
             selection.delete(element);
         });
     }
-    getToFunctionchart(node) {
-        if (node instanceof Functionchart)
-            return node;
-        let result = node.parent;
-        while (result && !(result instanceof Functionchart))
-            result = result.parent;
-        return result;
-    }
     isValidWire(wire) {
         if (wire.pSrc || wire.pDst)
             return true; // Return valid for wires that are being dragged.
@@ -1133,7 +1141,7 @@ export class FunctionchartContext extends EventBase {
             return false;
         // Wires must be within the functionchart or from a source in an enclosing functionchart.
         const lca = getLowestCommonAncestor(src, dst);
-        if (!lca || lca !== this.getToFunctionchart(src.parent)) // TODO tests
+        if (!lca || lca !== this.getToFunctionchart(src.parent)) // TODO test
             return false;
         const srcPin = wire.srcPin, dstPin = wire.dstPin;
         if (srcPin < 0 || srcPin >= src.type.outputs.length)
@@ -1848,6 +1856,11 @@ export class FunctionchartContext extends EventBase {
     }
     removeElement(element) {
         this.nodes.delete(element);
+        if (element instanceof ContainerElement) {
+            if (element.innerElement) {
+                this.removeElement(element.innerElement);
+            }
+        }
         this.derivedInfoNeedsUpdate = true;
     }
     // Parent can be undefined in the case of the root functionchart.
@@ -1858,8 +1871,7 @@ export class FunctionchartContext extends EventBase {
         const self = this;
         functionchart.nodes.forEach(item => self.insertItem(item, functionchart));
         functionchart.wires.forEach(wire => self.insertWire(wire, functionchart));
-        // Update function chart after all descendants have been added and updated. We need that
-        // in order to compute the type info for the functionchart.
+        // Update function chart after all descendants have been updated.
         this.updateGlobalPosition(functionchart);
         this.derivedInfoNeedsUpdate = true;
     }
@@ -3527,7 +3539,10 @@ export class FunctionchartEditor {
                 lastSelected.type.canConnectTo(hitInfo.item.type)) {
                 const target = hitInfo.item;
                 if (!(lastSelected instanceof Functionchart)) {
+                    // TODO move this to context.
                     if (target instanceof ContainerElement && context.canAddNode(lastSelected, target)) {
+                        if (target.innerElement)
+                            context.disconnectNode(target.innerElement);
                         context.addItem(lastSelected, target);
                     }
                     else {

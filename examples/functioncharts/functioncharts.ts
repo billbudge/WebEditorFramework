@@ -931,6 +931,22 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return this.functionchart;
   }
 
+  getToFunctionchart(node: NodeTypes) : Functionchart | undefined {
+    if (node instanceof Functionchart)
+      return node;
+    let result = node.parent;
+    while (result && !(result instanceof Functionchart))
+      result = result.parent;
+    return result;
+  }
+
+  // getToUncontainedNode(node: NodeTypes) : NodeTypes {
+  //   let result = node;
+  //   while (result.parent instanceof ContainerElement)
+  //     result = result.parent;
+  //   return result;
+  // }
+
   forInWires(dst: NodeTypes, visitor: WireVisitor) {
     dst.inWires.forEach(wire => {
       if (wire)
@@ -1129,6 +1145,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   disconnectNode(node: NodeTypes) {
+    if (node instanceof ContainerElement && node.innerElement)
+      this.disconnectNode(node.innerElement);
+
     const self = this;
     node.inWires.forEach(wire => {
       if (wire)
@@ -1383,15 +1402,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
       selection.delete(element);
     });
-  }
-
-  getToFunctionchart(node: NodeTypes) : Functionchart | undefined {
-    if (node instanceof Functionchart)
-      return node;
-    let result = node.parent;
-    while (result && !(result instanceof Functionchart))
-      result = result.parent;
-    return result;
   }
 
   isValidWire(wire: Wire) {
@@ -2220,6 +2230,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   private removeElement(element: ElementTypes) {
     this.nodes.delete(element);
+    if (element instanceof ContainerElement) {
+      if (element.innerElement) {
+        this.removeElement(element.innerElement);
+      }
+    }
     this.derivedInfoNeedsUpdate = true;
   }
 
@@ -2233,8 +2248,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     functionchart.nodes.forEach(item => self.insertItem(item, functionchart));
     functionchart.wires.forEach(wire => self.insertWire(wire, functionchart));
 
-    // Update function chart after all descendants have been added and updated. We need that
-    // in order to compute the type info for the functionchart.
+    // Update function chart after all descendants have been updated.
     this.updateGlobalPosition(functionchart);
     this.derivedInfoNeedsUpdate = true;
   }
@@ -4162,7 +4176,12 @@ export class FunctionchartEditor implements CanvasLayer {
           lastSelected.type.canConnectTo(hitInfo.item.type)) {
         const target = hitInfo.item;
         if (!(lastSelected instanceof Functionchart)) {
+          // TODO move this to context.
           if (target instanceof ContainerElement && context.canAddNode(lastSelected, target)) {
+            // We could replaceNode but any errors can't be corrected in the current editor. We
+            // have no way to un-import/export.
+            if (target.innerElement)
+              context.disconnectNode(target.innerElement);
             context.addItem(lastSelected, target);
           } else {
             context.replaceNode(hitInfo.item, lastSelected);
