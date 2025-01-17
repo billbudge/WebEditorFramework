@@ -54,7 +54,7 @@ export class Type {
         return this;
     }
     get needsLayout() {
-        return this.height === 0; // width may be 0 in the case of spacer type.
+        return this.height === 0;
     }
     static fromInfo(inputs, outputs, name) {
         // Generally, pins can't be shared between types.
@@ -1115,6 +1115,14 @@ export class FunctionchartContext extends EventBase {
             selection.delete(element);
         });
     }
+    getToFunctionchart(node) {
+        if (node instanceof Functionchart)
+            return node;
+        let result = node.parent;
+        while (result && !(result instanceof Functionchart))
+            result = result.parent;
+        return result;
+    }
     isValidWire(wire) {
         if (wire.pSrc || wire.pDst)
             return true; // Return valid for wires that are being dragged.
@@ -1125,7 +1133,7 @@ export class FunctionchartContext extends EventBase {
             return false;
         // Wires must be within the functionchart or from a source in an enclosing functionchart.
         const lca = getLowestCommonAncestor(src, dst);
-        if (!lca || lca !== src.parent)
+        if (!lca || lca !== this.getToFunctionchart(src.parent)) // TODO tests
             return false;
         const srcPin = wire.srcPin, dstPin = wire.dstPin;
         if (srcPin < 0 || srcPin >= src.type.outputs.length)
@@ -1620,7 +1628,6 @@ export class FunctionchartContext extends EventBase {
         elements.forEach(element => {
             if (element instanceof ContainerElement)
                 return;
-            self.disconnectNode(element);
             selection.delete(element);
             const exporter = self.exportElement(element), parent = element.parent;
             self.addItem(exporter, parent);
@@ -1633,7 +1640,6 @@ export class FunctionchartContext extends EventBase {
         elements.forEach(element => {
             if (element instanceof ContainerElement)
                 return;
-            self.disconnectNode(element);
             selection.delete(element);
             const importer = self.importElement(element), parent = element.parent;
             self.addItem(importer, parent);
