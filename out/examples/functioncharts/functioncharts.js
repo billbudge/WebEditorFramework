@@ -1524,6 +1524,22 @@ export class FunctionchartContext extends EventBase {
         });
         this.deleteItem(node);
     }
+    dropNodeOnElement(node, target) {
+        const selection = this.selection;
+        if (target instanceof ContainerElement && this.canAddNode(node, target)) {
+            // We could replaceNode but any errors can't be corrected in the current editor. We
+            // have no way to un-import/export.
+            if (target.innerElement)
+                this.disconnectNode(target.innerElement);
+            this.addItem(node, target);
+            selection.delete(node);
+            selection.add(target);
+        }
+        else {
+            this.replaceNode(target, node);
+            selection.add(node);
+        }
+    }
     // Create an abstract functionchart to represent the given type.
     typeToFunctionchart(type) {
         const self = this, layoutEngine = this.layoutEngine, functioncharts = new Map(), sorted = new Array();
@@ -1677,13 +1693,25 @@ export class FunctionchartContext extends EventBase {
         abstractElement.typeString = type.typeString;
         return abstractElement;
     }
-    abstractElements(elements) {
+    abstractElements(elements, asFunctioncharts) {
         const self = this, selection = this.selection;
         elements.forEach(element => {
             selection.delete(element);
-            const abstractElement = self.abstractElement(element);
-            self.replaceNode(element, abstractElement);
-            selection.add(abstractElement);
+            if (asFunctioncharts) {
+                const abstractElement = self.abstractElement(element);
+                self.replaceNode(element, abstractElement);
+                selection.add(abstractElement);
+            }
+            else {
+                const abstractFunctionchart = self.typeToFunctionchart(element.type);
+                self.addItem(abstractFunctionchart, element.parent);
+                self.disconnectNode(element);
+                self.deleteItem(element);
+                abstractFunctionchart.x = element.x;
+                abstractFunctionchart.y = element.y;
+                self.addItem(abstractFunctionchart, element.parent);
+                selection.add(abstractFunctionchart);
+            }
         });
     }
     group(items, grandparent, bounds) {
@@ -2350,7 +2378,6 @@ class Renderer {
             case RenderMode.Highlight:
             case RenderMode.HotTrack:
                 ctx.strokeStyle = (mode === RenderMode.Highlight) ? theme.highlightColor : theme.hotTrackColor;
-                ctx.strokeStyle = theme.highlightColor;
                 ctx.lineWidth = 2;
                 if (element.isAbstract) {
                     this.abstractStroke(ctx);
@@ -2598,7 +2625,7 @@ function isDropTarget(hitInfo) {
     if (hitInfo instanceof FunctionchartHitResult)
         return true;
     const lastSelected = selection.lastSelected;
-    if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase) {
+    if (hitInfo instanceof ElementHitResult) {
         // Drop onto an element requires type compatibility.
         return true; //lastSelected.type.canConnectTo(hitInfo.item.type);
     }
@@ -2610,12 +2637,15 @@ function isClickable(hitInfo) {
 function isDraggable(hitInfo) {
     return !(hitInfo instanceof Wire);
 }
-function isElementInputPin(hitInfo) {
-    return hitInfo instanceof ElementHitResult && hitInfo.input >= 0;
+function isElement(hitInfo) {
+    return hitInfo instanceof ElementHitResult;
 }
-function isElementOutputPin(hitInfo) {
-    return hitInfo instanceof ElementHitResult && hitInfo.output >= 0;
-}
+// function isElementInputPin(hitInfo: HitResultTypes) : boolean {
+//   return hitInfo instanceof ElementHitResult && hitInfo.input >= 0;
+// }
+// function isElementOutputPin(hitInfo: HitResultTypes) : boolean {
+//   return hitInfo instanceof ElementHitResult && hitInfo.output >= 0;
+// }
 function hasProperties(hitInfo) {
     return !(hitInfo instanceof Wire);
 }
@@ -2740,19 +2770,25 @@ export class FunctionchartEditor {
                     break;
                 case 'element': { // [vv,v](label), [v,v](label), [vvv,v](label)
                     const element = item;
-                    if (element.name == 'literal')
+                    if (element.name == 'literal') {
                         result = item.type.outputs[0].name;
-                    else
+                    }
+                    else {
                         result = item.type.name;
+                    }
                     break;
                 }
-                case 'importer':
-                case 'exporter':
-                case 'cast': {
-                    const element = item;
-                    result = element.type.name;
-                    break;
-                }
+                // case 'importer':
+                // case 'exporter':
+                // case 'cast': {
+                //   const container = item as ContainerElement;
+                //   if (container.isImporter || container.isExporter) {
+                //     result = item.type.outputs[0].name;
+                //   } else if (container.isCast) {
+                //     result = item.type.outputs[1].name;
+                //   }
+                //   break;
+                // }
             }
             return result ? result : '';
         }
@@ -2775,13 +2811,18 @@ export class FunctionchartEditor {
                     }
                     break;
                 }
-                case 'importer':
-                case 'exporter':
-                case 'cast': {
-                    const element = item, type = element.type;
-                    newType = type.rename(value);
-                    break;
-                }
+                // case 'importer':
+                // case 'exporter':
+                // case 'cast': {
+                //   const container = item as ContainerElement,
+                //         type = container.type;
+                //   if (container.isImporter || container.isExporter) {
+                //     newType = Type.fromInfo([], [new Pin(type.outputs[0].type, value)]);
+                //   } else if (container.isCast) {
+                //     newType = Type.fromInfo([], [new Pin(type.outputs[1].type, value)]);
+                //   }
+                //   break;
+                // }
             }
             if (newType) {
                 const newValue = newType.typeString;
@@ -2902,13 +2943,13 @@ export class FunctionchartEditor {
             },
         ]);
         this.propertyInfo.set('importer', [
-            {
-                label: 'name',
-                type: 'text',
-                getter: nodeLabelGetter,
-                setter: nodeLabelSetter,
-                prop: typeStringProp,
-            },
+            // {
+            //   label: 'name',
+            //   type: 'text',
+            //   getter: nodeLabelGetter,
+            //   setter: nodeLabelSetter,
+            //   prop: typeStringProp,
+            // },
             {
                 label: 'comment',
                 type: 'text',
@@ -2918,13 +2959,13 @@ export class FunctionchartEditor {
             },
         ]);
         this.propertyInfo.set('exporter', [
-            {
-                label: 'name',
-                type: 'text',
-                getter: nodeLabelGetter,
-                setter: nodeLabelSetter,
-                prop: typeStringProp,
-            },
+            // {
+            //   label: 'name',
+            //   type: 'text',
+            //   getter: nodeLabelGetter,
+            //   setter: nodeLabelSetter,
+            //   prop: typeStringProp,
+            // },
             {
                 label: 'comment',
                 type: 'text',
@@ -2934,13 +2975,13 @@ export class FunctionchartEditor {
             },
         ]);
         this.propertyInfo.set('cast', [
-            {
-                label: 'name',
-                type: 'text',
-                getter: nodeLabelGetter,
-                setter: nodeLabelSetter,
-                prop: typeStringProp,
-            },
+            // {
+            //   label: 'name',
+            //   type: 'text',
+            //   getter: nodeLabelGetter,
+            //   setter: nodeLabelSetter,
+            //   prop: typeStringProp,
+            // },
             {
                 label: 'comment',
                 type: 'text',
@@ -3465,8 +3506,9 @@ export class FunctionchartEditor {
             const wire = drag.wire;
             switch (drag.kind) {
                 case 'connectWireSrc': {
-                    const dst = wire.dst, hitInfo = this.getFirstHit(hitList, isElementOutputPin), src = hitInfo ? hitInfo.item : undefined;
-                    if (src && dst && src !== dst) {
+                    hitInfo = this.getFirstHit(hitList, isElement);
+                    const dst = wire.dst, src = hitInfo ? hitInfo.item : undefined;
+                    if (src && dst && src !== dst && hitInfo.output >= 0) {
                         wire.src = src;
                         wire.srcPin = hitInfo.output;
                     }
@@ -3477,8 +3519,9 @@ export class FunctionchartEditor {
                     break;
                 }
                 case 'connectWireDst': {
-                    const src = wire.src, hitInfo = this.getFirstHit(hitList, isElementInputPin), dst = hitInfo ? hitInfo.item : undefined;
-                    if (src && dst && src !== dst) {
+                    hitInfo = this.getFirstHit(hitList, isElement);
+                    const src = wire.src, dst = hitInfo ? hitInfo.item : undefined;
+                    if (src && dst && src !== dst && hitInfo.input >= 0) {
                         wire.dst = dst;
                         wire.dstPin = hitInfo.input;
                     }
@@ -3517,6 +3560,9 @@ export class FunctionchartEditor {
                 let output;
                 if (src.isInstancer && pin.type !== Type.valueType) {
                     output = context.newInstanceForWire(wire, parent, p);
+                    if (hitInfo instanceof ElementHitResult && hitInfo.input < 0) {
+                        context.dropNodeOnElement(output, hitInfo.item);
+                    }
                 }
                 else {
                     output = context.newOutputForWire(wire, parent, p);
@@ -3535,19 +3581,11 @@ export class FunctionchartEditor {
         else if (drag instanceof NonWireDrag &&
             (drag.kind == 'copyPalette' || drag.kind === 'moveSelection' ||
                 drag.kind === 'moveCopySelection')) {
-            if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase &&
-                lastSelected.type.canConnectTo(hitInfo.item.type)) {
+            if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase /*&&  TODO
+                lastSelected.type.canConnectTo(hitInfo.item.type)*/) {
                 const target = hitInfo.item;
                 if (!(lastSelected instanceof Functionchart)) {
-                    // TODO move this to context.
-                    if (target instanceof ContainerElement && context.canAddNode(lastSelected, target)) {
-                        if (target.innerElement)
-                            context.disconnectNode(target.innerElement);
-                        context.addItem(lastSelected, target);
-                    }
-                    else {
-                        context.replaceNode(hitInfo.item, lastSelected);
-                    }
+                    context.dropNodeOnElement(lastSelected, target);
                 }
             }
             else {
@@ -3673,7 +3711,7 @@ export class FunctionchartEditor {
                     return true;
                 case 73: // 'i'
                     context.beginTransaction('abstract element');
-                    context.abstractElements(context.selectedElements());
+                    context.abstractElements(context.selectedElements(), !shiftKey);
                     context.endTransaction();
                     return true;
                 case 85: // 'u'

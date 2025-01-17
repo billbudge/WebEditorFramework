@@ -1846,6 +1846,22 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.deleteItem(node);
   }
 
+  dropNodeOnElement(node: ElementTypes, target: ElementTypes) {
+    const selection = this.selection;
+    if (target instanceof ContainerElement && this.canAddNode(node, target)) {
+      // We could replaceNode but any errors can't be corrected in the current editor. We
+      // have no way to un-import/export.
+      if (target.innerElement)
+        this.disconnectNode(target.innerElement);
+      this.addItem(node, target);
+      selection.delete(node);
+      selection.add(target);
+    } else {
+      this.replaceNode(target, node);
+      selection.add(node);
+    }
+  }
+
   // Create an abstract functionchart to represent the given type.
   typeToFunctionchart(type: Type) : Functionchart {
     const self = this,
@@ -2020,15 +2036,26 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return abstractElement;
   }
 
-  abstractElements(elements: Element[]) {
+  abstractElements(elements: Element[], asFunctioncharts: boolean) {
     const self = this,
           selection = this.selection;
 
     elements.forEach(element => {
       selection.delete(element);
-      const abstractElement = self.abstractElement(element);
-      self.replaceNode(element, abstractElement);
-      selection.add(abstractElement);
+      if (asFunctioncharts) {
+        const abstractElement = self.abstractElement(element);
+        self.replaceNode(element, abstractElement);
+        selection.add(abstractElement);
+      } else {
+        const abstractFunctionchart = self.typeToFunctionchart(element.type);
+        self.addItem(abstractFunctionchart, element.parent);
+        self.disconnectNode(element);
+        self.deleteItem(element);
+        abstractFunctionchart.x = element.x;
+        abstractFunctionchart.y = element.y;
+        self.addItem(abstractFunctionchart, element.parent);
+        selection.add(abstractFunctionchart);
+      }
     });
   }
 
@@ -2823,7 +2850,6 @@ class Renderer implements ILayoutEngine {
       case RenderMode.Highlight:
       case RenderMode.HotTrack:
         ctx.strokeStyle = (mode === RenderMode.Highlight) ? theme.highlightColor : theme.hotTrackColor;
-        ctx.strokeStyle = theme.highlightColor;
         ctx.lineWidth = 2;
         if (element.isAbstract) {
           this.abstractStroke(ctx);
@@ -3106,7 +3132,7 @@ function isDropTarget(hitInfo: HitResultTypes) : boolean {
     return true;
 
   const lastSelected = selection.lastSelected;
-  if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase) {
+  if (hitInfo instanceof ElementHitResult) {
     // Drop onto an element requires type compatibility.
     return true;//lastSelected.type.canConnectTo(hitInfo.item.type);
   }
@@ -3121,13 +3147,17 @@ function isDraggable(hitInfo: HitResultTypes) : boolean {
   return !(hitInfo instanceof Wire);
 }
 
-function isElementInputPin(hitInfo: HitResultTypes) : boolean {
-  return hitInfo instanceof ElementHitResult && hitInfo.input >= 0;
+function isElement(hitInfo: HitResultTypes) : boolean {
+  return hitInfo instanceof ElementHitResult;
 }
 
-function isElementOutputPin(hitInfo: HitResultTypes) : boolean {
-  return hitInfo instanceof ElementHitResult && hitInfo.output >= 0;
-}
+// function isElementInputPin(hitInfo: HitResultTypes) : boolean {
+//   return hitInfo instanceof ElementHitResult && hitInfo.input >= 0;
+// }
+
+// function isElementOutputPin(hitInfo: HitResultTypes) : boolean {
+//   return hitInfo instanceof ElementHitResult && hitInfo.output >= 0;
+// }
 
 function hasProperties(hitInfo: HitResultTypes) : boolean {
   return !(hitInfo instanceof Wire);
@@ -3307,19 +3337,24 @@ export class FunctionchartEditor implements CanvasLayer {
           break;
         case 'element': {     // [vv,v](label), [v,v](label), [vvv,v](label)
           const element = item as Element;
-          if (element.name == 'literal')
+          if (element.name == 'literal') {
             result = item.type.outputs[0].name;
-          else
+          } else {
             result = item.type.name;
+          }
           break;
         }
-        case 'importer':
-        case 'exporter':
-        case 'cast': {
-          const element = item as ContainerElement;
-          result = element.type.name;
-          break;
-        }
+        // case 'importer':
+        // case 'exporter':
+        // case 'cast': {
+        //   const container = item as ContainerElement;
+        //   if (container.isImporter || container.isExporter) {
+        //     result = item.type.outputs[0].name;
+        //   } else if (container.isCast) {
+        //     result = item.type.outputs[1].name;
+        //   }
+        //   break;
+        // }
       }
       return result ? result : '';
     }
@@ -3342,14 +3377,18 @@ export class FunctionchartEditor implements CanvasLayer {
           }
           break;
         }
-        case 'importer':
-        case 'exporter':
-        case 'cast': {
-          const element = item as ContainerElement,
-                type = element.type;
-          newType = type.rename(value);
-          break;
-        }
+        // case 'importer':
+        // case 'exporter':
+        // case 'cast': {
+        //   const container = item as ContainerElement,
+        //         type = container.type;
+        //   if (container.isImporter || container.isExporter) {
+        //     newType = Type.fromInfo([], [new Pin(type.outputs[0].type, value)]);
+        //   } else if (container.isCast) {
+        //     newType = Type.fromInfo([], [new Pin(type.outputs[1].type, value)]);
+        //   }
+        //   break;
+        // }
       }
       if (newType) {
         const newValue = newType.typeString;
@@ -3470,13 +3509,13 @@ export class FunctionchartEditor implements CanvasLayer {
       },
     ]);
     this.propertyInfo.set('importer', [
-      {
-        label: 'name',
-        type: 'text',
-        getter: nodeLabelGetter,
-        setter: nodeLabelSetter,
-        prop: typeStringProp,
-      },
+      // {
+      //   label: 'name',
+      //   type: 'text',
+      //   getter: nodeLabelGetter,
+      //   setter: nodeLabelSetter,
+      //   prop: typeStringProp,
+      // },
       {
         label: 'comment',
         type: 'text',
@@ -3486,13 +3525,13 @@ export class FunctionchartEditor implements CanvasLayer {
       },
     ]);
     this.propertyInfo.set('exporter', [
-      {
-        label: 'name',
-        type: 'text',
-        getter: nodeLabelGetter,
-        setter: nodeLabelSetter,
-        prop: typeStringProp,
-      },
+      // {
+      //   label: 'name',
+      //   type: 'text',
+      //   getter: nodeLabelGetter,
+      //   setter: nodeLabelSetter,
+      //   prop: typeStringProp,
+      // },
       {
         label: 'comment',
         type: 'text',
@@ -3502,13 +3541,13 @@ export class FunctionchartEditor implements CanvasLayer {
       },
     ]);
     this.propertyInfo.set('cast', [
-      {
-        label: 'name',
-        type: 'text',
-        getter: nodeLabelGetter,
-        setter: nodeLabelSetter,
-        prop: typeStringProp,
-      },
+      // {
+      //   label: 'name',
+      //   type: 'text',
+      //   getter: nodeLabelGetter,
+      //   setter: nodeLabelSetter,
+      //   prop: typeStringProp,
+      // },
       {
         label: 'comment',
         type: 'text',
@@ -4094,10 +4133,10 @@ export class FunctionchartEditor implements CanvasLayer {
       const wire = drag.wire;
       switch (drag.kind) {
         case 'connectWireSrc': {
+          hitInfo = this.getFirstHit(hitList, isElement) as ElementHitResult;
           const dst = wire.dst,
-                hitInfo = this.getFirstHit(hitList, isElementOutputPin) as ElementHitResult,
                 src = hitInfo ? hitInfo.item as NodeTypes : undefined;
-          if (src && dst && src !== dst) {
+          if (src && dst && src !== dst && hitInfo.output >= 0) {
             wire.src = src;
             wire.srcPin = hitInfo.output;
           } else {
@@ -4107,10 +4146,10 @@ export class FunctionchartEditor implements CanvasLayer {
           break;
         }
         case 'connectWireDst': {
+          hitInfo = this.getFirstHit(hitList, isElement) as ElementHitResult;
           const src = wire.src,
-                hitInfo = this.getFirstHit(hitList, isElementInputPin) as ElementHitResult,
                 dst = hitInfo ? hitInfo.item as NodeTypes : undefined;
-          if (src && dst && src !== dst) {
+          if (src && dst && src !== dst && hitInfo.input >= 0) {
             wire.dst = dst;
             wire.dstPin = hitInfo.input;
           } else {
@@ -4154,9 +4193,12 @@ export class FunctionchartEditor implements CanvasLayer {
       } else if (dst === undefined) {
         const p = wire.pDst!,
               pin = src.type.outputs[wire.srcPin];
-        let output;
+        let output: ElementTypes;
         if (src.isInstancer && pin.type !== Type.valueType) {
           output = context.newInstanceForWire(wire, parent, p);
+          if (hitInfo instanceof ElementHitResult && hitInfo.input < 0) {
+            context.dropNodeOnElement(output, hitInfo.item);
+          }
         } else {
           output = context.newOutputForWire(wire, parent, p);
         }
@@ -4172,20 +4214,11 @@ export class FunctionchartEditor implements CanvasLayer {
     } else if (drag instanceof NonWireDrag &&
               (drag.kind == 'copyPalette' || drag.kind === 'moveSelection' ||
                drag.kind === 'moveCopySelection')) {
-      if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase &&
-          lastSelected.type.canConnectTo(hitInfo.item.type)) {
+      if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase /*&&  TODO
+          lastSelected.type.canConnectTo(hitInfo.item.type)*/) {
         const target = hitInfo.item;
         if (!(lastSelected instanceof Functionchart)) {
-          // TODO move this to context.
-          if (target instanceof ContainerElement && context.canAddNode(lastSelected, target)) {
-            // We could replaceNode but any errors can't be corrected in the current editor. We
-            // have no way to un-import/export.
-            if (target.innerElement)
-              context.disconnectNode(target.innerElement);
-            context.addItem(lastSelected, target);
-          } else {
-            context.replaceNode(hitInfo.item, lastSelected);
-          }
+          context.dropNodeOnElement(lastSelected, target);
         }
       } else {
         let parent: Functionchart = functionchart;
@@ -4322,7 +4355,7 @@ export class FunctionchartEditor implements CanvasLayer {
           return true;
         case 73: // 'i'
           context.beginTransaction('abstract element');
-          context.abstractElements(context.selectedElements());
+          context.abstractElements(context.selectedElements(), !shiftKey);
           context.endTransaction();
           return true;
         case 85: // 'u'
