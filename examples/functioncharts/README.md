@@ -80,6 +80,12 @@ TODO up/down, step 1, n, exotic step (binary search)
   <img src="./resources/iteration2.svg"  alt="" title="Generic iteration with start, end, condition, and step configurable.">
 </figure>
 
+## Counters
+Minimal iteration abstraction
+<figure>
+  <img src="./resources/counters.svg"  alt="" title="Counters for iterating integer ranges.">
+</figure>
+
 ## Quicksort
 Let's implement Quicksort using these iteration primitives. Here is the source for a Javascript implementation of the classic Quicksort which does the partition step in place.
 
