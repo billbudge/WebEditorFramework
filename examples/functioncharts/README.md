@@ -145,13 +145,26 @@ Similarly to the recursion example, we can define a Fibonacci function. We defin
 
 ## Exponentiation by Squaring
 
-We can define an efficient exponentiation function. We create some simple helper functions to test for zero and even, and a two condition operator. We also create an expStep helper function to implement the recursion. Again, this function is arranged to call itself recursively as the last step, allowing the tail-recursion optimization.
+We can define an efficient exponentiation function. [Wikipedia](https://en.wikipedia.org/wiki/Exponentiation_by_squaring)
+
+```js
+function exp_by_squaring(x: number, n: number) {
+  return exp_by_squaring2(1, x, n)
+}
+function exp_by_squaring2(y: number, x: number, n: number) : number {
+  else if (n == 0) return y;
+  else if (n & 1 === 0) return exp_by_squaring2(y, x * x, n / 2);
+  else return exp_by_squaring2(x * y, x * x, (n - 1) / 2);
+}
+```
+
+We create some simple helper functions to test for zero and even, and a two condition operator. We also create an expStep helper function to implement the recursion. Again, this function is arranged to call itself recursively as the last step, allowing the tail-recursion optimization.
 
 <figure>
   <img src="./resources/exp_by_squaring.svg"  alt="" title="Tail-recursive implemention of exponentiation by squaring.">
 </figure>
 
-The diagram is a bit complex to follow. We can refactor this by pulling out the core step that computes the new x, y from the inputs. This simplifies the connections and makes the diagram much easier to follow.
+The diagram is hard to understand, with many wires crossing. We can refactor this by pulling out the core step that computes the new x, y from the inputs and using a function chart to create a helper function. We also order the 'n', 'y', and 'x' inputs to minimize crossings. This makes the diagram much easier to follow.
 
 <figure>
   <img src="./resources/exp_by_squaring2.svg"  alt="" title="Simplified implemention of exponentiation by squaring.">
