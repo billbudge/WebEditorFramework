@@ -284,13 +284,13 @@
     {
       "type": "functionchart",
       "id": 35,
-      "typeString": "[,[v(n)v(x)v(y)[vv,v]()(mul),v](expStep)]",
+      "typeString": "[,[v(n)v(y)v(x)[vv,v]()(mul),v](expStep)]",
       "x": 596.9532104432583,
       "y": 17.187541961669922,
       "width": 377.75924149155617,
-      "height": 430.69994735717773,
+      "height": 439.8343162536621,
       "name": "expStep",
-      "hideLinks": true,
+      "hideLinks": false,
       "nodes": [
         {
           "type": "input",
@@ -303,15 +303,15 @@
           "type": "input",
           "id": 37,
           "typeString": "[,v(x)]",
-          "x": 12.165679931640625,
-          "y": 77.45625305175781
+          "x": 13.315704345703125,
+          "y": 139.54688262939453
         },
         {
           "type": "input",
           "id": 38,
           "typeString": "[,v(y)]",
-          "x": 11.706329345703125,
-          "y": 112.51872253417969
+          "x": 13.906341552734375,
+          "y": 85.58121490478516
         },
         {
           "type": "output",
@@ -341,7 +341,7 @@
         {
           "type": "instance",
           "id": 42,
-          "typeString": "[v(n)v(x)v(y),v(x')v(y')]",
+          "typeString": "[v(n)v(y)v(x),v(y')v(x')]",
           "x": 75.96252432465553,
           "y": 112.62188720703125,
           "instancer": 8,
@@ -350,7 +350,7 @@
         {
           "type": "instance",
           "id": 43,
-          "typeString": "[v(n)v(x)v(y)[vv,v]()(mul),v](expStep)",
+          "typeString": "[v(n)v(y)v(x)[vv,v]()(mul),v](expStep)",
           "x": 206.76562491059303,
           "y": 115.9499626159668,
           "instancer": 35,
@@ -368,10 +368,10 @@
         {
           "type": "functionchart",
           "id": 8,
-          "typeString": "[,[v(n)v(x)v(y),v(x')v(y')]]",
-          "x": 75.45919266343117,
-          "y": 214.58430099487305,
-          "width": 286.300048828125,
+          "typeString": "[,[v(n)v(y)v(x),v(y')v(x')]]",
+          "x": 105.13418045639992,
+          "y": 223.71866989135742,
+          "width": 249.43133544921875,
           "height": 200.1156463623047,
           "name": "",
           "hideLinks": false,
@@ -389,15 +389,15 @@
               "type": "input",
               "id": 12,
               "typeString": "[,v(x)]",
-              "x": 4.572057336568832,
-              "y": 59.615638732910156
+              "x": 8.537694543600082,
+              "y": 118.86249542236328
             },
             {
               "type": "input",
               "id": 13,
               "typeString": "[,v(y)]",
-              "x": 3.8689933717250824,
-              "y": 87.30938720703125
+              "x": 8.444005578756332,
+              "y": 56.175018310546875
             },
             {
               "type": "output",
@@ -410,8 +410,8 @@
               "type": "output",
               "id": 15,
               "typeString": "[v(y'),]",
-              "x": 185.6875114440918,
-              "y": 120.8499984741211
+              "x": 183.9062614440918,
+              "y": 66.94689178466797
             },
             {
               "type": "instance",
@@ -526,8 +526,8 @@
           "type": "importer",
           "id": 9,
           "typeString": "[,[vv,v](mul)]",
-          "x": 12.962248235940933,
-          "y": 199.24058151245117,
+          "x": 14.002897650003433,
+          "y": 172.44057846069336,
           "name": "",
           "hideLinks": false,
           "inner": {
@@ -582,14 +582,14 @@
           "src": 37,
           "srcPin": 0,
           "dst": 42,
-          "dstPin": 1
+          "dstPin": 2
         },
         {
           "type": "wire",
           "src": 38,
           "srcPin": 0,
           "dst": 42,
-          "dstPin": 2
+          "dstPin": 1
         },
         {
           "type": "wire",
@@ -608,16 +608,16 @@
         {
           "type": "wire",
           "src": 42,
-          "srcPin": 0,
+          "srcPin": 1,
           "dst": 43,
-          "dstPin": 1
+          "dstPin": 2
         },
         {
           "type": "wire",
           "src": 42,
-          "srcPin": 1,
+          "srcPin": 0,
           "dst": 43,
-          "dstPin": 2
+          "dstPin": 1
         },
         {
           "type": "wire",
@@ -639,10 +639,10 @@
       "type": "functionchart",
       "id": 46,
       "typeString": "[,[v(n)v(x),v](xⁿ)]",
-      "x": 996.9968185424805,
-      "y": 131.2406005859375,
+      "x": 1003.8998947143555,
+      "y": 54.40623474121094,
       "width": 214.02484893798828,
-      "height": 148.94690704345703,
+      "height": 156.28438568115234,
       "name": "xⁿ",
       "hideLinks": false,
       "nodes": [
@@ -656,7 +656,7 @@
         {
           "type": "instance",
           "id": 48,
-          "typeString": "[v(n)v(x)v(y)[vv,v]()(mul),v](expStep)",
+          "typeString": "[v(n)v(y)v(x)[vv,v]()(mul),v](expStep)",
           "x": 58.47797393798828,
           "y": 8,
           "instancer": 35,
@@ -691,8 +691,8 @@
           "type": "element",
           "id": 52,
           "typeString": "[,v(1)]",
-          "x": 9.321881771087646,
-          "y": 52.18119430541992,
+          "x": 8.609357357025146,
+          "y": 32.640567779541016,
           "name": "literal",
           "hideLinks": false
         },
@@ -700,8 +700,8 @@
           "type": "input",
           "id": 53,
           "typeString": "[,v(x)]",
-          "x": 8.399909973144531,
-          "y": 31.15625
+          "x": 9.034248352050781,
+          "y": 57.38439178466797
         }
       ],
       "wires": [
@@ -717,14 +717,14 @@
           "src": 52,
           "srcPin": 0,
           "dst": 48,
-          "dstPin": 2
+          "dstPin": 1
         },
         {
           "type": "wire",
           "src": 53,
           "srcPin": 0,
           "dst": 48,
-          "dstPin": 1
+          "dstPin": 2
         },
         {
           "type": "wire",

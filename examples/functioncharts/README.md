@@ -29,13 +29,13 @@ The picture below is a simple example of a Functionchart to compute the signum f
 3) Binary operators (<, >), which take two input values and output a boolean value.
 4) The conditional operator (?), which takes an input value and two inputs. It outputs the second input if the first input is true, or the third input if the first input is false.
 
-The Functionchart defines a function, which is displayed in the top right corner. It is shaded to indicate that it can be instanced in the diagram.
+The Functionchart is drawn with rounded corners to distinguish it from functions. In the top right corner is the function that is defined by the contents of the functionchart. It is shaded to indicate that it can be instanced in the diagram.
 
 <figure>
   <img src="./resources/signum.svg"  alt="" title="Signum function.">
 </figure>
 
-This diagram is already a little hard to read because of the wires. We can simplify by defining new functions using sibling functioncharts to define helper functions. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function easier to read. Then we use the new functions to represent the final signum function as before.
+This diagram is already a little hard to read because of the wires. We can refactor by defining new functions using functioncharts to define helper functions. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function easier to read. Then we use the new functions to represent the final signum function as before. Ordinarily the sub-functions would be drawn with links to their defining functioncharts, but we have set the links to be invisible for such simple helpers.
 
 <figure>
   <img src="./resources/signum2.svg"  alt="" title="Signum function using helper functions.">
