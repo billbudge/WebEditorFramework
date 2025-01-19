@@ -1956,7 +1956,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           exporterType = element.type.toImportExportType();
     exporter.x = element.globalPosition.x;
     exporter.y = element.globalPosition.y;
-    exporter.typeString = exporterType.typeString;
     return exporter;
   }
 
@@ -1965,7 +1964,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           importerType = element.type.toImportExportType();
     importer.x = element.globalPosition.x;
     importer.y = element.globalPosition.y;
-    importer.typeString = importerType.typeString;
     return importer;
   }
 
@@ -1974,7 +1972,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           castType = element.type.toCastType();
     cast.x = element.globalPosition.x;
     cast.y = element.globalPosition.y;
-    cast.typeString = castType.typeString;
     return cast;
   }
 
@@ -2243,7 +2240,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         const innerType = element.type;
         let containerType;
         if (parent.isCast) {
-          containerType = innerType.toCastType();
+          containerType = innerType.toCastType().rename('(' + innerType.name + ')');
         } else {
           containerType = innerType.toImportExportType();
         }
@@ -3517,6 +3514,13 @@ export class FunctionchartEditor implements CanvasLayer {
       //   prop: typeStringProp,
       // },
       {
+        label: 'hideLinks',
+        type: 'boolean',
+        getter: getter,
+        setter: setter,
+        prop: hideLinksProp,
+      },
+      {
         label: 'comment',
         type: 'text',
         getter: getter,
@@ -3563,7 +3567,8 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
         prop: nameProp,
-      },{
+      },
+      {
         label: 'hideLinks',
         type: 'boolean',
         getter: getter,

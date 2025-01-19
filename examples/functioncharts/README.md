@@ -145,10 +145,16 @@ Similarly to the recursion example, we can define a Fibonacci function. We defin
 
 ## Exponentiation by Squaring
 
-We can define an efficient exponentiation function.
+We can define an efficient exponentiation function. We create some simple helper functions to test for zero and even, and a two condition operator. We also create an expStep helper function to implement the recursion. Again, this function is arranged to call itself recursively as the last step, allowing the tail-recursion optimization.
 
 <figure>
-  <img src="./resources/exp_by_squaring.svg"  alt="" title="Recursive implemention of exponentiation by squaring.">
+  <img src="./resources/exp_by_squaring.svg"  alt="" title="Tail-recursive implemention of exponentiation by squaring.">
+</figure>
+
+The diagram is a bit complex to follow. We can refactor this by pulling out the core step that computes the new x, y from the inputs. This simplifies the connections and makes the diagram much easier to follow.
+
+<figure>
+  <img src="./resources/exp_by_squaring2.svg"  alt="" title="Simplified implemention of exponentiation by squaring.">
 </figure>
 
 ## Live Demo Editor with Examples

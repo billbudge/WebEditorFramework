@@ -1630,21 +1630,18 @@ export class FunctionchartContext extends EventBase {
         const exporter = this.newElement('exporter'), exporterType = element.type.toImportExportType();
         exporter.x = element.globalPosition.x;
         exporter.y = element.globalPosition.y;
-        exporter.typeString = exporterType.typeString;
         return exporter;
     }
     importElement(element) {
         const importer = this.newElement('importer'), importerType = element.type.toImportExportType();
         importer.x = element.globalPosition.x;
         importer.y = element.globalPosition.y;
-        importer.typeString = importerType.typeString;
         return importer;
     }
     castElement(element) {
         const cast = this.newElement('cast'), castType = element.type.toCastType();
         cast.x = element.globalPosition.x;
         cast.y = element.globalPosition.y;
-        cast.typeString = castType.typeString;
         return cast;
     }
     exportElements(elements) {
@@ -1870,7 +1867,7 @@ export class FunctionchartContext extends EventBase {
                 const innerType = element.type;
                 let containerType;
                 if (parent.isCast) {
-                    containerType = innerType.toCastType();
+                    containerType = innerType.toCastType().rename('(' + innerType.name + ')');
                 }
                 else {
                     containerType = innerType.toImportExportType();
@@ -2951,6 +2948,13 @@ export class FunctionchartEditor {
             //   prop: typeStringProp,
             // },
             {
+                label: 'hideLinks',
+                type: 'boolean',
+                getter: getter,
+                setter: setter,
+                prop: hideLinksProp,
+            },
+            {
                 label: 'comment',
                 type: 'text',
                 getter: getter,
@@ -2997,7 +3001,8 @@ export class FunctionchartEditor {
                 getter: getter,
                 setter: setter,
                 prop: nameProp,
-            }, {
+            },
+            {
                 label: 'hideLinks',
                 type: 'boolean',
                 getter: getter,
