@@ -1803,17 +1803,15 @@ export class FunctionchartContext extends EventBase {
                 //           pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
                 //     outputs.push(pinInfo);
                 //   }
-                if (node instanceof ContainerElement) {
+                if (node instanceof ContainerElement && node.innerElement) {
                     if (node.isImporter) {
                         const innerType = node.innerType, name = innerType.name, type = innerType.rename(), pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
                         inputs.push(pinInfo);
                     }
                     else if (node.isExporter && node.isAbstract) {
                         // Abstract exporters must be outputs.
-                        if (node.isExporter) {
-                            const name = node.type.name, type = node.innerType.rename(), pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-                            outputs.push(pinInfo);
-                        }
+                        const name = node.innerType.name, type = node.innerType.rename(), pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                        outputs.push(pinInfo);
                     }
                 }
                 else if (node instanceof Element && node.isAbstract) {

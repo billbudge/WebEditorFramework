@@ -175,18 +175,18 @@ The functionchart is hard to understand, with a tangle of wires crossing in the 
 Here is a binary search implementation. Again, judicious use of helpers gives a visual explanation of the index calculations, and keeps the wires organized. [Wikipedia](https://en.wikipedia.org/wiki/Binary_search)
 
 ```ts
-function binary_search_leftmost(A: Array<number>, n: number, T: number) {
-  let L = 0;
-  let R = n;
-  while (L < R)  {
-    const m = Math.floor((L + R) / 2);
-    if (A[m] < T) {
-        L = m + 1;
+function binary_search_leftmost(A: Array<number>, n: number, t: number) {
+  let lo = 0;
+  let hi = n;
+  while (lo < R)  {
+    const m = Math.floor((lo + hi) / 2);
+    if (A[m] < t) {
+      lo = m + 1;
     } else {
-      R = m;
+      hi = m;
     }
   }
-  return L
+  return lo;
 }
 ```
 <figure>
