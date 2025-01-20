@@ -164,7 +164,7 @@ We create some simple helper functions to test for zero and even, and a two cond
   <img src="./resources/exp_by_squaring.svg"  alt="" title="Tail-recursive implemention of exponentiation by squaring.">
 </figure>
 
-The functionchart is hard to understand, with a tangle of wires crossing in the middle. Functioncharts can be refactored. Here we do take the core step that computes the new x, y from the inputs and use a functionchart to create a helper function. We also reorder the 'n', 'y', and 'x' inputs to minimize crossings. The use of hierarchy has the effect of removing a part of the circuit and creating an indirection when we instantiate the single instance. This makes the diagram much easier to follow.
+The functionchart is hard to understand, with a tangle of wires crossing in the middle. Functioncharts can be refactored. Here we do take the core step that computes the new x, y from the inputs and use a functionchart to create a helper function. We also reorder the 'n', 'y', and 'x' inputs to minimize crossings. The use of hierarchy has the effect of removing a part of the circuit and creating an indirection when we instantiate the single instance. The helper function gives a visual explanation of the core multiply step.
 
 <figure>
   <img src="./resources/exp_by_squaring2.svg"  alt="" title="Simplified implemention of exponentiation by squaring.">
@@ -172,7 +172,7 @@ The functionchart is hard to understand, with a tangle of wires crossing in the 
 
 ## Binary Search
 
-Here is a binary search implementation. Again, judicious use of helpers keeps the wire tangle to a manageable level.
+Here is a binary search implementation. Again, judicious use of helpers gives a visual explanation of the index calculations, and keeps the wires organized. [Wikipedia](https://en.wikipedia.org/wiki/Binary_search)
 
 ```ts
 function binary_search_leftmost(A: Array<number>, n: number, T: number) {
