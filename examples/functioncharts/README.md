@@ -91,8 +91,8 @@ Let's implement Quicksort using these iteration primitives. Here is the source f
 
 We'll start by implementing the iterations which advance indices to a pair of out of place functions.
 
-```js
-function partition(a, i, j) {
+```ts
+function partition(a: Array<number>, i: number, j: number) {
   let p = a[i];
   while (1) {
     while (i < j && a[i] <= p) i++;
@@ -102,7 +102,7 @@ function partition(a, i, j) {
     i++; j--;
   }
 }
-function qsort(a, i, j) {
+function qsort(a: Array<number>, i: number, j: number) {
   if (i >= j) return;
   let k = partition(a, i, j);
   qsort(a, i, k);
@@ -147,7 +147,7 @@ Similarly to the recursion example, we can define a Fibonacci function. We defin
 
 We can define an efficient exponentiation function. [Wikipedia](https://en.wikipedia.org/wiki/Exponentiation_by_squaring)
 
-```js
+```ts
 function exp_by_squaring(x: number, n: number) {
   return exp_by_squaring2(1, x, n)
 }
@@ -169,6 +169,30 @@ The functionchart is hard to understand, with a tangle of wires crossing in the 
 <figure>
   <img src="./resources/exp_by_squaring2.svg"  alt="" title="Simplified implemention of exponentiation by squaring.">
 </figure>
+
+## Binary Search
+
+Here is a binary search implementation. Again, judicious use of helpers keeps the wire tangle to a manageable level.
+
+```ts
+function binary_search_leftmost(A: Array<number>, n: number, T: number) {
+  let L = 0;
+  let R = n;
+  while (L < R)  {
+    const m = Math.floor((L + R) / 2);
+    if (A[m] < T) {
+        L = m + 1;
+    } else {
+      R = m;
+    }
+  }
+  return L
+}
+```
+<figure>
+  <img src="./resources/binary_search.svg"  alt="" title="Binary search implementation.">
+</figure>
+
 
 ## Live Demo Editor with Examples
 Our palette contains the built in functions and Pseudofunctions. On the top are the input, output, apply, and pass Pseudofunctions. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an function and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
@@ -230,7 +254,7 @@ Function closing is a powerful graph simplification mechanism. Imagine we wanted
 
 Let's try a more typical iteration, equivalent to the following for loop in Javascript. Let's try to add the numbers in the range [0..n].
 
-```js
+```ts
 let acc = 0;
 for (let i = 0; i < n; i++) {
 	acc += i;
