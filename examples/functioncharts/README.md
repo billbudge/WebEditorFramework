@@ -87,26 +87,30 @@ Minimal iteration abstraction
 </figure>
 
 ## Quicksort
-Let's implement Quicksort using these iteration primitives. Here is the source for a Javascript implementation of the classic Quicksort which does the partition step in place.
-
-We'll start by implementing the iterations which advance indices to a pair of out of place functions.
+Let's implement Quicksort using these iteration primitives. Here is the source for a Javascript implementation of Quicksort which does the partition step in place using Hoare's algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Quicksort)
 
 ```ts
-function partition(a: Array<number>, i: number, j: number) {
-  let p = a[i];
-  while (1) {
-    while (i < j && a[i] <= p) i++;
-    while (j > i && a[j] >= p) j--;
-    if (i >= j) return j;
-    [a[i], a[j]] = [a[j], a[i]];
-    i++; j--;
+function quicksort(A: Array<number>, lo: number, hi: number) {
+  if (lo >= 0 && hi >= 0 && lo < hi) {
+    let p = partition(A, lo, hi);
+    quicksort(A, lo, p);
+    quicksort(A, p + 1, hi);
   }
 }
-function qsort(a: Array<number>, i: number, j: number) {
-  if (i >= j) return;
-  let k = partition(a, i, j);
-  qsort(a, i, k);
-  qsort(a, k + 1, j);
+
+// Divides array into two partitions
+function partition(A: Array<number>, lo: number, hi: number) {
+  let pivot = A[lo];
+  let i = lo - 1;
+  let j = hi + 1
+  while (true) {
+    do { i++ } while (A[i] < pivot);
+    do { j-- } while (A[j] > pivot);
+    if (i >= j) { return j; }
+    let temp = A[i];
+    A[i] = A[j];
+    A[j] = temp;
+  }
 }
 ```
 
