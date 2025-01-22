@@ -7,7 +7,7 @@ The two innovations in Functioncharts are:
 
 1. Functions can accept other functions as inputs, and produce new functions as outputs. This gives the diagrams much greater expressive power as we can represent abstractions.
 
-2. Functions may be defined by the user using nested Functions. The nested Function can be edited live, so the new function can be used inside its own definition. This allows recursion, and as a special case, iteration through the tail call optimization. Nested Functioncharts may define complete functions, or partial functions, allowing us to express things like closures.
+1. Functions may be defined by the user using nested Functions. The nested Function can be edited live, so the new function can be used inside its own definition. This allows recursion, and as a special case, iteration through the tail call optimization. Nested Functioncharts may define complete functions, or partial functions, allowing us to express things like closures.
 
 Both features serve to reduce the visual complexity of the Functionchart diagrams, by having scopes, by reducing the number of wires, and by organizing them.
 
@@ -65,29 +65,39 @@ We can re-use our "Reduce" to implement Factorial.
   <img src="./resources/factorial2.svg"  alt="" title="Factorial function defined with reduce function.">
 </figure>
 
-## Iteration over a Numeric Range
-We can make iteration more generic. First we define an abstract "body" function, with 1 input and 1 output. The first input is the iteration index, the typical "i" in a for-loop. The output is the result of the body, and is used by the iteration function to break. We choose "undefined" as the sentinel value to break. Then we iterate over the range [0..n[, passing the index to the body function and continuing as long as the body returns a defined value.
+## Generic functions (Binary Search)
 
-We can use the iteration to implement our factorial function. However, since we don't have an accumulator passed as a parameter to our body function, we must instead encapsulate that in the body function as a bit of state. We do this now by using a 'var' element, which has two outputs - the first returns the current value, and the second returns a function which changes the value, and returns the previous value. Then our body function multiplies the current value by the iteration index, then sets the var to the result. We also return the value, so we continue rather than breaking from the iteration.
+Here is a binary search implementation. Again, judicious use of helpers gives a visual explanation of the index calculations, and keeps the wires organized. [Wikipedia](https://en.wikipedia.org/wiki/Binary_search)
+
+```ts
+function binary_search_leftmost(A: Array<number>, n: number, t: number) {
+  let lo = 0;
+  let hi = n;
+  while (lo < R)  {
+    const m = Math.floor((lo + hi) / 2);
+    if (A[m] < t) {
+      lo = m + 1;
+    } else {
+      hi = m;
+    }
+  }
+  return lo;
+}
+```
 <figure>
-  <img src="./resources/iteration.svg"  alt="" title="Simple iteration over the range [0..n[.">
+  <img src="./resources/binary_search.svg"  alt="" title="Binary search implementation.">
 </figure>
 
-## More General Iteration over a Range
-Generic iteration with start, end, condition, and step configurable.
-TODO up/down, step 1, n, exotic step (binary search)
-<figure>
-  <img src="./resources/iteration2.svg"  alt="" title="Generic iteration with start, end, condition, and step configurable.">
-</figure>
+The key features in this diagram are:
 
-## Counters
-Minimal iteration abstraction
-<figure>
-  <img src="./resources/counters.svg"  alt="" title="Counters for iterating integer ranges.">
-</figure>
+1. Helper functions are defined first, including abstractions for indexing ('[i]') and the "less than" predicate ('pred'). There is also a '??' predicate which returns two separate values for the true and false cases. This helps organize wires since it's used twice.
 
-## Quicksort
-Let's implement Quicksort using these iteration primitives. Here is the source for a Javascript implementation of Quicksort which does the partition step in place using Hoare's algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Quicksort)
+1. The 'div' helper function divides the range [lo..hi] into two sub-ranges [lo..mid] and [mid + 1, hi]. This helps reduce clutter.
+
+1. TODO
+
+## Generic functions continued (Quicksort)
+Here is the source for a Javascript implementation of Quicksort which does the partition step in place using Hoare's algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Quicksort)
 
 ```ts
 function quicksort(A: Array<number>, lo: number, hi: number) {
@@ -117,6 +127,23 @@ function partition(A: Array<number>, lo: number, hi: number) {
 <figure>
   <img src="./resources/quicksort.svg"  alt="" title="Quicksort, partition in place.">
 </figure>
+<figure>
+  <img src="./resources/Solarium.pdf"  alt="" title="Quicksort, partition in place.">
+</figure>
+
+The key features in this diagram are:
+
+1. Helper functions are defined first, including abstractions for indexing ('[i]') and swapping ('swap').
+
+1. Quicksort uses the abstract functions, making the algorithm more generic. (TODO, make the comparison functions generic.)
+
+1. The generic functions are declared in the outermost scope 'quicksort', but can be used in nested function definitions such as 'partStep', 'partition', and 'quickStep'. This simplifies the inputs and outputs of the helpers, reducing the number of wires. This is just like closure in Javascript.
+
+1. The generic do-while function calls the abstract 'body' function until the abstract 'cond' function returns false. The body function takes 1 input parameter and returns 1 output. The do-while function passes the body result to the cond function to perform the loop test. If it's true, do-while calls itself recursively, passing the result of body in to itself. If false, then the result of body is returned. Thus, do-while returns the result of the last call to body. Note that body must execute before cond, since it's "upstream" from it.
+
+1. 'quickStep' doesn't return a meaninful result (it's true if sorting happened, otherwise undefined if we return.) However, the result is important, since it drives the execution. This is important because quicksort isn't purely functional and has important side effects.
+
+1. Finally, 'quicksort' defines a function that takes in the generic function parameters and returns a function to sort given a length.
 
 ## State
 While it might seem that Functioncharts are a purely higher-order functional language, we can define functions with side effects, which allow us to support programming paradigms like regular imperative programming and Object Oriented Programming.
@@ -174,29 +201,26 @@ The functionchart is hard to understand, with a tangle of wires crossing in the 
   <img src="./resources/exp_by_squaring2.svg"  alt="" title="Simplified implemention of exponentiation by squaring.">
 </figure>
 
-## Binary Search
+## Iteration over a Numeric Range
+We can make iteration more generic. First we define an abstract "body" function, with 1 input and 1 output. The first input is the iteration index, the typical "i" in a for-loop. The output is the result of the body, and is used by the iteration function to break. We choose "undefined" as the sentinel value to break. Then we iterate over the range [0..n[, passing the index to the body function and continuing as long as the body returns a defined value.
 
-Here is a binary search implementation. Again, judicious use of helpers gives a visual explanation of the index calculations, and keeps the wires organized. [Wikipedia](https://en.wikipedia.org/wiki/Binary_search)
-
-```ts
-function binary_search_leftmost(A: Array<number>, n: number, t: number) {
-  let lo = 0;
-  let hi = n;
-  while (lo < R)  {
-    const m = Math.floor((lo + hi) / 2);
-    if (A[m] < t) {
-      lo = m + 1;
-    } else {
-      hi = m;
-    }
-  }
-  return lo;
-}
-```
+We can use the iteration to implement our factorial function. However, since we don't have an accumulator passed as a parameter to our body function, we must instead encapsulate that in the body function as a bit of state. We do this now by using a 'var' element, which has two outputs - the first returns the current value, and the second returns a function which changes the value, and returns the previous value. Then our body function multiplies the current value by the iteration index, then sets the var to the result. We also return the value, so we continue rather than breaking from the iteration.
 <figure>
-  <img src="./resources/binary_search.svg"  alt="" title="Binary search implementation.">
+  <img src="./resources/iteration.svg"  alt="" title="Simple iteration over the range [0..n[.">
 </figure>
 
+## More General Iteration over a Range
+Generic iteration with start, end, condition, and step configurable.
+TODO up/down, step 1, n, exotic step (binary search)
+<figure>
+  <img src="./resources/iteration2.svg"  alt="" title="Generic iteration with start, end, condition, and step configurable.">
+</figure>
+
+## Counters
+Minimal iteration abstraction
+<figure>
+  <img src="./resources/counters.svg"  alt="" title="Counters for iterating integer ranges.">
+</figure>
 
 ## Live Demo Editor with Examples
 Our palette contains the built in functions and Pseudofunctions. On the top are the input, output, apply, and pass Pseudofunctions. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an function and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
