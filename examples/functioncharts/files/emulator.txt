@@ -1,0 +1,86 @@
+{
+  "type": "functionchart",
+  "id": 0,
+  "typeString": "[,[,]]",
+  "x": 0,
+  "y": 0,
+  "width": 998.3687133789062,
+  "height": 427.65937423706055,
+  "name": "",
+  "hideLinks": false,
+  "nodes": [
+    {
+      "type": "element",
+      "id": 2,
+      "typeString": "[,[,v(N)[v,v]v(V)[v,v]v(Z)[v,v]v(C)[v,v][v,v]()(ZP.load)[v,v]()(Mem.load)[vv,v]()(ZP.store)[vv,v]()(Mem.store)](state)]",
+      "x": 419.84686279296875,
+      "y": 145.65937423706055,
+      "name": "external",
+      "hideLinks": false
+    },
+    {
+      "type": "functionchart",
+      "id": 4,
+      "typeString": "[,[v((zp))),v](adc zp)]",
+      "x": 623.0656127929688,
+      "y": 102.73124694824219,
+      "width": 359.3031005859375,
+      "height": 282,
+      "name": "adc zp",
+      "hideLinks": false,
+      "nodes": [
+        {
+          "type": "instance",
+          "id": 3,
+          "typeString": "[,v(N)[v,v]v(V)[v,v]v(Z)[v,v]v(C)[v,v][v,v]()(ZP.load)[v,v]()(Mem.load)[vv,v]()(ZP.store)[vv,v]()(Mem.store)](state)",
+          "x": 8,
+          "y": 8,
+          "instancer": 2,
+          "srcPin": 0
+        },
+        {
+          "type": "output",
+          "id": 5,
+          "typeString": "[v,]",
+          "x": 319.8531494140625,
+          "y": 73.11249923706055
+        },
+        {
+          "type": "element",
+          "id": 6,
+          "typeString": "[vv,v](+)",
+          "x": 291.4375,
+          "y": 98.6312484741211,
+          "name": "binop",
+          "hideLinks": false
+        },
+        {
+          "type": "instance",
+          "id": 8,
+          "typeString": "[v,v]",
+          "x": 246.93438720703125,
+          "y": 136.4437713623047,
+          "instancer": 3,
+          "srcPin": 8
+        },
+        {
+          "type": "input",
+          "id": 9,
+          "typeString": "[,v((zp)))]",
+          "x": 176.359375,
+          "y": 104.64375305175781
+        }
+      ],
+      "wires": [
+        {
+          "type": "wire",
+          "src": 9,
+          "srcPin": 0,
+          "dst": 8,
+          "dstPin": 0
+        }
+      ]
+    }
+  ],
+  "wires": []
+}

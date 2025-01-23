@@ -12,7 +12,7 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
         canvasController.configure([functionchartEditor]);
         canvasController.setSize(window.innerWidth, window.innerHeight);
         paletteController.configure([functionchartEditor]);
-        paletteController.setSize(256, 128);
+        paletteController.setSize(324, 128);
         paletteController.draggable = true;
         window.onbeforeunload = function () {
             return "Confirm unload?";

@@ -399,7 +399,7 @@ class NodeBase {
     }
 }
 // Base class, for Elements that are not user defined.
-// 'binop', 'unop', 'cond', 'var', are the built-in elements.
+// 'binop', 'unop', 'cond', 'let', 'const', are the built-in elements.
 // 'external' are library elements.
 // 'abstract' are abstractions created from other elements.
 export class Element extends NodeBase {
@@ -414,14 +414,40 @@ export class Element extends NodeBase {
         super(template, context, id);
     }
 }
+function containerType(container) {
+    if (container.innerElement) {
+        const innerType = container.innerType;
+        let containerType;
+        if (container.isCast) {
+            containerType = innerType.toCastType().rename('(' + innerType.name + ')');
+        }
+        else {
+            containerType = innerType.toImportExportType();
+        }
+        container.typeString = containerType.typeString;
+    }
+}
 export class ContainerElement extends Element {
     get innerElement() { return this.template.innerElement.get(this).get(0); }
     set innerElement(value) { this.template.innerElement.get(this).set(0, value); }
     // Derived properties.
-    get innerType() { return this.innerElement ? this.innerElement.type : Type.emptyType; }
+    get innerType() { var _b; return ((_b = this.innerElement) === null || _b === void 0 ? void 0 : _b.type) || Type.emptyType; }
     get isAbstract() {
         const innerElement = this.innerElement;
         return !innerElement || innerElement.isAbstract;
+    }
+    updateTypeInfo() {
+        if (this.innerElement) {
+            const innerType = this.innerType;
+            let containerType;
+            if (this.isCast) {
+                containerType = innerType.toCastType().rename('(' + innerType.name + ')');
+            }
+            else {
+                containerType = innerType.toImportExportType();
+            }
+            this.typeString = containerType.typeString;
+        }
     }
     constructor(context, template, id) {
         super(template, context, id);
@@ -489,6 +515,10 @@ export class Wire {
             return this.dst.type.inputs[this.dstPin].type;
         }
         return Type.valueType;
+    }
+    get isPseudowire() {
+        const src = this.src, dst = this.dst;
+        return src instanceof Pseudoelement || dst instanceof Pseudoelement;
     }
     constructor(context) {
         this.template = wireTemplate;
@@ -1773,8 +1803,11 @@ export class FunctionchartContext extends EventBase {
         return type;
     }
     getFunctionchartTypeInfo(functionchart) {
-        const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name, subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()), unwired = subgraphInfo.wires.size === 0, closed = subgraphInfo.inWires.size == 0;
-        let abstract = unwired && closed;
+        const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name, subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()), closed = subgraphInfo.inWires.size == 0;
+        let abstract = closed;
+        subgraphInfo.wires.forEach(wire => {
+            abstract = abstract && wire.isPseudowire;
+        });
         // Collect the functionchart's input and output pseudoelements.
         subgraphInfo.nodes.forEach(node => {
             if (node instanceof Pseudoelement) {
@@ -1861,19 +1894,9 @@ export class FunctionchartContext extends EventBase {
             }
         }
         else if (parent instanceof ContainerElement) {
-            if (parent.innerElement) {
-                const innerType = element.type;
-                let containerType;
-                if (parent.isCast) {
-                    containerType = innerType.toCastType().rename('(' + innerType.name + ')');
-                }
-                else {
-                    containerType = innerType.toImportExportType();
-                }
-                parent.typeString = containerType.typeString;
-            }
+            parent.updateTypeInfo();
         }
-        element.type = Type.fromString(element.typeString); // TODO necessary?
+        element.type = Type.fromString(element.typeString);
         this.updateGlobalPosition(element);
         this.derivedInfoNeedsUpdate = true;
     }
@@ -1946,6 +1969,9 @@ export class FunctionchartContext extends EventBase {
             if (prop === typeStringProp) {
                 const newType = Type.fromString(owner.typeString);
                 owner.type = newType;
+                if (owner.parent instanceof ContainerElement) {
+                    owner.parent.updateTypeInfo();
+                }
             }
             else {
                 this.updateGlobalPosition(owner);
@@ -2681,7 +2707,7 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), use = context.newPseudoelement('use'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), varBinding = context.newElement('element'), external = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart');
+        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), use = context.newPseudoelement('use'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), constFn = context.newElement('element'), letFn = context.newElement('element'), external = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart');
         context.root = functionchart;
         input.x = 8;
         input.y = 8;
@@ -2705,11 +2731,15 @@ export class FunctionchartEditor {
         cond.y = 32;
         cond.name = 'cond';
         cond.typeString = '[vvv,v](?)'; // conditional
-        varBinding.x = 172;
-        varBinding.y = 32;
-        varBinding.name = 'var';
-        varBinding.typeString = '[,v[v,v]](var)';
-        external.x = 214;
+        constFn.x = 172;
+        constFn.y = 32;
+        constFn.name = 'const';
+        constFn.typeString = '[v,v](const)';
+        letFn.x = 234;
+        letFn.y = 32;
+        letFn.name = 'let';
+        letFn.typeString = '[v,v[v,v]](let)';
+        external.x = 284;
         external.y = 32;
         external.name = 'external';
         external.typeString = '[,](lib)';
@@ -2724,7 +2754,8 @@ export class FunctionchartEditor {
         functionchart.nodes.append(binop);
         functionchart.nodes.append(unop);
         functionchart.nodes.append(cond);
-        functionchart.nodes.append(varBinding);
+        functionchart.nodes.append(constFn);
+        functionchart.nodes.append(letFn);
         functionchart.nodes.append(external);
         functionchart.nodes.append(newFunctionchart);
         context.root = functionchart;
@@ -2895,7 +2926,7 @@ export class FunctionchartEditor {
                 prop: commentProp,
             },
         ]);
-        this.propertyInfo.set('var', [
+        this.propertyInfo.set('let', [
             {
                 label: 'name',
                 type: 'enum',
@@ -3321,7 +3352,7 @@ export class FunctionchartEditor {
                 type = item.template.typeName; // 'importer', 'exporter'...
             }
             else {
-                type = item.name; // 'binop', 'unop', 'cond', 'literal', 'var'
+                type = item.name; // 'binop', 'unop', 'cond', 'literal', 'let', 'const'
             }
         }
         else if (item) {

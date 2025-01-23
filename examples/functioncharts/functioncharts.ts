@@ -514,13 +514,16 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
   }
 }
 
+export type BuiltinType = 'abstract' | 'external' |
+                          'literal' | 'unop' | 'binop' | 'cond' | 'const' | 'let';
+
 // Base class, for Elements that are not user defined.
-// 'binop', 'unop', 'cond', 'var', are the built-in elements.
+// 'binop', 'unop', 'cond', 'let', 'const', are the built-in elements.
 // 'external' are library elements.
 // 'abstract' are abstractions created from other elements.
 export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBase<T> {
   get name() { return this.template.name.get(this); }
-  set name(value: string | undefined) { this.template.name.set(this, value); }
+  set name(value: BuiltinType) { this.template.name.set(this, value); }
   get hideLinks() { return this.template.hideLinks.get(this); }
   set hideLinks(value: string) { this.template.hideLinks.set(this, value); }
 
@@ -533,16 +536,42 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
   }
 }
 
+function containerType(container: ContainerElement) {
+  if (container.innerElement) {
+    const innerType = container.innerType;
+    let containerType;
+    if (container.isCast) {
+      containerType = innerType.toCastType().rename('(' + innerType.name + ')');
+    } else {
+      containerType = innerType.toImportExportType();
+    }
+    container.typeString = containerType.typeString;
+  }
+
+}
 export class ContainerElement extends Element<ContainerElementTemplate> {
   get innerElement() { return this.template.innerElement.get(this).get(0) as ElementTypes | undefined; }
   set innerElement(value: ElementTypes | undefined) { this.template.innerElement.get(this).set(0, value); }
 
   // Derived properties.
-  get innerType() : Type { return this.innerElement ? this.innerElement.type : Type.emptyType; }
+  get innerType() : Type { return this.innerElement?.type || Type.emptyType; }
 
   get isAbstract() : boolean {
     const innerElement = this.innerElement;
     return !innerElement || innerElement.isAbstract;
+  }
+
+  updateTypeInfo() {
+    if (this.innerElement) {
+      const innerType = this.innerType;
+      let containerType;
+      if (this.isCast) {
+        containerType = innerType.toCastType().rename('(' + innerType.name + ')');
+      } else {
+        containerType = innerType.toImportExportType();
+      }
+      this.typeString = containerType.typeString;
+    }
   }
 
   constructor(context: FunctionchartContext, template: ContainerElementTemplate, id: number) {
@@ -629,6 +658,12 @@ export class Wire implements DataContextObject {
       return this.dst.type.inputs[this.dstPin].type;
     }
     return Type.valueType;
+  }
+
+  get isPseudowire() : boolean {
+    const src = this.src,
+          dst = this.dst;
+    return src instanceof Pseudoelement || dst instanceof Pseudoelement;
   }
 
   constructor(context: FunctionchartContext) {
@@ -2131,10 +2166,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           outputs = new Array<PinInfo>(),
           name = functionchart.name,
           subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()),
-          unwired = subgraphInfo.wires.size === 0,
           closed = subgraphInfo.inWires.size == 0;
-    let abstract = unwired && closed;
+    let abstract = closed;
 
+    subgraphInfo.wires.forEach(wire => {
+      abstract = abstract && wire.isPseudowire;
+    });
     // Collect the functionchart's input and output pseudoelements.
     subgraphInfo.nodes.forEach(node => {
       if (node instanceof Pseudoelement) {
@@ -2234,18 +2271,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         this.insertElement(element.innerElement, element);
       }
     } else if (parent instanceof ContainerElement) {
-      if (parent.innerElement) {
-        const innerType = element.type;
-        let containerType;
-        if (parent.isCast) {
-          containerType = innerType.toCastType().rename('(' + innerType.name + ')');
-        } else {
-          containerType = innerType.toImportExportType();
-        }
-        parent.typeString = containerType.typeString;
-      }
+      parent.updateTypeInfo();
     }
-    element.type = Type.fromString(element.typeString);  // TODO necessary?
+    element.type = Type.fromString(element.typeString);
     this.updateGlobalPosition(element);
     this.derivedInfoNeedsUpdate = true;
   }
@@ -2324,6 +2352,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (prop === typeStringProp) {
         const newType = Type.fromString(owner.typeString)
         owner.type = newType;
+        if (owner.parent instanceof ContainerElement) {
+          owner.parent.updateTypeInfo();
+        }
       } else {
         this.updateGlobalPosition(owner);
       }
@@ -3249,7 +3280,8 @@ export class FunctionchartEditor implements CanvasLayer {
           binop = context.newElement('element'),
           unop = context.newElement('element'),
           cond = context.newElement('element'),
-          varBinding = context.newElement('element'),
+          constFn = context.newElement('element'),
+          letFn = context.newElement('element'),
           external = context.newElement('element'),
           newFunctionchart = context.newFunctionchart('functionchart');
 
@@ -3270,10 +3302,13 @@ export class FunctionchartEditor implements CanvasLayer {
     cond.x = 134; cond.y = 32;
     cond.name = 'cond';
     cond.typeString = '[vvv,v](?)';  // conditional
-    varBinding.x = 172; varBinding.y = 32;
-    varBinding.name = 'var';
-    varBinding.typeString = '[,v[v,v]](var)';
-    external.x = 214; external.y = 32;
+    constFn.x = 172; constFn.y = 32;
+    constFn.name = 'const';
+    constFn.typeString = '[v,v](const)';
+    letFn.x = 234; letFn.y = 32;
+    letFn.name = 'let';
+    letFn.typeString = '[v,v[v,v]](let)';
+    external.x = 284; external.y = 32;
     external.name = 'external';
     external.typeString = '[,](lib)'
 
@@ -3288,7 +3323,8 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nodes.append(binop);
     functionchart.nodes.append(unop);
     functionchart.nodes.append(cond);
-    functionchart.nodes.append(varBinding);
+    functionchart.nodes.append(constFn);
+    functionchart.nodes.append(letFn);
     functionchart.nodes.append(external);
     functionchart.nodes.append(newFunctionchart);
     context.root = functionchart;
@@ -3461,7 +3497,7 @@ export class FunctionchartEditor implements CanvasLayer {
         prop: commentProp,
       },
     ]);
-    this.propertyInfo.set('var', [
+    this.propertyInfo.set('let', [
       {
         label: 'name',
         type: 'enum',
@@ -3941,7 +3977,7 @@ export class FunctionchartEditor implements CanvasLayer {
       if (item instanceof ContainerElement) {
         type = item.template.typeName;  // 'importer', 'exporter'...
       } else {
-        type = item.name;  // 'binop', 'unop', 'cond', 'literal', 'var'
+        type = item.name;  // 'binop', 'unop', 'cond', 'literal', 'let', 'const'
       }
     } else if (item) {
       type = item.template.typeName;
