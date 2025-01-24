@@ -67,6 +67,12 @@ We can re-use our "Reduce" to implement Factorial.
   <img src="./resources/factorial2.svg"  alt="" title="Factorial function defined with reduce function.">
 </figure>
 
+We can also use the reduce function to sum the elements of an Array, given a function that somehow contains an array and provides its length and an "indexer" function.
+
+<figure>
+  <img src="./resources/factorial3.svg"  alt="" title="Array sum function defined with reduce function.">
+</figure>
+
 ## Generic functions (Binary Search)
 
 Here is a binary search implementation. Again, judicious use of helpers gives a visual explanation of the index calculations, and keeps the wires organized. [Wikipedia](https://en.wikipedia.org/wiki/Binary_search)
