@@ -1805,6 +1805,7 @@ export class FunctionchartContext extends EventBase {
     getFunctionchartTypeInfo(functionchart) {
         const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name, subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()), closed = subgraphInfo.inWires.size == 0;
         let abstract = closed;
+        // Only pseudowires (to/from Pseudoelement) in an abstract functionchart.
         subgraphInfo.wires.forEach(wire => {
             abstract = abstract && wire.isPseudowire;
         });
@@ -1843,19 +1844,16 @@ export class FunctionchartContext extends EventBase {
                     }
                     else if (node.isExporter && node.isAbstract) {
                         // Abstract exporters must be outputs.
-                        const name = node.innerType.name, type = node.innerType.rename(), pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                        const type = node.innerType, name = undefined, pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
                         outputs.push(pinInfo);
                     }
                 }
                 else if (node instanceof Element && node.isAbstract) {
                     // Abstract elements must be inputs.
-                    const type = node.type.rename(), name = node.type.name, pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                    const type = node.type, name = undefined, pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
                     inputs.push(pinInfo);
                 }
-                if (abstract) {
-                    // Abstract functioncharts can only hold abstract nodes.
-                    abstract = node.isAbstract;
-                }
+                abstract = abstract && node.isAbstract;
             }
         });
         // Sort pins in increasing y-order. This lets users arrange the pins of the

@@ -31,6 +31,8 @@ The picture below is a simple example of a Functionchart to compute the signum f
 
 The Functionchart is drawn with rounded corners to distinguish it from functions. In the top right corner is the function that is defined by the contents of the functionchart. It is shaded to indicate that it can be instanced in the diagram.
 
+TODO explain ordering of inputs, outputs.
+
 <figure>
   <img src="./resources/signum.svg"  alt="" title="Signum function.">
 </figure>
@@ -145,6 +147,22 @@ The key features in this diagram are:
 
 1. Finally, 'quicksort' defines a function that takes in the generic function parameters and returns a function to sort given a length.
 
+## Representing State (swap)
+
+TODO explain abstraction for variable binding.
+TODO explain 'let'
+TODO explain why swap.set returns the input value, not the old value.
+
+<figure>
+  <img src="./resources/swap.svg"  alt="" title="A swap function.">
+</figure>
+
+## Representing State (Tuples)
+
+<figure>
+  <img src="./resources/tuples.svg"  alt="" title="Const and mutable Tuple types.">
+</figure>
+
 ## Representing State (Point types)
 While it might seem that Functioncharts are a purely higher-order functional language, we can define functions with side effects, which allow us to support programming paradigms like regular imperative programming and Object Oriented Programming.
 
@@ -154,11 +172,6 @@ Below this function we create a function VNormal representing a subtype function
 
 <figure>
   <img src="./resources/points.svg"  alt="" title="A simple 2d point library.">
-</figure>
-
-## Swap
-<figure>
-  <img src="./resources/swap.svg"  alt="" title="Swapping in many forms.">
 </figure>
 
 ## Covariance (fewer inputs), Contravariance (more outputs)
