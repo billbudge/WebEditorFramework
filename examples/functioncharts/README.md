@@ -59,21 +59,21 @@ Since functions can call instances of themselves, we can define a recursive fact
 
 Similarly, we can define a [Fibonacci](#Fibonacci) functionchart.
 
-We can abstract this a bit by replacing the multiplication function with an abstract binary operation, represented by a function import. This is a stand-in for a function to be provided by the caller, and just defines the shape of the function. That makes this function look just like the "reduce" function. We can use this function to compute factorial by using an export function to pass the multiplication operator, and again passing 1 as the initial "acc" value.
+We can abstract this a bit by replacing the multiplication function with an abstract binary operation that takes an index and an accumulator and returns some result. This "callback" is a stand-in for a function to be provided by the caller, and just defines the shape of the function. That makes this function look like a "reducer" function.
 
-We can re-use our "Reduce" to implement Factorial.
+We can use "reduce" to compute factorial by using an export function to pass the built-in multiplication function as "callback", and passing 1 as the initial "acc" value.
 
 <figure>
   <img src="./resources/factorial2.svg"  alt="" title="Factorial function defined with reduce function.">
 </figure>
 
-We can also use the reduce function to sum the elements of an Array, given a function that somehow contains an array and provides its length and an "indexer" function.
+We can also use the reduce function to sum the elements of an Array, if we are given a function that somehow contains an array and provides its length and an "indexer" function. We use the Array's indexer function in a small functionchart that uses the "i" parameter to get the i-th element of the array, and the "acc" parameter to add to the accumulator. This function is passed into reduce. This time, we set the initial "acc" to 0.
 
 <figure>
   <img src="./resources/factorial3.svg"  alt="" title="Array sum function defined with reduce function.">
 </figure>
 
-## Generic functions (Binary Search)
+## Abstract functions (Binary Search)
 
 Here is a binary search implementation. Again, judicious use of helpers gives a visual explanation of the index calculations, and keeps the wires organized. [Wikipedia](https://en.wikipedia.org/wiki/Binary_search)
 
@@ -104,7 +104,13 @@ The key features in this diagram are:
 
 1. TODO why is this better?
 
-## Generic functions continued (Quicksort)
+## Abstract functions continued (Iteration)
+
+<figure>
+  <img src="./resources/do_while.svg"  alt="" title="TODO.">
+</figure>
+
+## Abstract functions continued (Quicksort)
 Here is the source for a Javascript implementation of Quicksort which does the partition step in place using Hoare's algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Quicksort)
 
 ```ts
