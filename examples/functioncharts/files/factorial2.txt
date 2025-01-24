@@ -12,11 +12,11 @@
     {
       "type": "functionchart",
       "id": 3,
-      "typeString": "[,[v(n)v(acc)[vv,v]()(*),v](reduce)]",
-      "x": 360.02825927734375,
-      "y": 88.54065322875977,
-      "width": 399.1930694580078,
-      "height": 230.30667114257812,
+      "typeString": "[,[v(n)v(acc)[vv,v]()(callback),v](reduce)]",
+      "x": 359.3748474121094,
+      "y": 123.02929306030273,
+      "width": 428.3699493408203,
+      "height": 235.79672241210938,
       "name": "reduce",
       "hideLinks": false,
       "nodes": [
@@ -24,8 +24,8 @@
           "type": "element",
           "id": 4,
           "typeString": "[vvv,v](?)",
-          "x": 313.1442413330078,
-          "y": 90.8705940246582,
+          "x": 351.5711212158203,
+          "y": 95.39119338989258,
           "name": "cond",
           "hideLinks": false
         },
@@ -33,8 +33,8 @@
           "type": "output",
           "id": 5,
           "typeString": "[v,]",
-          "x": 357.9430694580078,
-          "y": 106.06321334838867
+          "x": 396.3699493408203,
+          "y": 110.58381271362305
         },
         {
           "type": "input",
@@ -71,9 +71,9 @@
         {
           "type": "instance",
           "id": 10,
-          "typeString": "[v(n)v(acc)[vv,v]()(*),v](reduce)",
-          "x": 211.94850158691406,
-          "y": 132.4083709716797,
+          "typeString": "[v(n)v(acc)[vv,v]()(callback),v](reduce)",
+          "x": 221.48329162597656,
+          "y": 135.71803283691406,
           "instancer": 3,
           "srcPin": 0
         },
@@ -89,27 +89,27 @@
         {
           "type": "importer",
           "id": 12,
-          "typeString": "[,[vv,v](*)]",
-          "x": 18.838706970214844,
-          "y": 164.30667114257812,
+          "typeString": "[,[vv,v](callback)]",
+          "x": 11.633476257324219,
+          "y": 169.79672241210938,
           "name": "",
           "hideLinks": false,
           "inner": {
             "type": "element",
-            "id": 13,
-            "typeString": "[vv,v](*)",
+            "id": 28,
+            "typeString": "[vv,v](callback)",
             "x": 8,
             "y": 4,
-            "name": "binop",
+            "name": "abstract",
             "hideLinks": false
           }
         },
         {
           "type": "instance",
           "id": 14,
-          "typeString": "[vv,v](*)",
-          "x": 123.13424071669579,
-          "y": 125.77810287475586,
+          "typeString": "[vv,v](callback)",
+          "x": 121.49007567763329,
+          "y": 140.85622787475586,
           "instancer": 12,
           "srcPin": 0
         }
@@ -205,10 +205,10 @@
       "type": "functionchart",
       "id": 15,
       "typeString": "[,[v,v](-1)]",
-      "x": 129.96252059936523,
-      "y": 164.52190399169922,
+      "x": 357.9099540710449,
+      "y": 20.683120727539062,
       "width": 151.94061279296875,
-      "height": 82.40937805175781,
+      "height": 81.75,
       "name": "-1",
       "hideLinks": true,
       "nodes": [
@@ -273,8 +273,8 @@
       "type": "functionchart",
       "id": 20,
       "typeString": "[,[v,v](n!)]",
-      "x": 819.0938873291016,
-      "y": 126.21248245239258,
+      "x": 845.8552398681641,
+      "y": 158.03419876098633,
       "width": 206.9471435546875,
       "height": 157.47502517700195,
       "name": "n!",
@@ -283,7 +283,7 @@
         {
           "type": "instance",
           "id": 21,
-          "typeString": "[v(n)v(acc)[vv,v]()(*),v](reduce)",
+          "typeString": "[v(n)v(acc)[vv,v]()(callback),v](reduce)",
           "x": 67.40313720703125,
           "y": 17.024993896484375,
           "instancer": 3,

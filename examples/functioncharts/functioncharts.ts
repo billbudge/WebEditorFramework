@@ -469,24 +469,7 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
   instances = new Array<Array<FunctionInstance>>();  // each output pin potentially has multiple instances.
 
   get isAbstract() : boolean { return false; }
-
-  // TODO move to Element or ContainerElement.
-  get isImporter() : boolean {
-    return this.template.typeName === 'importer';
-  }
-  get isExporter() {
-    return this.template.typeName === 'exporter';
-  }
-  get isCast() {
-    return this.template.typeName === 'cast';
-  }
-  get isInstancer(): boolean {
-    return !this.isExporter;
-  }
-  get isInstanced(): boolean {
-    return this instanceof FunctionInstance ||
-           this instanceof ContainerElement && this.innerElement instanceof FunctionInstance;
-  }
+  get isInstancer(): boolean { return false; }
 
   asInstance() : FunctionInstance | undefined {
     if (this instanceof FunctionInstance)
@@ -530,25 +513,28 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
   get isAbstract() : boolean {
     return this.name === 'abstract';
   }
+  get isInstancer() : boolean {
+    return !this.isExporter;
+  }
+  get isImporter() : boolean {
+    return this.template.typeName === 'importer';
+  }
+  get isExporter() {
+    return this.template.typeName === 'exporter';
+  }
+  get isCast() {
+    return this.template.typeName === 'cast';
+  }
+  get isInstanced(): boolean {
+    return this instanceof FunctionInstance ||
+           this instanceof ContainerElement && this.innerElement instanceof FunctionInstance;
+  }
 
   constructor(template: T, context: FunctionchartContext, id: number) {
     super(template, context,  id);
   }
 }
 
-function containerType(container: ContainerElement) {
-  if (container.innerElement) {
-    const innerType = container.innerType;
-    let containerType;
-    if (container.isCast) {
-      containerType = innerType.toCastType().rename('(' + innerType.name + ')');
-    } else {
-      containerType = innerType.toImportExportType();
-    }
-    container.typeString = containerType.typeString;
-  }
-
-}
 export class ContainerElement extends Element<ContainerElementTemplate> {
   get innerElement() { return this.template.innerElement.get(this).get(0) as ElementTypes | undefined; }
   set innerElement(value: ElementTypes | undefined) { this.template.innerElement.get(this).set(0, value); }
@@ -590,16 +576,7 @@ export class FunctionInstance extends Element<FunctionInstanceTemplate>  {
     const src = this.src;
     return src instanceof Functionchart && src.isAbstract;
   }
-  // get isStandAlone() : boolean {
-  //   const src = this.src;
-  //   if (src.parent === this.parent)
-  //     return true;
-  //   if (src instanceof Functionchart) {
-  //     return src.isAbstract || src.isClosed;
-  //   }
-  //   // src instanceof Element
-  //   return false;
-  // }
+  get isInstancer() : boolean { return true; }
 
   getSrcType() : Type {
     return this.src.type.outputs[this.srcPin].type;
@@ -721,6 +698,7 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> {
 
   // Derived properties.
   get isAbstract() : boolean { return this.typeInfo.abstract; }
+  get isInstancer() : boolean { return true; }
   get isClosed() { return this.typeInfo.closed; }
 
   typeInfo = emptyTypeInfo;
@@ -1489,7 +1467,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return true;
   }
 
-  isIsolated(node: NodeTypes) : boolean {
+  isWiredOrInstanced(node: NodeTypes) : boolean {
     const type = node.type,
           nInputs = type.inputs.length,
           nOutputs = type.outputs.length,
@@ -1503,7 +1481,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (outputs[i].length !== 0)
         return false;
     }
-    if (node.isInstancer) {
+    if (node instanceof Element && node.isInstancer) {
       const instances = node.instances;
       for (let i = 0; i < nOutputs; i++) {
         if (instances[i].length !== 0)
@@ -2190,16 +2168,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           outputs.push(pinInfo);
         }
       } else {
-        // TODO remove, don't do implicit inputs/outputs.
-        // if (node instanceof Functionchart) {
-        //   if (self.isIsolated(node)) {
-        //     const instanceType = node.instanceType,
-        //           name = instanceType.name,
-        //           type = instanceType.rename(),
-        //           pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-        //     outputs.push(pinInfo);
-        //   }
-
         if (node instanceof ContainerElement && node.innerElement) {
           if (node.isImporter) {
             const innerType = node.innerType,
@@ -2814,7 +2782,7 @@ class Renderer implements ILayoutEngine {
     ctx.setLineDash([0]);
   }
 
-  drawElement(element: ElementTypes, mode: RenderMode) {
+  drawElement(element: Element, mode: RenderMode) {
     const ctx = this.ctx,
           theme = this.theme,
           rect = this.getBounds(element),

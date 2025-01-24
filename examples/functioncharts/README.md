@@ -96,7 +96,7 @@ The key features in this diagram are:
 
 1. The 'div' helper function divides the range [lo..hi] into two sub-ranges [lo..mid] and [mid + 1, hi]. This helps reduce clutter.
 
-1. TODO
+1. TODO why is this better?
 
 ## Generic functions continued (Quicksort)
 Here is the source for a Javascript implementation of Quicksort which does the partition step in place using Hoare's algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Quicksort)

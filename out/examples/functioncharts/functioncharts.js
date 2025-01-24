@@ -356,23 +356,7 @@ class NodeBase {
         }
     }
     get isAbstract() { return false; }
-    // TODO move to Element or ContainerElement.
-    get isImporter() {
-        return this.template.typeName === 'importer';
-    }
-    get isExporter() {
-        return this.template.typeName === 'exporter';
-    }
-    get isCast() {
-        return this.template.typeName === 'cast';
-    }
-    get isInstancer() {
-        return !this.isExporter;
-    }
-    get isInstanced() {
-        return this instanceof FunctionInstance ||
-            this instanceof ContainerElement && this.innerElement instanceof FunctionInstance;
-    }
+    get isInstancer() { return false; }
     asInstance() {
         if (this instanceof FunctionInstance)
             return this;
@@ -410,21 +394,24 @@ export class Element extends NodeBase {
     get isAbstract() {
         return this.name === 'abstract';
     }
+    get isInstancer() {
+        return !this.isExporter;
+    }
+    get isImporter() {
+        return this.template.typeName === 'importer';
+    }
+    get isExporter() {
+        return this.template.typeName === 'exporter';
+    }
+    get isCast() {
+        return this.template.typeName === 'cast';
+    }
+    get isInstanced() {
+        return this instanceof FunctionInstance ||
+            this instanceof ContainerElement && this.innerElement instanceof FunctionInstance;
+    }
     constructor(template, context, id) {
         super(template, context, id);
-    }
-}
-function containerType(container) {
-    if (container.innerElement) {
-        const innerType = container.innerType;
-        let containerType;
-        if (container.isCast) {
-            containerType = innerType.toCastType().rename('(' + innerType.name + ')');
-        }
-        else {
-            containerType = innerType.toImportExportType();
-        }
-        container.typeString = containerType.typeString;
     }
 }
 export class ContainerElement extends Element {
@@ -463,16 +450,7 @@ export class FunctionInstance extends Element {
         const src = this.src;
         return src instanceof Functionchart && src.isAbstract;
     }
-    // get isStandAlone() : boolean {
-    //   const src = this.src;
-    //   if (src.parent === this.parent)
-    //     return true;
-    //   if (src instanceof Functionchart) {
-    //     return src.isAbstract || src.isClosed;
-    //   }
-    //   // src instanceof Element
-    //   return false;
-    // }
+    get isInstancer() { return true; }
     getSrcType() {
         return this.src.type.outputs[this.srcPin].type;
     }
@@ -554,6 +532,7 @@ export class Functionchart extends NodeBase {
     get wires() { return this.template.wires.get(this); }
     // Derived properties.
     get isAbstract() { return this.typeInfo.abstract; }
+    get isInstancer() { return true; }
     get isClosed() { return this.typeInfo.closed; }
     constructor(context, template, id) {
         super(template, context, id);
@@ -1204,7 +1183,7 @@ export class FunctionchartContext extends EventBase {
         }
         return true;
     }
-    isIsolated(node) {
+    isWiredOrInstanced(node) {
         const type = node.type, nInputs = type.inputs.length, nOutputs = type.outputs.length, inputs = node.inWires, outputs = node.outWires;
         for (let i = 0; i < nInputs; i++) {
             if (inputs[i] !== undefined)
@@ -1214,7 +1193,7 @@ export class FunctionchartContext extends EventBase {
             if (outputs[i].length !== 0)
                 return false;
         }
-        if (node.isInstancer) {
+        if (node instanceof Element && node.isInstancer) {
             const instances = node.instances;
             for (let i = 0; i < nOutputs; i++) {
                 if (instances[i].length !== 0)
@@ -1828,15 +1807,6 @@ export class FunctionchartContext extends EventBase {
                 }
             }
             else {
-                // TODO remove, don't do implicit inputs/outputs.
-                // if (node instanceof Functionchart) {
-                //   if (self.isIsolated(node)) {
-                //     const instanceType = node.instanceType,
-                //           name = instanceType.name,
-                //           type = instanceType.rename(),
-                //           pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-                //     outputs.push(pinInfo);
-                //   }
                 if (node instanceof ContainerElement && node.innerElement) {
                     if (node.isImporter) {
                         const innerType = node.innerType, name = innerType.name, type = innerType.rename(), pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
