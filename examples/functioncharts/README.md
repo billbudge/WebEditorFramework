@@ -1,5 +1,5 @@
 # Functioncharts: Diagrams of Computation
-Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. This repository contains the source code for a Web Editor that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs (yet!)
+Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. This repository contains the source code for a Web Editor that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs (yet!) Functioncharts are inspired by [Statecharts](../statecharts/README.md).
 
 Many "node and wire" programming systems have been built. However, most are either domain-specific, or are intended for non-programmers building small, simple programs. Functioncharts are loosely patterned after Harel Statecharts, using hierarchy and abstraction to increase the power of the notation. The ambitious goal is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages.
 
