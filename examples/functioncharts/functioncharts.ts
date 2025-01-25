@@ -3465,12 +3465,11 @@ export class FunctionchartEditor implements CanvasLayer {
     ]);
     this.propertyInfo.set('let', [
       {
-        label: 'name',
-        type: 'enum',
-        values: unaryOps.join(','),
-        getter: nodeLabelGetter,
-        setter: nodeLabelSetter,
-        prop: typeStringProp,
+        label: 'comment',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+        prop: commentProp,
       },
     ]);
     this.propertyInfo.set('external', [
