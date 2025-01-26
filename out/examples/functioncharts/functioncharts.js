@@ -256,7 +256,7 @@ export function visitType(type, visitor) {
 }
 //------------------------------------------------------------------------------
 // Properties and templates for the raw data interface for cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x', 0), yProp = new ScalarProp('y', 0), nameProp = new ScalarProp('name', ''), typeStringProp = new ScalarProp('typeString', Type.emptyTypeString), widthProp = new ScalarProp('width', 0), heightProp = new ScalarProp('height', 0), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin', 0), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin', 0), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner'), hideLinksProp = new ScalarProp('hideLinks', false), commentProp = new ScalarProp('comment');
+const idProp = new IdProp('id'), xProp = new ScalarProp('x', 0), yProp = new ScalarProp('y', 0), nameProp = new ScalarProp('name', ''), typeStringProp = new ScalarProp('typeString', Type.emptyTypeString), widthProp = new ScalarProp('width', 0), heightProp = new ScalarProp('height', 0), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin', 0), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin', 0), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner'), implicitProp = new ScalarProp('implicit', false), hideLinksProp = new ScalarProp('hideLinks', false), commentProp = new ScalarProp('comment');
 class NodeTemplate {
     constructor() {
         this.id = idProp;
@@ -317,11 +317,13 @@ class FunctionchartTemplate extends NodeTemplate {
         this.width = widthProp;
         this.height = heightProp;
         this.name = nameProp;
+        this.implicit = implicitProp;
         this.hideLinks = hideLinksProp;
         this.nodes = nodesProp;
         this.wires = wiresProp;
         this.properties = [this.id, this.typeString, this.x, this.y, this.width, this.height,
-            this.name, this.hideLinks, this.nodes, this.wires, this.comment];
+            this.name, this.implicit, this.hideLinks, this.nodes, this.wires,
+            this.comment];
         this.typeName = typeName;
     }
 }
@@ -526,6 +528,8 @@ export class Functionchart extends NodeBase {
     set typeString(value) { this.template.typeString.set(this, value); }
     get name() { return this.template.name.get(this); }
     set name(value) { this.template.name.set(this, value); }
+    get implicit() { return this.template.implicit.get(this); }
+    set implicit(value) { this.template.implicit.set(this, value); }
     get hideLinks() { return this.template.hideLinks.get(this); }
     set hideLinks(value) { this.template.hideLinks.set(this, value); }
     get nodes() { return this.template.nodes.get(this); }
@@ -581,6 +585,7 @@ export class FunctionchartContext extends EventBase {
         }
         this.functionchart = root;
         this.insertFunctionchart(root, undefined);
+        this.updateDerivedInfo();
         this.updateFunctioncharts(); // Initialize TypeInfo for all functioncharts.
         this.updateDerivedInfo();
     }
@@ -1782,7 +1787,7 @@ export class FunctionchartContext extends EventBase {
         return type;
     }
     getFunctionchartTypeInfo(functionchart) {
-        const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name, subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()), closed = subgraphInfo.inWires.size == 0;
+        const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name, implicit = functionchart.implicit, subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()), closed = subgraphInfo.inWires.size == 0;
         let abstract = closed;
         // Only pseudowires (to/from Pseudoelement) in an abstract functionchart.
         subgraphInfo.wires.forEach(wire => {
@@ -1822,6 +1827,23 @@ export class FunctionchartContext extends EventBase {
                     // Abstract elements must be inputs.
                     const type = node.type, name = undefined, pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
                     inputs.push(pinInfo);
+                }
+                else if (node instanceof Element && implicit) {
+                    const type = node.type, inputPins = type.inputs, outputPins = type.outputs;
+                    for (let i = 0; i < inputPins.length; i++) {
+                        if (node.inWires[i])
+                            continue;
+                        const pin = inputPins[i];
+                        const type = pin.type, name = pin.name, pinInfo = { element: node, index: i, type, name, fcIndex: -1 };
+                        inputs.push(pinInfo);
+                    }
+                    for (let i = 0; i < outputPins.length; i++) {
+                        if (node.outWires[i].length !== 0)
+                            continue;
+                        const pin = outputPins[i];
+                        const type = pin.type, name = pin.name, pinInfo = { element: node, index: i, type, name, fcIndex: -1 };
+                        outputs.push(pinInfo);
+                    }
                 }
                 abstract = abstract && node.isAbstract;
             }
@@ -2896,12 +2918,11 @@ export class FunctionchartEditor {
         ]);
         this.propertyInfo.set('let', [
             {
-                label: 'name',
-                type: 'enum',
-                values: unaryOps.join(','),
-                getter: nodeLabelGetter,
-                setter: nodeLabelSetter,
-                prop: typeStringProp,
+                label: 'comment',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: commentProp,
             },
         ]);
         this.propertyInfo.set('external', [
@@ -2998,6 +3019,13 @@ export class FunctionchartEditor {
                 getter: getter,
                 setter: setter,
                 prop: nameProp,
+            },
+            {
+                label: 'implicit',
+                type: 'boolean',
+                getter: getter,
+                setter: setter,
+                prop: implicitProp,
             },
             {
                 label: 'hideLinks',

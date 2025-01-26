@@ -328,6 +328,7 @@ const idProp = new IdProp('id'),
       wiresProp = new ChildListProp('wires'),
       instancerProp = new ReferenceProp('instancer'),
       innerElementProp = new ChildSlotProp('inner'),
+      implicitProp = new ScalarProp('implicit', false),
       hideLinksProp = new ScalarProp('hideLinks', false),
       commentProp = new ScalarProp('comment');
 
@@ -401,11 +402,13 @@ class FunctionchartTemplate extends NodeTemplate {
   readonly width = widthProp;
   readonly height = heightProp;
   readonly name = nameProp;
+  readonly implicit = implicitProp;
   readonly hideLinks = hideLinksProp;
   readonly nodes = nodesProp;
   readonly wires = wiresProp;
   readonly properties = [this.id, this.typeString, this.x, this.y, this.width, this.height,
-                         this.name, this.hideLinks, this.nodes, this.wires, this.comment];
+                         this.name, this.implicit, this.hideLinks, this.nodes, this.wires,
+                         this.comment];
     constructor(typeName: FunctionchartType) {
       super();
       this.typeName = typeName;
@@ -690,6 +693,8 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> {
   set typeString(value: string) { this.template.typeString.set(this, value); }
   get name() { return this.template.name.get(this); }
   set name(value: string) { this.template.name.set(this, value); }
+  get implicit() { return this.template.implicit.get(this); }
+  set implicit(value: string) { this.template.implicit.set(this, value); }
   get hideLinks() { return this.template.hideLinks.get(this); }
   set hideLinks(value: string) { this.template.hideLinks.set(this, value); }
 
@@ -802,6 +807,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.functionchart = root;
     this.insertFunctionchart(root, undefined);
 
+    this.updateDerivedInfo();
     this.updateFunctioncharts();  // Initialize TypeInfo for all functioncharts.
     this.updateDerivedInfo();
   }
@@ -2143,6 +2149,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           inputs = new Array<PinInfo>(),
           outputs = new Array<PinInfo>(),
           name = functionchart.name,
+          implicit = functionchart.implicit,
           subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()),
           closed = subgraphInfo.inWires.size == 0;
     let abstract = closed;
@@ -2188,6 +2195,28 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
                 name = undefined,
                 pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
           inputs.push(pinInfo);
+        } else if (node instanceof Element && implicit) {
+          const type = node.type,
+                inputPins = type.inputs,
+                outputPins = type.outputs;
+          for (let i = 0; i < inputPins.length; i++) {
+            if (node.inWires[i])
+              continue;
+            const pin = inputPins[i];
+            const type = pin.type,
+                  name = pin.name,
+                  pinInfo = { element: node, index: i, type, name, fcIndex: -1 };
+            inputs.push(pinInfo);
+          }
+          for (let i = 0; i < outputPins.length; i++) {
+            if (node.outWires[i].length !== 0)
+              continue;
+            const pin = outputPins[i];
+            const type = pin.type,
+                  name = pin.name,
+                  pinInfo = { element: node, index: i, type, name, fcIndex: -1 };
+            outputs.push(pinInfo);
+          }
         }
         abstract = abstract && node.isAbstract;
       }
@@ -3566,6 +3595,13 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
         prop: nameProp,
+      },
+      {
+        label: 'implicit',
+        type: 'boolean',
+        getter: getter,
+        setter: setter,
+        prop: implicitProp,
       },
       {
         label: 'hideLinks',
