@@ -807,7 +807,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.functionchart = root;
     this.insertFunctionchart(root, undefined);
 
-    this.updateDerivedInfo();
+    this.updateDerivedInfo();     // Make sure wire arrays are present for implicit functioncharts.
     this.updateFunctioncharts();  // Initialize TypeInfo for all functioncharts.
     this.updateDerivedInfo();
   }
@@ -2195,7 +2195,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
                 name = undefined,
                 pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
           inputs.push(pinInfo);
-        } else if (node instanceof Element && implicit) {
+        } else if ((node instanceof Element || node instanceof Functionchart) && implicit) {
+          // In implicit mode, empty pins of true elements become pins for the functionchart type.
           const type = node.type,
                 inputPins = type.inputs,
                 outputPins = type.outputs;
