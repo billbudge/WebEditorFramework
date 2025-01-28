@@ -512,27 +512,21 @@ describe('FunctionchartContext', () => {
         let typeInfo = context.getFunctionchartTypeInfo(functionchart);
         // No inputs or outputs.
         expect(typeInfo.instanceType.typeString).toBe('[,]');
-        // expect(typeInfo.passThroughs.length).toBe(0);
         const wire1 = addWire(functionchart, elem1, 0, elem2, 2);
         mutate(context, () => context.completeNode([elem1, elem2]));
         typeInfo = context.getFunctionchartTypeInfo(functionchart);
         expect(typeInfo.instanceType.typeString).toBe('[vvvvv,v]');
         expect(typeInfo.abstract).toBe(false);
-        // expect(typeInfo.passThroughs.length).toBe(1);
-        // arrayEquals(typeInfo.passThroughs[0], [1, 2, 4, 5]);
     });
     test('getAbstractFunctionchartTypeInfo', () => {
         const context = new FC.FunctionchartContext(), functionchart = context.root, input = addPseudoelement(functionchart, 'input'), output = addPseudoelement(functionchart, 'output');
         let typeInfo = context.getFunctionchartTypeInfo(functionchart);
         expect(typeInfo.instanceType.typeString).toBe('[v,v]');
         expect(typeInfo.abstract).toBe(true);
-        // expect(typeInfo.passThroughs.length).toBe(0);
         const wire1 = addWire(functionchart, input, 0, output, 0);
         typeInfo = context.getFunctionchartTypeInfo(functionchart);
         expect(typeInfo.instanceType.typeString).toBe('[v,v]');
-        expect(typeInfo.abstract).toBe(false);
-        // expect(typeInfo.passThroughs.length).toBe(1);
-        // arrayEquals(typeInfo.passThroughs[0], [0, 1]);
+        expect(typeInfo.abstract).toBe(true); // Pseudo-wire is abstract
     });
     const recursiveFuncionchartTest = {
         "type": "functionchart",
