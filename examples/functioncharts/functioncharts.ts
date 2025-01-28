@@ -17,12 +17,11 @@ import { ScalarProp, ChildListProp, ReferenceProp, IdProp, PropertyTypes,
          List, TransactionManager, TransactionEvent, HistoryManager, ScalarPropertyTypes,
          ChildPropertyTypes,
          ChildSlotProp} from '../../src/dataModels.js'
-import { ParentTypes } from '../statecharts/statecharts.js';
+
 import { types } from '@babel/core';
 
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 
-// TODO abstract exporters can't be wired.
 // TODO Functionchart imports.
 // TODO Root functionchart type display.
 // TODO Check validity of function instances during drag-n-drop.
@@ -709,6 +708,7 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> {
   typeInfo = emptyTypeInfo;
   lastTypeInfo: TypeInfo | undefined;
   pinMap: Array<number> | undefined;
+  recursive: boolean = false;
 
   instanceType: Type = Type.emptyType;
 
@@ -768,6 +768,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   // Topologically sorted elements. If a cycle is present, the size is less than the elements set.
   private sorted = new Array<NodeTypes>();
   private invalidWires = new Array<Wire>();  // Wires that violate the fan-in constraint.
+  private instancingGraph = new Map<Functionchart, Set<Functionchart>>();
 
   private readonly transactionManager: TransactionManager;
   private readonly historyManager: HistoryManager;
@@ -1552,6 +1553,49 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return invalidWires;
   }
 
+  // TODO some tests.
+  private buildInstancingGraph() : Map<Functionchart, Set<Functionchart>> {
+    const instancingGraph = new Map<Functionchart, Set<Functionchart>>();
+    // -Only functioncharts can be recursive.
+    // -For each functionchart, make a list of other functioncharts it instantiates, either directly, or
+    // indirectly through another functionchart, possibly including itself.
+    // -If a functionchart references itself, or another functionchart that references it, it is recursive.
+    function visitInstance(instance: FunctionInstance, functioncharts: Set<Functionchart>) {
+      const src = instance.src;
+      if (src instanceof Functionchart) {
+        if (!functioncharts.has(src)) {
+          functioncharts.add(src);
+          visitFunctionchart(src);
+        }
+      }
+    }
+    function visitFunctionchart(functionchart: Functionchart) {
+      if (instancingGraph.has(functionchart))
+        return;
+      const functioncharts = new Set<Functionchart>();
+      instancingGraph.set(functionchart, functioncharts);
+      functionchart.nodes.forEach(node => {
+        if (node instanceof FunctionInstance) {
+          visitInstance(node, functioncharts);
+        } else if (node instanceof ContainerElement) {
+          if (node.innerElement instanceof FunctionInstance) {
+            // TODO chains of instancers shouldn't be possible.
+            visitInstance(node.innerElement, functioncharts);
+          }
+        }
+      });
+    }
+    this.nodes.forEach(node => {
+      if (node instanceof Functionchart) {
+        visitFunctionchart(node);
+      }
+    });
+    instancingGraph.forEach((srcs, functionchart)=> {
+      functionchart.recursive = srcs.has(functionchart);
+    });
+    return instancingGraph;
+  }
+
   // Topological sort of elements for update and validation. The circuit should form a DAG.
   // All wires should be valid.
   private topologicalSort() : NodeTypes[] {
@@ -1608,9 +1652,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       this.derivedInfoNeedsUpdate = false;
       this.invalidWires = this.updateReferenceLists();
       this.sorted = this.topologicalSort();
+      this.instancingGraph = this.buildInstancingGraph();
       this.updateFunctioncharts();
     }
   }
+
   isValidFunctionchart() {
     if (this.invalidWires.length !== 0 || this.sorted.length !== this.nodes.size)
       return false;
@@ -1618,9 +1664,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const self = this,
           invalidWires = new Array<Wire>(),
           invalidInstances = new Array<FunctionInstance>(),
-          graphInfo = this.getGraphInfo();
+          invalidFunctioncharts = new Array<Functionchart>();
     // Check wires.
-    graphInfo.wires.forEach(wire => {
+    this.wires.forEach(wire => {
       if (!self.isValidWire(wire)) {  // TODO incorporate in update graph info?
         invalidWires.push(wire);
       }
@@ -1628,16 +1674,25 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (invalidWires.length !== 0)
       return false;
 
-    // Check function instances.
-    graphInfo.nodes.forEach(node => {
-      const instance = node.asInstance();
-      if (instance) {
-        if (!self.isValidFunctionInstance(instance))
-          invalidInstances.push(instance);
+    // Check functioncharts and functioninstances.
+    this.nodes.forEach(node => {
+      if (node instanceof Functionchart) {
+        if (node.recursive) {
+          // Recursive functioncharts can't be implicit.
+          if (node.implicit) {
+            invalidFunctioncharts.push(node);
+          }
+        }
+      } else {
+        const instance = node.asInstance();
+        if (instance) {
+          if (!self.isValidFunctionInstance(instance))
+            invalidInstances.push(instance);
+        }
       }
     });
 
-    return invalidInstances.length === 0;
+    return invalidFunctioncharts.length === 0 && invalidInstances.length === 0;
   }
 
   // Makes an array that maps old inputs and outputs to new ones based on the TypeInfo.
@@ -2210,7 +2265,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
             inputs.push(pinInfo);
           }
           for (let i = 0; i < outputPins.length; i++) {
-            if (node.outWires[i].length !== 0)
+            // If output is used or instanced from.
+            if (node.outWires[i].length !== 0 || node.instances[i].length !== 0)
               continue;
             const pin = outputPins[i];
             const type = pin.type,
