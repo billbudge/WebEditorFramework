@@ -73,8 +73,11 @@ export class Type {
     toImportExportType() {
         return Type.fromInfo([], [new Pin(this)]);
     }
-    toCastType() {
+    toUpCastType() {
         return Type.fromInfo([new Pin(Type.valueType)], [new Pin(Type.valueType), new Pin(this)]);
+    }
+    toDownCastType() {
+        return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)]);
     }
     static outputType(pin) {
         const type = pin.type;
@@ -328,7 +331,7 @@ class FunctionchartTemplate extends NodeTemplate {
 }
 const elementTemplate = new ElementTemplate('element'), // built-in elements
 importerTemplate = new ContainerElementTemplate('importer'), // container elements
-castTemplate = new ContainerElementTemplate('cast'), inputTemplate = new PseudoelementTemplate('input'), // input pseudoelement
+upCastTemplate = new ContainerElementTemplate('upCast'), downCastTemplate = new ContainerElementTemplate('downCast'), inputTemplate = new PseudoelementTemplate('input'), // input pseudoelement
 outputTemplate = new PseudoelementTemplate('output'), // output pseudoelement
 useTemplate = new PseudoelementTemplate('use'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate('functionchart'), functionInstanceTemplate = new FunctionInstanceTemplate('instance');
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
@@ -401,8 +404,11 @@ export class Element extends NodeBase {
     get isImporter() {
         return this.template.typeName === 'importer';
     }
-    get isCast() {
-        return this.template.typeName === 'cast';
+    get isUpCast() {
+        return this.template.typeName === 'upCast';
+    }
+    get isDownCast() {
+        return this.template.typeName === 'downCast';
     }
     get isInstanced() {
         return this instanceof FunctionInstance ||
@@ -417,16 +423,17 @@ export class ContainerElement extends Element {
     set innerElement(value) { this.template.innerElement.get(this).set(0, value); }
     // Derived properties.
     get innerType() { var _b; return ((_b = this.innerElement) === null || _b === void 0 ? void 0 : _b.type) || Type.emptyType; }
-    get isAbstract() {
-        const innerElement = this.innerElement;
-        return !innerElement || innerElement.isAbstract;
-    }
+    get isAbstract() { return false; }
     updateTypeInfo() {
         if (this.innerElement) {
             const innerType = this.innerType;
             let containerType;
-            if (this.isCast) {
-                containerType = innerType.toCastType().rename('(' + innerType.name + ')');
+            if (this.isUpCast) {
+                // containerType = innerType.toCastType().rename('(' + innerType.name + ')');
+                containerType = innerType.toUpCastType();
+            }
+            else if (this.isDownCast) {
+                containerType = innerType.toDownCastType();
             }
             else {
                 containerType = innerType.toImportExportType();
@@ -493,8 +500,9 @@ export class Wire {
         return Type.valueType;
     }
     get isPseudowire() {
-        const src = this.src, dst = this.dst;
-        return src instanceof Pseudoelement || dst instanceof Pseudoelement;
+        // The src is a pseudoelement and the dst isn't.
+        const srcPseudo = this.src instanceof Pseudoelement, dstPseudo = this.dst instanceof Pseudoelement;
+        return srcPseudo && !dstPseudo;
     }
     constructor(context) {
         this.template = wireTemplate;
@@ -600,8 +608,11 @@ export class FunctionchartContext extends EventBase {
             case 'importer':
                 result = new ContainerElement(this, importerTemplate, nextId);
                 break;
-            case 'cast':
-                result = new ContainerElement(this, castTemplate, nextId);
+            case 'upCast':
+                result = new ContainerElement(this, upCastTemplate, nextId);
+                break;
+            case 'downCast':
+                result = new ContainerElement(this, downCastTemplate, nextId);
                 break;
             default: throw new Error('Unknown element type: ' + typeName);
         }
@@ -1183,6 +1194,29 @@ export class FunctionchartContext extends EventBase {
         }
         return true;
     }
+    // isIsolated(node: NodeTypes) : boolean {
+    //   const type = node.type,
+    //         nInputs = type.inputs.length,
+    //         nOutputs = type.outputs.length,
+    //         inputs = node.inWires,
+    //         outputs = node.outWires;
+    //   for (let i = 0; i < inputs.length; i++) {
+    //     if (inputs[i] !== undefined)
+    //       return false;
+    //   }
+    //   for (let i = 0; i < outputs.length; i++) {
+    //     if (outputs[i].length !== 0)
+    //       return false;
+    //   }
+    //   if (node.isInstancer) {
+    //     const instances = node.instances;
+    //     for (let i = 0; i < outputs.length; i++) {
+    //       if (instances[i].length !== 0)
+    //         return false;
+    //     }
+    //   }
+    //   return true;
+    // }
     isWiredOrInstanced(node) {
         const type = node.type, nInputs = type.inputs.length, nOutputs = type.outputs.length, inputs = node.inWires, outputs = node.outWires;
         for (let i = 0; i < nInputs; i++) {
@@ -1686,15 +1720,26 @@ export class FunctionchartContext extends EventBase {
         return root;
     }
     importElement(element) {
-        const importer = this.newElement('importer'), importerType = element.type.toImportExportType();
-        importer.x = element.globalPosition.x;
-        importer.y = element.globalPosition.y;
+        const importer = this.newElement('importer');
+        importer.typeString = element.type.toImportExportType().typeString;
+        importer.x = element.x;
+        importer.y = element.y;
         return importer;
     }
-    castElement(element) {
-        const cast = this.newElement('cast'), castType = element.type.toCastType();
-        cast.x = element.globalPosition.x;
-        cast.y = element.globalPosition.y;
+    castElement(element, upCast) {
+        let typeName, type;
+        if (upCast) {
+            typeName = 'upCast';
+            type = element.type.toUpCastType();
+        }
+        else {
+            typeName = 'downCast';
+            type = element.type.toDownCastType();
+        }
+        const cast = this.newElement(typeName);
+        cast.typeString = type.typeString;
+        cast.x = element.x;
+        cast.y = element.y;
         return cast;
     }
     importElements(elements) {
@@ -1709,14 +1754,14 @@ export class FunctionchartContext extends EventBase {
             selection.add(importer);
         });
     }
-    castElements(elements) {
+    castElements(elements, upCast) {
         const self = this, selection = this.selection;
         elements.forEach(element => {
             if (element instanceof ContainerElement)
                 return;
             self.disconnectNode(element);
             selection.delete(element);
-            const castElement = self.castElement(element), parent = element.parent;
+            const castElement = self.castElement(element, upCast), parent = element.parent;
             self.addItem(castElement, parent);
             self.addItem(element, castElement);
             selection.add(castElement);
@@ -1815,7 +1860,9 @@ export class FunctionchartContext extends EventBase {
     }
     getFunctionchartTypeInfo(functionchart) {
         const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name, implicit = functionchart.implicit, subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()), closed = subgraphInfo.inWires.size == 0;
-        let abstract = closed;
+        // A functionchart is abstract unless it contains a non-abstract Element or Functionchart, or
+        // a non-pseudowire.
+        let abstract = true;
         // Only pseudowires (to/from Pseudoelement) in an abstract functionchart.
         subgraphInfo.wires.forEach(wire => {
             abstract = abstract && wire.isPseudowire;
@@ -1839,18 +1886,19 @@ export class FunctionchartContext extends EventBase {
                 }
             }
             else {
-                if (node instanceof ContainerElement && node.innerElement) {
-                    if (node.isImporter) {
-                        const innerType = node.innerType, name = innerType.name, type = innerType.rename(), pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-                        inputs.push(pinInfo);
-                    }
+                // Special cases of nodes that generate pins.
+                if (node instanceof ContainerElement && node.innerElement && node.isImporter) {
+                    const innerType = node.innerType, name = innerType.name, type = innerType.rename(), pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                    inputs.push(pinInfo);
                 }
                 else if (node instanceof Element && node.isAbstract) {
-                    // Abstract elements must be inputs.
+                    // Abstract elements become a single input (and don't implicitly generate other pins).
                     const type = node.type, name = undefined, pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
                     inputs.push(pinInfo);
                 }
                 else if ((node instanceof Element || node instanceof Functionchart) && implicit) {
+                    // The general case node...
+                    abstract = abstract && node.isAbstract;
                     // In implicit mode, empty pins of true elements become pins for the functionchart type.
                     const type = node.type, inputPins = type.inputs, outputPins = type.outputs;
                     for (let i = 0; i < inputPins.length; i++) {
@@ -1869,7 +1917,6 @@ export class FunctionchartContext extends EventBase {
                         outputs.push(pinInfo);
                     }
                 }
-                abstract = abstract && node.isAbstract;
             }
         });
         // Sort pins in increasing y-order. This lets users arrange the pins of the
@@ -2018,7 +2065,8 @@ export class FunctionchartContext extends EventBase {
         switch (typeName) {
             case 'element':
             case 'importer':
-            case 'cast':
+            case 'upCast':
+            case 'downCast':
             case 'instance': return this.newElement(typeName);
             case 'input':
             case 'output':
@@ -2130,11 +2178,6 @@ class Renderer {
                 width = item.width;
                 height = item.height;
             }
-            else if (item instanceof ContainerElement && item.innerElement && item.isImporter) {
-                const spacing = this.theme.spacing, innerElement = item.innerElement;
-                width = innerElement.type.width + spacing;
-                height = innerElement.type.height + spacing; // TODO
-            }
             else {
                 // All element types.
                 const type = item.type;
@@ -2145,12 +2188,23 @@ class Renderer {
         return { x, y, width, height };
     }
     getInnerElementOffset(container) {
-        const spacing = this.theme.spacing;
-        switch (container.template.typeName) { // TODO improve magic numbers.
-            case 'cast':
-                return { x: spacing + spacing, y: spacing + spacing };
-            default:
-                return { x: spacing, y: spacing / 2 };
+        const spacing = this.theme.spacing, type = container.type;
+        if (type.needsLayout) {
+            this.layoutType(type);
+        }
+        switch (container.template.typeName) {
+            case 'upCast': {
+                const y = type.outputs[1].y;
+                return { x: spacing + spacing, y };
+            }
+            case 'downCast': {
+                const y = type.inputs[0].y;
+                return { x: 0, y };
+            }
+            default: {
+                const y = type.outputs[0].y;
+                return { x: spacing, y };
+            }
         }
     }
     // Get wire attachment point for element input/output pins.
@@ -2812,8 +2866,7 @@ export class FunctionchartEditor {
                     }
                     break;
                 }
-                // case 'importer':
-                // case 'cast': {
+                // case 'importer': {
                 //   const container = item as ContainerElement;
                 //   if (container.isImporter) {
                 //     result = item.type.outputs[0].name;
@@ -2844,8 +2897,7 @@ export class FunctionchartEditor {
                     }
                     break;
                 }
-                // case 'importer':
-                // case 'cast': {
+                // case 'importer': {
                 //   const container = item as ContainerElement,
                 //         type = container.type;
                 //   if (container.isImporter) {
@@ -2996,14 +3048,16 @@ export class FunctionchartEditor {
                 prop: commentProp,
             },
         ]);
-        this.propertyInfo.set('cast', [
-            // {
-            //   label: 'name',
-            //   type: 'text',
-            //   getter: nodeLabelGetter,
-            //   setter: nodeLabelSetter,
-            //   prop: typeStringProp,
-            // },
+        this.propertyInfo.set('upCast', [
+            {
+                label: 'comment',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: commentProp,
+            },
+        ]);
+        this.propertyInfo.set('downCast', [
             {
                 label: 'comment',
                 type: 'text',
@@ -3746,7 +3800,7 @@ export class FunctionchartEditor {
                     return true;
                 case 85: // 'u'
                     context.beginTransaction('cast element');
-                    context.castElements(context.selectedElements());
+                    context.castElements(context.selectedElements(), !shiftKey);
                     context.endTransaction();
                     return true;
                 case 78: { // ctrl 'n'   // Can't intercept cmd n.

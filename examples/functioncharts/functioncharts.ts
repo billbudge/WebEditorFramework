@@ -132,8 +132,11 @@ export class Type {
   toImportExportType() : Type {
     return Type.fromInfo([], [new Pin(this)]);
   }
-  toCastType() : Type {
+  toUpCastType() : Type {
     return Type.fromInfo([new Pin(Type.valueType)], [new Pin(Type.valueType), new Pin(this)]);
+  }
+  toDownCastType() : Type {
+    return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)]);
   }
 
   static outputType(pin: Pin) : Type {
@@ -343,7 +346,7 @@ abstract class NodeTemplate {
   readonly properties: PropertyTypes[] = [];
 }
 
-export type ContainerElementType = 'importer' | 'new' | 'cast';
+export type ContainerElementType = 'importer' | 'new' | 'upCast' | 'downCast';
 export type ElementType = 'element' | 'instance' | ContainerElementType;
 
 class ElementTemplate extends NodeTemplate {
@@ -416,7 +419,8 @@ class FunctionchartTemplate extends NodeTemplate {
 
 const elementTemplate = new ElementTemplate('element'),        // built-in elements
       importerTemplate = new ContainerElementTemplate('importer'),  // container elements
-      castTemplate = new ContainerElementTemplate('cast'),
+      upCastTemplate = new ContainerElementTemplate('upCast'),
+      downCastTemplate = new ContainerElementTemplate('downCast'),
       inputTemplate = new PseudoelementTemplate('input'),      // input pseudoelement
       outputTemplate = new PseudoelementTemplate('output'),    // output pseudoelement
       useTemplate = new PseudoelementTemplate('use'),
@@ -520,8 +524,11 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
   get isImporter() : boolean {
     return this.template.typeName === 'importer';
   }
-  get isCast() {
-    return this.template.typeName === 'cast';
+  get isUpCast() {
+    return this.template.typeName === 'upCast';
+  }
+  get isDownCast() {
+    return this.template.typeName === 'downCast';
   }
   get isInstanced(): boolean {
     return this instanceof FunctionInstance ||
@@ -540,17 +547,17 @@ export class ContainerElement extends Element<ContainerElementTemplate> {
   // Derived properties.
   get innerType() : Type { return this.innerElement?.type || Type.emptyType; }
 
-  get isAbstract() : boolean {
-    const innerElement = this.innerElement;
-    return !innerElement || innerElement.isAbstract;
-  }
+  get isAbstract() : boolean { return false; }
 
   updateTypeInfo() {
     if (this.innerElement) {
       const innerType = this.innerType;
       let containerType;
-      if (this.isCast) {
-        containerType = innerType.toCastType().rename('(' + innerType.name + ')');
+      if (this.isUpCast) {
+        // containerType = innerType.toCastType().rename('(' + innerType.name + ')');
+        containerType = innerType.toUpCastType();
+      } else if (this.isDownCast) {
+        containerType = innerType.toDownCastType();
       } else {
         containerType = innerType.toImportExportType();
       }
@@ -636,9 +643,10 @@ export class Wire implements DataContextObject {
   }
 
   get isPseudowire() : boolean {
-    const src = this.src,
-          dst = this.dst;
-    return src instanceof Pseudoelement || dst instanceof Pseudoelement;
+    // The src is a pseudoelement and the dst isn't.
+    const srcPseudo = this.src instanceof Pseudoelement,
+          dstPseudo = this.dst instanceof Pseudoelement;
+    return srcPseudo && !dstPseudo;
   }
 
   constructor(context: FunctionchartContext) {
@@ -822,8 +830,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'importer':
         result = new ContainerElement(this, importerTemplate, nextId);
         break;
-      case 'cast':
-        result = new ContainerElement(this, castTemplate, nextId);
+      case 'upCast':
+        result = new ContainerElement(this, upCastTemplate, nextId);
+        break;
+      case 'downCast':
+        result = new ContainerElement(this, downCastTemplate, nextId);
         break;
       default: throw new Error('Unknown element type: ' + typeName);
     }
@@ -1467,6 +1478,30 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return true;
   }
 
+  // isIsolated(node: NodeTypes) : boolean {
+  //   const type = node.type,
+  //         nInputs = type.inputs.length,
+  //         nOutputs = type.outputs.length,
+  //         inputs = node.inWires,
+  //         outputs = node.outWires;
+  //   for (let i = 0; i < inputs.length; i++) {
+  //     if (inputs[i] !== undefined)
+  //       return false;
+  //   }
+  //   for (let i = 0; i < outputs.length; i++) {
+  //     if (outputs[i].length !== 0)
+  //       return false;
+  //   }
+  //   if (node.isInstancer) {
+  //     const instances = node.instances;
+  //     for (let i = 0; i < outputs.length; i++) {
+  //       if (instances[i].length !== 0)
+  //         return false;
+  //     }
+  //   }
+  //   return true;
+  // }
+
   isWiredOrInstanced(node: NodeTypes) : boolean {
     const type = node.type,
           nInputs = type.inputs.length,
@@ -2014,18 +2049,26 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   importElement(element: Element) : ContainerElement {
-    const importer = this.newElement('importer') as ContainerElement,
-          importerType = element.type.toImportExportType();
-    importer.x = element.globalPosition.x;
-    importer.y = element.globalPosition.y;
+    const importer = this.newElement('importer') as ContainerElement;
+    importer.typeString = element.type.toImportExportType().typeString;
+    importer.x = element.x;
+    importer.y = element.y;
     return importer;
   }
 
-  castElement(element: Element) : ContainerElement {
-    const cast = this.newElement('cast') as ContainerElement,
-          castType = element.type.toCastType();
-    cast.x = element.globalPosition.x;
-    cast.y = element.globalPosition.y;
+  castElement(element: Element, upCast: boolean) : ContainerElement {
+    let typeName: ElementType, type: Type;
+    if (upCast) {
+      typeName = 'upCast';
+      type = element.type.toUpCastType();
+    } else {
+      typeName = 'downCast';
+      type = element.type.toDownCastType();
+    }
+    const cast = this.newElement(typeName) as ContainerElement;
+    cast.typeString = type.typeString;
+    cast.x = element.x;
+    cast.y = element.y;
     return cast;
   }
 
@@ -2044,7 +2087,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  castElements(elements: Element[]) {
+  castElements(elements: Element[], upCast: boolean) {
     const self = this,
           selection = this.selection;
 
@@ -2052,7 +2095,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (element instanceof ContainerElement) return;
       self.disconnectNode(element);
       selection.delete(element);
-      const castElement = self.castElement(element),
+      const castElement = self.castElement(element, upCast),
             parent = element.parent as Functionchart;
       self.addItem(castElement, parent);
       self.addItem(element, castElement);
@@ -2172,8 +2215,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           implicit = functionchart.implicit,
           subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()),
           closed = subgraphInfo.inWires.size == 0;
-    let abstract = closed;
-
+    // A functionchart is abstract unless it contains a non-abstract Element or Functionchart, or
+    // a non-pseudowire.
+    let abstract = true;
     // Only pseudowires (to/from Pseudoelement) in an abstract functionchart.
     subgraphInfo.wires.forEach(wire => {
       abstract = abstract && wire.isPseudowire;
@@ -2195,21 +2239,22 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           outputs.push(pinInfo);
         }
       } else {
-        if (node instanceof ContainerElement && node.innerElement) {
-          if (node.isImporter) {
-            const innerType = node.innerType,
-                  name = innerType.name,
-                  type = innerType.rename(),
-                  pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
-            inputs.push(pinInfo);
-          }
+        // Special cases of nodes that generate pins.
+        if (node instanceof ContainerElement && node.innerElement && node.isImporter) {
+          const innerType = node.innerType,
+                name = innerType.name,
+                type = innerType.rename(),
+                pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+          inputs.push(pinInfo);
         } else if (node instanceof Element && node.isAbstract) {
-          // Abstract elements must be inputs.
+          // Abstract elements become a single input (and don't implicitly generate other pins).
           const type = node.type,
                 name = undefined,
                 pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
           inputs.push(pinInfo);
         } else if ((node instanceof Element || node instanceof Functionchart) && implicit) {
+          // The general case node...
+          abstract = abstract && node.isAbstract;
           // In implicit mode, empty pins of true elements become pins for the functionchart type.
           const type = node.type,
                 inputPins = type.inputs,
@@ -2234,7 +2279,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
             outputs.push(pinInfo);
           }
         }
-        abstract = abstract && node.isAbstract;
       }
     });
 
@@ -2397,8 +2441,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     switch (typeName) {
       case 'element':
       case 'importer':
-      case 'cast':
-      case 'instance': return this.newElement(typeName);
+        case 'upCast':
+        case 'downCast':
+        case 'instance': return this.newElement(typeName);
 
       case 'input':
       case 'output':
@@ -2540,11 +2585,6 @@ class Renderer implements ILayoutEngine {
       if (item instanceof Functionchart) {
         width = item.width;
         height = item.height;
-      } else if (item instanceof ContainerElement && item.innerElement && item.isImporter) {
-        const spacing = this.theme.spacing,
-              innerElement = item.innerElement;
-        width = innerElement.type.width + spacing;
-        height = innerElement.type.height + spacing;  // TODO
       } else {
         // All element types.
         const type = item.type;
@@ -2555,12 +2595,24 @@ class Renderer implements ILayoutEngine {
     return { x, y, width, height };
   }
   getInnerElementOffset(container: ContainerElement): Point {
-    const spacing = this.theme.spacing;
-    switch (container.template.typeName) {  // TODO improve magic numbers.
-      case 'cast':
-        return { x: spacing + spacing, y: spacing + spacing }
-      default:
-        return { x: spacing, y: spacing / 2 };
+    const spacing = this.theme.spacing,
+          type = container.type;
+    if (type.needsLayout) {
+      this.layoutType(type);
+    }
+    switch (container.template.typeName) {
+      case 'upCast': {
+        const y = type.outputs[1].y;
+        return { x: spacing + spacing, y }
+      }
+      case 'downCast': {
+        const y = type.inputs[0].y;
+        return { x: 0, y };
+      }
+      default: {
+        const y = type.outputs[0].y;
+        return { x: spacing, y };
+      }
     }
   }
   // Get wire attachment point for element input/output pins.
@@ -3381,8 +3433,7 @@ export class FunctionchartEditor implements CanvasLayer {
           }
           break;
         }
-        // case 'importer':
-        // case 'cast': {
+        // case 'importer': {
         //   const container = item as ContainerElement;
         //   if (container.isImporter) {
         //     result = item.type.outputs[0].name;
@@ -3413,8 +3464,7 @@ export class FunctionchartEditor implements CanvasLayer {
           }
           break;
         }
-        // case 'importer':
-        // case 'cast': {
+        // case 'importer': {
         //   const container = item as ContainerElement,
         //         type = container.type;
         //   if (container.isImporter) {
@@ -3565,14 +3615,16 @@ export class FunctionchartEditor implements CanvasLayer {
         prop: commentProp,
       },
     ]);
-    this.propertyInfo.set('cast', [
-      // {
-      //   label: 'name',
-      //   type: 'text',
-      //   getter: nodeLabelGetter,
-      //   setter: nodeLabelSetter,
-      //   prop: typeStringProp,
-      // },
+    this.propertyInfo.set('upCast', [
+      {
+        label: 'comment',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+        prop: commentProp,
+      },
+    ]);
+    this.propertyInfo.set('downCast', [
       {
         label: 'comment',
         type: 'text',
@@ -4393,7 +4445,7 @@ export class FunctionchartEditor implements CanvasLayer {
           return true;
         case 85: // 'u'
           context.beginTransaction('cast element');
-          context.castElements(context.selectedElements());
+          context.castElements(context.selectedElements(), !shiftKey);
           context.endTransaction();
           return true;
         case 78: { // ctrl 'n'   // Can't intercept cmd n.
