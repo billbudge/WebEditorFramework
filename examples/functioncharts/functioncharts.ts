@@ -642,12 +642,12 @@ export class Wire implements DataContextObject {
     return Type.valueType;
   }
 
-  get isPseudowire() : boolean {
-    // The src is a pseudoelement and the dst isn't.
-    const srcPseudo = this.src instanceof Pseudoelement,
-          dstPseudo = this.dst instanceof Pseudoelement;
-    return srcPseudo && !dstPseudo;
-  }
+  // get isPseudowire() : boolean {  // TODO
+  //   // The src is a pseudoelement and the dst isn't.
+  //   const srcPseudo = this.src instanceof Pseudoelement,
+  //         dstPseudo = this.dst instanceof Pseudoelement;
+  //   return srcPseudo && !dstPseudo;
+  // }
 
   constructor(context: FunctionchartContext) {
     this.context = context;
@@ -2218,10 +2218,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     // A functionchart is abstract unless it contains a non-abstract Element or Functionchart, or
     // a non-pseudowire.
     let abstract = true;
-    // Only pseudowires (to/from Pseudoelement) in an abstract functionchart.
-    subgraphInfo.wires.forEach(wire => {
-      abstract = abstract && wire.isPseudowire;
-    });
+    // // Only pseudowires (to/from Pseudoelement) in an abstract functionchart.
+    // subgraphInfo.wires.forEach(wire => {
+    //   abstract = abstract && wire.isPseudowire;
+    // });
     // Collect the functionchart's input and output pseudoelements.
     subgraphInfo.nodes.forEach(node => {
       if (node instanceof Pseudoelement) {
@@ -2252,31 +2252,34 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
                 name = undefined,
                 pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
           inputs.push(pinInfo);
-        } else if ((node instanceof Element || node instanceof Functionchart) && implicit) {
+        } else {
           // The general case node...
           abstract = abstract && node.isAbstract;
-          // In implicit mode, empty pins of true elements become pins for the functionchart type.
-          const type = node.type,
-                inputPins = type.inputs,
-                outputPins = type.outputs;
-          for (let i = 0; i < inputPins.length; i++) {
-            if (node.inWires[i])
-              continue;
-            const pin = inputPins[i];
-            const type = pin.type,
-                  name = pin.name,
-                  pinInfo = { element: node, index: i, type, name, fcIndex: -1 };
-            inputs.push(pinInfo);
-          }
-          for (let i = 0; i < outputPins.length; i++) {
-            // If output is used or instanced from.
-            if (node.outWires[i].length !== 0 || node.instances[i].length !== 0)
-              continue;
-            const pin = outputPins[i];
-            const type = pin.type,
-                  name = pin.name,
-                  pinInfo = { element: node, index: i, type, name, fcIndex: -1 };
-            outputs.push(pinInfo);
+
+          if (implicit && (node instanceof Element || node instanceof Functionchart)) {
+            // In implicit mode, empty pins of true elements become pins for the functionchart type.
+            const type = node.type,
+                  inputPins = type.inputs,
+                  outputPins = type.outputs;
+            for (let i = 0; i < inputPins.length; i++) {
+              if (node.inWires[i])
+                continue;
+              const pin = inputPins[i];
+              const type = pin.type,
+                    name = pin.name,
+                    pinInfo = { element: node, index: i, type, name, fcIndex: -1 };
+              inputs.push(pinInfo);
+            }
+            for (let i = 0; i < outputPins.length; i++) {
+              // If output is used or instanced from.
+              if (node.outWires[i].length !== 0 || node.instances[i].length !== 0)
+                continue;
+              const pin = outputPins[i];
+              const type = pin.type,
+                    name = pin.name,
+                    pinInfo = { element: node, index: i, type, name, fcIndex: -1 };
+              outputs.push(pinInfo);
+            }
           }
         }
       }

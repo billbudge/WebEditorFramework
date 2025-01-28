@@ -73,7 +73,7 @@ We can also use the reduce function to sum the elements of an Array, if we are g
   <img src="./resources/factorial3.svg"  alt="" title="Array sum function defined with reduce function.">
 </figure>
 
-## Abstract functions (Binary Search)
+## Abstract Functions (Binary Search)
 
 Here is a binary search implementation. Again, judicious use of helpers gives a visual explanation of the index calculations, and keeps the wires organized. [Wikipedia](https://en.wikipedia.org/wiki/Binary_search)
 
@@ -104,10 +104,18 @@ The key features in this diagram are:
 
 1. TODO why is this better?
 
-## Abstract functions continued (Iteration)
+## Abstract Functions (Iteration)
+
+We can define two basic iteration primitives, roughly corresponding to a do-while loop and a while-do loop. We begin by defining abstractions for the body of the loop, and the condition for continuing the iteration.
 
 <figure>
   <img src="./resources/do_while.svg"  alt="" title="TODO.">
+</figure>
+
+We can make the iteration parameter an "iterator" which the body and condition can test. Then we can define for-loop primitives. TODO fix the body of the n! example part.
+
+<figure>
+  <img src="./resources/do_while2.svg"  alt="" title="TODO.">
 </figure>
 
 ## Abstract functions continued (Quicksort)
