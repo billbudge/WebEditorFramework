@@ -1908,7 +1908,7 @@ export class FunctionchartContext extends EventBase {
         // Sort pins in increasing y-order. This lets users arrange the pins of the
         // new type in an intuitive way.
         function compareYs(p1, p2) {
-            const element1 = p1.element, element2 = p2.element, pin1 = element1.getPin(p1.index), pin2 = element2.getPin(p2.index), y1 = element1.y + pin1.y, y2 = element2.y + pin2.y;
+            const element1 = p1.element, element2 = p2.element, pin1 = element1.getPin(p1.index), pin2 = element2.getPin(p2.index), y1 = element1.globalPosition.y + pin1.y, y2 = element2.globalPosition.y + pin2.y;
             return y1 - y2;
         }
         // function compareIndices(p1: PinInfo, p2: PinInfo) {

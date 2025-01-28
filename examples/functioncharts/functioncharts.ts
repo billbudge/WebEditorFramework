@@ -2286,8 +2286,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
             element2 = p2.element,
             pin1 = element1.getPin(p1.index),
             pin2 = element2.getPin(p2.index),
-            y1 = element1.y + pin1.y,
-            y2 = element2.y + pin2.y;
+            y1 = element1.globalPosition.y + pin1.y,
+            y2 = element2.globalPosition.y + pin2.y;
       return y1 - y2;
     }
     // function compareIndices(p1: PinInfo, p2: PinInfo) {
