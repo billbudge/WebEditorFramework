@@ -100,25 +100,34 @@ The key features in this diagram are:
 
 1. Helper functions are defined first, including abstractions for indexing ('[i]') and the "less than" predicate ('pred'). There is also a '??' predicate which returns two separate values for the true and false cases. This helps organize wires since it's used twice.
 
-1. The 'div' helper function divides the range [lo..hi] into two sub-ranges [lo..mid] and [mid + 1, hi]. This helps reduce clutter.
+1. The 'divide' helper function divides the range [lo..hi] into two sub-ranges [lo..mid] and [mid + 1, hi]. This helps reduce clutter.
 
 1. TODO why is this better?
 
 ## Abstract Functions (Iteration)
 
-We can define two basic iteration primitives, roughly corresponding to a do-while loop and a while-do loop. We begin by defining abstractions for the body of the loop, and the condition for continuing the iteration.
+We can define two basic iteration primitives, roughly corresponding to a do-while loop and a while-do loop. We begin by defining abstractions for the body of the loop, and the condition for continuing the iteration. Each function takes a single input and produces a single output. do-while and while-do both take an initial value 'p' and simply pass it to the 'body' and 'cond' functions. This is our loop variable, corresponding to a numeric index or an iterator of some kind. The result of 'body' is simply passed on to the next invocation of 'body'. 'body' is responsible for updating the loop variable and returning it. The result of 'cond' determines when the loop terminates. A true value continues the loop.
+
+The do-while form runs 'body' before 'cond', by making 'cond' depend on the result of 'body'. The while-do runs cond on the loop variable first, and only invokes 'body' if we iterate (call while-do recursively).
 
 <figure>
   <img src="./resources/do_while.svg"  alt="" title="TODO.">
 </figure>
 
-We can make the iteration parameter an "iterator" which the body and condition can test. Then we can define for-loop primitives. TODO fix the body of the n! example part.
+If we make the iteration parameter a numeric index which the body and condition can test, then we can define for-loop primitives. Depending on the predicate chosen, we can implement various kinds of loop. Here we choose to implement the most common for-loops.
 
+```ts
+for (let i = start; i < end; )   // for [start,end[+
+
+for (let i = start; i >= end; )  // for [start,end]-
+```
+
+Finally, at the bottom, we again implement factorial using our for-loop. We choose the "down" iteration which iterates over the range [n..2] (inclusive). We use a 'let' to hold our product as it's computed. We initialize the accumulator to 1.
 <figure>
   <img src="./resources/do_while2.svg"  alt="" title="TODO.">
 </figure>
 
-## Abstract functions continued (Quicksort)
+## Abstract Functions (Quicksort)
 Here is the source for a Javascript implementation of Quicksort which does the partition step in place using Hoare's algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Quicksort)
 
 ```ts
