@@ -62,6 +62,16 @@ Similarly we can define other useful functions. In this Functionchart, the funct
   <img src="./resources/simpleFns.svg"  alt="" title="Comparisons, maximum, minimum, and absolute value.">
 </figure>
 
+## Implicit and Explicit Functioncharts
+
+For very simple functions, we can specify that any disconnected pins will become inputs and outputs on the new function defined by the functionchart. Below, function 'a' is an implicit chained conditional operator, like we used for the signum function. The cond functions are arranged so that the inputs of the topmost one come before (y-order) the inputs of the second. The single disconnected output becomes the composed function's output.
+
+If we set the 'implicit' property of the functionchart to 'false', then our composed function now has no inputs or outputs ('b'). In this case we need to explicitly add pseudo-functions to specify inputs and outputs. In 'c' we add the pseudo-functions, placing them so that they appear in the correct order (y-order). In 'd' we need a pseudo-function to specify that the same input goes to both cond functions. In general, explicit functioncharts give more control over naming, ordering, and routing inputs, but for simple functions they can contribute to clutter. In these cases, implicit is preferable.
+
+<figure>
+  <img src="./resources/implicit_explicit.svg"  alt="" title="Implicit and explicit functioncharts.">
+</figure>
+
 ## Recursion and Iteration
 
 Since functions can call instances of themselves, we can define a recursive factorial (N!) function. The recursion is equivalent to a simple iteration, and in fact this is how the diagram can represent iteration. Reading left to right, we define a helper decrement function, a "facstep" helper function, carefully arranged to return the recursive function invocation as the last step to allow the "tail recursion" optimization, and finally an invocation of "facstep" with an pseudofunction input and 1 passed to the "acc" input.
@@ -115,11 +125,15 @@ The key features in this diagram are:
 
 1. The 'divide' helper function divides the range [lo..hi] into two sub-ranges [lo..mid] and [mid + 1, hi]. This helps reduce clutter.
 
+1. TODO explain abstract array.
+
 1. TODO why is this better?
 
 ## Abstract Functions (Iteration)
 
-We can define two basic iteration primitives, roughly corresponding to a do-while loop and a while-do loop. We begin by defining abstractions for the body of the loop, and the condition for continuing the iteration. Each function takes a single input and produces a single output. do-while and while-do both take an initial value 'p' and simply pass it to the 'body' and 'cond' functions. This is our loop variable, corresponding to a numeric index or an iterator of some kind. The result of 'body' is simply passed on to the next invocation of 'body'. 'body' is responsible for updating the loop variable and returning it. The result of 'cond' determines when the loop terminates. A true value continues the loop.
+We can define two basic iteration primitives, roughly corresponding to a do-while loop and a while-do loop. We begin by defining abstractions for the body of the loop, and the condition for continuing the iteration. We create abstract functioncharts for these. An abstract functionchart is one that contains only pseudo-functions and other abstract functions.
+
+Each function takes a single input and produces a single output. do-while and while-do both take an initial value 'p' and simply pass it to the 'body' and 'cond' functions. This is our loop variable, corresponding to a numeric index or an iterator of some kind. The result of 'body' is simply passed on to the next invocation of 'body'. 'body' is responsible for updating the loop variable and returning it. The result of 'cond' determines when the loop terminates. A true value continues the loop.
 
 The do-while form runs 'body' before 'cond', by making 'cond' depend on the result of 'body'. The while-do runs cond on the loop variable first, and only invokes 'body' if we iterate (call while-do recursively).
 
@@ -138,6 +152,23 @@ for (let i = start; i >= end; )  // for [start,end]-
 Finally, at the bottom, we again implement factorial using our for-loop. We choose the "down" iteration which iterates over the range [n..2] (inclusive). We use a 'let' to hold our product as it's computed. We initialize the accumulator to 1.
 <figure>
   <img src="./resources/do_while2.svg"  alt="" title="TODO.">
+</figure>
+
+## Representing State (swap)
+
+The let function is a built-in variable binding that can hold a value. 'let' has a single input to initialize the value, and two outputs, one to return the current value, and a 'setter' function to change the value. This function takes a single input, the new value, and just returns that value.
+
+We can create an abstract functionchart to represent a "stateful, mutable" value. This has the same function shape or signature as 'let'.
+
+Now we use a single 'let' as a temporary variable, and create a function that takes two input variables, and performs a swap between them. The function uses 'setter' functions to first set temp to the first input, then first to second, and finally second to temp. Orchestrating all of this is a 'use' pseudo-function, which takes a variable number of inputs. The inputs are evaluated in order, which does two things:
+
+1. 'use' uses the input, which executes the source function - important when there are side-effects.
+2. 'use' evaluates its inputs in order, providing a way to sequence functions that have side-effects.
+
+Swap would be simpler to implement if the semantics of the setter were to return the old value. We might be able to avoid the 'use' pseudo-function. However, the old value is less useful in our function graphs than the new value, and this helps route values without long wires crossing the graph.
+
+<figure>
+  <img src="./resources/swap.svg"  alt="" title="A swap function.">
 </figure>
 
 ## Abstract Functions (Quicksort)
@@ -177,27 +208,17 @@ function partition(A: Array<number>, lo: number, hi: number) {
 
 The key features in this diagram are:
 
-1. Helper functions are defined first, including abstractions for indexing ('[i]') and swapping ('swap').
+1. Abstractions for indexing ('[i]'), setting the pivot, and swapping ('swap') are defined first. These will make the quicksort generic.
 
-1. Quicksort uses the abstract functions, making the algorithm more generic. (TODO, make the comparison functions generic.)
+1. (TODO, make the comparison functions generic.)
 
-1. The generic functions are declared in the outermost scope 'quicksort', but can be used in nested function definitions such as 'partStep', 'partition', and 'quickStep'. This simplifies the inputs and outputs of the helpers, reducing the number of wires. This is just like closure in Javascript.
+1. The generic functions are inputs in the outermost scope 'quicksort', but can be used in nested function definitions such as 'advToSwap', 'partition', and 'quicksort'. This simplifies the inputs and outputs of the helpers, reducing the number of wires. This is just like closure in Javascript.
 
 1. The generic do-while function calls the abstract 'body' function until the abstract 'cond' function returns false. The body function takes 1 input parameter and returns 1 output. The do-while function passes the body result to the cond function to perform the loop test. If it's true, do-while calls itself recursively, passing the result of body in to itself. If false, then the result of body is returned. Thus, do-while returns the result of the last call to body. Note that body must execute before cond, since it's "upstream" from it.
 
 1. 'quickStep' doesn't return a meaninful result (it's true if sorting happened, otherwise undefined if we return.) However, the result is important, since it drives the execution. This is important because this quicksort has important side effects.
 
 1. Finally, 'quicksort' defines a function that takes in the generic function parameters and returns a function to sort given a length.
-
-## Representing State (swap)
-
-TODO explain abstraction for variable binding.
-TODO explain 'let'
-TODO explain why swap.set returns the input value, not the old value.
-
-<figure>
-  <img src="./resources/swap.svg"  alt="" title="A swap function.">
-</figure>
 
 ## Representing State (Tuples)
 
