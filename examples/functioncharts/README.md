@@ -1,43 +1,56 @@
 # Functioncharts: Diagrams of Computation
-Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. This repository contains the source code for a Web Editor that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs (yet!) Functioncharts are inspired by [Statecharts](../statecharts/README.md).
+Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. This repository contains the source code for a Web Editor that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs. Functioncharts are inspired by [Statecharts](../statecharts/README.md). "Flowcharts" would have been a great name for these, but here we are.
 
-Many "node and wire" programming systems have been built. However, most are either domain-specific, or are intended for non-programmers building small, simple programs. Functioncharts are loosely patterned after Harel Statecharts, using hierarchy and abstraction to increase the power of the notation. The ambitious goal is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages.
+Many "node and wire" programming systems have been built. However, most are either domain-specific, or are intended for non-programmers building small, simple programs. Like Statecharts, Functioncharts use hierarchy and abstraction to increase the power and economy of the notation. The ambitious goal is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages.
 
-The two innovations in Functioncharts are:
+The two principal innovations in Functioncharts are:
 
 1. Functions can accept other functions as inputs, and produce new functions as outputs. This gives the diagrams much greater expressive power as we can represent abstractions.
 
 1. Functions may be defined by the user using nested Functions. The nested Function can be edited live, so the new function can be used inside its own definition. This allows recursion, and as a special case, iteration through the tail call optimization. Nested Functioncharts may define complete functions, or partial functions, allowing us to express things like closures.
 
-Both features serve to reduce the visual complexity of the Functionchart diagrams, by having scopes, by reducing the number of wires, and by organizing them.
+Both features serve to reduce the visual complexity of the Functionchart diagrams, by making it easy to produce and consume helper functions which in turn can reduce the number of wires and organize them.
 
 This introduction shows how some illustrative programs can be built and discusses the advantages and potential of this approach.
 
-For our purposes here, we implement a simple mono-type language which looks a lot like Javascript. This simplifies our diagrams since we only have "simple" values (numbers, strings, etc.) and function values flowing along wires.
+For our purposes here, we implement a simple uni-type language which looks a lot like Javascript. We have primitive values (numbers, strings, etc.) and Functions. This simplifies our diagrams since we only have one kind of value and then functions flowing on our wires. However, we could extend these diagrams to include distinct primtive types with stronger typing to model languages like C, C++, Java, or Go.
 
 ## Simple Functions
 We start by using the built-in functions provided by the language to create a new function.
 
 Functions have input and output pins that can be wired to other functions. Input pins can only accept one wire at a time, while an output pin may fan out to multiple functions.
 
-We also have Pseudofunctions which look like functions in our diagrams, but don't calculate anything. One use of these is to allow us to specify inputs and outputs and name them.
+We also have Pseudo-functions which look like functions in our diagrams, but don't calculate anything. One use of these is to allow us to specify inputs and outputs and name them.
 
-The picture below is a simple example of a Functionchart to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x = 0, or -1 if x < 0. We use the following built in functions:
+The picture below is a simple example of a Functionchart to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x = 0, or -1 if x < 0.
 
-1) Pseudofunctions to mark and name the input, 'a', and the output, 'b'. The 'a' input also allows us to indicate that the same value is used in two different places.
-3) Literal functions (0, 1, -1), which have no inputs and output a literal value.
+```ts
+function signum(x: number) {
+  if (x < 0)
+    return -1;
+  else if (x > 0)
+    return 1;
+  else
+    return 0;
+}
+```
+
+We use the following built in functions to implement signum:
+
+1) Pseudo-functions to mark and name the input, 'a', and the output, 'b'. The 'a' pseudo-function allows us to indicate that the same value is used in two different places and give it a name which appears on the new function type.
+3) Literal functions (0, 1, -1), which have no inputs and output a literal primitive value.
 3) Binary operators (<, >), which take two input values and output a boolean value.
 4) The conditional operator (?), which takes an input value and two inputs. It outputs the second input if the first input is true, or the third input if the first input is false.
 
-The Functionchart is drawn with rounded corners to distinguish it from functions. In the top right corner is the function that is defined by the contents of the functionchart. It is shaded to indicate that it can be instanced in the diagram.
+The Functionchart is drawn with rounded corners to distinguish it from functions. In the top right corner is the function that is defined by the contents of the functionchart. It is shaded to indicate that it can be instanced in the diagram. Clicking on this and dragging creates a new instance of the function.
 
-TODO explain ordering of inputs, outputs.
+TODO explain ordering of inputs, outputs, instance links.
 
 <figure>
   <img src="./resources/signum.svg"  alt="" title="Signum function.">
 </figure>
 
-This diagram is already a little hard to read because of the wires. We can refactor by defining new functions using functioncharts to define helper functions. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function easier to read. Then we use the new functions to represent the final signum function as before. Ordinarily the sub-functions would be drawn with links to their defining functioncharts, but we have set the links to be invisible for such simple helpers.
+This diagram is already a little hard to read because of the wires. We can refactor by defining new helper functions. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function easier to read. Then we use the new functions to represent the final signum function as before. Ordinarily the sub-functions would be drawn with links to their defining functioncharts, but we have set the links to be invisible for such simple helpers.
 
 <figure>
   <img src="./resources/signum2.svg"  alt="" title="Signum function using helper functions.">
