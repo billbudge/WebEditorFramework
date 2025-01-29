@@ -141,7 +141,7 @@ Finally, at the bottom, we again implement factorial using our for-loop. We choo
 </figure>
 
 ## Abstract Functions (Quicksort)
-Here is the source for a Javascript implementation of Quicksort which does the partition step in place using Hoare's algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Quicksort)
+Here is Javascript source for an implementation of Quicksort which does the partition step in place using Hoare's algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Quicksort)
 
 ```ts
 function quicksort(A: Array<number>, lo: number, hi: number) {
@@ -185,7 +185,7 @@ The key features in this diagram are:
 
 1. The generic do-while function calls the abstract 'body' function until the abstract 'cond' function returns false. The body function takes 1 input parameter and returns 1 output. The do-while function passes the body result to the cond function to perform the loop test. If it's true, do-while calls itself recursively, passing the result of body in to itself. If false, then the result of body is returned. Thus, do-while returns the result of the last call to body. Note that body must execute before cond, since it's "upstream" from it.
 
-1. 'quickStep' doesn't return a meaninful result (it's true if sorting happened, otherwise undefined if we return.) However, the result is important, since it drives the execution. This is important because quicksort isn't purely functional and has important side effects.
+1. 'quickStep' doesn't return a meaninful result (it's true if sorting happened, otherwise undefined if we return.) However, the result is important, since it drives the execution. This is important because this quicksort has important side effects.
 
 1. Finally, 'quicksort' defines a function that takes in the generic function parameters and returns a function to sort given a length.
 

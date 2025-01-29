@@ -1185,6 +1185,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           self.deleteItem(wire);
       });
     });
+    node.instances.forEach(instances => {
+      if (instances.length ===  0) return;
+      // Copy array since we're mutating it.
+      instances.slice().forEach(instance => {
+        if (instance)
+          self.deleteItem(instance);
+      });
+    });
   }
   disconnectSelection() {
     const self = this;
