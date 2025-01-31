@@ -1,5 +1,5 @@
 # Functioncharts: Diagrams of Computation
-Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. This repository contains the source code for a Web Editor that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs. Functioncharts are inspired by [Statecharts](../statecharts/README.md). "Flowcharts" would have been a great name for these, but here we are.
+Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. This repository contains the source code for a Web Editor that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs. Functioncharts are inspired by [Statecharts](../statecharts/README.md). "Flowcharts" would have been a great name for these, but that name is taken.
 
 Many "node and wire" programming systems have been built. However, most are either domain-specific, or are intended for non-programmers building small, simple programs. Like Statecharts, Functioncharts use hierarchy and abstraction to increase the power and economy of the notation. The ambitious goal is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages.
 
@@ -20,7 +20,7 @@ We start by using the built-in functions provided by the language to create a ne
 
 Functions have input and output pins that can be wired to other functions. Input pins can only accept one wire at a time, while an output pin may fan out to multiple functions.
 
-We also have Pseudo-functions which look like functions in our diagrams, but don't calculate anything. One use of these is to allow us to specify inputs and outputs and name them.
+We also have pseudofunctions which look like functions in our diagrams, but don't calculate anything. One use of these is to allow us to specify inputs and outputs and name them.
 
 The picture below is a simple example of a Functionchart to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x = 0, or -1 if x < 0.
 
@@ -35,28 +35,34 @@ function signum(x: number) {
 }
 ```
 
-We use the following built in functions to implement signum:
+We can implement signum using built in functions:
 
-1) Pseudo-functions to mark and name the input, 'a', and the output, 'b'. The 'a' pseudo-function allows us to indicate that the same value is used in two different places and give it a name which appears on the new function type.
-3) Literal functions (0, 1, -1), which have no inputs and output a literal primitive value.
-3) Binary operators (<, >), which take two input values and output a boolean value.
-4) The conditional operator (?), which takes an input value and two inputs. It outputs the second input if the first input is true, or the third input if the first input is false.
+1. pseudofunctions for the input, 'a', and the output, 'b'. The 'a' pseudo-function indicates that the same value is used in two different places and gives the input a name which appears on the new function type.
+1. Literal functions (0, 1, -1), which have no inputs and output a literal primitive value.
+1. Binary operators (<, >), which take two input values and output a boolean value.
+1. The conditional operator (?), which takes an input value and two inputs. Its semantics are:
+```ts
+  if (input1)
+    return input2
+  else
+    return input3.
+```
 
-The Functionchart is drawn with rounded corners to distinguish it from functions. In the top right corner is the function that is defined by the contents of the functionchart. It is shaded to indicate that it can be instanced in the diagram. Clicking on this and dragging creates a new instance of the function.
+The Functionchart is drawn with rounded corners to distinguish it from function instances in the diagram. In the top right corner is the function that is defined by the contents of the functionchart. It is shaded to indicate that it can be instanced. Tha means clicking on it and dragging and dropping creates a new instance of the function in the diagram.
 
-TODO explain ordering of inputs, outputs, instance links.
+The order of the function instance's inputs and outputs is determined by their vertical position in the functionchart. Inputs and outputs are sorted by their y-coordinate, so the topmost input in the functionchart becomes the first input in its function instance.
 
 <figure>
   <img src="./resources/signum.svg"  alt="" title="Signum function.">
 </figure>
 
-This diagram is already a little hard to read because of the wires. We can refactor by defining new helper functions. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function easier to read. Then we use the new functions to represent the final signum function as before. Ordinarily the sub-functions would be drawn with links to their defining functioncharts, but we have set the links to be invisible for such simple helpers.
+This diagram is already a little hard to read. We can refactor, defining new helper functions. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function easier to read. Then we use the new functions to represent the final signum function as before. By default the sub-functions are drawn with links to their defining functioncharts, as in this diagram. Normally we would set the links to be invisible for such simple helpers.
 
 <figure>
   <img src="./resources/signum2.svg"  alt="" title="Signum function using helper functions.">
 </figure>
 
-Similarly we can define other useful functions. In this Functionchart, the function instance links are visible. Note the use of the "< 0" function in the abs functionchart. We can hide these links when they're obvious in the context. For example, links to simple helpers may be hidden for clarity of the overall diagram.
+Similarly we can define other useful functions. In this Functionchart, the function instance links are visible. We use the "< 0" function in the abs functionchart.
 
 <figure>
   <img src="./resources/simpleFns.svg"  alt="" title="Comparisons, maximum, minimum, and absolute value.">
@@ -64,9 +70,9 @@ Similarly we can define other useful functions. In this Functionchart, the funct
 
 ## Implicit and Explicit Functioncharts
 
-For very simple functions, we can specify that any disconnected pins will become inputs and outputs on the new function defined by the functionchart. Below, function 'a' is an implicit chained conditional operator, like we used for the signum function. The cond functions are arranged so that the inputs of the topmost one come before (y-order) the inputs of the second. The single disconnected output becomes the composed function's output.
+For very simple functions, we can specify that any open input and output pins will become inputs and outputs on the new function defined by the functionchart. Below, function 'a' is an implicit chained conditional operator, like we used for the signum function. The cond functions are arranged so that the inputs of the topmost one come before (y-order) the inputs of the second. The single disconnected output becomes the composed function's output.
 
-If we set the 'implicit' property of the functionchart to 'false', then our composed function now has no inputs or outputs ('b'). In this case we need to explicitly add pseudo-functions to specify inputs and outputs. In 'c' we add the pseudo-functions, placing them so that they appear in the correct order (y-order). In 'd' we need a pseudo-function to specify that the same input goes to both cond functions. In general, explicit functioncharts give more control over naming, ordering, and routing inputs, but for simple functions they can contribute to clutter. In these cases, implicit is preferable.
+If we set the 'implicit' property of the functionchart to 'false', then our composed function now has no inputs or outputs ('b'). In this case we need to explicitly add pseudofunctions to specify inputs and outputs. In 'c' we add the pseudofunctions, placing them so that they appear in the correct order (y-order). In 'd' we need a pseudo-function to specify that the same input goes to both cond functions. In general, explicit functioncharts give more control over naming, ordering, and routing inputs, but for simple functions they can contribute to clutter. In these cases, implicit is preferable.
 
 <figure>
   <img src="./resources/implicit_explicit.svg"  alt="" title="Implicit and explicit functioncharts.">
@@ -74,7 +80,7 @@ If we set the 'implicit' property of the functionchart to 'false', then our comp
 
 ## Recursion and Iteration
 
-Since functions can call instances of themselves, we can define a recursive factorial (N!) function. The recursion is equivalent to a simple iteration, and in fact this is how the diagram can represent iteration. Reading left to right, we define a helper decrement function, a "facstep" helper function, carefully arranged to return the recursive function invocation as the last step to allow the "tail recursion" optimization, and finally an invocation of "facstep" with an pseudofunction input and 1 passed to the "acc" input.
+Since functions can call instances of themselves, we can define a recursive factorial (n!) function. This recursion is equivalent to an iteration, and in fact this is how functioncharts can represent iteration. Reading left to right, we define a helper decrement function, a "step" helper function, carefully arranged to return the recursive function invocation as the last step to allow the "tail recursion" optimization, and finally an invocation of "step" with an pseudofunction input and 1 passed to the "acc" accumulator input.
 
 <figure>
   <img src="./resources/factorial.svg"  alt="" title="Recursive definition of factorial function N!.">
@@ -82,18 +88,30 @@ Since functions can call instances of themselves, we can define a recursive fact
 
 Similarly, we can define a [Fibonacci](#Fibonacci) functionchart.
 
-We can abstract this a bit by replacing the multiplication function with an abstract binary operation that takes an index and an accumulator and returns some result. This "callback" is a stand-in for a function to be provided by the caller, and just defines the shape of the function. That makes this function look like a "reducer" function.
+Abstraction is an important technique for making software more useful. We can abstract this program a bit by changing the end value "1" with another input "end" and replacing the multiplication function with an abstracted binary function "f" that takes an index and an accumulator and returns some result. "f" is a stand-in for a function to be provided by the caller, and just defines the shape or signature of the function.
 
-We can use "reduce" to compute factorial by using an export function to pass the built-in multiplication function as "callback", and passing 1 as the initial "acc" value.
+Below is a functionchart that defines a more general iteration that can be used to implement factorial again.
+
+We create a helper functionchart for "f" which contains pseudofunctions for two inputs and one output. This makes the functionchart abstract, indicated by a dotted outline around its function instances. The abstract function can be used inside another functionchart and is interpreted as an implicit input of a function. Since we want to use it inside the inner functionchart, we have to modify it with an "importer" node. This allows us to create multiple instances from the same input.
+
+This function now looks like a "reduce" function.
+
+We can use "reduce" to compute factorial by using an export function to pass the built-in multiplication function as "callback", and passing 1 as both the end index and the initial "acc" value.
 
 <figure>
   <img src="./resources/factorial2.svg"  alt="" title="Factorial function defined with reduce function.">
 </figure>
 
+This diagram is becoming hard to read. We can clean this up. Note that 'end' and 'f' inputs don't change over the entire iteration. We can move them out of the functionchart, and put them and the original into an enclosing functionchart. The inner functionchart closes over those external inputs, simplifying its signature.
+
+<figure>
+  <img src="./resources/factorial3.svg"  alt="" title="Cleaned up reduce function.">
+</figure>
+
 We can also use the reduce function to sum the elements of an Array, if we are given a function that somehow contains an array and provides its length and an "indexer" function. We use the Array's indexer function in a small functionchart that uses the "i" parameter to get the i-th element of the array, and the "acc" parameter to add to the accumulator. This function is passed into reduce. This time, we set the initial "acc" to 0.
 
 <figure>
-  <img src="./resources/factorial3.svg"  alt="" title="Array sum function defined with reduce function.">
+  <img src="./resources/factorial4.svg"  alt="" title="Array sum function defined with reduce function.">
 </figure>
 
 ## Abstract Functions (Binary Search)
@@ -131,7 +149,7 @@ The key features in this diagram are:
 
 ## Abstract Functions (Iteration)
 
-We can define two basic iteration primitives, roughly corresponding to a do-while loop and a while-do loop. We begin by defining abstractions for the body of the loop, and the condition for continuing the iteration. We create abstract functioncharts for these. An abstract functionchart is one that contains only pseudo-functions and other abstract functions.
+We can define two basic iteration primitives, roughly corresponding to a do-while loop and a while-do loop. We begin by defining abstractions for the body of the loop, and the condition for continuing the iteration. We create abstract functioncharts for these. An abstract functionchart is one that contains only pseudofunctions and other abstract functions.
 
 Each function takes a single input and produces a single output. do-while and while-do both take an initial value 'p' and simply pass it to the 'body' and 'cond' functions. This is our loop variable, corresponding to a numeric index or an iterator of some kind. The result of 'body' is simply passed on to the next invocation of 'body'. 'body' is responsible for updating the loop variable and returning it. The result of 'cond' determines when the loop terminates. A true value continues the loop.
 
@@ -202,9 +220,6 @@ function partition(A: Array<number>, lo: number, hi: number) {
 <figure>
   <img src="./resources/quicksort.svg"  alt="" title="Quicksort, partition in place.">
 </figure>
-<figure>
-  <img src="./resources/Solarium.pdf"  alt="" title="Quicksort, partition in place.">
-</figure>
 
 The key features in this diagram are:
 
@@ -219,6 +234,13 @@ The key features in this diagram are:
 1. 'quickStep' doesn't return a meaninful result (it's true if sorting happened, otherwise undefined if we return.) However, the result is important, since it drives the execution. This is important because this quicksort has important side effects.
 
 1. Finally, 'quicksort' defines a function that takes in the generic function parameters and returns a function to sort given a length.
+
+## Stateful Iteration (Counters)
+Minimal iteration abstraction
+<figure>
+  <img src="./resources/counters.svg"  alt="" title="Counters for iterating integer ranges.">
+</figure>
+
 
 ## Representing State (Tuples)
 
@@ -317,7 +339,7 @@ Functioncharts were inspired by Harel Statecharts, another graphical representat
 TODO default value adapter.
 
 <figure>
-  <img src="/resources/palette2.svg"  alt="" title="Pseudo-functions">
+  <img src="/resources/palette2.svg"  alt="" title="pseudofunctions">
 </figure>
 
 So far we haven't used the ability to pass functions as parameters very much. However, they make it possible to express many different things besides expressions. Let's introduce three new stateful functions, which allow us to hold state and "open" values as objects or arrays.

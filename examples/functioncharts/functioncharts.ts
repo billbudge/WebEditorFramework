@@ -2817,6 +2817,7 @@ class Renderer implements ILayoutEngine {
           textSize = theme.fontSize, spacing = theme.spacing,
           name = type.name,
           w = type.width;
+    ctx.beginPath();
     ctx.lineWidth = 0.5;
     ctx.fillStyle = theme.textColor;
     if (name) {
@@ -3003,6 +3004,7 @@ class Renderer implements ILayoutEngine {
     const ctx = this.ctx,
           theme = this.theme,
           r = Functionchart.radius,
+          implicit = functionchart.implicit,
           rect = this.getBounds(functionchart),
           x = rect.x, y = rect.y, w = rect.width, h = rect.height;
     roundRectPath(x, y, w, h, r, ctx);
@@ -3028,6 +3030,32 @@ class Renderer implements ILayoutEngine {
         }
         const instanceType = functionchart.instanceType;
         this.drawType(instanceType, x + w - instanceType.width, y + r);
+
+        if (implicit) {
+          // Draw tick marks indicating the auto-generated pins.
+          const self = this,
+                spacing = theme.spacing,
+                typeInfo = functionchart.typeInfo,
+                inputs = typeInfo.inputs,
+                outputs = typeInfo.outputs;
+          ctx.beginPath();
+          ctx.lineWidth = 1;
+          inputs.forEach(input => {
+            const element = input.element;
+            if (element instanceof Pseudoelement || element.type.inputs.length === 0) return;
+            const p = self.inputPinToPoint(element, input.index);
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x - spacing, p.y);
+          });
+          outputs.forEach(output => {
+            const element = output.element;
+            if (element instanceof Pseudoelement || element.type.outputs.length === 0) return;
+            const p = self.outputPinToPoint(element, output.index);
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x + spacing, p.y);
+          });
+          ctx.stroke();
+        }
         break;
       case RenderMode.Highlight:
       case RenderMode.HotTrack:
