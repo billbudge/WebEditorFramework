@@ -24,17 +24,6 @@ We also have pseudofunctions which look like functions in our diagrams, but don'
 
 The picture below is a simple example of a Functionchart to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x = 0, or -1 if x < 0.
 
-```ts
-function signum(x: number) {
-  if (x < 0)
-    return -1;
-  else if (x > 0)
-    return 1;
-  else
-    return 0;
-}
-```
-
 We can implement signum using built in functions:
 
 1. pseudofunctions for the input, 'a', and the output, 'b'. The 'a' pseudo-function indicates that the same value is used in two different places and gives the input a name which appears on the new function type.
@@ -56,7 +45,7 @@ The order of the function instance's inputs and outputs is determined by their v
   <img src="./resources/signum.svg"  alt="" title="Signum function.">
 </figure>
 
-This diagram is already a little hard to read. We can refactor, defining new helper functions. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function easier to read. Then we use the new functions to represent the final signum function as before. By default the sub-functions are drawn with links to their defining functioncharts, as in this diagram. Normally we would set the links to be invisible for such simple helpers.
+This diagram is already a little hard to read. We can refactor, defining new helper functions. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function easier to read. Then we use the new functions to represent the final signum function as before. By default the sub-functions are drawn with lighter gray links to their defining functioncharts, as in this diagram. Normally we would set the links to be invisible for such simple helpers.
 
 <figure>
   <img src="./resources/signum2.svg"  alt="" title="Signum function using helper functions.">
@@ -74,35 +63,47 @@ For very simple functions, we can specify that any open input and output pins wi
 
 If we set the 'implicit' property of the functionchart to 'false', then our composed function now has no inputs or outputs ('b'). In this case we need to explicitly add pseudofunctions to specify inputs and outputs. In 'c' we add the pseudofunctions, placing them so that they appear in the correct order (y-order). In 'd' we need a pseudo-function to specify that the same input goes to both cond functions. In general, explicit functioncharts give more control over naming, ordering, and routing inputs, but for simple functions they can contribute to clutter. In these cases, implicit is preferable.
 
+In the diagram of simple functions above, all of the functioncharts are implicit, except where input pseudofunctions are needed to route the input to multiple functions.
+
 <figure>
   <img src="./resources/implicit_explicit.svg"  alt="" title="Implicit and explicit functioncharts.">
 </figure>
 
 ## Recursion and Iteration
 
-Since functions can call instances of themselves, we can define a recursive factorial (n!) function. This recursion is equivalent to an iteration, and in fact this is how functioncharts can represent iteration. Reading left to right, we define a helper decrement function, a "step" helper function, carefully arranged to return the recursive function invocation as the last step to allow the "tail recursion" optimization, and finally an invocation of "step" with an pseudofunction input and 1 passed to the "acc" accumulator input.
+Since functions can call instances of themselves, we can define a recursive factorial (n!) function. This recursion is equivalent to an iteration, and in fact this is how functioncharts can represent iteration. Reading left to right, we define a helper decrement function, a "step" inner function, and finally an implicit functionchart which makes a single invocation of "step" with a pseudofunction input and 1 passed to the "acc" accumulator input.
 
 <figure>
   <img src="./resources/factorial.svg"  alt="" title="Recursive definition of factorial function N!.">
 </figure>
 
+The key features in this diagram are:
+
+1. 'step' is carefully arranged to return the recursive function invocation as the last step to allow the "tail recursion" optimization.
+1. The 'step' function can't be implicit because it is recursive. Implicit only works with non-recursive functions.
+1. The final 'n!' functionchart is implicit to simplify the diagram.
+
 Similarly, we can define a [Fibonacci](#Fibonacci) functionchart.
 
-Abstraction is an important technique for making software more useful. We can abstract this program a bit by changing the end value "1" with another input "end" and replacing the multiplication function with an abstracted binary function "f" that takes an index and an accumulator and returns some result. "f" is a stand-in for a function to be provided by the caller, and just defines the shape or signature of the function.
+## Abstract Functions (Factorial)
 
 Below is a functionchart that defines a more general iteration that can be used to implement factorial again.
 
-We create a helper functionchart for "f" which contains pseudofunctions for two inputs and one output. This makes the functionchart abstract, indicated by a dotted outline around its function instances. The abstract function can be used inside another functionchart and is interpreted as an implicit input of a function. Since we want to use it inside the inner functionchart, we have to modify it with an "importer" node. This allows us to create multiple instances from the same input.
+Abstraction is an important technique for making software more useful. We can abstract this program a bit by changing the end value "1" with another input "end" and replacing the multiplication function with an abstract binary function 'f' that takes an index and an accumulator and returns some result. 'f' is a stand-in for a function to be provided by the caller, and just defines the shape or signature of the function.
 
-This function now looks like a "reduce" function.
+We create a helper functionchart for 'f' which contains pseudofunctions for two inputs and one output. This makes the functionchart abstract, indicated by a dotted outline around its function instances. Abstract functions can be used just like any function inside a functionchart and are interpreted as an implicit input of a function.
 
-We can use "reduce" to compute factorial by using an export function to pass the built-in multiplication function as "callback", and passing 1 as both the end index and the initial "acc" value.
+In this example, we want to pass it to the inner functionchart, so we wrap it with an importer node. This converts the wrapped function into a function that produces instances of the wrapped function. It also allows us to create multiple instances from one input when that is desired.
+
+This function now looks like a "reducer".
+
+We can use 'reduce' to compute factorial by using an export function to pass the built-in multiplication function as "callback", and passing 1 as both the end index and the initial "acc" value.
 
 <figure>
   <img src="./resources/factorial2.svg"  alt="" title="Factorial function defined with reduce function.">
 </figure>
 
-This diagram is becoming hard to read. We can clean this up. Note that 'end' and 'f' inputs don't change over the entire iteration. We can move them out of the functionchart, and put them and the original into an enclosing functionchart. The inner functionchart closes over those external inputs, simplifying its signature.
+This diagram is becoming hard to read. We can refactor to improve the diagram. Note that 'end' and 'f' inputs don't change during the iteration. We can move them out of the functionchart, and put them and the original into an enclosing functionchart. The inner functionchart closes over those external inputs, simplifying its signature. Then we can invoke the inner 'step' function in the parent functionchart to get our desired result.
 
 <figure>
   <img src="./resources/factorial3.svg"  alt="" title="Cleaned up reduce function.">
@@ -116,7 +117,7 @@ We can also use the reduce function to sum the elements of an Array, if we are g
 
 ## Abstract Functions (Binary Search)
 
-Here is a binary search implementation. Again, judicious use of helpers gives a visual explanation of the index calculations, and keeps the wires organized. [Wikipedia](https://en.wikipedia.org/wiki/Binary_search)
+Here is a binary search implementation. [Wikipedia](https://en.wikipedia.org/wiki/Binary_search)
 
 ```ts
 function binary_search_leftmost(A: Array<number>, n: number, t: number) {
@@ -133,37 +134,40 @@ function binary_search_leftmost(A: Array<number>, n: number, t: number) {
   return lo;
 }
 ```
+
+In the functionchart below, judicious use of helpers gives a visual explanation of the index calculations, and keeps the wires organized. The inputs for our function will be a search value, and a indexer function '[i]' which maps an index to a value, exactly like in an array. We use an abstract indexer, so we can reuse this search function.
+
 <figure>
   <img src="./resources/binary_search.svg"  alt="" title="Binary search implementation.">
 </figure>
 
 The key features in this diagram are:
 
-1. Helper functions are defined first, including abstractions for indexing ('[i]') and the "less than" predicate ('pred'). There is also a '??' predicate which returns two separate values for the true and false cases. This helps organize wires since it's used twice.
+1. Helper functions are defined first, including abstractions for indexing ('[i]') and the "less than" predicate ('pred'). There is also a '??' predicate which returns two separate values for the true and false cases. This helps organize related wires and prevent wires crossing.
 
-1. The 'divide' helper function divides the range [lo..hi] into two sub-ranges [lo..mid] and [mid + 1, hi]. This helps reduce clutter.
+1. The 'divide' helper function divides the range [lo..hi] into two sub-ranges [lo..mid] and [mid + 1, hi]. This helps reduce clutter. It also provides a nice visual explanation of how the range is split, as the outputs are increasing as we read top to bottom.
 
-1. TODO explain abstract array.
+1. The implementation is very general, taking only an abstract indexer function.
+
+We can apply our 'search' function to an array, or at least an abstracted array - this provides a length, and an indexer function '[i]', making it effectively read-only to the 'search' function.
 
 <figure>
   <img src="./resources/binary_search2.svg"  alt="" title="Binary search of an array.">
 </figure>
 
-1. TODO why is this better?
-
-## Abstract Functions (Iteration)
+## More General Iteration
 
 We can define two basic iteration primitives, roughly corresponding to a do-while loop and a while-do loop. We begin by defining abstractions for the body of the loop, and the condition for continuing the iteration. We create abstract functioncharts for these. An abstract functionchart is one that contains only pseudofunctions and other abstract functions.
 
-Each function takes a single input and produces a single output. do-while and while-do both take an initial value 'p' and simply pass it to the 'body' and 'cond' functions. This is our loop variable, corresponding to a numeric index or an iterator of some kind. The result of 'body' is simply passed on to the next invocation of 'body'. 'body' is responsible for updating the loop variable and returning it. The result of 'cond' determines when the loop terminates. A true value continues the loop.
+Each function takes a single input and produces a single output. 'do-while' and 'while-do' both take an initial value 'p' and simply pass it to the 'body' and 'cond' functions. This is our loop variable, corresponding to a numeric index or an iterator of some kind. It can be anything since we only forward it in the iteration functions. The result of 'body' is simply passed on to the next invocation of 'body'. 'body' is responsible for updating the loop variable and returning it. The result of 'cond' determines when the loop terminates. A true value continues the loop.
 
-The do-while form runs 'body' before 'cond', by making 'cond' depend on the result of 'body'. The while-do runs cond on the loop variable first, and only invokes 'body' if we iterate (call while-do recursively).
+The do-while form runs 'body' before 'cond', by making 'cond' depend on the result of 'body'. The while-do runs 'cond' on the loop variable first, and only invokes 'body' if we iterate (call while-do recursively).
 
 <figure>
-  <img src="./resources/do_while.svg"  alt="" title="TODO.">
+  <img src="./resources/do_while.svg"  alt="" title="More general iteration functions.">
 </figure>
 
-If we make the iteration parameter a numeric index which the body and condition can test, then we can define for-loop primitives. Depending on the predicate chosen, we can implement various kinds of loop. Here we choose to implement the most common for-loops.
+If we make the iteration parameter a numeric index which the body and condition can test, then we can define for-loop primitives. Depending on the predicate chosen, we can implement various kinds of loop. Below we choose to implement the most common for-loops.
 
 ```ts
 for (let i = start; i < end; )   // for [start,end[+
@@ -171,16 +175,18 @@ for (let i = start; i < end; )   // for [start,end[+
 for (let i = start; i >= end; )  // for [start,end]-
 ```
 
-Finally, at the bottom, we again implement factorial using our for-loop. We choose the "down" iteration which iterates over the range [n..2] (inclusive). We use a 'let' to hold our product as it's computed. We initialize the accumulator to 1.
+At the bottom,= we again implement factorial using our for-loops. We choose the "down" iteration which iterates over the range [n..2] (inclusive).
+
+Until now, our functions have all been pure, producing outputs and having no "side-effects". Now, we use a 'let' to hold our product as it's computed. 'let' represents a variable binding. We initialize the 'let' to 1 using the single input, and in our function 'body', multiply its value by the single input, changing the variable and returning the result to the iterator function.
 <figure>
-  <img src="./resources/do_while2.svg"  alt="" title="TODO.">
+  <img src="./resources/do_while2.svg"  alt="" title="Using the general iterator functions to implement factorial.">
 </figure>
 
 ## Representing State (swap)
 
 The let function is a built-in variable binding that can hold a value. 'let' has a single input to initialize the value, and two outputs, one to return the current value, and a 'setter' function to change the value. This function takes a single input, the new value, and just returns that value.
 
-We can create an abstract functionchart to represent a "stateful, mutable" value. This has the same function shape or signature as 'let'.
+We can create an abstract functionchart to represent a "stateful, mutable" value. We give this the same signature as 'let'.
 
 Now we use a single 'let' as a temporary variable, and create a function that takes two input variables, and performs a swap between them. The function uses 'setter' functions to first set temp to the first input, then first to second, and finally second to temp. Orchestrating all of this is a 'use' pseudo-function, which takes a variable number of inputs. The inputs are evaluated in order, which does two things:
 
@@ -238,6 +244,12 @@ The key features in this diagram are:
 1. 'quickStep' doesn't return a meaninful result (it's true if sorting happened, otherwise undefined if we return.) However, the result is important, since it drives the execution. This is important because this quicksort has important side effects.
 
 1. Finally, 'quicksort' defines a function that takes in the generic function parameters and returns a function to sort given a length.
+
+TODO text for quicksort application.
+
+<figure>
+  <img src="./resources/quicksort2.svg"  alt="" title="Using quicksort to sort an array.">
+</figure>
 
 ## Stateful Iteration (Counters)
 Minimal iteration abstraction
