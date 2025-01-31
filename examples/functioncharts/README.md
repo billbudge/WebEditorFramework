@@ -145,6 +145,10 @@ The key features in this diagram are:
 
 1. TODO explain abstract array.
 
+<figure>
+  <img src="./resources/binary_search2.svg"  alt="" title="Binary search of an array.">
+</figure>
+
 1. TODO why is this better?
 
 ## Abstract Functions (Iteration)
