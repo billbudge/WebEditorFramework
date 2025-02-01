@@ -11,6 +11,12 @@ The two principal innovations in Functioncharts are:
 
 Both features serve to reduce the visual complexity of the Functionchart diagrams, by making it easy to produce and consume helper functions which in turn can reduce the number of wires and organize them.
 
+Here is an example to give you the general idea.
+
+<figure>
+  <img src="./resources/binary_search.svg"  alt="" title="Binary search implementation.">
+</figure>
+
 This introduction shows how some illustrative programs can be built and discusses the advantages and potential of this approach.
 
 For our purposes here, we implement a simple uni-type language which looks a lot like Javascript. We have primitive values (numbers, strings, etc.) and Functions. This simplifies our diagrams since we only have one kind of value and then functions flowing on our wires. However, we could extend these diagrams to include distinct primtive types with stronger typing to model languages like C, C++, Java, or Go.
