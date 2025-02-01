@@ -174,7 +174,7 @@ The do-while form runs 'body' before 'cond', by making 'cond' depend on the resu
   <img src="./resources/do_while.svg"  alt="" title="More general iteration functions.">
 </figure>
 
-If we make the iteration parameter a numeric index which the body and condition can test, then we can define for-loop primitives. Depending on the predicate chosen, we can implement various kinds of loop. Below we choose to implement the most common for-loops.
+If we make the iteration parameter a numeric index which the body and condition can test, then we can define for-loop primitives over a numeric range. Depending on the predicate chosen, we can implement various kinds of loops. Below we choose to implement the most common for-loops.
 
 ```ts
 for (let i = start; i < end; )   // for [start,end[+
