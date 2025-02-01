@@ -11,7 +11,7 @@ The two principal innovations in Functioncharts are:
 
 Both features serve to reduce the visual complexity of the Functionchart diagrams, by making it easy to produce and consume helper functions which in turn can reduce the number of wires and organize them.
 
-Here is an example to give you the general idea.
+Here is an example, an abstract binary search on a sorted Array.
 
 <figure>
   <img src="./resources/binary_search.svg"  alt="" title="Binary search implementation.">
@@ -149,13 +149,14 @@ In the functionchart below, judicious use of helpers gives a visual explanation 
 
 The key features in this diagram are:
 
-1. Helper functions are defined first, including abstractions for indexing ('[i]') and the "less than" predicate ('pred'). There is also a '??' predicate which returns two separate values for the true and false cases. This helps organize related wires and prevent wires crossing.
+1. Helper functions are defined first. The '??' predicate returns two separate values for the true and false cases. This helps organize related wires.
 
 1. The 'divide' helper function divides the range [lo..hi] into two sub-ranges [lo..mid] and [mid + 1, hi]. This helps reduce clutter. It also provides a nice visual explanation of how the range is split, as the outputs are increasing as we read top to bottom.
 
-1. The implementation is very general, taking only an abstract indexer function.
+1. The implementation is very general, taking an abstract indexer function '[i]' and "less than" function '<'.
+1. A helper function 'test' is created using the indexer and less than function. This consumes the input parameters in one corner of the chart and replaces some long wires and links with a single instance link.
 
-We can apply our 'search' function to an array, or at least an abstracted array - this provides a length, and an indexer function '[i]', making it effectively read-only to the 'search' function.
+We can apply our 'search' function to an array-like abstraction. This provides a 'length' and an indexer function '[i]', making it effectively read-only to the 'search' function.
 
 <figure>
   <img src="./resources/binary_search2.svg"  alt="" title="Binary search of an array.">
@@ -338,12 +339,6 @@ Generic iteration with start, end, condition, and step configurable.
 TODO up/down, step 1, n, exotic step (binary search)
 <figure>
   <img src="./resources/iteration2.svg"  alt="" title="Generic iteration with start, end, condition, and step configurable.">
-</figure>
-
-## Counters
-Minimal iteration abstraction
-<figure>
-  <img src="./resources/counters.svg"  alt="" title="Counters for iterating integer ranges.">
 </figure>
 
 ## Live Demo Editor with Examples

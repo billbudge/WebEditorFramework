@@ -2466,9 +2466,6 @@ class Renderer {
                 ctx.fill();
                 ctx.fillStyle = fillStyle;
                 this.drawType(element.type, x, y);
-                if (element instanceof FunctionInstance && !element.src.hideLinks) {
-                    this.drawFunctionInstanceLink(element, theme.dimColor);
-                }
                 break;
             }
             case RenderMode.Highlight:
@@ -3287,7 +3284,16 @@ export class FunctionchartEditor {
             functionchart.nodes.forEach(item => {
                 context.visitNodes(item, item => { renderer.draw(item, RenderMode.Normal); });
             });
-            // Draw wires after elements.
+            // Draw instance links.
+            const linkColor = this.theme.dimColor;
+            context.visitNodes(functionchart, node => {
+                if (node instanceof FunctionInstance) {
+                    const src = node.src;
+                    if (!src.hideLinks)
+                        renderer.drawFunctionInstanceLink(node, linkColor);
+                }
+            });
+            // Draw wires elements.
             context.visitWires(functionchart, wire => {
                 renderer.drawWire(wire, RenderMode.Normal);
             });
@@ -3363,7 +3369,16 @@ export class FunctionchartEditor {
         functionchart.nodes.forEach(item => {
             context.visitNodes(item, item => { renderer.draw(item, renderMode); });
         });
-        // Draw wires after elements.
+        // Draw instance links.
+        const linkColor = this.theme.dimColor;
+        context.visitNodes(functionchart, node => {
+            if (node instanceof FunctionInstance) {
+                const src = node.src;
+                if (!src.hideLinks)
+                    renderer.drawFunctionInstanceLink(node, linkColor);
+            }
+        });
+        // Draw wires elements.
         context.visitWires(functionchart, wire => {
             renderer.drawWire(wire, renderMode);
         });
