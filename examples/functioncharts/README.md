@@ -240,17 +240,15 @@ function partition(A: Array<number>, lo: number, hi: number) {
 
 The key features in this diagram are:
 
-1. Abstractions for indexing ('[i]'), setting the pivot, and swapping ('swap') are defined first. These will make the quicksort generic.
-
-1. (TODO, make the comparison functions generic.)
+1. Abstractions for getting the pivot index for [lo..hi], swapping ('swap') at indices (i, j), and binary predicates for comparing at (i, j) are defined first. These will make the quicksort generic.
 
 1. The generic functions are inputs in the outermost scope 'quicksort', but can be used in nested function definitions such as 'advToSwap', 'partition', and 'quicksort'. This simplifies the inputs and outputs of the helpers, reducing the number of wires. This is just like closure in Javascript.
 
 1. The generic do-while function calls the abstract 'body' function until the abstract 'cond' function returns false. The body function takes 1 input parameter and returns 1 output. The do-while function passes the body result to the cond function to perform the loop test. If it's true, do-while calls itself recursively, passing the result of body in to itself. If false, then the result of body is returned. Thus, do-while returns the result of the last call to body. Note that body must execute before cond, since it's "upstream" from it.
 
-1. 'quickStep' doesn't return a meaninful result (it's true if sorting happened, otherwise undefined if we return.) However, the result is important, since it drives the execution. This is important because this quicksort has important side effects.
+1. 'quicksort' doesn't return a meaninful result (it's true if sorting happened, otherwise undefined if we return.) However, the result must be consumed, since it drives the execution. This is important because this quicksort has important side effects.
 
-1. Finally, 'quicksort' defines a function that takes in the generic function parameters and returns a function to sort given a length.
+1. Finally, 'quicksort' defines a function that takes in the generic function parameters and returns a function to sort given a range [lo..hi].
 
 TODO text for quicksort application.
 
@@ -291,8 +289,10 @@ Below this function we create a function VNormal representing a subtype function
 
 ## Semantics
 
-1. To evaluate a function, evaluate its inputs.
-1. For each output of the function, trace back to recursively evaluate. If a 'cond' is encountered, evaluate the condition, then the branch that will be the result.
+1. To evaluate a function in a context, determine which outputs are consumed.
+1. For each consumed output of the function, trace back to evaluate (cache results, so each function is evaluated only once). If a 'cond' is encountered, evaluate the condition, then evaluate along the branch that will be the result.
+1. This "lazy" evaluation is not for efficiency; it is needed when side-effects are desired only under certain conditions.
+1. 'use' pseudofunctions can be used to pull in side-effects, and to order function evaluation.
 
 # More Examples
 
@@ -348,9 +348,9 @@ We can use the iteration to implement our factorial function. However, since we 
 ## More General Iteration over a Range
 Generic iteration with start, end, condition, and step configurable.
 TODO up/down, step 1, n, exotic step (binary search)
-<figure>
+<!-- <figure>
   <img src="./resources/iteration2.svg"  alt="" title="Generic iteration with start, end, condition, and step configurable.">
-</figure>
+</figure> -->
 
 ## Live Demo Editor with Examples
 Our palette contains the built in functions and Pseudofunctions. On the top are the input, output, apply, and pass Pseudofunctions. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an function and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.

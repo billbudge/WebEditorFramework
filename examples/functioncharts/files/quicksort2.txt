@@ -85,11 +85,11 @@
     {
       "type": "functionchart",
       "id": 11,
-      "typeString": "[,[[,v(length)[v,v]([i])[vv,v]([i]:=)](Array),v(length)[v,v]([i])[v(i)v(j),vv](swap)[v(lo)v(hi),v](chooseP)](adapter)]",
+      "typeString": "[,[[,v(length)[v,v]([i])[vv,v]([i]:=)](Array)[v,v]()([i]),v(length)[v(i)v(j),vv](swap)[vv,v](<)[vv,v](>)](adapter)]",
       "x": 352.8749122619629,
       "y": 125.38062763214111,
-      "width": 850.7035713195801,
-      "height": 427.9566946029663,
+      "width": 917.4879236221313,
+      "height": 404.55970287323,
       "name": "adapter",
       "implicit": true,
       "hideLinks": true,
@@ -107,8 +107,8 @@
           "type": "functionchart",
           "id": 13,
           "typeString": "[,[v(i)v(j),vv](swap)]",
-          "x": 113.95713424682617,
-          "y": 80.70242309570312,
+          "x": 162.91312789916992,
+          "y": 57.261383056640625,
           "width": 546.0517654418945,
           "height": 184.68400478363037,
           "name": "swap",
@@ -234,12 +234,12 @@
                     },
                     {
                       "type": "instance",
-                      "id": 27,
+                      "id": 58,
                       "typeString": "[v,v]([i])",
                       "x": 30.03123712539673,
                       "y": 11.245735168457031,
-                      "instancer": 12,
-                      "srcPin": 1
+                      "instancer": 57,
+                      "srcPin": 0
                     }
                   ],
                   "wires": []
@@ -257,7 +257,7 @@
                   "type": "wire",
                   "src": 23,
                   "srcPin": 0,
-                  "dst": 27,
+                  "dst": 58,
                   "dstPin": 0
                 }
               ]
@@ -316,161 +316,171 @@
           ]
         },
         {
+          "type": "output",
+          "id": 36,
+          "typeString": "[v(length),]",
+          "x": 113.20104885101318,
+          "y": 27.798338890075684
+        },
+        {
           "type": "functionchart",
-          "id": 28,
-          "typeString": "[,[v(lo)v(hi),v](chooseP)]",
-          "x": 111.28964328765869,
-          "y": 276.33826065063477,
-          "width": 566.3736953735352,
-          "height": 135.61843395233154,
-          "name": "chooseP",
+          "id": 49,
+          "typeString": "[,[vv,v](<)]",
+          "x": 76.73727035522461,
+          "y": 255.46952438354492,
+          "width": 128.91619873046875,
+          "height": 91.48866176605225,
+          "name": "<",
           "implicit": true,
-          "hideLinks": true,
+          "hideLinks": false,
           "nodes": [
             {
-              "type": "input",
-              "id": 29,
-              "typeString": "[,v(lo)]",
-              "x": 8.60547924041748,
-              "y": 21.085402488708496
-            },
-            {
-              "type": "input",
-              "id": 30,
-              "typeString": "[,v(hi)]",
-              "x": 7.1915082931518555,
-              "y": 85.50456142425537
-            },
-            {
               "type": "element",
-              "id": 31,
-              "typeString": "[vv,v](-)",
-              "x": 80.24796295166016,
-              "y": 74.02763366699219,
+              "id": 48,
+              "typeString": "[vv,v](<)",
+              "x": 58.08526611328125,
+              "y": 11.277679443359375,
               "name": "binop",
               "hideLinks": false
             },
             {
-              "type": "element",
-              "id": 32,
-              "typeString": "[v,v](Math.floor)",
-              "x": 231.4759063720703,
-              "y": 74.00993347167969,
-              "name": "external",
-              "hideLinks": false
+              "type": "instance",
+              "id": 59,
+              "typeString": "[v,v]([i])",
+              "x": 9.975863456726074,
+              "y": 9.245772361755371,
+              "instancer": 57,
+              "srcPin": 0
             },
             {
-              "type": "element",
-              "id": 33,
-              "typeString": "[v,v](Math.random)",
-              "x": 118.42633056640625,
-              "y": 74.109375,
-              "name": "external",
-              "hideLinks": false
-            },
-            {
-              "type": "element",
-              "id": 34,
-              "typeString": "[vv,v](+)",
-              "x": 345.76981353759766,
-              "y": 17.695999145507812,
-              "name": "binop",
-              "hideLinks": false
+              "type": "instance",
+              "id": 60,
+              "typeString": "[v,v]([i])",
+              "x": 10.973727226257324,
+              "y": 45.488661766052246,
+              "instancer": 57,
+              "srcPin": 0
             }
           ],
           "wires": [
             {
               "type": "wire",
-              "src": 30,
+              "src": 59,
               "srcPin": 0,
-              "dst": 31,
+              "dst": 48,
               "dstPin": 0
             },
             {
               "type": "wire",
-              "src": 31,
+              "src": 60,
               "srcPin": 0,
-              "dst": 33,
-              "dstPin": 0
-            },
-            {
-              "type": "wire",
-              "src": 33,
-              "srcPin": 0,
-              "dst": 32,
-              "dstPin": 0
-            },
-            {
-              "type": "wire",
-              "src": 29,
-              "srcPin": 0,
-              "dst": 31,
-              "dstPin": 1
-            },
-            {
-              "type": "wire",
-              "src": 29,
-              "srcPin": 0,
-              "dst": 34,
-              "dstPin": 0
-            },
-            {
-              "type": "wire",
-              "src": 32,
-              "srcPin": 0,
-              "dst": 34,
+              "dst": 48,
               "dstPin": 1
             }
           ]
         },
         {
-          "type": "output",
-          "id": 39,
-          "typeString": "[v,]",
-          "x": 112.38780307769775,
-          "y": 53.41127395629883
+          "type": "functionchart",
+          "id": 52,
+          "typeString": "[,[vv,v](>)]",
+          "x": 227.64638900756836,
+          "y": 297.07104110717773,
+          "width": 128.91619873046875,
+          "height": 91.48866176605225,
+          "name": ">",
+          "implicit": true,
+          "hideLinks": false,
+          "nodes": [
+            {
+              "type": "element",
+              "id": 53,
+              "typeString": "[vv,v](>)",
+              "x": 58.08526611328125,
+              "y": 11.277679443359375,
+              "name": "binop",
+              "hideLinks": false
+            },
+            {
+              "type": "instance",
+              "id": 61,
+              "typeString": "[v,v]([i])",
+              "x": 9.975863456726074,
+              "y": 9.245772361755371,
+              "instancer": 57,
+              "srcPin": 0
+            },
+            {
+              "type": "instance",
+              "id": 62,
+              "typeString": "[v,v]([i])",
+              "x": 10.973727226257324,
+              "y": 45.488661766052246,
+              "instancer": 57,
+              "srcPin": 0
+            }
+          ],
+          "wires": [
+            {
+              "type": "wire",
+              "src": 61,
+              "srcPin": 0,
+              "dst": 53,
+              "dstPin": 0
+            },
+            {
+              "type": "wire",
+              "src": 62,
+              "srcPin": 0,
+              "dst": 53,
+              "dstPin": 1
+            }
+          ]
         },
         {
-          "type": "output",
-          "id": 40,
-          "typeString": "[v(length),]",
-          "x": 113.20104885101318,
-          "y": 27.798338890075684
+          "type": "importer",
+          "id": 57,
+          "typeString": "[,[v,v]([i])]",
+          "x": 102.94390869140625,
+          "y": 152.5590476989746,
+          "name": "",
+          "hideLinks": true,
+          "inner": {
+            "type": "instance",
+            "id": 56,
+            "typeString": "[v,v]([i])",
+            "x": 8,
+            "y": 4,
+            "instancer": 12,
+            "srcPin": 1
+          }
         }
       ],
       "wires": [
         {
           "type": "wire",
           "src": 12,
-          "srcPin": 1,
-          "dst": 39,
-          "dstPin": 0
-        },
-        {
-          "type": "wire",
-          "src": 12,
           "srcPin": 0,
-          "dst": 40,
+          "dst": 36,
           "dstPin": 0
         }
       ]
     },
     {
       "type": "functionchart",
-      "id": 41,
+      "id": 37,
       "typeString": "[,[[,v(length)[v,v]([i])[vv,v]([i]:=)](Array),v](Array.sort)]",
-      "x": 412.66396713256836,
-      "y": 585.3813982009888,
+      "x": 397.1419334411621,
+      "y": 713.0162858963013,
       "width": 643.2348594665527,
-      "height": 221.72931575775146,
+      "height": 219.52127742767334,
       "name": "Array.sort",
       "implicit": false,
       "hideLinks": false,
       "nodes": [
         {
           "type": "instance",
-          "id": 43,
-          "typeString": "[[,v(length)[v,v]([i])[vv,v]([i]:=)](Array),v(length)[v,v]([i])[v(i)v(j),vv](swap)[v(lo)v(hi),v](chooseP)](adapter)",
+          "id": 38,
+          "typeString": "[[,v(length)[v,v]([i])[vv,v]([i]:=)](Array)[v,v]()([i]),v(length)[v(i)v(j),vv](swap)[vv,v](<)[vv,v](>)](adapter)",
           "x": 38.092315673828125,
           "y": 29.52127742767334,
           "instancer": 11,
@@ -478,7 +488,7 @@
         },
         {
           "type": "element",
-          "id": 44,
+          "id": 39,
           "typeString": "[,v(0)]",
           "x": 346.8843803405762,
           "y": 14.93536376953125,
@@ -487,32 +497,32 @@
         },
         {
           "type": "element",
-          "id": 52,
-          "typeString": "[[vv,v]()(pivot)[vv,vv]()(swap)[v,v]()([i]),[v(lo)v(hi),v](quicksort)[v(lo)v(hi),v(lo)v(p)v(p+1)v(hi)](partition)]",
-          "x": 225.31893920898438,
-          "y": 70.87421321868896,
+          "id": 40,
+          "typeString": "[[vv,v]()(pivot)[vv,vv]()(swap)[vv,v]()(<)[vv,v]()(>),[v(lo)v(hi),v](quicksort)[v(lo)v(hi),v(p)](partition)]",
+          "x": 228.39065551757812,
+          "y": 65.99143123626709,
           "name": "external",
           "hideLinks": false
         },
         {
           "type": "instance",
-          "id": 54,
+          "id": 41,
           "typeString": "[v(lo)v(hi),v](quicksort)",
           "x": 415.9475164413452,
           "y": 11.17823314666748,
-          "instancer": 52,
+          "instancer": 40,
           "srcPin": 0
         },
         {
           "type": "output",
-          "id": 55,
+          "id": 42,
           "typeString": "[v,]",
           "x": 519.065375328064,
           "y": 24.18250560760498
         },
         {
           "type": "input",
-          "id": 56,
+          "id": 43,
           "typeString": "[,v]",
           "x": 6.092315673828125,
           "y": 95.52127742767334
@@ -521,58 +531,58 @@
       "wires": [
         {
           "type": "wire",
+          "src": 39,
+          "srcPin": 0,
+          "dst": 41,
+          "dstPin": 0
+        },
+        {
+          "type": "wire",
+          "src": 38,
+          "srcPin": 0,
+          "dst": 41,
+          "dstPin": 1
+        },
+        {
+          "type": "wire",
+          "src": 41,
+          "srcPin": 0,
+          "dst": 42,
+          "dstPin": 0
+        },
+        {
+          "type": "wire",
           "src": 43,
-          "srcPin": 3,
-          "dst": 52,
+          "srcPin": 0,
+          "dst": 38,
+          "dstPin": 0
+        },
+        {
+          "type": "wire",
+          "src": 38,
+          "srcPin": 1,
+          "dst": 40,
+          "dstPin": 1
+        },
+        {
+          "type": "wire",
+          "src": 38,
+          "srcPin": 2,
+          "dst": 40,
           "dstPin": 2
         },
         {
           "type": "wire",
-          "src": 43,
-          "srcPin": 1,
-          "dst": 52,
-          "dstPin": 0
-        },
-        {
-          "type": "wire",
-          "src": 44,
-          "srcPin": 0,
-          "dst": 54,
-          "dstPin": 0
-        },
-        {
-          "type": "wire",
-          "src": 43,
-          "srcPin": 0,
-          "dst": 54,
-          "dstPin": 1
-        },
-        {
-          "type": "wire",
-          "src": 54,
-          "srcPin": 0,
-          "dst": 55,
-          "dstPin": 0
-        },
-        {
-          "type": "wire",
-          "src": 56,
-          "srcPin": 0,
-          "dst": 43,
-          "dstPin": 0
-        },
-        {
-          "type": "wire",
-          "src": 43,
-          "srcPin": 2,
-          "dst": 52,
-          "dstPin": 1
+          "src": 38,
+          "srcPin": 3,
+          "dst": 40,
+          "dstPin": 3
         }
       ]
     },
     {
       "type": "functionchart",
-      "id": 48,
+      "id": 44,
       "typeString": "[,[vv,v](setPivot)]",
       "x": 656.6219329833984,
       "y": 34.45639419555664,
@@ -584,28 +594,144 @@
       "nodes": [
         {
           "type": "input",
-          "id": 49,
+          "id": 45,
           "typeString": "[,v]",
           "x": 8,
           "y": 8
         },
         {
           "type": "output",
-          "id": 50,
+          "id": 46,
           "typeString": "[v,]",
           "x": 40,
           "y": 8
         },
         {
           "type": "input",
-          "id": 51,
+          "id": 47,
           "typeString": "[,v]",
           "x": 8.38751220703125,
           "y": 31.809356689453125
         }
       ],
       "wires": []
+    },
+    {
+      "type": "functionchart",
+      "id": 28,
+      "typeString": "[,[v(lo)v(hi),v](pivot)]",
+      "x": 388.01752185821533,
+      "y": 549.0981454849243,
+      "width": 448.4262466430664,
+      "height": 135.61843395233154,
+      "name": "pivot",
+      "implicit": true,
+      "hideLinks": true,
+      "nodes": [
+        {
+          "type": "input",
+          "id": 29,
+          "typeString": "[,v(lo)]",
+          "x": 8.60547924041748,
+          "y": 21.085402488708496
+        },
+        {
+          "type": "input",
+          "id": 30,
+          "typeString": "[,v(hi)]",
+          "x": 7.1915082931518555,
+          "y": 85.50456142425537
+        },
+        {
+          "type": "element",
+          "id": 31,
+          "typeString": "[vv,v](-)",
+          "x": 80.24796295166016,
+          "y": 74.02763366699219,
+          "name": "binop",
+          "hideLinks": false
+        },
+        {
+          "type": "element",
+          "id": 32,
+          "typeString": "[v,v](Math.floor)",
+          "x": 231.4759063720703,
+          "y": 74.00993347167969,
+          "name": "external",
+          "hideLinks": false
+        },
+        {
+          "type": "element",
+          "id": 33,
+          "typeString": "[v,v](Math.random)",
+          "x": 118.42633056640625,
+          "y": 74.109375,
+          "name": "external",
+          "hideLinks": false
+        },
+        {
+          "type": "element",
+          "id": 34,
+          "typeString": "[vv,v](+)",
+          "x": 345.76981353759766,
+          "y": 17.695999145507812,
+          "name": "binop",
+          "hideLinks": false
+        }
+      ],
+      "wires": [
+        {
+          "type": "wire",
+          "src": 30,
+          "srcPin": 0,
+          "dst": 31,
+          "dstPin": 0
+        },
+        {
+          "type": "wire",
+          "src": 31,
+          "srcPin": 0,
+          "dst": 33,
+          "dstPin": 0
+        },
+        {
+          "type": "wire",
+          "src": 33,
+          "srcPin": 0,
+          "dst": 32,
+          "dstPin": 0
+        },
+        {
+          "type": "wire",
+          "src": 29,
+          "srcPin": 0,
+          "dst": 31,
+          "dstPin": 1
+        },
+        {
+          "type": "wire",
+          "src": 29,
+          "srcPin": 0,
+          "dst": 34,
+          "dstPin": 0
+        },
+        {
+          "type": "wire",
+          "src": 32,
+          "srcPin": 0,
+          "dst": 34,
+          "dstPin": 1
+        }
+      ]
     }
   ],
-  "wires": []
+  "wires": [
+    {
+      "type": "wire",
+      "src": 28,
+      "srcPin": 0,
+      "dst": 40,
+      "dstPin": 0
+    }
+  ]
 }
