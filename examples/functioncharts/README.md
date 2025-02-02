@@ -282,6 +282,13 @@ Below this function we create a function VNormal representing a subtype function
   <img src="./resources/points.svg"  alt="" title="A simple 2d point library.">
 </figure>
 
+## Libraries
+
+<figure>
+  <img src="./resources/Library.svg"  alt="" title="An example of a Javascript built-in library.">
+</figure>
+
+
 ## Covariance (fewer inputs), Contravariance (more outputs)
 TODO
 
