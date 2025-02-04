@@ -19,14 +19,14 @@ Here is an example, an abstract binary search on a sorted Array.
 
 This introduction shows how some illustrative programs can be built and discusses the advantages and potential of this approach.
 
-For our purposes here, we implement a simple uni-type language which looks a lot like Javascript. We have primitive values (numbers, strings, etc.) and Functions. This simplifies our diagrams since we only have one kind of value and then functions flowing on our wires. However, we could extend these diagrams to include distinct primtive types with stronger typing to model languages like C, C++, Java, or Go.
+For our purposes here, we implement a simple uni-type language which looks a lot like Javascript. We have primitive values (numbers, strings, etc.) and Functions. This simplifies this diagrams since we only have one kind of value and then functions flowing on our wires. However, we could extend these diagrams to include distinct primtive types with stronger typing to model languages like C, C++, Java, or Go.
 
 ## Simple Functions
 We start by using the built-in functions provided by the language to create a new function.
 
 Functions have input and output pins that can be wired to other functions. Input pins can only accept one wire at a time, while an output pin may fan out to multiple functions.
 
-We also have pseudofunctions which look like functions in our diagrams, but don't calculate anything. One use of these is to allow us to specify inputs and outputs and name them.
+We also have pseudofunctions which look like functions in this diagrams, but don't calculate anything. One use of these is to allow us to specify inputs and outputs and name them.
 
 The picture below is a simple example of a Functionchart to compute the signum function, which takes a single number x as input and returns 1 if x > 0, 0 if x = 0, or -1 if x < 0.
 
@@ -99,7 +99,7 @@ Abstraction is an important technique for making software more useful. We can ab
 
 We create a helper functionchart for 'f' which contains pseudofunctions for two inputs and one output. This makes the functionchart abstract, indicated by a dotted outline around its function instances. Abstract functions can be used just like any function inside a functionchart and are interpreted as an implicit input of a function.
 
-In this example, we want to pass it to the inner functionchart, so we wrap it with an importer node. This converts the wrapped function into a function that produces instances of the wrapped function. It also allows us to create multiple instances from one input when that is desired.
+In this example, we want to pass it to the inner functionchart, so we make it an importer node. This wraps the function in another function that produces the wrapped function as an output. This allows us to create instances of the wrapped function, which we do here, and also to pass the function into other functions as an input.
 
 This function now looks like a "reducer".
 
@@ -121,6 +121,12 @@ We can also use the reduce function to sum the elements of an Array, if we are g
   <img src="./resources/factorial4.svg"  alt="" title="Array sum function defined with reduce function.">
 </figure>
 
+## Modifier Functions
+
+Modifier functions perform transformations that are difficult or awkward to represent with functioncharts. One example we saw was the 'importer' modifier, which converts a function instance into a function which can create instances of it.
+
+TODO
+
 ## Abstract Functions (Binary Search)
 
 Here is a binary search implementation. [Wikipedia](https://en.wikipedia.org/wiki/Binary_search)
@@ -141,7 +147,7 @@ function binary_search_leftmost(A: Array<number>, n: number, t: number) {
 }
 ```
 
-In the functionchart below, judicious use of helpers gives a visual explanation of the index calculations, and keeps the wires organized. The inputs for our function will be a search value, and a indexer function '[i]' which maps an index to a value, exactly like in an array. We use an abstract indexer, so we can reuse this search function.
+In the functionchart below, the helper function 'divide' gives a visual explanation of the index calculations, and keeps the wires organized. The inputs for our function will be a search value, and a indexer function '[i]' which maps an index to a value, exactly like in an array. We use an abstract indexer, so we can reuse this search function.
 
 <figure>
   <img src="./resources/binary_search.svg"  alt="" title="Binary search implementation.">
@@ -155,8 +161,9 @@ The key features in this diagram are:
 
 1. The implementation is very general, taking an abstract indexer function '[i]' and "less than" function '<'.
 1. A helper function 'test' is created using the indexer and less than function. This consumes the input parameters in one corner of the chart and replaces some long wires and links with a single instance link.
+1. Finally, 'binSearch' calls the 'search' function on the input range.
 
-We can apply our 'search' function to an array-like abstraction. This provides a 'length' and an indexer function '[i]', making it effectively read-only to the 'search' function.
+We can apply our 'binSearch' function to an array-like abstraction. This provides a 'length' and an indexer function '[i]', making it effectively read-only to the 'search' function.
 
 <figure>
   <img src="./resources/binary_search2.svg"  alt="" title="Binary search of an array.">
@@ -240,7 +247,7 @@ function partition(A: Array<number>, lo: number, hi: number) {
   <img src="./resources/quicksort.svg"  alt="" title="Quicksort, partition in place.">
 </figure>
 
-The key features in our diagram are:
+The key features in this diagram are:
 
 1. An abstraction for swapping elements at indices (i, j). It has two index inputs. This swaps the elements at i and j, and returns the input parameters for convenience.
 
@@ -268,11 +275,12 @@ We create an adapter which adapts the array abstraction to the required 'swap' a
   <img src="./resources/quicksort2.svg"  alt="" title="Using quicksort to sort an array.">
 </figure>
 
-The key features in our diagram are:
+The key features in this diagram are:
 
 1. The 'adapter' function uses the array indexed getter to implement the comparison functions.
 1. It uses the getter and setter to create an indexed let-like function, which can be passed to the 'swap' we implemented before. The output isn't needed, but we must 'use' it to drive the side effects.
-1. We use the adpater to implement two pivot selection algorithms. The adapter is useful since it implements 'swap', and the pivot functions generally must swap the selected pivot with the element at 'lo'.
+1. We use the adpater to implement two pivot selection algorithms. The adapter is useful since it implements 'swap', and the pivot functions in general swap the selected pivot with the element at 'lo'.
+1. Finally, we call 'quicksort' on our abstracted array, using the adapter, and choosing the "median-of-3" pivot function.
 
 Code fragment for Median of the 3 elements at 'lo', 'mid', and 'hi'.
 ```ts
@@ -286,12 +294,25 @@ if A[mid] < A[lo]
 pivot := A[lo]
 ```
 
-## Stateful Iteration (Counters)
-Minimal iteration abstraction
+## Stateful Iteration (Iterators)
+The diagram below defines a counter "construction set" by defining some base counters that can be composed. 'counter' is our counter abstraction, returning a value 'c' for the counter's current value, and a function 'n' which advances the counter's state, returning the new value. 'count' is an abstract base counter which contains the variable binding for the counter's value, and defines the next function 'n'. This uses an abstract 'inc' function to modify the counter's value.
+
+This is still abstract, and counter could be a number or a linked list pointer for example. For our purposes, we will only specialize this for numeric counters.
+
 <figure>
   <img src="./resources/counters.svg"  alt="" title="Counters for iterating integer ranges.">
 </figure>
 
+The key features in this diagram are:
+
+1. The 'counter' adapter defines the counter API.
+1. 'count' implements the stateful part of a counter. It's abstract until it gets an 'inc' function.
+1. 'countBy' adds the concept of a step. We specialize two functions for the common +1 and -1 cases.
+1. 'countTo' adds the concept of a limit, for counting up or down.
+1. Finally, we construct a counter that counts up by 1 in the range [lo..hi[.
+
+## Casts
+TODO down-casting, up-casting.
 
 ## Representing State (Tuples)
 

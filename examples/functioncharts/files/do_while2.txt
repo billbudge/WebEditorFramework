@@ -78,7 +78,7 @@
         {
           "type": "element",
           "id": 9,
-          "typeString": "[[v,v]()(body)[v,v]()(cond)v(p),v(p)](while-do)",
+          "typeString": "[[v,v]()(body)[v,v]()(test)v(p),v(p)](while-do)",
           "x": 185.15399169921875,
           "y": 41.0042724609375,
           "name": "external",
@@ -177,7 +177,7 @@
         {
           "type": "element",
           "id": 16,
-          "typeString": "[[v,v]()(body)[v,v]()(cond)v(p),v(p)](while-do)",
+          "typeString": "[[v,v]()(body)[v,v]()(test)v(p),v(p)](while-do)",
           "x": 185.15399169921875,
           "y": 41.0042724609375,
           "name": "external",

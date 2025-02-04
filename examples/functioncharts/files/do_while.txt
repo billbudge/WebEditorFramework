@@ -13,7 +13,7 @@
     {
       "type": "functionchart",
       "id": 3,
-      "typeString": "[,[[v,v]()(body)[v,v]()(cond)v(p),v(p)](while-do)]",
+      "typeString": "[,[[v,v]()(body)[v,v]()(test)v(p),v(p)](while-do)]",
       "x": 338.10870361328125,
       "y": 311.25850677490234,
       "width": 357.0030517578125,
@@ -68,14 +68,14 @@
             "typeString": "[v,v](body)",
             "x": 8,
             "y": 4,
-            "instancer": 34,
+            "instancer": 25,
             "srcPin": 0
           }
         },
         {
           "type": "importer",
           "id": 10,
-          "typeString": "[,[v,v](cond)]",
+          "typeString": "[,[v,v](test)]",
           "x": 11.799934387207031,
           "y": 66.61552429199219,
           "name": "",
@@ -83,10 +83,10 @@
           "inner": {
             "type": "instance",
             "id": 11,
-            "typeString": "[v,v](cond)",
+            "typeString": "[v,v](test)",
             "x": 8,
             "y": 4,
-            "instancer": 37,
+            "instancer": 28,
             "srcPin": 0
           }
         },
@@ -102,7 +102,7 @@
         {
           "type": "instance",
           "id": 13,
-          "typeString": "[v,v](cond)",
+          "typeString": "[v,v](test)",
           "x": 64.89844512939453,
           "y": 108.53876495361328,
           "instancer": 10,
@@ -178,7 +178,7 @@
     {
       "type": "functionchart",
       "id": 14,
-      "typeString": "[,[[v,v]()(body)[v,v]()(cond)v(p),v(p)](do-while)]",
+      "typeString": "[,[[v,v]()(body)[v,v]()(test)v(p),v(p)](do-while)]",
       "x": 339.5262756347656,
       "y": 107.70095443725586,
       "width": 320.0968017578125,
@@ -233,14 +233,14 @@
             "typeString": "[v,v](body)",
             "x": 8,
             "y": 4,
-            "instancer": 34,
+            "instancer": 25,
             "srcPin": 0
           }
         },
         {
           "type": "importer",
           "id": 21,
-          "typeString": "[,[v,v](cond)]",
+          "typeString": "[,[v,v](test)]",
           "x": 11.799934387207031,
           "y": 66.61552429199219,
           "name": "",
@@ -248,17 +248,17 @@
           "inner": {
             "type": "instance",
             "id": 22,
-            "typeString": "[v,v](cond)",
+            "typeString": "[v,v](test)",
             "x": 8,
             "y": 4,
-            "instancer": 37,
+            "instancer": 28,
             "srcPin": 0
           }
         },
         {
           "type": "instance",
           "id": 23,
-          "typeString": "[v,v](cond)",
+          "typeString": "[v,v](test)",
           "x": 124.12799835205078,
           "y": 111.78746795654297,
           "instancer": 21,
@@ -342,7 +342,7 @@
     },
     {
       "type": "functionchart",
-      "id": 34,
+      "id": 25,
       "typeString": "[,[v,v](body)]",
       "x": 342.16258573532104,
       "y": 38.29899787902832,
@@ -354,14 +354,14 @@
       "nodes": [
         {
           "type": "output",
-          "id": 35,
+          "id": 26,
           "typeString": "[v,]",
           "x": 35.834571838378906,
           "y": 6.700288772583008
         },
         {
           "type": "input",
-          "id": 36,
+          "id": 27,
           "typeString": "[,v]",
           "x": 8,
           "y": 8
@@ -371,26 +371,26 @@
     },
     {
       "type": "functionchart",
-      "id": 37,
-      "typeString": "[,[v,v](cond)]",
+      "id": 28,
+      "typeString": "[,[v,v](test)]",
       "x": 468.2315249443054,
       "y": 38.39133644104004,
       "width": 100.40555572509766,
       "height": 46,
-      "name": "cond",
+      "name": "test",
       "implicit": false,
       "hideLinks": true,
       "nodes": [
         {
           "type": "output",
-          "id": 38,
+          "id": 29,
           "typeString": "[v,]",
           "x": 35.834571838378906,
           "y": 6.700288772583008
         },
         {
           "type": "input",
-          "id": 39,
+          "id": 30,
           "typeString": "[,v]",
           "x": 8,
           "y": 8
