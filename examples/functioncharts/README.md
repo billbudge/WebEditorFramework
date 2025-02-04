@@ -207,7 +207,7 @@ Swap would be simpler to implement if the semantics of the setter were to return
 </figure>
 
 ## Abstract Functions (Quicksort)
-Here is Javascript source for an implementation of Quicksort which does the partition step in place using Hoare's algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Quicksort)
+Here is Typescript source for an implementation of Quicksort which does the partition step in place using Hoare's algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Quicksort)
 
 ```ts
 function quicksort(A: Array<number>, lo: number, hi: number) {
@@ -240,7 +240,7 @@ function partition(A: Array<number>, lo: number, hi: number) {
 
 The key features in this diagram are:
 
-1. Abstractions for getting the pivot index for [lo..hi], swapping ('swap') at indices (i, j), and binary predicates for comparing at (i, j) are defined first. These will make the quicksort generic.
+1. Abstractions for getting the pivot index for [lo..hi], swapping ('swap') at indices (i, j), and binary predicates for comparing at (i, j) are defined first. These make the quicksort generic. Note that the quicksort routine never accesses the array directly. '<' and '>' are used to compare entries, and 'swap' is used to move them.
 
 1. The generic functions are inputs in the outermost scope 'quicksort', but can be used in nested function definitions such as 'advToSwap', 'partition', and 'quicksort'. This simplifies the inputs and outputs of the helpers, reducing the number of wires. This is just like closure in Javascript.
 
@@ -248,9 +248,20 @@ The key features in this diagram are:
 
 1. 'quicksort' doesn't return a meaninful result (it's true if sorting happened, otherwise undefined if we return.) However, the result must be consumed, since it drives the execution. This is important because this quicksort has important side effects.
 
-1. Finally, 'quicksort' defines a function that takes in the generic function parameters and returns a function to sort given a range [lo..hi].
+1. Finally, 'quicksort' defines a function that takes in generic function parameters and returns functions to sort or partition given a range [lo..hi].
 
 TODO text for quicksort application.
+
+```ts
+mid := ⌊(lo + hi) / 2⌋
+if A[mid] < A[hi]
+    swap A[hi] with A[mid]
+if A[lo] < A[hi]
+    swap A[hi] with A[lo]
+if A[mid] < A[lo]
+    swap A[mid] with A[lo]
+pivot := A[lo]
+```
 
 <figure>
   <img src="./resources/quicksort2.svg"  alt="" title="Using quicksort to sort an array.">

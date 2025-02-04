@@ -1910,7 +1910,7 @@ export class FunctionchartContext extends EventBase {
                     // The general case node...
                     abstract = abstract && node.isAbstract;
                     if (implicit && (node instanceof Element || node instanceof Functionchart)) {
-                        // In implicit mode, empty pins of true elements become pins for the functionchart type.
+                        // In implicit mode, empty pins of nodes become pins for the functionchart type.
                         const type = node.type, inputPins = type.inputs, outputPins = type.outputs;
                         for (let i = 0; i < inputPins.length; i++) {
                             if (node.inWires[i])
