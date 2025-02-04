@@ -209,6 +209,8 @@ Swap would be simpler to implement if the semantics of the setter were to return
 ## Abstract Functions (Quicksort)
 Here is Typescript source for an implementation of Quicksort which does the partition step in place using Hoare's algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Quicksort)
 
+The code is subtle in places. In particular, it assumes the element used for the pivot is at the 'lo' index. Because of this, the do-while loops in 'partition' don't need to check i, j against lo, hi while iterating.
+
 ```ts
 function quicksort(A: Array<number>, lo: number, hi: number) {
   if (lo >= 0 && hi >= 0 && lo < hi) {
@@ -238,20 +240,41 @@ function partition(A: Array<number>, lo: number, hi: number) {
   <img src="./resources/quicksort.svg"  alt="" title="Quicksort, partition in place.">
 </figure>
 
-The key features in this diagram are:
+The key features in our diagram are:
 
-1. Abstractions for getting the pivot index for [lo..hi], swapping ('swap') at indices (i, j), and binary predicates for comparing at (i, j) are defined first. These make the quicksort generic. Note that the quicksort routine never accesses the array directly. '<' and '>' are used to compare entries, and 'swap' is used to move them.
+1. An abstraction for swapping elements at indices (i, j). It has two index inputs. This swaps the elements at i and j, and returns the input parameters for convenience.
 
-1. The generic functions are inputs in the outermost scope 'quicksort', but can be used in nested function definitions such as 'advToSwap', 'partition', and 'quicksort'. This simplifies the inputs and outputs of the helpers, reducing the number of wires. This is just like closure in Javascript.
+1. An abstraction 'setP' for setting the pivot for the range [lo..hi]. Similarly, it takes two indices and simply returns them.
 
-1. The generic do-while function calls the abstract 'body' function until the abstract 'cond' function returns false. The body function takes 1 input parameter and returns 1 output. The do-while function passes the body result to the cond function to perform the loop test. If it's true, do-while calls itself recursively, passing the result of body in to itself. If false, then the result of body is returned. Thus, do-while returns the result of the last call to body. Note that body must execute before cond, since it's "upstream" from it.
+1. Binary predicates for comparing the elements at (i, j). This takes two indices and returns a boolean result.
 
-1. 'quicksort' doesn't return a meaninful result (it's true if sorting happened, otherwise undefined if we return.) However, the result must be consumed, since it drives the execution. This is important because this quicksort has important side effects.
+1. Note that array is accessed only indirectly, through indices.
 
-1. Finally, 'quicksort' defines a function that takes in generic function parameters and returns functions to sort or partition given a range [lo..hi].
+1. The abstract functions are inputs in the outermost scope, but are used in nested functioncharts such as 'advToSwap', 'partition', and 'quicksort'. The outermost functionchart takes these inputs and returns the functions 'quicksort' and 'partition'.
 
-TODO text for quicksort application.
+1. The first, 'quicksort' doesn't return a meaninful result (always 'true' because we return the result of the termination check.) However, the result must be consumed, since it drives the execution. This is important because this mutating quicksort is all side effects.
 
+1. The second, 'partition' finds the point where the pivot element divides the range into two. It returns this 'p', and the input parameters, which is convenient for the 'quicksort' diagram. We return 'partition' as a result function since it is useful on its own.
+
+1. The third, 'advToSwap' uses do-while to advance the pointers. Note that 'lo' is passed to '<' and '>' since these compare to the pivot, which is at 'lo'.
+
+## Calling Quicksort
+
+In order to call 'quicksort', we must create the functions 'swap', 'setP', '<', and '>'. We could do this, given an array. Again we choose to create an abstraction, this time for an Array-like function. The abstraction has a 'length', an indexed getter, and an indexed setter. This looks similar to a 'let', except that the additional index parameter is needed by both get and set.
+
+We create an adapter which adapts the array abstraction to the required 'swap' and predicate functions, then use the adapter to implement two pivot selection algorithms, one a random element in the range, and the other a median-of-3 implementation. Finally, we use our adapter and pivot functions to call quicksort.
+
+<figure>
+  <img src="./resources/quicksort2.svg"  alt="" title="Using quicksort to sort an array.">
+</figure>
+
+The key features in our diagram are:
+
+1. The 'adapter' function uses the array indexed getter to implement the comparison functions.
+1. It uses the getter and setter to create an indexed let-like function, which can be passed to the 'swap' we implemented before. The output isn't needed, but we must 'use' it to drive the side effects.
+1. We use the adpater to implement two pivot selection algorithms. The adapter is useful since it implements 'swap', and the pivot functions generally must swap the selected pivot with the element at 'lo'.
+
+Code fragment for Median of the 3 elements at 'lo', 'mid', and 'hi'.
 ```ts
 mid := ⌊(lo + hi) / 2⌋
 if A[mid] < A[hi]
@@ -262,10 +285,6 @@ if A[mid] < A[lo]
     swap A[mid] with A[lo]
 pivot := A[lo]
 ```
-
-<figure>
-  <img src="./resources/quicksort2.svg"  alt="" title="Using quicksort to sort an array.">
-</figure>
 
 ## Stateful Iteration (Counters)
 Minimal iteration abstraction
