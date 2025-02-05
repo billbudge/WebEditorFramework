@@ -24,7 +24,6 @@ import { types } from '@babel/core';
 
 // TODO Functionchart imports.
 // TODO Root functionchart type display.
-// TODO Check validity of function instances during drag-n-drop.
 
 //------------------------------------------------------------------------------
 
@@ -2161,6 +2160,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       self.addItem(item, parent);
       selection.add(item);
     });
+    selection.add(parent);
   }
 
   // Visit the given pin, then follow wires from the parent element.
@@ -3714,6 +3714,7 @@ export class FunctionchartEditor implements CanvasLayer {
     // On ending transactions and undo/redo, layout the changed top level functioncharts.
     function update() {
       self.updateBounds();
+      self.setPropertyGrid();
     }
     context.addTransactionHandler('transactionEnding', update);
     context.addTransactionHandler('didUndo', update);
@@ -4373,8 +4374,6 @@ export class FunctionchartEditor implements CanvasLayer {
 
     context.endTransaction();
 
-    this.setPropertyGrid();
-
     this.dragInfo = undefined;
     this.pointerHitInfo = undefined;
     this.draggableHitInfo = undefined;
@@ -4398,7 +4397,6 @@ export class FunctionchartEditor implements CanvasLayer {
     const self = this,
           context = this.context,
           functionchart = this.functionchart,
-          selection = context.selection,
           keyCode = e.keyCode,  // TODO fix me.
           cmdKey = e.ctrlKey || e.metaKey,
           shiftKey = e.shiftKey;
@@ -4410,10 +4408,11 @@ export class FunctionchartEditor implements CanvasLayer {
     if (cmdKey) {
       switch (keyCode) {
         case 65: { // 'a'
-          functionchart.nodes.forEach(function (v) {
-            context.selection.add(v);
+          functionchart.nodes.forEach(node => {
+            context.selection.add(node);
           });
           self.canvasController.draw();
+          this.setPropertyGrid();
           return true;
         }
         case 90: { // 'z'
@@ -4502,7 +4501,8 @@ export class FunctionchartEditor implements CanvasLayer {
           context.castElements(context.selectedElements(), !shiftKey);
           context.endTransaction();
           return true;
-        case 78: { // ctrl 'n'   // Can't intercept cmd n.
+        case 78: { // 'n'
+          // ctrl-n
           const context = new FunctionchartContext(this.renderer);
           self.initializeContext(context);
           self.setContext(context);

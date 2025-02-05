@@ -6,7 +6,6 @@ import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems,
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
 // TODO Functionchart imports.
 // TODO Root functionchart type display.
-// TODO Check validity of function instances during drag-n-drop.
 //------------------------------------------------------------------------------
 // Value and Function type descriptions.
 function escapeName(name) {
@@ -1818,6 +1817,7 @@ export class FunctionchartContext extends EventBase {
             self.addItem(item, parent);
             selection.add(item);
         });
+        selection.add(parent);
     }
     // Visit the given pin, then follow wires from the parent element.
     visitPin(node, index, visitor, visited) {
@@ -3141,6 +3141,7 @@ export class FunctionchartEditor {
         // On ending transactions and undo/redo, layout the changed top level functioncharts.
         function update() {
             self.updateBounds();
+            self.setPropertyGrid();
         }
         context.addTransactionHandler('transactionEnding', update);
         context.addTransactionHandler('didUndo', update);
@@ -3735,7 +3736,6 @@ export class FunctionchartEditor {
             }
         }
         context.endTransaction();
-        this.setPropertyGrid();
         this.dragInfo = undefined;
         this.pointerHitInfo = undefined;
         this.draggableHitInfo = undefined;
@@ -3753,7 +3753,7 @@ export class FunctionchartEditor {
         this.canvasController.draw();
     }
     onKeyDown(e) {
-        const self = this, context = this.context, functionchart = this.functionchart, selection = context.selection, keyCode = e.keyCode, // TODO fix me.
+        const self = this, context = this.context, functionchart = this.functionchart, keyCode = e.keyCode, // TODO fix me.
         cmdKey = e.ctrlKey || e.metaKey, shiftKey = e.shiftKey;
         if (keyCode === 8) { // 'delete'
             context.deleteSelection();
@@ -3762,10 +3762,11 @@ export class FunctionchartEditor {
         if (cmdKey) {
             switch (keyCode) {
                 case 65: { // 'a'
-                    functionchart.nodes.forEach(function (v) {
-                        context.selection.add(v);
+                    functionchart.nodes.forEach(node => {
+                        context.selection.add(node);
                     });
                     self.canvasController.draw();
+                    this.setPropertyGrid();
                     return true;
                 }
                 case 90: { // 'z'
@@ -3854,7 +3855,8 @@ export class FunctionchartEditor {
                     context.castElements(context.selectedElements(), !shiftKey);
                     context.endTransaction();
                     return true;
-                case 78: { // ctrl 'n'   // Can't intercept cmd n.
+                case 78: { // 'n'
+                    // ctrl-n
                     const context = new FunctionchartContext(this.renderer);
                     self.initializeContext(context);
                     self.setContext(context);

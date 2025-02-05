@@ -302,6 +302,7 @@ This is still abstract, and counter could be a number or a linked list pointer f
 <figure>
   <img src="./resources/counters.svg"  alt="" title="Counters for iterating integer ranges.">
 </figure>
+<!-- <video src="./resources/functioncharts.mp4" width="1280" height="960" controls></video> -->
 
 The key features in this diagram are:
 
