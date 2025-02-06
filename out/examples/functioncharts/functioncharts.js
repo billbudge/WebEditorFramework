@@ -397,6 +397,9 @@ export class Element extends NodeBase {
     get isAbstract() {
         return this.name === 'abstract';
     }
+    get hasSideEffects() {
+        return false;
+    }
     get isInstancer() {
         return true;
     }
@@ -454,6 +457,13 @@ export class FunctionInstance extends Element {
         const src = this.src;
         return src instanceof Functionchart && src.isAbstract;
     }
+    get hasSideEffects() {
+        const src = this.src;
+        if (src instanceof Element) {
+            return (src.name === 'let' || src.name === 'this'); // must be this/let setter, which has side effects.
+        }
+        return src instanceof Functionchart && src.hasSideEffects;
+    }
     get isInstancer() { return true; }
     getSrcType() {
         return this.src.type.outputs[this.srcPin].type;
@@ -498,12 +508,6 @@ export class Wire {
         }
         return Type.valueType;
     }
-    // get isPseudowire() : boolean {  // TODO
-    //   // The src is a pseudoelement and the dst isn't.
-    //   const srcPseudo = this.src instanceof Pseudoelement,
-    //         dstPseudo = this.dst instanceof Pseudoelement;
-    //   return srcPseudo && !dstPseudo;
-    // }
     constructor(context) {
         this.template = wireTemplate;
         this.bezier = defaultBezierCurve;
@@ -517,6 +521,7 @@ const emptyTypeInfo = {
     instanceType: Type.emptyExporterType,
     closed: true,
     abstract: false,
+    sideEffects: false,
     inputs: [],
     outputs: [],
 };
@@ -540,6 +545,7 @@ export class Functionchart extends NodeBase {
     get wires() { return this.template.wires.get(this); }
     // Derived properties.
     get isAbstract() { return this.typeInfo.abstract; }
+    get hasSideEffects() { return this.typeInfo.sideEffects; }
     get isInstancer() { return true; }
     get isClosed() { return this.typeInfo.closed; }
     constructor(context, template, id) {
@@ -1552,7 +1558,7 @@ export class FunctionchartContext extends EventBase {
         // Delete unsupported FunctionInstances. Update the rest.
         Array.from(this.nodes).forEach(node => {
             if (node instanceof FunctionInstance) {
-                const instancer = node.src, supported = self.nodes.has(instancer);
+                const src = node.src, srcPin = node.srcPin, supported = self.nodes.has(src) && src.instances[srcPin].includes(node);
                 if (!supported) {
                     self.disconnectNode(node);
                     self.deleteItem(node);
@@ -1870,13 +1876,9 @@ export class FunctionchartContext extends EventBase {
     }
     getFunctionchartTypeInfo(functionchart) {
         const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name, implicit = functionchart.implicit, subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()), closed = subgraphInfo.inWires.size == 0;
-        // A functionchart is abstract unless it contains a non-abstract Element or Functionchart, or
-        // a non-pseudowire.
-        let abstract = true;
-        // // Only pseudowires (to/from Pseudoelement) in an abstract functionchart.
-        // subgraphInfo.wires.forEach(wire => {
-        //   abstract = abstract && wire.isPseudowire;
-        // });
+        // A functionchart is abstract if it has no wires.
+        let abstract = subgraphInfo.wires.size === 0;
+        let sideEffects = false;
         // Collect the functionchart's input and output pseudoelements.
         subgraphInfo.nodes.forEach(node => {
             if (node instanceof Pseudoelement) {
@@ -1909,6 +1911,7 @@ export class FunctionchartContext extends EventBase {
                 else {
                     // The general case node...
                     abstract = abstract && node.isAbstract;
+                    sideEffects = sideEffects || node.hasSideEffects;
                     if (implicit && (node instanceof Element || node instanceof Functionchart)) {
                         // In implicit mode, empty pins of nodes become pins for the functionchart type.
                         const type = node.type, inputPins = type.inputs, outputPins = type.outputs;
@@ -1951,7 +1954,7 @@ export class FunctionchartContext extends EventBase {
             return new Pin(pinInfo.type, pinInfo.name);
         });
         const type = Type.fromInfo(inputPins, outputPins, name);
-        return { instanceType: type, closed, abstract, inputs, outputs };
+        return { instanceType: type, closed, abstract, sideEffects, inputs, outputs };
     }
     updateGlobalPosition(node) {
         if (node instanceof NodeBase) {
@@ -2421,6 +2424,11 @@ class Renderer {
         ctx.stroke();
         ctx.setLineDash([0]);
     }
+    drawSideEffectsTick(right, top) {
+        const ctx = this.ctx, theme = this.theme, spacing = theme.spacing;
+        ctx.moveTo(right - spacing, top);
+        ctx.lineTo(right, top + spacing);
+    }
     drawElement(element, mode) {
         const ctx = this.ctx, theme = this.theme, rect = this.getBounds(element), x = rect.x, y = rect.y, w = rect.width, h = rect.height;
         ctx.beginPath();
@@ -2436,6 +2444,9 @@ class Renderer {
         }
         else {
             ctx.rect(x, y, w, h);
+            if (element.hasSideEffects) {
+                this.drawSideEffectsTick(x + w, y);
+            }
         }
         switch (mode) {
             case RenderMode.Normal:
@@ -2536,6 +2547,9 @@ class Renderer {
                 ctx.fillStyle = theme.altBgColor;
                 ctx.fill();
                 ctx.strokeStyle = theme.strokeColor;
+                if (functionchart.hasSideEffects) {
+                    this.drawSideEffectsTick(x + w, y + r);
+                }
                 if (functionchart.isAbstract) {
                     this.abstractStroke(ctx);
                 }
@@ -2802,7 +2816,7 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), use = context.newPseudoelement('use'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), constFn = context.newElement('element'), letFn = context.newElement('element'), external = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart');
+        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), use = context.newPseudoelement('use'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), letFn = context.newElement('element'), thisFn = context.newElement('element'), external = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart');
         context.root = functionchart;
         input.x = 8;
         input.y = 8;
@@ -2826,15 +2840,15 @@ export class FunctionchartEditor {
         cond.y = 32;
         cond.name = 'cond';
         cond.typeString = '[vvv,v](?)'; // conditional
-        constFn.x = 172;
-        constFn.y = 32;
-        constFn.name = 'const';
-        constFn.typeString = '[v,v](const)';
-        letFn.x = 234;
+        letFn.x = 172;
         letFn.y = 32;
         letFn.name = 'let';
         letFn.typeString = '[v,v[v,v]](let)';
-        external.x = 284;
+        thisFn.x = 224;
+        thisFn.y = 32;
+        thisFn.name = 'this';
+        thisFn.typeString = '[vv,v[v,v]](this)';
+        external.x = 274;
         external.y = 32;
         external.name = 'external';
         external.typeString = '[,](lib)';
@@ -2849,8 +2863,8 @@ export class FunctionchartEditor {
         functionchart.nodes.append(binop);
         functionchart.nodes.append(unop);
         functionchart.nodes.append(cond);
-        functionchart.nodes.append(constFn);
         functionchart.nodes.append(letFn);
+        functionchart.nodes.append(thisFn);
         functionchart.nodes.append(external);
         functionchart.nodes.append(newFunctionchart);
         context.root = functionchart;
