@@ -1,15 +1,17 @@
-# Functioncharts: Diagrams of Computation
-Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. This repository contains the source code for a Web Editor that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs. Functioncharts are inspired by [Statecharts](../statecharts/README.md). "Flowcharts" would have been a great name for these, but that name is taken.
+# Functioncharts: A Graphical Programming Language
+Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. This repository contains the source code for a Web application that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs (but that will be a fun project!) The emphasis here is on the design of the language. The web application is essentially a fancy diagram editor.
+
+Functioncharts are inspired by [Statecharts](../statecharts/README.md). "Flowcharts" would have been a great name for these, but that name is taken.
 
 Many "node and wire" programming systems have been built. However, most are either domain-specific, or are intended for non-programmers building small, simple programs. Like Statecharts, Functioncharts use hierarchy and abstraction to increase the power and economy of the notation. The ambitious goal is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages.
 
 The two principal innovations in Functioncharts are:
 
-1. Functions can accept other functions as inputs, and produce new functions as outputs. This gives the diagrams much greater expressive power as we can represent abstractions.
+1. Functions can accept other functions as inputs, and produce new functions as outputs. This gives the diagrams much greater expressive power.
 
-1. Functions may be defined by the user using nested Functions. The nested Function can be edited live, so the new function can be used inside its own definition. This allows recursion, and as a special case, iteration through the tail call optimization. Nested Functioncharts may define complete functions, or partial functions, allowing us to express things like closures.
+1. Functions define scopes, and a function can be used inside its own scope. This allows recursion, and as a special case, iteration through the tail call optimization. Function scopes can be nested, and may define complete functions, or partial functions, allowing us to create closures.
 
-Both features serve to reduce the visual complexity of the Functionchart diagrams, by making it easy to produce and consume helper functions which in turn can reduce the number of wires and organize them.
+Both features help to reduce the visual complexity of the Functionchart diagrams, by making it easy to produce and consume helper functions which can control the routing of wires, and reduce their number.
 
 Here is an example, an abstract binary search on a sorted Array.
 
