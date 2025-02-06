@@ -13,8 +13,9 @@ Both features serve to reduce the visual complexity of the Functionchart diagram
 
 Here is an example, an abstract binary search on a sorted Array.
 
-<figure>
+<figure align="center">
   <img src="./resources/binary_search.svg"  alt="" title="Binary search implementation.">
+  <figcaption align="center">A Functionchart example - Binary Search of a sorted Array-like object.</figcaption>
 </figure>
 
 This introduction shows how some illustrative programs can be built and discusses the advantages and potential of this approach.
@@ -47,20 +48,22 @@ The Functionchart is drawn with rounded corners to distinguish it from function 
 
 The order of the function instance's inputs and outputs is determined by their vertical position in the functionchart. Inputs and outputs are sorted by their y-coordinate, so the topmost input in the functionchart becomes the first input in its function instance.
 
-<figure>
+<figure align="center">
   <img src="./resources/signum.svg"  alt="" title="Signum function.">
+  <figcaption align="center">Function to return -1 if a < 0, 1 if a > 0, or 0 otherwise.</figcaption>
 </figure>
 
 This diagram is already a little hard to read. We can refactor, defining new helper functions. For the above example, we can define some very simple primitives (x<0, x>0, and a cascaded conditional operator) that make our function easier to read. Then we use the new functions to represent the final signum function as before. By default the sub-functions are drawn with lighter gray links to their defining functioncharts, as in this diagram. Normally we would set the links to be invisible for such simple helpers.
 
-<figure>
+<figure align="center">
   <img src="./resources/signum2.svg"  alt="" title="Signum function using helper functions.">
 </figure>
 
 Similarly we can define other useful functions. In this Functionchart, the function instance links are visible. We use the "< 0" function in the abs functionchart.
 
-<figure>
+<figure align="center">
   <img src="./resources/simpleFns.svg"  alt="" title="Comparisons, maximum, minimum, and absolute value.">
+  <figcaption align="center">Simple helper functions, and an instance link.</figcaption>
 </figure>
 
 ## Implicit and Explicit Functioncharts
@@ -71,19 +74,20 @@ If we set the 'implicit' property of the functionchart to 'false', then our comp
 
 In the diagram of simple functions above, all of the functioncharts are implicit, except where input pseudofunctions are needed to route the input to multiple functions.
 
-<figure>
+<figure align="center">
   <img src="./resources/implicit_explicit.svg"  alt="" title="Implicit and explicit functioncharts.">
+  <figcaption align="center">Implicit cascaded cond (a), explicit empty function (b), explicit cascaded cond (c), (d) implicit parallel cond (d).</figcaption>
 </figure>
 
 ## Recursion and Iteration
 
 Since functions can call instances of themselves, we can define a recursive factorial (n!) function. This recursion is equivalent to an iteration, and in fact this is how functioncharts can represent iteration. Reading left to right, we define a helper decrement function, a "step" inner function, and finally an implicit functionchart which makes a single invocation of "step" with a pseudofunction input and 1 passed to the "acc" accumulator input.
 
-<figure>
+<figure align="center">
   <img src="./resources/factorial.svg"  alt="" title="Recursive definition of factorial function N!.">
 </figure>
 
-The key features in this diagram are:
+Key diagram features:
 
 1. 'step' is carefully arranged to return the recursive function invocation as the last step to allow the "tail recursion" optimization.
 1. The 'step' function can't be implicit because it is recursive. Implicit only works with non-recursive functions.
@@ -103,28 +107,32 @@ In this example, we use it but also pass it to the inner functionchart, so we ad
 
 We can use 'reduce' to compute factorial. We use an exporter modifier to pass the built-in multiplication function as 'f', and passing 1 as both the 'end' index and the initial 'acc' value.
 
-<figure>
+<figure align="center">
   <img src="./resources/factorial2.svg"  alt="" title="Factorial function defined with reduce function.">
+  <figcaption align="center">Somewhat busy abstracted factorial.</figcaption>
 </figure>
 
 This diagram is becoming hard to read. We can refactor to improve the diagram. Note that 'end' and 'f' inputs don't change during the iteration. We can move them out of the functionchart, and put them and the original into an enclosing functionchart. The inner functionchart closes over those external inputs, simplifying its signature. Then we can invoke the inner 'step' function in the parent functionchart to get our desired result.
 
-<figure>
+<figure align="center">
   <img src="./resources/factorial3.svg"  alt="" title="Cleaned up reduce function.">
+  <figcaption align="center">Refactored abstracted factorial.</figcaption>
 </figure>
 
 We can also use the reduce function to sum the elements of an Array, if we are given a function that somehow contains an array and provides its length and an "indexer" function. We use the Array's indexer function in a small functionchart that uses the "i" parameter to get the i-th element of the array, and the "acc" parameter to add to the accumulator. This function is passed into reduce. This time, we set the initial "acc" to 0.
 
-<figure>
+<figure align="center">
   <img src="./resources/factorial4.svg"  alt="" title="Array sum function defined with reduce function.">
+  <figcaption align="center">Reusing the 'reduce' function to sum an Array.</figcaption>
 </figure>
 
 ## Modifier Functions
 
 Modifier functions extend the notation for things that are difficult or impossible to represent without them. Above we saw the 'importer' and 'exporter' modifiers, which convert a function F into a function that outputs 'F'. These are interpreted differently in functioncharts. Importers become explicit inputs in a functionchart. Exporters are implicit outputs.
 
-<figure>
+<figure align="center">
   <img src="./resources/modifiers.svg"  alt="" title="Modifiers and how they interact.">
+  <figcaption align="center">Empty import and export modifiers (left), modifying '+' (center), effect in Functionchart (right).</figcaption>
 </figure>
 
 ## Abstract Functions (Binary Search)
@@ -149,11 +157,12 @@ function binary_search_leftmost(A: Array<number>, n: number, t: number) {
 
 In the functionchart below, the helper function 'divide' gives a visual explanation of the index calculations, and keeps the wires organized. The inputs for our function will be a search value, and a indexer function '[i]' which maps an index to a value, exactly like in an array. We use an abstract indexer, so we can reuse this search function.
 
-<figure>
+<figure align="center">
   <img src="./resources/binary_search.svg"  alt="" title="Binary search implementation.">
+  <figcaption align="center">Binary search given an indexer and '<' function. 't' is the search target.</figcaption>
 </figure>
 
-The key features in this diagram are:
+Key diagram features:
 
 1. Helper functions are defined first. The '??' predicate returns two separate values for the true and false cases. This helps organize related wires.
 
@@ -165,8 +174,9 @@ The key features in this diagram are:
 
 We can apply our 'binSearch' function to an array-like abstraction. This provides a 'length' and an indexer function '[i]', making it effectively read-only to the 'search' function.
 
-<figure>
+<figure align="center">
   <img src="./resources/binary_search2.svg"  alt="" title="Binary search of an array.">
+  <figcaption align="center">Applying our 'binSearch' to an abstracted Array of values.</figcaption>
 </figure>
 
 ## More General Iteration
@@ -177,8 +187,9 @@ Each function takes a single input and produces a single output. 'do-while' and 
 
 The do-while form runs 'body' before 'cond', by making 'cond' depend on the result of 'body'. The while-do runs 'cond' on the loop variable first, and only invokes 'body' if we iterate (call while-do recursively).
 
-<figure>
+<figure align="center">
   <img src="./resources/do_while.svg"  alt="" title="More general iteration functions.">
+  <figcaption align="center">Minimal iteration abstractions, abstract parameter for 'body' and 'test'.</figcaption>
 </figure>
 
 If we make the iteration parameter a numeric index which the body and condition can test, then we can define for-loop primitives over a numeric range. Depending on the predicate chosen, we can implement various kinds of loops. Below we choose to implement the most common for-loops.
@@ -192,8 +203,9 @@ for (let i = start; i >= end; )  // for [start,end]-
 At the bottom,= we again implement factorial using our for-loops. We choose the "down" iteration which iterates over the range [n..2] (inclusive).
 
 Until now, our functions have all been pure, producing outputs and having no "side-effects". Now, we use a 'let' to hold our product as it's computed. 'let' represents a variable binding. We initialize the 'let' to 1 using the single input, and in our function 'body', multiply its value by the single input, changing the variable and returning the result to the iterator function.
-<figure>
+<figure align="center">
   <img src="./resources/do_while2.svg"  alt="" title="Using the general iterator functions to implement factorial.">
+  <figcaption align="center">Specialized 'for' iterations, value parameter for 'body' and 'test'. Implementing factorial (bottom)</figcaption>
 </figure>
 
 ## Representing State (swap)
@@ -209,8 +221,9 @@ Now we use a single 'let' as a temporary variable, and create a function that ta
 
 Swap would be simpler to implement if the semantics of the setter were to return the old value. We might be able to avoid the 'use' pseudo-function. However, the old value is less useful in our function graphs than the new value, and this helps route values without long wires crossing the graph.
 
-<figure>
+<figure align="center">
   <img src="./resources/swap.svg"  alt="" title="A swap function.">
+  <figcaption align="center">Swap two values, using a temp variable binding.</figcaption>
 </figure>
 
 ## Abstract Functions (Quicksort)
@@ -243,11 +256,12 @@ function partition(A: Array<number>, lo: number, hi: number) {
 }
 ```
 
-<figure>
+<figure align="center">
   <img src="./resources/quicksort.svg"  alt="" title="Quicksort, partition in place.">
+  <figcaption align="center">Implementing quicksort and partition, given functions 'setPivot', 'swap', '<' and '>'.</figcaption>
 </figure>
 
-The key features in this diagram are:
+Key diagram features:
 
 1. An abstraction for swapping elements at indices (i, j). It has two index inputs. This swaps the elements at i and j, and returns the input parameters for convenience.
 
@@ -271,11 +285,12 @@ In order to call 'quicksort', we must create the functions 'swap', 'setP', '<', 
 
 We create an adapter which adapts the array abstraction to the required 'swap' and predicate functions, then use the adapter to implement two pivot selection algorithms, one a random element in the range, and the other a median-of-3 implementation. Finally, we use our adapter and pivot functions to call quicksort.
 
-<figure>
+<figure align="center">
   <img src="./resources/quicksort2.svg"  alt="" title="Using quicksort to sort an array.">
+  <figcaption align="center">Applying quicksort to an Array. (top) Adapt the Array, (middle) Implement pivot functions, (bottom) Sort the Array.</figcaption>
 </figure>
 
-The key features in this diagram are:
+Key diagram features:
 
 1. The 'adapter' function uses the array indexed getter to implement the comparison functions.
 1. It uses the getter and setter to create an indexed let-like function, which can be passed to the 'swap' we implemented before. The output isn't needed, but we must 'use' it to drive the side effects.
@@ -299,12 +314,13 @@ The diagram below defines a counter "construction set" by defining some base cou
 
 This is still abstract, and counter could be a number or a linked list pointer for example. For our purposes, we will only specialize this for numeric counters.
 
-<figure>
+<figure align="center">
   <img src="./resources/counters.svg"  alt="" title="Counters for iterating integer ranges.">
+  <figcaption align="center">Counter Construction Set.</figcaption>
 </figure>
 <!-- <video src="./resources/functioncharts.mp4" width="1280" height="960" controls></video> -->
 
-The key features in this diagram are:
+Key diagram features:
 
 1. The 'counter' adapter defines the counter API.
 1. 'count' implements the stateful part of a counter. It's abstract until it gets an 'inc' function.
@@ -317,7 +333,7 @@ TODO down-casting, up-casting.
 
 ## Representing State (Tuples)
 
-<figure>
+<figure align="center">
   <img src="./resources/tuples.svg"  alt="" title="Const and mutable Tuple types.">
 </figure>
 
@@ -328,13 +344,13 @@ Below, we define a function V representing a vector of numbers in 2 dimensions. 
 
 Below this function we create a function VNormal representing a subtype function which represents only normalized (length 1) vectors. This function calls the V function, which initializes the 'x' and 'y' properties. However, VNormal first normalizes the two coordinates before calling the V function so it is initialized properly. It also overrides the V setting function to first normalize the coordinates before calling the base setter function. In other words, it overrides its base type's function.
 
-<figure>
+<figure align="center">
   <img src="./resources/points.svg"  alt="" title="A simple 2d point library.">
 </figure>
 
 ## Libraries
 
-<figure>
+<figure align="center">
   <img src="./resources/Library.svg"  alt="" title="An example of a Javascript built-in library.">
 </figure>
 
@@ -352,7 +368,7 @@ Below this function we create a function VNormal representing a subtype function
 
 Similarly to the recursion example, we can define a Fibonacci function. We define a helper which takes 3 parameters, and then "call" it with n, 1, 1, to start the iteration.
 
-<figure>
+<figure align="center">
   <img src="./resources/fibonacci.svg"  alt="" title="Recursive definition of fibonacci function.">
 </figure>
 
@@ -373,14 +389,16 @@ function exp_by_squaring2(y: number, x: number, n: number) : number {
 
 We create some simple helper functions to test for zero and even, and a two condition operator. We also create an expStep helper function to implement the recursion. Again, this function is arranged to call itself recursively as the last step, allowing the tail-recursion optimization.
 
-<figure>
+<figure align="center">
   <img src="./resources/exp_by_squaring.svg"  alt="" title="Tail-recursive implemention of exponentiation by squaring.">
+  <figcaption align="center">Naive implementation</figcaption>
 </figure>
 
-The functionchart is hard to understand, with a tangle of wires crossing in the middle. Functioncharts can be refactored. Here we do take the core step that computes the new x, y from the inputs and use a functionchart to create a helper function. We also reorder the 'n', 'y', and 'x' inputs to minimize crossings. The use of hierarchy has the effect of removing a part of the circuit and creating an indirection when we instantiate the single instance. The helper function gives a visual explanation of the core multiply step.
+Messy! This is why node-and-wire gets a bad name. The tangle of wires crossing in the middle makes this difficult to read. Functioncharts can be refactored. Here we do take the core step that computes the new x, y from the inputs and use a functionchart to create a helper function. We also reorder the 'n', 'y', and 'x' inputs to minimize crossings. The use of hierarchy has the effect of removing a part of the circuit and creating an indirection when we instantiate the single instance. The helper function gives a visual explanation of the core multiply step.
 
-<figure>
+<figure align="center">
   <img src="./resources/exp_by_squaring2.svg"  alt="" title="Simplified implemention of exponentiation by squaring.">
+  <figcaption align="center">Refactored implementation</figcaption>
 </figure>
 
 ## Covariance (fewer inputs), Contravariance (more outputs)
@@ -393,21 +411,21 @@ TODO
 We can make iteration more generic. First we define an abstract "body" function, with 1 input and 1 output. The first input is the iteration index, the typical "i" in a for-loop. The output is the result of the body, and is used by the iteration function to break. We choose "undefined" as the sentinel value to break. Then we iterate over the range [0..n[, passing the index to the body function and continuing as long as the body returns a defined value.
 
 We can use the iteration to implement our factorial function. However, since we don't have an accumulator passed as a parameter to our body function, we must instead encapsulate that in the body function as a bit of state. We do this now by using a 'var' element, which has two outputs - the first returns the current value, and the second returns a function which changes the value, and returns the previous value. Then our body function multiplies the current value by the iteration index, then sets the var to the result. We also return the value, so we continue rather than breaking from the iteration.
-<!-- <figure>
+<!-- <figure align="center">
   <img src="./resources/iteration.svg"  alt="" title="Simple iteration over the range [0..n[.">
 </figure> -->
 
 ## More General Iteration over a Range
 Generic iteration with start, end, condition, and step configurable.
 TODO up/down, step 1, n, exotic step (binary search)
-<!-- <figure>
+<!-- <figure align="center">
   <img src="./resources/iteration2.svg"  alt="" title="Generic iteration with start, end, condition, and step configurable.">
 </figure> -->
 
 ## Live Demo Editor with Examples
 Our palette contains the built in functions and Pseudofunctions. On the top are the input, output, apply, and pass Pseudofunctions. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an function and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
 
-<!-- <figure>
+<!-- <figure align="center">
   <img src="./resources/palette.svg"  alt="" title="Palette (Pseudofunctions and primitive computational functions)">
 </figure> -->
 
@@ -416,6 +434,6 @@ Our palette contains the built in functions and Pseudofunctions. On the top are 
 ## Inspiration
 Functioncharts were inspired by Harel Statecharts, another graphical representation of programs, which employs hierarchy to give state-transition diagrams more expressive power.
 
-<figure>
+<figure align="center">
   <img src="/resources/palette2.svg"  alt="" title="pseudofunctions">
 </figure>
