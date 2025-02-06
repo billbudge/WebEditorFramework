@@ -3439,7 +3439,9 @@ export class FunctionchartEditor implements CanvasLayer {
           letFn = context.newElement('element'),
           thisFn = context.newElement('element'),
           external = context.newElement('element'),
-          newFunctionchart = context.newFunctionchart('functionchart');
+          newFunctionchart = context.newFunctionchart('functionchart'),
+          importer = context.newElement('importer'),
+          exporter = context.newElement('exporter');
 
     context.root = functionchart;
 
@@ -3472,6 +3474,11 @@ export class FunctionchartEditor implements CanvasLayer {
     newFunctionchart.width = this.theme.minFunctionchartWidth;
     newFunctionchart.height = this.theme.minFunctionchartHeight;
 
+    importer.x = 80; importer.y = 96;
+    importer.typeString = '[,[,]]';
+    exporter.x = 104; exporter.y = 96;
+    exporter.typeString = '[,[,]]';
+
     functionchart.nodes.append(input);
     functionchart.nodes.append(output);
     functionchart.nodes.append(use);
@@ -3483,6 +3490,9 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nodes.append(thisFn);
     functionchart.nodes.append(external);
     functionchart.nodes.append(newFunctionchart);
+    functionchart.nodes.append(importer);
+    functionchart.nodes.append(exporter);
+
     context.root = functionchart;
     this.palette = functionchart;
 
@@ -4049,9 +4059,9 @@ export class FunctionchartEditor implements CanvasLayer {
       }
     }
 
-    // Adjust all edges 1 pixel out.
-    const ctx = new (window as any).C2S(bounds.width + 2, bounds.height + 2);
-    ctx.translate(-bounds.x + 1, -bounds.y + 1);
+    // Adjust all edges 8 pixels out.
+    const ctx = new (window as any).C2S(bounds.width + 16, bounds.height + 16);
+    ctx.translate(-bounds.x + 8, -bounds.y + 8);
 
     renderer.begin(ctx);
     canvasController.applyTransform();

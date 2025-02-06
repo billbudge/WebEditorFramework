@@ -99,11 +99,9 @@ Abstraction is an important technique for making software more useful. We can ab
 
 We create a helper functionchart for 'f' which contains pseudofunctions for two inputs and one output. This makes the functionchart abstract, indicated by a dotted outline around its function instances. Abstract functions can be used just like any function inside a functionchart and are interpreted as an implicit input of a function.
 
-In this example, we want to pass it to the inner functionchart, so we make it an importer node. This wraps the function in another function that produces the wrapped function as an output. This allows us to create instances of the wrapped function, which we do here, and also to pass the function into other functions as an input.
+In this example, we use it but also pass it to the inner functionchart, so we add it to an importer node. The 'importer' modifier now has the inner function as an output. This allows us to create instances of the wrapped function, which we do here, and also to wire the function to other functions as an input. We do that to pass 'f' to 'reduce'.
 
-This function now looks like a "reducer".
-
-We can use 'reduce' to compute factorial by using an export function to pass the built-in multiplication function as "callback", and passing 1 as both the end index and the initial "acc" value.
+We can use 'reduce' to compute factorial. We use an exporter modifier to pass the built-in multiplication function as 'f', and passing 1 as both the 'end' index and the initial 'acc' value.
 
 <figure>
   <img src="./resources/factorial2.svg"  alt="" title="Factorial function defined with reduce function.">
@@ -123,13 +121,15 @@ We can also use the reduce function to sum the elements of an Array, if we are g
 
 ## Modifier Functions
 
-Modifier functions perform transformations that are difficult or awkward to represent with functioncharts. One example we saw was the 'importer' modifier, which converts a function instance into a function which can create instances of it.
+Modifier functions extend the notation for things that are difficult or impossible to represent without them. Above we saw the 'importer' and 'exporter' modifiers, which convert a function F into a function that outputs 'F'. These are interpreted differently in functioncharts. Importers become explicit inputs in a functionchart. Exporters are implicit outputs.
 
-TODO
+<figure>
+  <img src="./resources/modifiers.svg"  alt="" title="Modifiers and how they interact.">
+</figure>
 
 ## Abstract Functions (Binary Search)
 
-Here is a binary search implementation. [Wikipedia](https://en.wikipedia.org/wiki/Binary_search)
+This is a simple binary search implementation. [Wikipedia](https://en.wikipedia.org/wiki/Binary_search)
 
 ```ts
 function binary_search_leftmost(A: Array<number>, n: number, t: number) {

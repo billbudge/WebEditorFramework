@@ -2859,7 +2859,7 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), use = context.newPseudoelement('use'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), letFn = context.newElement('element'), thisFn = context.newElement('element'), external = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart');
+        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), use = context.newPseudoelement('use'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), letFn = context.newElement('element'), thisFn = context.newElement('element'), external = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart'), importer = context.newElement('importer'), exporter = context.newElement('exporter');
         context.root = functionchart;
         input.x = 8;
         input.y = 8;
@@ -2899,6 +2899,12 @@ export class FunctionchartEditor {
         newFunctionchart.y = 90;
         newFunctionchart.width = this.theme.minFunctionchartWidth;
         newFunctionchart.height = this.theme.minFunctionchartHeight;
+        importer.x = 80;
+        importer.y = 96;
+        importer.typeString = '[,[,]]';
+        exporter.x = 104;
+        exporter.y = 96;
+        exporter.typeString = '[,[,]]';
         functionchart.nodes.append(input);
         functionchart.nodes.append(output);
         functionchart.nodes.append(use);
@@ -2910,6 +2916,8 @@ export class FunctionchartEditor {
         functionchart.nodes.append(thisFn);
         functionchart.nodes.append(external);
         functionchart.nodes.append(newFunctionchart);
+        functionchart.nodes.append(importer);
+        functionchart.nodes.append(exporter);
         context.root = functionchart;
         this.palette = functionchart;
         // Default Functionchart.
@@ -3437,9 +3445,9 @@ export class FunctionchartEditor {
                 bounds.height = Math.max(bounds.width, hoverHeight);
             }
         }
-        // Adjust all edges 1 pixel out.
-        const ctx = new window.C2S(bounds.width + 2, bounds.height + 2);
-        ctx.translate(-bounds.x + 1, -bounds.y + 1);
+        // Adjust all edges 8 pixels out.
+        const ctx = new window.C2S(bounds.width + 16, bounds.height + 16);
+        ctx.translate(-bounds.x + 8, -bounds.y + 8);
         renderer.begin(ctx);
         canvasController.applyTransform();
         // Don't draw the root functionchart.
