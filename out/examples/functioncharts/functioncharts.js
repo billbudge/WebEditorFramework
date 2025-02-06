@@ -1664,32 +1664,31 @@ export class FunctionchartContext extends EventBase {
     }
     // Create an abstract functionchart to represent the given type.
     typeToFunctionchart(type) {
-        const self = this, layoutEngine = this.layoutEngine, functioncharts = new Map(), sorted = new Array();
-        // Create a key for each non-value type. Leave values undefined for the topological sort.
-        visitType(type, type => {
-            if (type !== Type.valueType && !functioncharts.has(type)) {
-                functioncharts.set(type, undefined);
-            }
-        });
-        // Recursively build the function chart. There can't be cycles in the type dependency graph.
+        const self = this, layoutEngine = this.layoutEngine, map = new Map(), functioncharts = new Array();
+        // Recursively build the function chart. Cycles in the type dependency graph are impossible.
         function populate(type) {
             const functionchart = self.newFunctionchart('functionchart');
+            functionchart.name = type.name;
             let y;
             y = 8;
             type.inputs.forEach(pin => {
                 const pinType = pin.type;
                 if (pinType === Type.valueType) {
-                    const input = self.newPseudoelement('input');
+                    const input = self.newPseudoelement('input'), name = pin.name || '';
+                    ;
                     input.x = 8;
                     input.y = y;
+                    input.typeString = '[,v(' + name + ')]';
                     y += layoutEngine.getBounds(input).height + 8;
                     functionchart.nodes.append(input);
                 }
                 else {
-                    let subFunctionchart = functioncharts.get(pinType);
+                    let subFunctionchart = map.get(pinType);
                     if (!subFunctionchart) {
                         subFunctionchart = populate(pinType);
+                        subFunctionchart.name = pinType.name;
                     }
+                    // Create an instance of the abstract sub-functionchart, to generate the input pin.
                     const instance = self.newElement('instance');
                     instance.src = subFunctionchart;
                     instance.srcPin = 0;
@@ -1704,36 +1703,39 @@ export class FunctionchartContext extends EventBase {
             type.outputs.forEach(pin => {
                 const pinType = pin.type;
                 if (pinType === Type.valueType) {
-                    const output = self.newPseudoelement('output');
+                    const output = self.newPseudoelement('output'), name = pin.name || '';
                     output.x = 40;
                     output.y = y;
+                    output.typeString = '[v(' + name + '),]';
                     y += layoutEngine.getBounds(output).height + 8;
                     functionchart.nodes.append(output);
                 }
                 else {
-                    let subFunctionchart = functioncharts.get(pinType);
+                    let subFunctionchart = map.get(pinType);
                     if (!subFunctionchart) {
                         subFunctionchart = populate(pinType);
+                        subFunctionchart.name = pinType.name;
                     }
-                    const instance = self.newElement('instance');
-                    instance.src = subFunctionchart;
-                    instance.srcPin = 0;
-                    instance.typeString = pinType.typeString;
-                    instance.x = 0;
-                    instance.y = 0;
-                    y += layoutEngine.getBounds(instance).height + 8;
-                    functionchart.nodes.append(instance);
+                    // Create an output, wired to the sub-functionchart, to generate the output pin.
+                    const output = self.newPseudoelement('output'), name = pin.name || '';
+                    output.x = 40;
+                    output.y = y;
+                    output.typeString = '[v(' + name + '),]';
+                    y += layoutEngine.getBounds(output).height + 8;
+                    functionchart.nodes.append(output);
+                    const wire = self.newWire(subFunctionchart, 0, output, 0);
+                    functionchart.wires.append(wire);
                 }
             });
             layoutEngine.layoutFunctionchart(functionchart);
             functionchart.width += type.width;
-            functioncharts.set(type, functionchart);
-            sorted.push(functionchart);
+            map.set(type, functionchart);
+            functioncharts.push(functionchart);
             return functionchart;
         }
         const root = populate(type);
         let y = root.height;
-        sorted.forEach(functionchart => {
+        functioncharts.forEach(functionchart => {
             if (functionchart === root)
                 return;
             functionchart.x = 8;
