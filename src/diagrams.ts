@@ -231,6 +231,18 @@ export function outFlagPath(
   ctx.lineTo(x, y + height); ctx.lineTo(x, y);
 }
 
+export function notchedRectPath(x: number, y: number, width: number, height: number, notch: number,
+    ctx: CanvasRenderingContext2D) {
+    const right = x + width, bottom = y + height;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(right - notch, y);
+    ctx.lineTo(right, y + notch);
+    ctx.lineTo(right, bottom);
+    ctx.lineTo(x, bottom);
+    ctx.lineTo(x, y);
+  }
+
 export function closedPath(points: Point[], ctx: CanvasRenderingContext2D) {
   ctx.beginPath();
   let length = points.length, pLast = points[length - 1];

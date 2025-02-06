@@ -3,7 +3,7 @@ import { SelectionSet, Multimap } from '../../src/collections.js'
 import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, RectHitResult,
          diskPath, hitTestDisk, DiskHitResult, roundRectPath, bezierEdgePath,
-         hitTestBezier, inFlagPath, outFlagPath, measureNameValuePairs,
+         hitTestBezier, inFlagPath, outFlagPath, notchedRectPath, measureNameValuePairs,
          CanvasController, CanvasLayer, PropertyGridController, PropertyInfo,
          FileController } from '../../src/diagrams.js'
 
@@ -2962,13 +2962,14 @@ class Renderer implements ILayoutEngine {
         inFlagPath(x - d, y, w + d, h, d, ctx);
       }  else if (element.isExporter) {
         outFlagPath(x, y, w + d, h, d, ctx);
-      }else {
+      } else {
         ctx.rect(x, y, w, h);
       }
     } else {
-      ctx.rect(x, y, w, h);
       if (element.hasSideEffects) {
-        this.drawSideEffectsTick(x + w, y);
+        notchedRectPath(x, y, w, h, theme.spacing / 3, ctx);
+      } else {
+        ctx.rect(x, y, w, h);
       }
     }
     switch (mode) {
@@ -3078,14 +3079,15 @@ class Renderer implements ILayoutEngine {
         ctx.lineWidth = 0.5;
         ctx.stroke();
         const pinRect = this.instancerBounds(functionchart, 0);
-        ctx.beginPath();
-        ctx.rect(pinRect.x, pinRect.y, pinRect.width, pinRect.height);
+        if (functionchart.hasSideEffects) {
+          notchedRectPath(pinRect.x, pinRect.y, pinRect.width, pinRect.height, theme.spacing / 3, ctx);
+        } else {
+          ctx.beginPath();
+          ctx.rect(pinRect.x, pinRect.y, pinRect.width, pinRect.height);
+        }
         ctx.fillStyle = theme.altBgColor;
         ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
-        if (functionchart.hasSideEffects) {
-          this.drawSideEffectsTick(x + w, y + r);
-        }
         if (functionchart.isAbstract) {
           this.abstractStroke(ctx);
         } else {

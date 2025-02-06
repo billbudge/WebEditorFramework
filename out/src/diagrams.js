@@ -205,6 +205,16 @@ export function outFlagPath(x, y, width, height, indent, ctx) {
     ctx.lineTo(x, y + height);
     ctx.lineTo(x, y);
 }
+export function notchedRectPath(x, y, width, height, notch, ctx) {
+    const right = x + width, bottom = y + height;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(right - notch, y);
+    ctx.lineTo(right, y + notch);
+    ctx.lineTo(right, bottom);
+    ctx.lineTo(x, bottom);
+    ctx.lineTo(x, y);
+}
 export function closedPath(points, ctx) {
     ctx.beginPath();
     let length = points.length, pLast = points[length - 1];
