@@ -668,7 +668,7 @@ describe('FunctionchartContext', () => {
     const wire1 = addWire(functionchart, input, 0, output, 0);
     typeInfo = context.getFunctionchartTypeInfo(functionchart);
     expect(typeInfo.instanceType.typeString).toBe('[v,v]');
-    expect(typeInfo.abstract).toBe(true);  // Pseudo-wire is abstract
+    expect(typeInfo.abstract).toBe(false);  // A wire.
   });
   const recursiveFuncionchartTest = {
     "type": "functionchart",

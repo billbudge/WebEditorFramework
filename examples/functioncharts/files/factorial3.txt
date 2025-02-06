@@ -58,7 +58,7 @@
       "x": 492.9070587158203,
       "y": 360.268985748291,
       "width": 240.81353759765625,
-      "height": 141.72554779052734,
+      "height": 128.30630111694336,
       "name": "n!",
       "implicit": true,
       "hideLinks": false,
@@ -71,30 +71,6 @@
           "y": 38.032257080078125,
           "name": "literal",
           "hideLinks": false
-        },
-        {
-          "type": "functionchart",
-          "id": 8,
-          "typeString": "[,[vv,v]]",
-          "x": 4.200927734375,
-          "y": 62.62059783935547,
-          "width": 74.40093994140625,
-          "height": 63.104949951171875,
-          "name": "",
-          "implicit": true,
-          "hideLinks": false,
-          "nodes": [
-            {
-              "type": "element",
-              "id": 9,
-              "typeString": "[vv,v](*)",
-              "x": 12.515472412109375,
-              "y": 5.104949951171875,
-              "name": "binop",
-              "hideLinks": false
-            }
-          ],
-          "wires": []
         },
         {
           "type": "instance",
@@ -111,16 +87,27 @@
           "typeString": "[,v(n)]",
           "x": 15.062235057353973,
           "y": 10.972200393676758
+        },
+        {
+          "type": "exporter",
+          "id": 31,
+          "typeString": "[,[vv,v](*)]",
+          "x": 11.036880493164062,
+          "y": 62.30630111694336,
+          "name": "",
+          "hideLinks": false,
+          "inner": {
+            "type": "element",
+            "id": 30,
+            "typeString": "[vv,v](*)",
+            "x": 8,
+            "y": 4,
+            "name": "binop",
+            "hideLinks": false
+          }
         }
       ],
       "wires": [
-        {
-          "type": "wire",
-          "src": 8,
-          "srcPin": 0,
-          "dst": 10,
-          "dstPin": 3
-        },
         {
           "type": "wire",
           "src": 7,
@@ -141,6 +128,13 @@
           "srcPin": 0,
           "dst": 10,
           "dstPin": 0
+        },
+        {
+          "type": "wire",
+          "src": 31,
+          "srcPin": 0,
+          "dst": 10,
+          "dstPin": 3
         }
       ]
     },
