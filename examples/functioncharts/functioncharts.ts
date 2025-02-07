@@ -131,6 +131,9 @@ export class Type {
   toImportExportType() : Type {
     return Type.fromInfo([], [new Pin(this)]);
   }
+  toNewType() : Type {
+    return Type.fromInfo(this.inputs.map(pin => new Pin(pin.type, pin.name)), [new Pin(this)]);
+  }
   toUpCastType() : Type {
     return Type.fromInfo([new Pin(Type.valueType)], [new Pin(Type.valueType), new Pin(this)]);
   }
@@ -345,8 +348,8 @@ abstract class NodeTemplate {
   readonly properties: PropertyTypes[] = [];
 }
 
-export type ContainerElementType = 'importer' | 'exporter' | 'new' | 'upCast' | 'downCast';
-export type ElementType = 'element' | 'instance' | ContainerElementType;
+export type ModifierElementType = 'importer' | 'exporter' | 'new' | 'upCast' | 'downCast';
+export type ElementType = 'element' | 'instance' | ModifierElementType;
 
 class ElementTemplate extends NodeTemplate {
   readonly typeName: ElementType;
@@ -360,7 +363,7 @@ class ElementTemplate extends NodeTemplate {
   }
 }
 
-class ContainerElementTemplate extends ElementTemplate {
+class ModifierElementTemplate extends ElementTemplate {
   readonly innerElement = innerElementProp;
   readonly properties: PropertyTypes[] = [this.id, this.typeString, this.x, this.y, this.name,
                                           this.hideLinks, this.innerElement, this.comment];
@@ -417,10 +420,11 @@ class FunctionchartTemplate extends NodeTemplate {
 }
 
 const elementTemplate = new ElementTemplate('element'),        // built-in elements
-      importerTemplate = new ContainerElementTemplate('importer'),  // container elements
-      exporterTemplate = new ContainerElementTemplate('exporter'),
-      upCastTemplate = new ContainerElementTemplate('upCast'),
-      downCastTemplate = new ContainerElementTemplate('downCast'),
+      importerTemplate = new ModifierElementTemplate('importer'),  // modifier elements
+      exporterTemplate = new ModifierElementTemplate('exporter'),
+      newTemplate = new ModifierElementTemplate('new'),
+      upCastTemplate = new ModifierElementTemplate('upCast'),
+      downCastTemplate = new ModifierElementTemplate('downCast'),
       inputTemplate = new PseudoelementTemplate('input'),      // input pseudoelement
       outputTemplate = new PseudoelementTemplate('output'),    // output pseudoelement
       useTemplate = new PseudoelementTemplate('use'),
@@ -479,7 +483,7 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
   asInstance() : FunctionInstance | undefined {
     if (this instanceof FunctionInstance)
       return this;
-    if (this instanceof ContainerElement) {
+    if (this instanceof ModifierElement) {
       const inner = this.innerElement;
       if (inner instanceof FunctionInstance)
         return inner;
@@ -530,6 +534,9 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
   get isExporter() : boolean {
     return this.template.typeName === 'exporter';
   }
+  get isNew() : boolean {
+    return this.template.typeName === 'new';
+  }
   get isUpCast() {
     return this.template.typeName === 'upCast';
   }
@@ -538,7 +545,7 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
   }
   get isInstanced(): boolean {
     return this instanceof FunctionInstance ||
-           this instanceof ContainerElement && this.innerElement instanceof FunctionInstance;
+           this instanceof ModifierElement && this.innerElement instanceof FunctionInstance;
   }
 
   constructor(template: T, context: FunctionchartContext, id: number) {
@@ -546,7 +553,7 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
   }
 }
 
-export class ContainerElement extends Element<ContainerElementTemplate> {
+export class ModifierElement extends Element<ModifierElementTemplate> {
   get innerElement() { return this.template.innerElement.get(this).get(0) as ElementTypes | undefined; }
   set innerElement(value: ElementTypes | undefined) { this.template.innerElement.get(this).set(0, value); }
 
@@ -561,20 +568,19 @@ export class ContainerElement extends Element<ContainerElementTemplate> {
   updateTypeInfo() {
     if (this.innerElement) {
       const innerType = this.innerType;
-      let containerType;
+      let modifierType;
       if (this.isUpCast) {
-        // containerType = innerType.toCastType().rename('(' + innerType.name + ')');
-        containerType = innerType.toUpCastType();
+        modifierType = innerType.toUpCastType();
       } else if (this.isDownCast) {
-        containerType = innerType.toDownCastType();
+        modifierType = innerType.toDownCastType();
       } else {
-        containerType = innerType.toImportExportType();
+        modifierType = innerType.toImportExportType();
       }
-      this.typeString = containerType.typeString;
+      this.typeString = modifierType.typeString;
     }
   }
 
-  constructor(context: FunctionchartContext, template: ContainerElementTemplate, id: number) {
+  constructor(context: FunctionchartContext, template: ModifierElementTemplate, id: number) {
     super(template, context,  id);
   }
 }
@@ -734,7 +740,7 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> {
 }
 
 export type ElementTypes = Element | Pseudoelement;
-export type ElementParentTypes = Functionchart | ContainerElement;
+export type ElementParentTypes = Functionchart | ModifierElement;
 export type NodeTypes = ElementTypes | Functionchart;
 export type InstancerTypes = Functionchart | Element;
 export type AllTypes = NodeTypes | Wire;
@@ -748,7 +754,7 @@ export type WirePredicate = (wire: Wire) => boolean;
 interface ILayoutEngine {
   // Get bounding box for elements, functioncharts, and wires.
   getBounds(items: AllTypes) : Rect;
-  getInnerElementOffset(container: ContainerElement) : Point;
+  getInnerElementOffset(modifier: ModifierElement) : Point;
   layoutFunctionchart(functionchart: Functionchart) : void;
 
   // Get wire attachment point for node input/output pins.
@@ -841,16 +847,19 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         result = new FunctionInstance(this, nextId);
         break;
       case 'importer':
-        result = new ContainerElement(this, importerTemplate, nextId);
+        result = new ModifierElement(this, importerTemplate, nextId);
         break;
       case 'exporter':
-        result = new ContainerElement(this, exporterTemplate, nextId);
+        result = new ModifierElement(this, exporterTemplate, nextId);
+        break;
+      case 'new':
+        result = new ModifierElement(this, newTemplate, nextId);
         break;
       case 'upCast':
-        result = new ContainerElement(this, upCastTemplate, nextId);
+        result = new ModifierElement(this, upCastTemplate, nextId);
         break;
       case 'downCast':
-        result = new ContainerElement(this, downCastTemplate, nextId);
+        result = new ModifierElement(this, downCastTemplate, nextId);
         break;
       default: throw new Error('Unknown element type: ' + typeName);
     }
@@ -906,7 +915,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (item instanceof Functionchart) {
       item.nodes.forEach(t => self.visitAll(t, visitor));
       item.wires.forEach(t => self.visitAll(t, visitor));
-    } else if (item instanceof ContainerElement) {
+    } else if (item instanceof ModifierElement) {
       if (item.innerElement)
         visitor(item.innerElement);
     }
@@ -916,7 +925,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (item instanceof Functionchart) {
       item.wires.forEachReverse(t => self.reverseVisitAll(t, visitor));
       item.nodes.forEachReverse(t => self.reverseVisitAll(t, visitor));
-    } else if (item instanceof ContainerElement) {
+    } else if (item instanceof ModifierElement) {
       if (item.innerElement)
         visitor(item.innerElement);
     }
@@ -927,7 +936,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     visitor(item);
     if (item instanceof Functionchart) {
       item.nodes.forEach(item => self.visitNodes(item, visitor));
-    } else if (item instanceof ContainerElement) {
+    } else if (item instanceof ModifierElement) {
       if (item.innerElement) {
         this.visitNodes(item.innerElement, visitor);
       }
@@ -937,7 +946,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const self = this;
     if (item instanceof Functionchart) {
       item.nodes.forEachReverse(item => self.reverseVisitNodes(item, visitor));
-    } else if (item instanceof ContainerElement) {
+    } else if (item instanceof ModifierElement) {
       if (item.innerElement) {
         this.reverseVisitNodes(item.innerElement, visitor);
       }
@@ -982,7 +991,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   // getToUncontainedNode(node: NodeTypes) : NodeTypes {
   //   let result = node;
-  //   while (result.parent instanceof ContainerElement)
+  //   while (result.parent instanceof ModifierElement)
   //     result = result.parent;
   //   return result;
   // }
@@ -1185,7 +1194,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   disconnectNode(node: NodeTypes) {
-    if (node instanceof ContainerElement && node.innerElement)
+    if (node instanceof ModifierElement && node.innerElement)
       this.disconnectNode(node.innerElement);
 
     const self = this;
@@ -1239,7 +1248,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     if (!(item instanceof Wire)) {
       const translation = this.getToParent(item, parent);
       let x, y;
-      if (parent instanceof ContainerElement) {
+      if (parent instanceof ModifierElement) {
         const offset = this.layoutEngine.getInnerElementOffset(parent);
         x = offset.x;
         y = offset.y;
@@ -1262,7 +1271,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       } else {
         parent.nodes.append(item);
       }
-    } else if (parent instanceof ContainerElement && item instanceof Element) {
+    } else if (parent instanceof ModifierElement && item instanceof Element) {
       const inner = parent.innerElement;
       if (inner) {
         this.deleteItem(inner);
@@ -1496,8 +1505,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (definition.isImporter) {
         return scope === definitionScope;
       }
-    } else if (node instanceof ContainerElement) {
-      return !(parent instanceof ContainerElement);  // A container can't be the inner element of another container.
+    } else if (node instanceof ModifierElement) {
+      return !(parent instanceof ModifierElement);  // A modifier can't modify another modifier.
     }
     return true;
   }
@@ -1553,7 +1562,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   isValidFunctionInstance(instance: FunctionInstance) : boolean {
     let parent = instance.parent;
     // To be able to export an instance, the inner element must be valid in the containing functionchart.
-    if (parent instanceof ContainerElement)
+    if (parent instanceof ModifierElement)
       parent = parent.parent;
     return parent instanceof Functionchart && this.canAddNode(instance, parent);
   }
@@ -1629,7 +1638,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       functionchart.nodes.forEach(node => {
         if (node instanceof FunctionInstance) {
           visitInstance(node, functioncharts);
-        } else if (node instanceof ContainerElement) {
+        } else if (node instanceof ModifierElement) {
           if (node.innerElement instanceof FunctionInstance) {
             // TODO chains of instancers shouldn't be possible.
             visitInstance(node.innerElement, functioncharts);
@@ -1975,7 +1984,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   dropNodeOnElement(node: ElementTypes, target: ElementTypes) {
     const selection = this.selection;
-    if (target instanceof ContainerElement && this.canAddNode(node, target)) {
+    if (target instanceof ModifierElement && this.canAddNode(node, target)) {
       // We could replaceNode but any errors can't be corrected in the current editor. We
       // have no way to un-import/export.
       if (target.innerElement)
@@ -2076,82 +2085,44 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     return root;
   }
 
-  importElement(element: Element) : ContainerElement {
-    const importer = this.newElement('importer') as ContainerElement;
-    importer.typeString = element.type.toImportExportType().typeString;
-    importer.x = element.x;
-    importer.y = element.y;
-    return importer;
-  }
-
-  exportElement(element: Element) : ContainerElement {
-    const exporter = this.newElement('exporter') as ContainerElement;
-    exporter.typeString = element.type.toImportExportType().typeString;
-    exporter.x = element.globalPosition.x;
-    exporter.y = element.globalPosition.y;
-    return exporter;
-  }
-
-  castElement(element: Element, upCast: boolean) : ContainerElement {
-    let typeName: ElementType, type: Type;
-    if (upCast) {
-      typeName = 'upCast';
-      type = element.type.toUpCastType();
-    } else {
-      typeName = 'downCast';
-      type = element.type.toDownCastType();
+  modifyElement(element: Element, modifierType: ModifierElementType) {
+    const modifier = this.newElement(modifierType) as ModifierElement;
+    let typeString;
+    switch (modifierType) {
+      case 'importer':
+      case 'exporter':
+        typeString = element.type.toImportExportType().typeString;
+        break;
+      case 'upCast':
+        typeString = element.type.toUpCastType().typeString;
+        break;
+      case 'downCast':
+        typeString = element.type.toDownCastType().typeString;
+        break;
+      case 'new':
+        typeString = element.type.toNewType().typeString;
+        break;
     }
-    const cast = this.newElement(typeName) as ContainerElement;
-    cast.typeString = type.typeString;
-    cast.x = element.x;
-    cast.y = element.y;
-    return cast;
+    modifier.typeString = typeString;
+    modifier.x = element.x;
+    modifier.y = element.y;
+    return modifier;
   }
 
-  importElements(elements: Element[]) {
+  modifyElements(elements: Element[], modifierType: ModifierElementType) {
     const self = this,
           selection = this.selection;
 
     elements.forEach(element => {
-      if (element instanceof ContainerElement) return;
+      if (element instanceof ModifierElement)
+        return;
       self.disconnectNode(element);
       selection.delete(element);
-      const importer = self.importElement(element),
+      const importer = self.modifyElement(element, modifierType),
             parent = element.parent as Functionchart;
       self.addItem(importer, parent);
       self.addItem(element, importer);
       selection.add(importer);
-    });
-  }
-
-  exportElements(elements: Element[]) {
-    const self = this,
-          selection = this.selection;
-    elements.forEach(element => {
-      if ( element instanceof ContainerElement) return;
-      self.disconnectNode(element);
-      selection.delete(element);
-      const exporter = self.exportElement(element),
-            parent = element.parent as Functionchart;
-      self.addItem(exporter, parent);
-      self.addItem(element, exporter);
-      selection.add(exporter);
-    });
-  }
-
-  castElements(elements: Element[], upCast: boolean) {
-    const self = this,
-          selection = this.selection;
-
-    elements.forEach(element => {
-      if (element instanceof ContainerElement) return;
-      self.disconnectNode(element);
-      selection.delete(element);
-      const castElement = self.castElement(element, upCast),
-            parent = element.parent as Functionchart;
-      self.addItem(castElement, parent);
-      self.addItem(element, castElement);
-      selection.add(castElement);
     });
   }
 
@@ -2289,14 +2260,14 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         }
       } else {
         // Special cases of nodes that generate pins.
-        if (node instanceof ContainerElement && node.isImporter) {
+        if (node instanceof ModifierElement && node.isImporter) {
           // Instancers are inputs.
           const innerType = node.innerType,
                 name = innerType.name,
                 type = innerType.rename(),
                 pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
           inputs.push(pinInfo);
-        } else if (node instanceof ContainerElement && node.isExporter && node.isAbstract) {
+        } else if (node instanceof ModifierElement && node.isExporter && node.isAbstract) {
           // Abstract exporters are outputs.
           const type = node.innerType,
                 name = undefined,
@@ -2381,11 +2352,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   private insertElement(element: ElementTypes, parent: ElementParentTypes) {
     this.nodes.add(element);
     element.parent = parent;
-    if (element instanceof ContainerElement) {
+    if (element instanceof ModifierElement) {
       if (element.innerElement) {
         this.insertElement(element.innerElement, element);
       }
-    } else if (parent instanceof ContainerElement) {
+    } else if (parent instanceof ModifierElement) {
       parent.updateTypeInfo();
     }
     element.type = Type.fromString(element.typeString);
@@ -2395,7 +2366,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   private removeElement(element: ElementTypes) {
     this.nodes.delete(element);
-    if (element instanceof ContainerElement) {
+    if (element instanceof ModifierElement) {
       if (element.innerElement) {
         this.removeElement(element.innerElement);
       }
@@ -2447,7 +2418,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       } else {
         this.insertElement(item, parent);
       }
-    } else if (parent instanceof ContainerElement && item instanceof Element) {
+    } else if (parent instanceof ModifierElement && item instanceof Element) {
       this.insertElement(item, parent);
     }
   }
@@ -2467,7 +2438,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (prop === typeStringProp) {
         const newType = Type.fromString(owner.typeString)
         owner.type = newType;
-        if (owner.parent instanceof ContainerElement) {
+        if (owner.parent instanceof ModifierElement) {
           owner.parent.updateTypeInfo();
         }
       } else {
@@ -2502,6 +2473,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'element':
       case 'importer':
       case 'exporter':
+      case 'new':
       case 'upCast':
       case 'downCast':
       case 'instance': return this.newElement(typeName);
@@ -2655,13 +2627,13 @@ class Renderer implements ILayoutEngine {
     }
     return { x, y, width, height };
   }
-  getInnerElementOffset(container: ContainerElement): Point {
+  getInnerElementOffset(modifier: ModifierElement): Point {
     const spacing = this.theme.spacing,
-          type = container.type;
+          type = modifier.type;
     if (type.needsLayout) {
       this.layoutType(type);
     }
-    switch (container.template.typeName) {
+    switch (modifier.template.typeName) {
       case 'upCast': {
         const y = type.outputs[1].y;
         return { x: spacing + spacing, y }
@@ -2907,23 +2879,9 @@ class Renderer implements ILayoutEngine {
           offset = theme.spacing / 2,
           rect = this.getBounds(instance),
           x = rect.x, y = rect.y, w = rect.width, h = rect.height,
-          type = instance.type,
           p1 = this.outputPinToPoint(instance.src, instance.srcPin),
-          p2 = { x, y: y + h / 2, nx : -1, ny: 0 },
-          barHeight = type.height / 2;
-    // ctx.fillStyle = color;
+          p2 = { x, y: y + h / 2, nx : -1, ny: 0 };
     ctx.strokeStyle = color;
-
-    // ctx.beginPath();
-    // ctx.moveTo(p1.x + offset, p1.y);
-    // ctx.lineTo(p1.x, p1.y - barHeight);
-    // ctx.lineTo(p1.x, p1.y + barHeight);
-    // ctx.closePath();
-    // ctx.moveTo(p2.x - offset, p2.y);
-    // ctx.lineTo(p2.x, p2.y - barHeight);
-    // ctx.lineTo(p2.x, p2.y + barHeight);
-    // ctx.closePath();
-    // ctx.fill();
     p1.x += offset;
     p2.x -= offset;
 
@@ -2956,12 +2914,14 @@ class Renderer implements ILayoutEngine {
 
     ctx.beginPath();
     // Importers and abstract instances define function inputs, so use the input shape.
-    if (element instanceof ContainerElement) {
+    if (element instanceof ModifierElement) {
       const d = theme.knobbyRadius * 2;
       if (element.isImporter) {
         inFlagPath(x - d, y, w + d, h, d, ctx);
       }  else if (element.isExporter) {
         outFlagPath(x, y, w + d, h, d, ctx);
+      } else if (element.isNew) {
+        notchedRectPath(x, y, w, h, theme.spacing / 2, ctx);
       } else {
         ctx.rect(x, y, w, h);
       }
@@ -2978,7 +2938,7 @@ class Renderer implements ILayoutEngine {
       case RenderMode.Print: {
         const fillStyle = (mode === RenderMode.Palette) ? theme.altBgColor : theme.bgColor;
         ctx.fillStyle = fillStyle;
-        if (!(element.parent instanceof ContainerElement))
+        if (!(element.parent instanceof ModifierElement))
           ctx.fill();
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
@@ -3132,7 +3092,7 @@ class Renderer implements ILayoutEngine {
 
   hitTestElement(element: ElementTypes, p: Point, tol: number, mode: RenderMode) :
                  ElementHitResult | undefined {
-    if (element.parent instanceof ContainerElement)  // TODO something better
+    if (element.parent instanceof ModifierElement)  // TODO something better
       return;
 
     const rect = this.getBounds(element),
@@ -3446,7 +3406,8 @@ export class FunctionchartEditor implements CanvasLayer {
           external = context.newElement('element'),
           newFunctionchart = context.newFunctionchart('functionchart'),
           importer = context.newElement('importer'),
-          exporter = context.newElement('exporter');
+          exporter = context.newElement('exporter'),
+          newFn = context.newElement('new');
 
     context.root = functionchart;
 
@@ -3471,7 +3432,7 @@ export class FunctionchartEditor implements CanvasLayer {
     thisFn.x = 224; thisFn.y = 32;
     thisFn.name = 'this';
     thisFn.typeString = '[vv,v[v,v]](this)';
-    external.x = 274; external.y = 32;
+    external.x = 278; external.y = 32;
     external.name = 'external';
     external.typeString = '[,](lib)'
 
@@ -3483,6 +3444,8 @@ export class FunctionchartEditor implements CanvasLayer {
     importer.typeString = '[,[,]]';
     exporter.x = 104; exporter.y = 96;
     exporter.typeString = '[,[,]]';
+    newFn.x = 136; newFn.y = 96;
+    newFn.typeString = '[,[,]]';
 
     functionchart.nodes.append(input);
     functionchart.nodes.append(output);
@@ -3497,6 +3460,7 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nodes.append(newFunctionchart);
     functionchart.nodes.append(importer);
     functionchart.nodes.append(exporter);
+    functionchart.nodes.append(newFn);
 
     context.root = functionchart;
     this.palette = functionchart;
@@ -3547,10 +3511,10 @@ export class FunctionchartEditor implements CanvasLayer {
           break;
         }
         // case 'importer': {
-        //   const container = item as ContainerElement;
-        //   if (container.isImporter || container.isExporter) {
+        //   const modifier = item as Modifierlement;
+        //   if (modifier.isImporter || modifier.isExporter) {
         //     result = item.type.outputs[0].name;
-        //   } else if (container.isCast) {
+        //   } else if (modifier.isCast) {
         //     result = item.type.outputs[1].name;
         //   }
         //   break;
@@ -3579,11 +3543,11 @@ export class FunctionchartEditor implements CanvasLayer {
         }
         // case 'importer':
         // case 'exporter': {
-        //   const container = item as ContainerElement,
-        //         type = container.type;
-        //   if (container.isImporter) {
+        //   const modifier = item as ModifierElement,
+        //         type = modifier.type;
+        //   if (modifier.isImporter) {
         //     newType = Type.fromInfo([], [new Pin(type.outputs[0].type, value)]);
-        //   } else if (container.isCast) {
+        //   } else if (modifier.isCast) {
         //     newType = Type.fromInfo([], [new Pin(type.outputs[1].type, value)]);
         //   }
         //   break;
@@ -3905,7 +3869,7 @@ export class FunctionchartEditor implements CanvasLayer {
           changedItems = this.changedItems;
     // This function is called during the draw, hitTest, and updateBounds_ methods,
     // so the renderer is started.
-    // First layout containers, and then layout wires which depend on elements'
+    // First layout elements, and then layout wires which depend on them.
     // size and location.
     function layout(item: AllTypes, visitor: FunctionchartVisitor) {
       context.reverseVisitAll(item, visitor);
@@ -4171,7 +4135,7 @@ export class FunctionchartEditor implements CanvasLayer {
           item = context.selection.lastSelected;
     let type = undefined;
     if (item instanceof Element) {
-      if (item instanceof ContainerElement) {
+      if (item instanceof ModifierElement) {
         type = item.template.typeName;  // 'importer', 'exporter', ...
       } else {
         type = item.name;  // 'binop', 'unop', 'cond', 'literal', 'let', 'const'
@@ -4578,13 +4542,13 @@ export class FunctionchartEditor implements CanvasLayer {
         }
         case 75: { // 'k'
           context.beginTransaction('export element');
-          context.exportElements(context.selectedElements());
+          context.modifyElements(context.selectedElements(), 'exporter');
           context.endTransaction();
           return true;
         }
         case 76: // 'l'
           context.beginTransaction('import element');
-          context.importElements(context.selectedElements());
+          context.modifyElements(context.selectedElements(), 'importer');
           context.endTransaction();
           return true;
         case 73: // 'i'
@@ -4594,7 +4558,7 @@ export class FunctionchartEditor implements CanvasLayer {
           return true;
         case 85: // 'u'
           context.beginTransaction('cast element');
-          context.castElements(context.selectedElements(), !shiftKey);
+          context.modifyElements(context.selectedElements(), shiftKey ? 'downCast' : 'upCast');
           context.endTransaction();
           return true;
         case 78: { // 'n'

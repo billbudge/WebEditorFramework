@@ -958,7 +958,7 @@ describe('FunctionchartContext', () => {
           grandparent = greatGrandparent.nodes.get(0) as FC.Functionchart,
           fc1 = grandparent.nodes.get(0) as FC.Functionchart,
           fc2 = grandparent.nodes.get(1) as FC.Functionchart,
-          importer = grandparent.nodes.get(3) as FC.ContainerElement;
+          importer = grandparent.nodes.get(3) as FC.ModifierElement;
     expect(greatGrandparent).toBeInstanceOf(FC.Functionchart);
     expect(grandparent).toBeInstanceOf(FC.Functionchart);
     expect(fc1).toBeInstanceOf(FC.Functionchart);
@@ -985,7 +985,7 @@ describe('FunctionchartContext', () => {
     const inst9 = addFunctionInstance(fc1, fc2);  // open, sibling scope, valid.
     expect(context.isValidFunctionInstance(inst9)).toBe(true);
     // ImporterElement instances.
-    expect(importer instanceof FC.ContainerElement);
+    expect(importer instanceof FC.ModifierElement);
     const inst10 = addFunctionInstance(grandparent, importer);  // instanced to importer scope.
     expect(context.isValidFunctionInstance(inst10)).toBe(true);
     const inst11 = addFunctionInstance(fc1, importer);  // instanced to scope inside scope of importer.
