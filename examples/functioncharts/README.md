@@ -344,10 +344,15 @@ While it might seem that Functioncharts are a purely higher-order functional lan
 
 Below, we define a function V representing a vector of numbers in 2 dimensions. Using a special 'this' element, we define properties 'x' and 'y' which the function adds to the 'this' object. 'this' functions have a simple value output for the current value of the property, and a setter function which has the side effect of changing the bound value. We don't define how 'this' is created yet. The V function returns two new functions, one to retrieve both properties and the other to set the two properties.
 
-Below this function we create a function VNormal representing a subtype function which represents only normalized (length 1) vectors. This function calls the V function, which initializes the 'x' and 'y' properties. However, VNormal first normalizes the two coordinates before calling the V function so it is initialized properly. It also overrides the V setting function to first normalize the coordinates before calling the base setter function. In other words, it overrides its base type's function.
 
 <figure align="center">
-  <img src="./resources/points.svg"  alt="" title="A simple 2d point library.">
+  <img src="./resources/points.svg"  alt="" title="A simple 2d point type.">
+</figure>
+
+We create a function VNormal representing a subtype function which represents only normalized (length 1) vectors. This function calls the V function, which initializes the 'x' and 'y' properties. However, VNormal first normalizes the two coordinates before calling the V function so it is initialized properly. It also overrides the V setting function to first normalize the coordinates before calling the base setter function. In other words, it overrides its base type's function.
+
+<figure align="center">
+  <img src="./resources/points2.svg"  alt="" title="A simple 2d point library.">
 </figure>
 
 ## Libraries

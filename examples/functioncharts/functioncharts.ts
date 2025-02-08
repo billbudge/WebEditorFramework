@@ -131,8 +131,11 @@ export class Type {
   toImportExportType() : Type {
     return Type.fromInfo([], [new Pin(this)]);
   }
-  toNewType() : Type {
-    return Type.fromInfo(this.inputs.map(pin => new Pin(pin.type, pin.name)), [new Pin(this)]);
+  toConstructorType() : Type {
+    const inputs = this.inputs.map(pin => new Pin(pin.type, pin.name)),
+          outputs = this.outputs.map(pin => new Pin(pin.type, pin.name));
+    outputs.splice(0, 0, new Pin(Type.valueType));
+    return Type.fromInfo(inputs, outputs, 'new ' + this.name);
   }
   toUpCastType() : Type {
     return Type.fromInfo([new Pin(Type.valueType)], [new Pin(Type.valueType), new Pin(this)]);
@@ -348,7 +351,7 @@ abstract class NodeTemplate {
   readonly properties: PropertyTypes[] = [];
 }
 
-export type ModifierElementType = 'importer' | 'exporter' | 'new' | 'upCast' | 'downCast';
+export type ModifierElementType = 'importer' | 'exporter' | 'constructor' | 'upCast' | 'downCast';
 export type ElementType = 'element' | 'instance' | ModifierElementType;
 
 class ElementTemplate extends NodeTemplate {
@@ -422,7 +425,7 @@ class FunctionchartTemplate extends NodeTemplate {
 const elementTemplate = new ElementTemplate('element'),        // built-in elements
       importerTemplate = new ModifierElementTemplate('importer'),  // modifier elements
       exporterTemplate = new ModifierElementTemplate('exporter'),
-      newTemplate = new ModifierElementTemplate('new'),
+      constructorTemplate = new ModifierElementTemplate('constructor'),
       upCastTemplate = new ModifierElementTemplate('upCast'),
       downCastTemplate = new ModifierElementTemplate('downCast'),
       inputTemplate = new PseudoelementTemplate('input'),      // input pseudoelement
@@ -534,8 +537,8 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
   get isExporter() : boolean {
     return this.template.typeName === 'exporter';
   }
-  get isNew() : boolean {
-    return this.template.typeName === 'new';
+  get isConstructor() : boolean {
+    return this.template.typeName === 'constructor';
   }
   get isUpCast() {
     return this.template.typeName === 'upCast';
@@ -573,6 +576,8 @@ export class ModifierElement extends Element<ModifierElementTemplate> {
         modifierType = innerType.toUpCastType();
       } else if (this.isDownCast) {
         modifierType = innerType.toDownCastType();
+      } else if (this.isConstructor) {
+        modifierType = innerType.toConstructorType();
       } else {
         modifierType = innerType.toImportExportType();
       }
@@ -852,8 +857,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'exporter':
         result = new ModifierElement(this, exporterTemplate, nextId);
         break;
-      case 'new':
-        result = new ModifierElement(this, newTemplate, nextId);
+      case 'constructor':
+        result = new ModifierElement(this, constructorTemplate, nextId);
         break;
       case 'upCast':
         result = new ModifierElement(this, upCastTemplate, nextId);
@@ -2096,11 +2101,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'upCast':
         typeString = element.type.toUpCastType().typeString;
         break;
+      case 'constructor':
+        typeString = element.type.toConstructorType().typeString;
+        break;
       case 'downCast':
         typeString = element.type.toDownCastType().typeString;
-        break;
-      case 'new':
-        typeString = element.type.toNewType().typeString;
         break;
     }
     modifier.typeString = typeString;
@@ -2473,7 +2478,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'element':
       case 'importer':
       case 'exporter':
-      case 'new':
+      case 'constructor':
       case 'upCast':
       case 'downCast':
       case 'instance': return this.newElement(typeName);
@@ -2907,7 +2912,10 @@ class Renderer implements ILayoutEngine {
   }
 
   drawElement(element: Element, mode: RenderMode) {
-    const ctx = this.ctx,
+    if (element.parent instanceof ModifierElement)  // TODO something better
+      return;
+
+      const ctx = this.ctx,
           theme = this.theme,
           rect = this.getBounds(element),
           x = rect.x, y = rect.y, w = rect.width, h = rect.height;
@@ -2920,7 +2928,7 @@ class Renderer implements ILayoutEngine {
         inFlagPath(x - d, y, w + d, h, d, ctx);
       }  else if (element.isExporter) {
         outFlagPath(x, y, w + d, h, d, ctx);
-      } else if (element.isNew) {
+      } else if (element.isConstructor) {
         notchedRectPath(x, y, w, h, theme.spacing / 2, ctx);
       } else {
         ctx.rect(x, y, w, h);
@@ -3407,7 +3415,7 @@ export class FunctionchartEditor implements CanvasLayer {
           newFunctionchart = context.newFunctionchart('functionchart'),
           importer = context.newElement('importer'),
           exporter = context.newElement('exporter'),
-          newFn = context.newElement('new');
+          constructor = context.newElement('constructor');
 
     context.root = functionchart;
 
@@ -3444,8 +3452,8 @@ export class FunctionchartEditor implements CanvasLayer {
     importer.typeString = '[,[,]]';
     exporter.x = 104; exporter.y = 96;
     exporter.typeString = '[,[,]]';
-    newFn.x = 136; newFn.y = 96;
-    newFn.typeString = '[,[,]]';
+    constructor.x = 136; constructor.y = 96;
+    constructor.typeString = '[,[,]]';
 
     functionchart.nodes.append(input);
     functionchart.nodes.append(output);
@@ -3460,7 +3468,7 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nodes.append(newFunctionchart);
     functionchart.nodes.append(importer);
     functionchart.nodes.append(exporter);
-    functionchart.nodes.append(newFn);
+    functionchart.nodes.append(constructor);
 
     context.root = functionchart;
     this.palette = functionchart;
