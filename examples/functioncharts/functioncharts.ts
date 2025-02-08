@@ -138,7 +138,7 @@ export class Type {
     return Type.fromInfo(inputs, outputs, 'new ' + this.name);
   }
   toUpCastType() : Type {
-    return Type.fromInfo([new Pin(Type.valueType)], [new Pin(Type.valueType), new Pin(this)]);
+    return Type.fromInfo([new Pin(Type.valueType)], [new Pin(this)]);
   }
   toDownCastType() : Type {
     return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)]);
