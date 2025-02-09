@@ -13,11 +13,10 @@ The two principal innovations in Functioncharts are:
 
 Both features help to reduce the visual complexity of the Functionchart diagrams, by making it easy to produce and consume helper functions which can control the routing of wires, and reduce their number.
 
-Here is an example, an abstract binary search on a sorted Array.
+Here is an example, implementing efficient exponentiation by squaring. It's generic, applying to any type where multiplication can be applied (e.g. numbers, complex numbers, polynomials, matrices).
 
 <figure align="center">
-  <img src="./resources/binary_search.svg"  alt="" title="Binary search implementation.">
-  <figcaption align="center">A Functionchart example - Binary Search of a sorted Array-like object.</figcaption>
+  <img src="./resources/exp_by_squaring2.svg"  alt="" title="Exponentiation by squaring.">
 </figure>
 
 This introduction shows how some illustrative programs can be built and discusses the advantages and potential of this approach.
@@ -406,6 +405,14 @@ Messy! This is why node-and-wire gets a bad name. The tangle of wires crossing i
 <figure align="center">
   <img src="./resources/exp_by_squaring2.svg"  alt="" title="Simplified implemention of exponentiation by squaring.">
   <figcaption align="center">Refactored implementation</figcaption>
+</figure>
+
+<figure align="center">
+  <img src="./resources/binary_search3.svg"  alt="" title="">
+</figure>
+
+<figure align="center">
+  <img src="./resources/intervals.svg"  alt="" title="">
 </figure>
 
 ## Covariance (fewer inputs), Contravariance (more outputs)
