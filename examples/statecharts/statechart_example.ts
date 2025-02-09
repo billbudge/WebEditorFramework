@@ -9,6 +9,9 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js'
         selectExample = document.getElementById('select-example');
   if (body && canvas && palette) {
 
+    body.style.overscrollBehaviorY = 'contain';
+    body.style.touchAction = 'pinch-zoom';
+
     const theme = getDefaultTheme(),  // or getBlueprintTheme
           canvasController = new CanvasController(canvas as HTMLCanvasElement),
           paletteController = new CanvasController(palette as HTMLCanvasElement),
