@@ -484,6 +484,7 @@ export class CanvasController {
     }
     onPointerDown(e) {
         e.preventDefault();
+        e.stopPropagation();
         this.canvas.focus({ preventScroll: true });
         this.initialClientX = e.clientX;
         this.initialClientY = e.clientY;
@@ -511,6 +512,7 @@ export class CanvasController {
     }
     onPointerMove(e) {
         e.preventDefault();
+        e.stopPropagation();
         this.clientX = e.clientX;
         this.clientY = e.clientY;
         let pointer = this.pointer = this.getPointerPosition(e), click = this.clickPointer;
@@ -535,6 +537,7 @@ export class CanvasController {
     }
     onPointerUp(e) {
         e.preventDefault();
+        e.stopPropagation();
         this.pointer = this.getPointerPosition(e);
         if (this.isDragging) {
             this.isDragging = false;
