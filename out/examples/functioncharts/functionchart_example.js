@@ -3,6 +3,7 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
 (function () {
     const body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette'), selectExample = document.getElementById('select-example');
     if (body && canvas && palette) {
+        canvas.style.touchAction = 'none';
         const theme = getDefaultTheme(), // or getBlueprintTheme
         canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette), propertyGridController = new PropertyGridController(body, theme), functionchartEditor = new FunctionchartEditor(theme, canvasController, paletteController, propertyGridController);
         palette.style.borderColor = theme.strokeColor;

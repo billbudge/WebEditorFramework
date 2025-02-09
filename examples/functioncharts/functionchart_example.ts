@@ -9,6 +9,8 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
         selectExample = document.getElementById('select-example');
   if (body && canvas && palette) {
 
+    canvas.style.touchAction = 'none';
+    
     const theme = getDefaultTheme(),  // or getBlueprintTheme
           canvasController = new CanvasController(canvas as HTMLCanvasElement),
           paletteController = new CanvasController(palette as HTMLCanvasElement),
