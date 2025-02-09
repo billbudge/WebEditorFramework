@@ -10,7 +10,7 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
   if (body && canvas && palette) {
 
     canvas.style.touchAction = 'none';
-    canvas.style.overscrollBehaviorY = 'contain';
+    canvas.style.overscrollBehavior = 'contain';
 
     const theme = getDefaultTheme(),  // or getBlueprintTheme
           canvasController = new CanvasController(canvas as HTMLCanvasElement),
