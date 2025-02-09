@@ -3,15 +3,16 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
 
 (function() {
 
-  const body = document.getElementById('body'),
+  const html = document.getElementById('html'),
+        body = document.getElementById('body'),
         canvas = document.getElementById('canvas'),
         palette = document.getElementById('palette'),
         selectExample = document.getElementById('select-example');
-  if (body && canvas && palette) {
+  if (html && body && canvas && palette) {
 
-    body.style.touchAction = 'none';
-    body.style.overscrollBehaviorY = 'contain';
-    body.style.overscrollBehavior = 'contain';
+    html.style.touchAction = 'none';
+    html.style.overscrollBehaviorY = 'none';
+    html.style.overscrollBehavior = 'none';
 
     const theme = getDefaultTheme(),  // or getBlueprintTheme
           canvasController = new CanvasController(canvas as HTMLCanvasElement),

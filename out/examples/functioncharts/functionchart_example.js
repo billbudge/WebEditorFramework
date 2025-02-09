@@ -1,10 +1,11 @@
 import { getDefaultTheme, CanvasController, PropertyGridController } from '../../src/diagrams.js';
 import { FunctionchartEditor } from '../../examples/functioncharts/functioncharts.js';
 (function () {
-    const body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette'), selectExample = document.getElementById('select-example');
-    if (body && canvas && palette) {
-        canvas.style.touchAction = 'none';
-        canvas.style.overscrollBehavior = 'contain';
+    const html = document.getElementById('html'), body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette'), selectExample = document.getElementById('select-example');
+    if (html && body && canvas && palette) {
+        html.style.touchAction = 'none';
+        html.style.overscrollBehaviorY = 'none';
+        html.style.overscrollBehavior = 'none';
         const theme = getDefaultTheme(), // or getBlueprintTheme
         canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette), propertyGridController = new PropertyGridController(body, theme), functionchartEditor = new FunctionchartEditor(theme, canvasController, paletteController, propertyGridController);
         palette.style.borderColor = theme.strokeColor;
