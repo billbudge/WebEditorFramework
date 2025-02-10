@@ -2910,7 +2910,7 @@ class Renderer implements ILayoutEngine {
   abstractStroke(ctx: CanvasRenderingContext2D) {
     ctx.setLineDash([6, 3]);
     ctx.stroke();
-    ctx.setLineDash([0]);
+    ctx.setLineDash([]);
   }
 
   drawSideEffectsTick(right: number, top: number) {
@@ -3950,7 +3950,7 @@ export class FunctionchartEditor implements CanvasLayer {
       ctx.lineWidth = 0.5;
       ctx.setLineDash([6, 3]);
       ctx.strokeRect(0, 0, size.width, size.height);
-      ctx.setLineDash([0]);
+      ctx.setLineDash([]);
 
       // Now draw the functionchart.
       renderer.begin(ctx);

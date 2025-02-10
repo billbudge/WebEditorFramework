@@ -2441,7 +2441,7 @@ class Renderer {
     abstractStroke(ctx) {
         ctx.setLineDash([6, 3]);
         ctx.stroke();
-        ctx.setLineDash([0]);
+        ctx.setLineDash([]);
     }
     drawSideEffectsTick(right, top) {
         const ctx = this.ctx, theme = this.theme, spacing = theme.spacing;
@@ -3354,7 +3354,7 @@ export class FunctionchartEditor {
             ctx.lineWidth = 0.5;
             ctx.setLineDash([6, 3]);
             ctx.strokeRect(0, 0, size.width, size.height);
-            ctx.setLineDash([0]);
+            ctx.setLineDash([]);
             // Now draw the functionchart.
             renderer.begin(ctx);
             this.updateLayout();
