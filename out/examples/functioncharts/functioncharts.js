@@ -1825,9 +1825,9 @@ export class FunctionchartContext extends EventBase {
             }
         });
     }
-    getExportElement() {
+    getExportType(functionchart) {
         const outputs = new Array();
-        this.functionchart.nodes.forEach(node => {
+        functionchart.nodes.forEach(node => {
             if (node instanceof Functionchart) {
                 outputs.push(new Pin(node.instanceType));
             }
@@ -3101,6 +3101,13 @@ export class FunctionchartEditor {
                 setter: setter,
                 prop: commentProp,
             },
+            {
+                label: 'hideLinks',
+                type: 'boolean',
+                getter: getter,
+                setter: setter,
+                prop: hideLinksProp,
+            },
         ]);
         this.propertyInfo.set('abstract', [
             {
@@ -3906,7 +3913,7 @@ export class FunctionchartEditor {
                     return true;
                 }
                 case 69: { // 'e'
-                    context.selectConnectedNodes((wire) => true, (wire) => true); // TODO more nuanced connecting.
+                    context.selectConnectedNodes(wire => true, wire => true); // TODO finer grained connecting.
                     self.canvasController.draw();
                     return true;
                 }
@@ -3950,7 +3957,26 @@ export class FunctionchartEditor {
                     return true;
                 }
                 case 79: { // 'o'
-                    this.fileController.openFile().then(result => self.openNewContext(result));
+                    if (shiftKey) {
+                        // import the functionchart
+                        this.fileController.openFile().then(result => {
+                            const imported = self.newContext(result);
+                            const type = imported.getExportType(imported.root);
+                            context.beginTransaction('import element');
+                            const element = context.newElement('element');
+                            element.name = 'external';
+                            element.typeString = type.typeString;
+                            element.x = 256;
+                            element.y = 256;
+                            context.addItem(element, functionchart);
+                            context.endTransaction();
+                            self.canvasController.draw();
+                        });
+                    }
+                    else {
+                        // open a new functionchart
+                        this.fileController.openFile().then(result => self.openNewContext(result));
+                    }
                     return true;
                 }
                 case 83: { // 's'
