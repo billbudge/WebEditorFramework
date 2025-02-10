@@ -583,8 +583,6 @@ export class CanvasController {
   private ctx: CanvasRenderingContext2D;
   private canvasRect: DOMRect;
   private layers: CanvasLayer[];
-  private translation: Point = { x: 0, y: 0 };
-  private scale: Point = { x: 1, y: 1 };
   private transform: number[] = [1, 0, 0, 1, 0, 0];
   private inverseTransform: number[] = [1, 0, 0, 1, 0, 0];
   private pointer: Point = { x: 0, y: 0 };
@@ -597,25 +595,26 @@ export class CanvasController {
   private dragThreshold: number = 4;
   private hoverTimeout: number = 500; // milliseconds
   private isDragging: boolean;
-  draggable: boolean;
+  private draggable: boolean;
   private hovering: number;
   private hoverOwner: CanvasLayer | undefined
   private keyOwner: CanvasLayer | undefined
+
+  get translation() : Point { return { x: this.transform[4], y: this.transform[5] }; };
+  get scale() : Point { return { x: this.transform[0], y: this.transform[3] }; };
 
   shiftKeyDown: boolean;
   cmdKeyDown: boolean;
 
   setTransform(translation: Point, scale: Point) {
-    let tx = 0, ty = 0, sx = 1, sy = 1, sin = 0, cos = 1;
+    let tx = 0, ty = 0, sx = 1, sy = 1;
     if (translation) {
       tx = translation.x;
       ty = translation.y;
-      this.translation = translation;
     }
     if (scale) {
       sx = scale.x;
       sy = scale.y;
-      this.scale = scale;
     }
     this.transform = [sx, 0, 0, sy, tx, ty];
     let ooSx = 1.0 / sx, ooSy = 1.0 / sy;
@@ -629,6 +628,9 @@ export class CanvasController {
   }
   viewToCanvas(p: Point) {
     return geometry.matMulPt(p, this.inverseTransform);
+  }
+  canvasToView(p: Point) {
+    return geometry.matMulPt(p, this.transform);
   }
   offsetToOtherCanvas(canvasController: CanvasController) {
     const rect = this.getClientRect(),
@@ -837,15 +839,17 @@ export class CanvasController {
     return this.clickPointer;
   }
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, draggable: boolean = false) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.canvasRect = canvas.getBoundingClientRect();
+    this.draggable = draggable;
 
     canvas.addEventListener('pointerdown', this.onPointerDown.bind(this));
     canvas.addEventListener('pointermove', this.onPointerMove.bind(this));
     canvas.addEventListener('pointerup', this.onPointerUp.bind(this));
   }
+
   configure(layers: CanvasLayer[]) {
     this.layers = layers.slice(0);
     const length = this.layers.length;

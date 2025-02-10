@@ -14,7 +14,7 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
 
     const theme = getDefaultTheme(),  // or getBlueprintTheme
           canvasController = new CanvasController(canvas as HTMLCanvasElement),
-          paletteController = new CanvasController(palette as HTMLCanvasElement),
+          paletteController = new CanvasController(palette as HTMLCanvasElement, true /* draggable */),
           propertyGridController = new PropertyGridController(body, theme),
           functionchartEditor = new FunctionchartEditor(
               theme, canvasController, paletteController, propertyGridController);
@@ -28,7 +28,6 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
     canvasController.setSize(window.innerWidth, window.innerHeight);
     paletteController.configure([functionchartEditor]);
     paletteController.setSize(324, 128);
-    paletteController.draggable = true;
 
     window.onbeforeunload = function() {
       return "Confirm unload?";

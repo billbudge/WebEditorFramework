@@ -14,7 +14,7 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js'
 
     const theme = getDefaultTheme(),  // or getBlueprintTheme
           canvasController = new CanvasController(canvas as HTMLCanvasElement),
-          paletteController = new CanvasController(palette as HTMLCanvasElement),
+          paletteController = new CanvasController(palette as HTMLCanvasElement, true /* draggable */),
           propertyGridController = new PropertyGridController(body, theme),
           statechartEditor = new StatechartEditor(
               theme, canvasController, paletteController, propertyGridController);
@@ -28,7 +28,6 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js'
     canvasController.setSize(window.innerWidth, window.innerHeight);
     paletteController.configure([statechartEditor]);
     paletteController.setSize(150, 100);
-    paletteController.draggable = true;
 
     window.onbeforeunload = function() {
       return "Confirm unload?";

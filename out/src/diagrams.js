@@ -429,17 +429,19 @@ export class PropertyGridController {
     }
 }
 export class CanvasController {
+    get translation() { return { x: this.transform[4], y: this.transform[5] }; }
+    ;
+    get scale() { return { x: this.transform[0], y: this.transform[3] }; }
+    ;
     setTransform(translation, scale) {
-        let tx = 0, ty = 0, sx = 1, sy = 1, sin = 0, cos = 1;
+        let tx = 0, ty = 0, sx = 1, sy = 1;
         if (translation) {
             tx = translation.x;
             ty = translation.y;
-            this.translation = translation;
         }
         if (scale) {
             sx = scale.x;
             sy = scale.y;
-            this.scale = scale;
         }
         this.transform = [sx, 0, 0, sy, tx, ty];
         let ooSx = 1.0 / sx, ooSy = 1.0 / sy;
@@ -452,6 +454,9 @@ export class CanvasController {
     }
     viewToCanvas(p) {
         return geometry.matMulPt(p, this.inverseTransform);
+    }
+    canvasToView(p) {
+        return geometry.matMulPt(p, this.transform);
     }
     offsetToOtherCanvas(canvasController) {
         const rect = this.getClientRect(), otherRect = canvasController.getClientRect();
@@ -651,9 +656,7 @@ export class CanvasController {
     getClickPointerPosition() {
         return this.clickPointer;
     }
-    constructor(canvas) {
-        this.translation = { x: 0, y: 0 };
-        this.scale = { x: 1, y: 1 };
+    constructor(canvas, draggable = false) {
         this.transform = [1, 0, 0, 1, 0, 0];
         this.inverseTransform = [1, 0, 0, 1, 0, 0];
         this.pointer = { x: 0, y: 0 };
@@ -662,6 +665,7 @@ export class CanvasController {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.canvasRect = canvas.getBoundingClientRect();
+        this.draggable = draggable;
         canvas.addEventListener('pointerdown', this.onPointerDown.bind(this));
         canvas.addEventListener('pointermove', this.onPointerMove.bind(this));
         canvas.addEventListener('pointerup', this.onPointerUp.bind(this));

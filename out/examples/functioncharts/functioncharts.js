@@ -1150,10 +1150,17 @@ export class FunctionchartContext extends EventBase {
         return output;
     }
     newInstanceForWire(wire, parent, p) {
-        const src = wire.src, type = src.type.outputs[wire.srcPin].type, element = this.newElement('instance');
+        const src = wire.src, type = src.type.outputs[wire.srcPin].type;
+        let element;
+        if (src instanceof Element && src.name === 'external') {
+            element = this.newElement('element');
+        }
+        else {
+            element = this.newElement('instance');
+            element.src = src;
+            element.srcPin = wire.srcPin;
+        }
         element.typeString = type.typeString;
-        element.src = src;
-        element.srcPin = wire.srcPin;
         element.x = p.x;
         element.y = p.y - type.height / 2;
         this.deleteItem(wire);
@@ -3966,8 +3973,9 @@ export class FunctionchartEditor {
                             const element = context.newElement('element');
                             element.name = 'external';
                             element.typeString = type.typeString;
-                            element.x = 256;
-                            element.y = 256;
+                            const clientRect = this.canvasController.getClientRect();
+                            element.x = clientRect.x + 256;
+                            element.y = -clientRect.y + 256;
                             context.addItem(element, functionchart);
                             context.endTransaction();
                             self.canvasController.draw();

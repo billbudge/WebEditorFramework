@@ -6,7 +6,7 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js';
         body.style.overscrollBehaviorY = 'contain';
         body.style.touchAction = 'pinch-zoom';
         const theme = getDefaultTheme(), // or getBlueprintTheme
-        canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette), propertyGridController = new PropertyGridController(body, theme), statechartEditor = new StatechartEditor(theme, canvasController, paletteController, propertyGridController);
+        canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette, true /* draggable */), propertyGridController = new PropertyGridController(body, theme), statechartEditor = new StatechartEditor(theme, canvasController, paletteController, propertyGridController);
         palette.style.borderColor = theme.strokeColor;
         palette.style.borderStyle = 'solid';
         palette.style.borderWidth = '0.25px';
@@ -15,7 +15,6 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js';
         canvasController.setSize(window.innerWidth, window.innerHeight);
         paletteController.configure([statechartEditor]);
         paletteController.setSize(150, 100);
-        paletteController.draggable = true;
         window.onbeforeunload = function () {
             return "Confirm unload?";
         };
