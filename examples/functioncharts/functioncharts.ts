@@ -2166,6 +2166,16 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
+  getExportElement() : Type {
+    const outputs = new Array<Pin>();
+    this.functionchart.nodes.forEach(node => {
+      if (node instanceof Functionchart) {
+        outputs.push(new Pin(node.instanceType));
+      }
+    });
+    return Type.fromInfo([], outputs);
+  }
+
   group(items: AllTypes[], grandparent: Functionchart, bounds: Rect) {
     const self = this,
           selection = this.selection,
@@ -3940,7 +3950,7 @@ export class FunctionchartEditor implements CanvasLayer {
       ctx.lineWidth = 0.5;
       ctx.setLineDash([6, 3]);
       ctx.strokeRect(0, 0, size.width, size.height);
-      ctx.setLineDash([]);
+      ctx.setLineDash([0]);
 
       // Now draw the functionchart.
       renderer.begin(ctx);
@@ -4449,11 +4459,22 @@ export class FunctionchartEditor implements CanvasLayer {
 
     this.canvasController.draw();
   }
-  createContext(text: string) {
-    const raw = JSON.parse(text),
-          context = new FunctionchartContext(this.renderer);
-    const functionchart = Deserialize(raw, context) as Functionchart;
+
+  newContext(text?: string) : FunctionchartContext{
+    const context = new FunctionchartContext(this.renderer);
+    let functionchart: Functionchart;
+    if (text) {
+      const raw = JSON.parse(text);
+      functionchart = Deserialize(raw, context) as Functionchart;
+    } else {
+      functionchart = context.newFunctionchart('functionchart');
+    }
     context.root = functionchart;
+    return context;
+  }
+
+  openNewContext(text?: string) {
+    const context = this.newContext(text);
     this.initializeContext(context);
     this.setContext(context);
     this.renderer.begin(this.canvasController.getCtx());
@@ -4571,17 +4592,11 @@ export class FunctionchartEditor implements CanvasLayer {
           return true;
         case 78: { // 'n'
           // ctrl-n
-          const context = new FunctionchartContext(this.renderer);
-          self.initializeContext(context);
-          self.setContext(context);
-          self.renderer.begin(self.canvasController.getCtx());
-          self.updateBounds();
-          self.canvasController.draw();
-          self.renderer.end();
+          this.openNewContext();
           return true;
         }
         case 79: { // 'o'
-          this.fileController.openFile().then(result => self.createContext(result));
+          this.fileController.openFile().then(result => self.openNewContext(result));
           return true;
         }
         case 83: { // 's'

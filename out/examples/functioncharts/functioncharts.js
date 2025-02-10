@@ -1825,6 +1825,15 @@ export class FunctionchartContext extends EventBase {
             }
         });
     }
+    getExportElement() {
+        const outputs = new Array();
+        this.functionchart.nodes.forEach(node => {
+            if (node instanceof Functionchart) {
+                outputs.push(new Pin(node.instanceType));
+            }
+        });
+        return Type.fromInfo([], outputs);
+    }
     group(items, grandparent, bounds) {
         const self = this, selection = this.selection, parent = this.newFunctionchart('functionchart');
         parent.x = bounds.x;
@@ -3345,7 +3354,7 @@ export class FunctionchartEditor {
             ctx.lineWidth = 0.5;
             ctx.setLineDash([6, 3]);
             ctx.strokeRect(0, 0, size.width, size.height);
-            ctx.setLineDash([]);
+            ctx.setLineDash([0]);
             // Now draw the functionchart.
             renderer.begin(ctx);
             this.updateLayout();
@@ -3811,10 +3820,21 @@ export class FunctionchartEditor {
         this.hotTrackInfo = undefined;
         this.canvasController.draw();
     }
-    createContext(text) {
-        const raw = JSON.parse(text), context = new FunctionchartContext(this.renderer);
-        const functionchart = Deserialize(raw, context);
+    newContext(text) {
+        const context = new FunctionchartContext(this.renderer);
+        let functionchart;
+        if (text) {
+            const raw = JSON.parse(text);
+            functionchart = Deserialize(raw, context);
+        }
+        else {
+            functionchart = context.newFunctionchart('functionchart');
+        }
         context.root = functionchart;
+        return context;
+    }
+    openNewContext(text) {
+        const context = this.newContext(text);
         this.initializeContext(context);
         this.setContext(context);
         this.renderer.begin(this.canvasController.getCtx());
@@ -3926,17 +3946,11 @@ export class FunctionchartEditor {
                     return true;
                 case 78: { // 'n'
                     // ctrl-n
-                    const context = new FunctionchartContext(this.renderer);
-                    self.initializeContext(context);
-                    self.setContext(context);
-                    self.renderer.begin(self.canvasController.getCtx());
-                    self.updateBounds();
-                    self.canvasController.draw();
-                    self.renderer.end();
+                    this.openNewContext();
                     return true;
                 }
                 case 79: { // 'o'
-                    this.fileController.openFile().then(result => self.createContext(result));
+                    this.fileController.openFile().then(result => self.openNewContext(result));
                     return true;
                 }
                 case 83: { // 's'

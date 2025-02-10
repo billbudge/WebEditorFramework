@@ -34,7 +34,7 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
             const id = event.target.value, fileName = id + '.txt';
             fetch(fileName)
                 .then(response => response.text())
-                .then(text => functionchartEditor.createContext(text));
+                .then(text => functionchartEditor.openNewContext(text));
         });
     }
 })();
