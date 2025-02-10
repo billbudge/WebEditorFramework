@@ -2098,19 +2098,19 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       case 'exporter':
         typeString = element.type.toImportExportType().typeString;
         break;
-      case 'upCast':
-        typeString = element.type.toUpCastType().typeString;
-        break;
       case 'constructor':
         typeString = element.type.toConstructorType().typeString;
+        break;
+      case 'upCast':
+        typeString = element.type.toUpCastType().typeString;
         break;
       case 'downCast':
         typeString = element.type.toDownCastType().typeString;
         break;
     }
     modifier.typeString = typeString;
-    modifier.x = element.x;
-    modifier.y = element.y;
+    modifier.x = element.globalPosition.x;
+    modifier.y = element.globalPosition.y;
     return modifier;
   }
 
@@ -2123,11 +2123,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         return;
       self.disconnectNode(element);
       selection.delete(element);
-      const importer = self.modifyElement(element, modifierType),
-            parent = element.parent as Functionchart;
-      self.addItem(importer, parent);
-      self.addItem(element, importer);
-      selection.add(importer);
+      const modifier = self.modifyElement(element, modifierType),
+            parent = element.parent as Functionchart;  // element is not modified.
+      self.addItem(modifier, parent);
+      self.addItem(element, modifier);
+      selection.add(modifier);
     });
   }
 
