@@ -287,15 +287,24 @@ In order to call 'quicksort', we must create the functions 'swap', 'setP', '<', 
 We create an adapter which adapts the array abstraction to the required 'swap' and predicate functions, then use the adapter to implement two pivot selection algorithms, one a random element in the range, and the other a median-of-3 implementation. Finally, we use our adapter and pivot functions to call quicksort.
 
 <figure align="center">
-  <img src="./resources/quicksort2.svg"  alt="" title="Using quicksort to sort an array.">
-  <figcaption align="center">Applying quicksort to an Array. (top) Adapt the Array, (middle) Implement pivot functions, (bottom) Sort the Array.</figcaption>
+  <img src="./resources/quicksort2a.svg"  alt="" title="Adapting an array for quicksort.">
 </figure>
 
 Key diagram features:
 
 1. The 'adapter' function uses the array indexed getter to implement the comparison functions.
 1. It uses the getter and setter to create an indexed let-like function, which can be passed to the 'swap' we implemented before. The output isn't needed, but we must 'use' it to drive the side effects.
+
+<figure align="center">
+  <img src="./resources/quicksort2b.svg"  alt="" title="Using the adapter to implement different pivot functions.">
+</figure>
+
 1. We use the adpater to implement two pivot selection algorithms. The adapter is useful since it implements 'swap', and the pivot functions in general swap the selected pivot with the element at 'lo'.
+
+<figure align="center">
+  <img src="./resources/quicksort2c.svg"  alt="" title="Calling quicksort with the adapter and pivot functions.">
+</figure>
+
 1. Finally, we call 'quicksort' on our abstracted array, using the adapter, and choosing the "median-of-3" pivot function.
 
 Code fragment for Median of the 3 elements at 'lo', 'mid', and 'hi'.

@@ -3233,6 +3233,7 @@ export class FunctionchartEditor {
             self.updateBounds();
         }
         function advance() {
+            self.updateBounds();
             self.setPropertyGrid();
         }
         context.addTransactionHandler('transactionEnding', advance);
@@ -3901,6 +3902,7 @@ export class FunctionchartEditor {
                 }
                 case 86: { // 'v'
                     if (this.scrap.length > 0) {
+                        // TODO paste at canvas controller center.
                         context.paste(this.scrap);
                         this.updateBounds();
                         return true;
@@ -3975,8 +3977,12 @@ export class FunctionchartEditor {
                             const center = this.canvasController.getViewCenter();
                             element.x = center.x;
                             element.y = center.y;
+                            this.renderer.begin(this.canvasController.getCtx());
+                            this.renderer.layoutElement(element);
+                            this.renderer.end();
                             context.beginTransaction('import functionchart');
                             context.addItem(element, functionchart);
+                            context.select(element);
                             context.endTransaction();
                             self.canvasController.draw();
                         });

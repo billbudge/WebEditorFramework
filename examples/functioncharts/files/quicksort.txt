@@ -13,11 +13,11 @@
     {
       "type": "functionchart",
       "id": 3,
-      "typeString": "[,[[vv,vv]()(setP)[vv,vv]()(swap)[vv,v]()(<)[vv,v]()(>),[v(lo)v(hi),v](quicksort)[v(lo)v(hi),vv(p)v](partition)]]",
+      "typeString": "[,[[vv,v]()(<)[vv,v]()(>)[vv,vv]()(swap)[vv,vv]()(setP),[v(lo)v(hi),vv(p)v](partition)[v(lo)v(hi),v](quicksort)]]",
       "x": 377.2417297363281,
       "y": 110.62765502929688,
-      "width": 832.6369352340698,
-      "height": 827.8034057617188,
+      "width": 759.6291837692261,
+      "height": 782.0095367431641,
       "name": "",
       "implicit": false,
       "hideLinks": true,
@@ -26,8 +26,8 @@
           "type": "functionchart",
           "id": 4,
           "typeString": "[,[v(lo)v(hi),vv(p)v](partition)]",
-          "x": 86.4486083984375,
-          "y": 302.5676574707031,
+          "x": 82.60272216796875,
+          "y": 366.6266098022461,
           "width": 615.9546036720276,
           "height": 156.3412322998047,
           "name": "partition",
@@ -220,8 +220,8 @@
           "type": "importer",
           "id": 15,
           "typeString": "[,[vv,vv](swap)]",
-          "x": 16.309593200683594,
-          "y": 433.89999771118164,
+          "x": 12.463706970214844,
+          "y": 497.9589500427246,
           "name": "",
           "hideLinks": false,
           "inner": {
@@ -238,8 +238,8 @@
           "type": "importer",
           "id": 17,
           "typeString": "[,[vv,vv](setP)]",
-          "x": 14.503135681152344,
-          "y": 186.5021858215332,
+          "x": 13.302879333496094,
+          "y": 673.014965057373,
           "name": "",
           "hideLinks": false,
           "inner": {
@@ -256,15 +256,15 @@
           "type": "output",
           "id": 19,
           "typeString": "[v,]",
-          "x": 652.995719909668,
-          "y": 83.3379020690918
+          "x": 651.7954635620117,
+          "y": 569.8506813049316
         },
         {
           "type": "functionchart",
           "id": 20,
           "typeString": "[,[v(lo)v(hi),vv](advToSwap)]",
-          "x": 85.57358932495117,
-          "y": 478.1861505508423,
+          "x": 66.35844039916992,
+          "y": 13.779191017150879,
           "width": 371.1843452453613,
           "height": 333.61725521087646,
           "name": "advToSwap",
@@ -319,7 +319,7 @@
             },
             {
               "type": "functionchart",
-              "id": 31,
+              "id": 27,
               "typeString": "[,[v,v]]",
               "x": 87.86361408233643,
               "y": 210.51721858978271,
@@ -331,7 +331,7 @@
               "nodes": [
                 {
                   "type": "instance",
-                  "id": 32,
+                  "id": 28,
                   "typeString": "[vv,v](>)",
                   "x": 8,
                   "y": 8,
@@ -343,7 +343,7 @@
             },
             {
               "type": "functionchart",
-              "id": 33,
+              "id": 29,
               "typeString": "[,[v,v]]",
               "x": 84.33028888702393,
               "y": 70.74794673919678,
@@ -355,7 +355,7 @@
               "nodes": [
                 {
                   "type": "instance",
-                  "id": 34,
+                  "id": 30,
                   "typeString": "[vv,v](<)",
                   "x": 8,
                   "y": 8,
@@ -367,7 +367,7 @@
             },
             {
               "type": "exporter",
-              "id": 79,
+              "id": 31,
               "typeString": "[,[v,v](+1)]",
               "x": 117.7059326171875,
               "y": 21.605133056640625,
@@ -375,7 +375,7 @@
               "hideLinks": false,
               "inner": {
                 "type": "instance",
-                "id": 28,
+                "id": 32,
                 "typeString": "[v,v](+1)",
                 "x": 8,
                 "y": 4,
@@ -385,7 +385,7 @@
             },
             {
               "type": "exporter",
-              "id": 80,
+              "id": 33,
               "typeString": "[,[v,v](-1)]",
               "x": 123.59732055664062,
               "y": 161.55538940429688,
@@ -393,7 +393,7 @@
               "hideLinks": false,
               "inner": {
                 "type": "instance",
-                "id": 30,
+                "id": 34,
                 "typeString": "[v,v](-1)",
                 "x": 8,
                 "y": 4,
@@ -433,14 +433,14 @@
             },
             {
               "type": "wire",
-              "src": 33,
+              "src": 29,
               "srcPin": 0,
               "dst": 21,
               "dstPin": 1
             },
             {
               "type": "wire",
-              "src": 31,
+              "src": 27,
               "srcPin": 0,
               "dst": 22,
               "dstPin": 1
@@ -449,26 +449,26 @@
               "type": "wire",
               "src": 26,
               "srcPin": 0,
-              "dst": 34,
+              "dst": 30,
               "dstPin": 1
             },
             {
               "type": "wire",
               "src": 26,
               "srcPin": 0,
-              "dst": 32,
+              "dst": 28,
               "dstPin": 1
             },
             {
               "type": "wire",
-              "src": 79,
+              "src": 31,
               "srcPin": 0,
               "dst": 21,
               "dstPin": 0
             },
             {
               "type": "wire",
-              "src": 80,
+              "src": 33,
               "srcPin": 0,
               "dst": 22,
               "dstPin": 0
@@ -479,8 +479,8 @@
           "type": "functionchart",
           "id": 35,
           "typeString": "[,[v(lo)v(hi),v](quicksort)]",
-          "x": 82.35150146484375,
-          "y": 60.490570068359375,
+          "x": 81.1512451171875,
+          "y": 547.0033493041992,
           "width": 556.7289352416992,
           "height": 219.00618743896484,
           "name": "quicksort",
@@ -762,15 +762,15 @@
           "type": "output",
           "id": 50,
           "typeString": "[v,]",
-          "x": 731.4750699996948,
-          "y": 330.66851806640625
+          "x": 727.6291837692261,
+          "y": 394.7274703979492
         },
         {
           "type": "importer",
           "id": 51,
           "typeString": "[,[vv,v](>)]",
-          "x": 31.382591247558594,
-          "y": 691.5463457107544,
+          "x": 12.167442321777344,
+          "y": 227.139386177063,
           "name": "",
           "hideLinks": false,
           "inner": {
@@ -787,8 +787,8 @@
           "type": "importer",
           "id": 53,
           "typeString": "[,[vv,v](<)]",
-          "x": 32.295204162597656,
-          "y": 552.8815507888794,
+          "x": 13.080055236816406,
+          "y": 88.47459125518799,
           "name": "",
           "hideLinks": false,
           "inner": {

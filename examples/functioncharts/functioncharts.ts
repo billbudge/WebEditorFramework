@@ -3805,6 +3805,7 @@ export class FunctionchartEditor implements CanvasLayer {
       self.updateBounds();
     }
     function advance() {  // TODO we should be able to setPropertyGrid after undo/redo.
+      self.updateBounds();
       self.setPropertyGrid();
     }
     context.addTransactionHandler('transactionEnding', advance);
@@ -4622,10 +4623,13 @@ export class FunctionchartEditor implements CanvasLayer {
               const center = this.canvasController.getViewCenter();
               element.x = center.x;
               element.y = center.y;
+              this.renderer.begin(this.canvasController.getCtx());
+              this.renderer.layoutElement(element);
+              this.renderer.end();
               context.beginTransaction('import functionchart');
               context.addItem(element, functionchart);
-              context.endTransaction();
               context.select(element);
+              context.endTransaction();
               self.canvasController.draw();
             });
           } else {
