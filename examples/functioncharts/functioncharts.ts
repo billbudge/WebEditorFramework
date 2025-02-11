@@ -4545,6 +4545,7 @@ export class FunctionchartEditor implements CanvasLayer {
         }
         case 86: { // 'v'
           if (this.scrap.length > 0) {
+            // TODO paste at canvas controller center.
             context.paste(this.scrap);
             this.updateBounds();
             return true;
@@ -4615,15 +4616,16 @@ export class FunctionchartEditor implements CanvasLayer {
               const imported = self.newContext(result);
               const type = imported.getExportType(imported.root);
 
-              context.beginTransaction('import element');
               const element = context.newElement('element');
               element.name = 'external';
               element.typeString = type.typeString;
-              const clientRect = this.canvasController.getClientRect();
-              element.x = clientRect.x + 256;
-              element.y = -clientRect.y + 256;
+              const center = this.canvasController.getViewCenter();
+              element.x = center.x;
+              element.y = center.y;
+              context.beginTransaction('import functionchart');
               context.addItem(element, functionchart);
               context.endTransaction();
+              context.select(element);
               self.canvasController.draw();
             });
           } else {

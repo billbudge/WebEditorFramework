@@ -3969,13 +3969,13 @@ export class FunctionchartEditor {
                         this.fileController.openFile().then(result => {
                             const imported = self.newContext(result);
                             const type = imported.getExportType(imported.root);
-                            context.beginTransaction('import element');
                             const element = context.newElement('element');
                             element.name = 'external';
                             element.typeString = type.typeString;
-                            const clientRect = this.canvasController.getClientRect();
-                            element.x = clientRect.x + 256;
-                            element.y = -clientRect.y + 256;
+                            const center = this.canvasController.getViewCenter();
+                            element.x = center.x;
+                            element.y = center.y;
+                            context.beginTransaction('import functionchart');
                             context.addItem(element, functionchart);
                             context.endTransaction();
                             self.canvasController.draw();

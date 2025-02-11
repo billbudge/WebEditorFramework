@@ -455,8 +455,9 @@ export class CanvasController {
     viewToCanvas(p) {
         return geometry.matMulPt(p, this.inverseTransform);
     }
-    canvasToView(p) {
-        return geometry.matMulPt(p, this.transform);
+    getViewCenter() {
+        const clientRect = this.getClientRect(), width = window.innerWidth, height = window.innerHeight;
+        return { x: -clientRect.x + width / 2, y: -clientRect.y + height / 2 };
     }
     offsetToOtherCanvas(canvasController) {
         const rect = this.getClientRect(), otherRect = canvasController.getClientRect();
