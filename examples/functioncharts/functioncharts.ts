@@ -3015,22 +3015,37 @@ class Renderer implements ILayoutEngine {
       case RenderMode.Print: {
         ctx.fillStyle = mode === RenderMode.Palette ? theme.altBgColor : theme.bgColor;
         ctx.strokeStyle = theme.strokeColor;
-        switch (element.template.typeName) {
-          case 'input': {
-            inFlagPath(x, y, w, h, d, ctx);
-            break;
+        if (element.template.typeName !== 'use') {
+          switch (element.template.typeName) {
+            case 'input': {
+              inFlagPath(x, y, w, h, d, ctx);
+              break;
+            }
+            case 'output': {
+              outFlagPath(x, y, w, h, d, ctx);
+              break;
+            }
           }
-          case 'output': {
-            outFlagPath(x, y, w, h, d, ctx);
-            break;
-          }
-          case 'use' : {
-            roundRectPath(x, y, w, h, 2 * r, ctx);
-          }
+          ctx.fill();
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        } else {
+          const spacing = theme.spacing,
+                cx = x + w / 2,
+                cy = y + spacing;
+          ctx.beginPath();
+          // ctx.moveTo(cx - spacing / 2, cy);
+          // ctx.lineTo(cx + spacing / 2, cy);
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(cx, cy + h - 2 * spacing);
+          element.type.outputs.forEach(pin => {
+            ctx.moveTo(cx, y + pin.y + spacing / 2);
+            ctx.lineTo(cx + spacing / 2, y + pin.y + spacing / 2);
+          });
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.lineWidth = 0.5;
         }
-        ctx.fill();
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
         this.drawType(element.type, x, y);
         break;
       }
