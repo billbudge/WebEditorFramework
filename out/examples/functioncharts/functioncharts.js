@@ -2435,7 +2435,7 @@ class Renderer {
         }
     }
     drawFunctionInstanceLink(instance, color) {
-        const ctx = this.ctx, theme = this.theme, offset = theme.spacing / 2, rect = this.getBounds(instance), x = rect.x, y = rect.y, w = rect.width, h = rect.height, p1 = this.outputPinToPoint(instance.src, instance.srcPin), p2 = { x, y: y + h / 2, nx: -1, ny: 0 };
+        const ctx = this.ctx, theme = this.theme, offset = theme.spacing / 2, rect = this.getBounds(instance), x = rect.x, y = rect.y, w = rect.width, h = rect.height, p1 = this.outputPinToPoint(instance.src, instance.srcPin), p2 = { x, y: y + h - 1, nx: -1, ny: 0 }; // 2 = linewidth
         ctx.strokeStyle = color;
         p1.x += offset;
         p2.x -= offset;
