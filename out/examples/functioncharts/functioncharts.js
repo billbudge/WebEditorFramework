@@ -2556,13 +2556,12 @@ class Renderer {
                 else {
                     const spacing = theme.spacing, cx = x + w / 2, cy = y + spacing;
                     ctx.beginPath();
-                    // ctx.moveTo(cx - spacing / 2, cy);
-                    // ctx.lineTo(cx + spacing / 2, cy);
                     ctx.moveTo(cx, cy);
                     ctx.lineTo(cx, cy + h - 2 * spacing);
                     element.type.outputs.forEach(pin => {
-                        ctx.moveTo(cx, y + pin.y + spacing / 2);
-                        ctx.lineTo(cx + spacing / 2, y + pin.y + spacing / 2);
+                        const py = y + pin.y + spacing / 2;
+                        ctx.moveTo(cx, py);
+                        ctx.lineTo(cx + spacing / 2, py);
                     });
                     ctx.lineWidth = 1.5;
                     ctx.stroke();

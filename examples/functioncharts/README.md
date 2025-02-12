@@ -69,15 +69,17 @@ Similarly we can define other useful functions. In this Functionchart, the funct
 
 ## Implicit and Explicit Functioncharts
 
-For very simple functions, we can specify that any open input and output pins will become inputs and outputs on the new function defined by the functionchart. Below, function 'a' is an implicit chained conditional operator, like we used for the signum function. The cond functions are arranged so that the inputs of the topmost one come before (y-order) the inputs of the second. The single disconnected output becomes the composed function's output.
+For very simple functions, we can specify that any open input and output pins will become inputs and outputs on the new function defined by the functionchart. Below, function 'a' is an explicit chained conditional operator. The input and output pseudofunctions are arranged so that the inputs of the topmost one come before (y-order) the inputs of the second. The single  output becomes the composed function's output.
 
-If we set the 'implicit' property of the functionchart to 'false', then our composed function now has no inputs or outputs ('b'). In this case we need to explicitly add pseudofunctions to specify inputs and outputs. In 'c' we add the pseudofunctions, placing them so that they appear in the correct order (y-order). In 'd' we need a pseudo-function to specify that the same input goes to both cond functions. In general, explicit functioncharts give more control over naming, ordering, and routing inputs, but for simple functions they can contribute to clutter. In these cases, implicit is preferable.
+If we set the 'implicit' property of the functionchart to 'false' and leave the 'cond' functions disconnected, then our composed function now has no inputs or outputs ('b'). In 'c' we set 'implicit' to true. The 'cond' functions are placed so that the pins are in the correct order. In 'd' we create a slightly different parallel 'cond', with two outputs, and each case has two inputs. We need a pseudo-function to specify that the same value goes to both 'cond' functions selector input. In general, explicit functioncharts give more control over naming, ordering, and routing inputs, but for simple functions they can contribute to clutter. In these cases, implicit is preferable.
 
-In the diagram of simple functions above, all of the functioncharts are implicit, except where input pseudofunctions are needed to route the input to multiple functions.
+In the diagram of simple functions at the beginning, all of the functioncharts are implicit, except where input pseudofunctions are needed to route the input to multiple functions.
+
+There is one case where 'implicit' isn't allowed - recursive functioncharts. We'll see those next.
 
 <figure align="center">
   <img src="./resources/implicit_explicit.svg"  alt="" title="Implicit and explicit functioncharts.">
-  <figcaption align="center">Implicit cascaded cond (a), explicit empty function (b), explicit cascaded cond (c), (d) implicit parallel cond (d).</figcaption>
+  <figcaption align="center">Explicit cascaded cond (a), explicit empty function (b), implicit cascaded cond (c), (d) implicit parallel cond (d).</figcaption>
 </figure>
 
 ## Recursion and Iteration
@@ -127,9 +129,11 @@ We can also use the reduce function to sum the elements of an Array, if we are g
   <figcaption align="center">Reusing the 'reduce' function to sum an Array.</figcaption>
 </figure>
 
-## Modifier Functions
+## Modifiers
 
-Modifier functions extend the notation for things that are difficult or impossible to represent without them. Above we saw the 'importer' and 'exporter' modifiers, which convert a function F into a function that outputs 'F'. These are interpreted differently in functioncharts. Importers become explicit inputs in a functionchart. Exporters are implicit outputs.
+Modifier functions extend the functionchart notation for things that are cumbersome or impossible to represent without them. For example, how do we convert a function into an output that can be connected to an input? Similarly, how do we import a function as an input?
+
+Above we saw the 'importer' and 'exporter' modifiers, which convert a function F into a function that outputs 'F'. These are interpreted differently in functioncharts. Importers become explicit inputs in a functionchart. Exporters are implicit outputs.
 
 <figure align="center">
   <img src="./resources/modifiers.svg"  alt="" title="Modifiers and how they interact.">
