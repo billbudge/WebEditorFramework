@@ -262,7 +262,7 @@ export function visitType(type, visitor) {
 }
 //------------------------------------------------------------------------------
 // Properties and templates for the raw data interface for cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x', 0), yProp = new ScalarProp('y', 0), nameProp = new ScalarProp('name', ''), typeStringProp = new ScalarProp('typeString', Type.emptyTypeString), widthProp = new ScalarProp('width', 0), heightProp = new ScalarProp('height', 0), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin', 0), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin', 0), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner'), implicitProp = new ScalarProp('implicit', false), hideLinksProp = new ScalarProp('hideLinks', false), commentProp = new ScalarProp('comment');
+const idProp = new IdProp('id'), xProp = new ScalarProp('x', 0), yProp = new ScalarProp('y', 0), nameProp = new ScalarProp('name', ''), typeStringProp = new ScalarProp('typeString', Type.emptyTypeString), defaultValueProp = new ScalarProp('defaultValue'), widthProp = new ScalarProp('width', 0), heightProp = new ScalarProp('height', 0), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin', 0), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin', 0), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner'), implicitProp = new ScalarProp('implicit', false), hideLinksProp = new ScalarProp('hideLinks', false), commentProp = new ScalarProp('comment');
 class NodeTemplate {
     constructor() {
         this.id = idProp;
@@ -303,7 +303,8 @@ class FunctionInstanceTemplate extends ElementTemplate {
 class PseudoelementTemplate extends NodeTemplate {
     constructor(typeName) {
         super();
-        this.properties = [this.id, this.typeString, this.x, this.y, this.comment];
+        this.defaultValue = defaultValueProp;
+        this.properties = [this.id, this.typeString, this.x, this.y, this.defaultValue, this.comment];
         this.typeName = typeName;
     }
 }
@@ -364,7 +365,6 @@ class NodeBase {
         }
     }
     get isAbstract() { return false; }
-    get isInstancer() { return false; }
     asInstance() {
         if (this instanceof FunctionInstance)
             return this;
@@ -399,14 +399,32 @@ export class Element extends NodeBase {
     set name(value) { this.template.name.set(this, value); }
     get hideLinks() { return this.template.hideLinks.get(this); }
     set hideLinks(value) { this.template.hideLinks.set(this, value); }
+    get isLiteral() {
+        return this.name === 'literal';
+    }
+    get isUnop() {
+        return this.name === 'unop';
+    }
+    get isBinop() {
+        return this.name === 'binop';
+    }
+    get isCond() {
+        return this.name === 'cond';
+    }
+    get isLet() {
+        return this.name === 'let';
+    }
+    get isThis() {
+        return this.name === 'this';
+    }
+    get isExternal() {
+        return this.name === 'external';
+    }
     get isAbstract() {
         return this.name === 'abstract';
     }
     get hasSideEffects() {
         return false;
-    }
-    get isInstancer() {
-        return !this.isExporter;
     }
     get isImporter() {
         return this.template.typeName === 'importer';
@@ -423,10 +441,10 @@ export class Element extends NodeBase {
     get isDownCast() {
         return this.template.typeName === 'downCast';
     }
-    get isInstanced() {
-        return this instanceof FunctionInstance ||
-            this instanceof ModifierElement && this.innerElement instanceof FunctionInstance;
-    }
+    // get isInstanced(): boolean {
+    //   return this instanceof FunctionInstance ||
+    //          this instanceof ModifierElement && this.innerElement instanceof FunctionInstance;
+    // }
     constructor(template, context, id) {
         super(template, context, id);
     }
@@ -454,7 +472,7 @@ export class ModifierElement extends Element {
             else if (this.isConstructor) {
                 modifierType = innerType.toConstructorType();
             }
-            else {
+            else { // isImporter || isExporter
                 modifierType = innerType.toImportExportType();
             }
             this.typeString = modifierType.typeString;
@@ -481,7 +499,6 @@ export class FunctionInstance extends Element {
         }
         return src instanceof Functionchart && src.hasSideEffects;
     }
-    get isInstancer() { return true; }
     getSrcType() {
         return this.src.type.outputs[this.srcPin].type;
     }
@@ -490,6 +507,8 @@ export class FunctionInstance extends Element {
     }
 }
 export class Pseudoelement extends NodeBase {
+    get defaultValue() { return this.template.defaultValue.get(this); }
+    set defaultValue(value) { this.template.defaultValue.set(this, value); }
     // Derived properties.
     // index: number = -1;
     constructor(context, template, id) {
@@ -563,7 +582,6 @@ export class Functionchart extends NodeBase {
     // Derived properties.
     get isAbstract() { return this.typeInfo.abstract; }
     get hasSideEffects() { return this.typeInfo.sideEffects; }
-    get isInstancer() { return true; }
     get isClosed() { return this.typeInfo.closed; }
     constructor(context, template, id) {
         super(template, context, id);
@@ -1272,12 +1290,10 @@ export class FunctionchartContext extends EventBase {
             if (outputs[i].length !== 0)
                 return false;
         }
-        if (node instanceof Element && node.isInstancer) {
-            const instances = node.instances;
-            for (let i = 0; i < nOutputs; i++) {
-                if (instances[i].length !== 0)
-                    return false;
-            }
+        const instances = node.instances;
+        for (let i = 0; i < nOutputs; i++) {
+            if (instances[i].length !== 0)
+                return false;
         }
         return true;
     }
@@ -3035,6 +3051,13 @@ export class FunctionchartEditor {
                 prop: typeStringProp,
             },
             {
+                label: 'defaultValue',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: defaultValueProp,
+            },
+            {
                 label: 'comment',
                 type: 'text',
                 getter: getter,
@@ -3800,7 +3823,7 @@ export class FunctionchartEditor {
             else if (dst === undefined) {
                 const p = wire.pDst, pin = src.type.outputs[wire.srcPin];
                 let output;
-                if (src.isInstancer && pin.type !== Type.valueType) {
+                if (src instanceof Element && !src.isExporter && pin.type !== Type.valueType) {
                     output = context.newInstanceForWire(wire, parent, p);
                     if (hitInfo instanceof ElementHitResult && hitInfo.input < 0) {
                         context.dropNodeOnElement(output, hitInfo.item);

@@ -325,6 +325,7 @@ const idProp = new IdProp('id'),
       yProp = new ScalarProp('y', 0),
       nameProp = new ScalarProp('name', ''),
       typeStringProp = new ScalarProp('typeString', Type.emptyTypeString),
+      defaultValueProp = new ScalarProp('defaultValue'),
       widthProp = new ScalarProp('width', 0),
       heightProp = new ScalarProp('height', 0),
       srcProp = new ReferenceProp('src'),
@@ -386,7 +387,8 @@ export type PseudoelementType = 'input' | 'output' | 'use';
 
 class PseudoelementTemplate extends NodeTemplate {
   readonly typeName: PseudoelementType;
-  readonly properties = [this.id, this.typeString, this.x, this.y, this.comment];
+  readonly defaultValue = defaultValueProp;
+  readonly properties = [this.id, this.typeString, this.x, this.y, this.defaultValue, this.comment];
   constructor(typeName: PseudoelementType) {
     super();
     this.typeName = typeName;
@@ -481,7 +483,6 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
   instances = new Array<Array<FunctionInstance>>();  // each output pin potentially has multiple instances.
 
   get isAbstract() : boolean { return false; }
-  get isInstancer(): boolean { return false; }
 
   asInstance() : FunctionInstance | undefined {
     if (this instanceof FunctionInstance)
@@ -522,14 +523,32 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
   get hideLinks() { return this.template.hideLinks.get(this); }
   set hideLinks(value: string) { this.template.hideLinks.set(this, value); }
 
+  get isLiteral() : boolean {
+    return this.name === 'literal';
+  }
+  get isUnop() : boolean {
+    return this.name === 'unop';
+  }
+  get isBinop() : boolean {
+    return this.name === 'binop';
+  }
+  get isCond() : boolean {
+    return this.name === 'cond';
+  }
+  get isLet() : boolean {
+    return this.name === 'let';
+  }
+  get isThis() : boolean {
+    return this.name === 'this';
+  }
+  get isExternal() : boolean {
+    return this.name === 'external';
+  }
   get isAbstract() : boolean {
     return this.name === 'abstract';
   }
   get hasSideEffects() : boolean {
     return false;
-  }
-  get isInstancer() : boolean {
-    return !this.isExporter;
   }
   get isImporter() : boolean {
     return this.template.typeName === 'importer';
@@ -546,10 +565,10 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
   get isDownCast() {
     return this.template.typeName === 'downCast';
   }
-  get isInstanced(): boolean {
-    return this instanceof FunctionInstance ||
-           this instanceof ModifierElement && this.innerElement instanceof FunctionInstance;
-  }
+  // get isInstanced(): boolean {
+  //   return this instanceof FunctionInstance ||
+  //          this instanceof ModifierElement && this.innerElement instanceof FunctionInstance;
+  // }
 
   constructor(template: T, context: FunctionchartContext, id: number) {
     super(template, context,  id);
@@ -557,8 +576,8 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
 }
 
 export class ModifierElement extends Element<ModifierElementTemplate> {
-  get innerElement() { return this.template.innerElement.get(this).get(0) as ElementTypes | undefined; }
-  set innerElement(value: ElementTypes | undefined) { this.template.innerElement.get(this).set(0, value); }
+  get innerElement() { return this.template.innerElement.get(this).get(0) as Element | undefined; }
+  set innerElement(value: Element | undefined) { this.template.innerElement.get(this).set(0, value); }
 
   // Derived properties.
   get innerType() : Type { return this.innerElement?.type || Type.emptyType; }
@@ -578,7 +597,7 @@ export class ModifierElement extends Element<ModifierElementTemplate> {
         modifierType = innerType.toDownCastType();
       } else if (this.isConstructor) {
         modifierType = innerType.toConstructorType();
-      } else {
+      } else {  // isImporter || isExporter
         modifierType = innerType.toImportExportType();
       }
       this.typeString = modifierType.typeString;
@@ -608,7 +627,6 @@ export class FunctionInstance extends Element<FunctionInstanceTemplate>  {
     }
     return src instanceof Functionchart && src.hasSideEffects;
   }
-  get isInstancer() : boolean { return true; }
 
   getSrcType() : Type {
     return this.src.type.outputs[this.srcPin].type;
@@ -620,6 +638,9 @@ export class FunctionInstance extends Element<FunctionInstanceTemplate>  {
 }
 
 export class Pseudoelement extends NodeBase<PseudoelementTemplate> {
+  get defaultValue() { return this.template.defaultValue.get(this); }
+  set defaultValue(value: string) { this.template.defaultValue.set(this, value); }
+
   // Derived properties.
   // index: number = -1;
 
@@ -729,7 +750,6 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> {
   // Derived properties.
   get isAbstract() : boolean { return this.typeInfo.abstract; }
   get hasSideEffects() : boolean { return this.typeInfo.sideEffects; }
-  get isInstancer() : boolean { return true; }
   get isClosed() { return this.typeInfo.closed; }
 
   typeInfo = emptyTypeInfo;
@@ -1560,14 +1580,12 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       if (outputs[i].length !== 0)
         return false;
     }
-    if (node instanceof Element && node.isInstancer) {
-      const instances = node.instances;
-      for (let i = 0; i < nOutputs; i++) {
-        if (instances[i].length !== 0)
-          return false;
-      }
+    const instances = node.instances;
+    for (let i = 0; i < nOutputs; i++) {
+      if (instances[i].length !== 0)
+        return false;
     }
-    return true;
+  return true;
   }
 
   isValidFunctionInstance(instance: FunctionInstance) : boolean {
@@ -3605,6 +3623,13 @@ export class FunctionchartEditor implements CanvasLayer {
         prop: typeStringProp,
       },
       {
+        label: 'defaultValue',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+        prop: defaultValueProp,
+      },
+      {
         label: 'comment',
         type: 'text',
         getter: getter,
@@ -4440,7 +4465,7 @@ export class FunctionchartEditor implements CanvasLayer {
         const p = wire.pDst!,
               pin = src.type.outputs[wire.srcPin];
         let output: ElementTypes;
-        if (src.isInstancer && pin.type !== Type.valueType) {
+        if (src instanceof Element && !src.isExporter && pin.type !== Type.valueType) {
           output = context.newInstanceForWire(wire, parent, p);
           if (hitInfo instanceof ElementHitResult && hitInfo.input < 0) {
             context.dropNodeOnElement(output, hitInfo.item);
