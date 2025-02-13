@@ -89,7 +89,7 @@ export function hitTestBezier(p1, p2, p3, p4, p, tolerance) {
     const beziers = new Queue();
     beziers.enqueue([p1, p2, p3, p4, 0, 1]);
     let dMin = Number.MAX_VALUE, closestX = 0, closestY = 0, tMin = 0;
-    while (beziers.length() > 0) {
+    while (beziers.length > 0) {
         const [b0, b1, b2, b3, t0, t1] = beziers.dequeue();
         // Get control point distances from the segment defined by the curve endpoints.
         const d1 = pointToLineDist(b0, b3, b1), d2 = pointToLineDist(b0, b3, b2), curvature = Math.max(d1, d2);

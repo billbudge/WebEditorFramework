@@ -139,8 +139,8 @@ describe('LinkedList', () => {
 describe('Queue', () => {
   test('constructor', () => {
     const queue = new Queue();
-    expect(queue.length()).toBe(0);
-    expect(queue.empty());
+    expect(queue.length).toBe(0);
+    expect(queue.empty);
     expect(queue.dequeue()).toBeUndefined();
   });
   test('enqueue and dequeue', () => {
@@ -148,17 +148,17 @@ describe('Queue', () => {
     expect(queue.enqueue(1)).toBe(queue);
     expect(queue.enqueue(2)).toBe(queue);
     expect(queue.enqueue(3)).toBe(queue);
-    expect(queue.length()).toBe(3);
+    expect(queue.length).toBe(3);
     expect(queue.dequeue()).toBe(1);
-    expect(queue.length()).toBe(2);
+    expect(queue.length).toBe(2);
     expect(queue.enqueue(4)).toBe(queue);
-    expect(queue.length()).toBe(3);
+    expect(queue.length).toBe(3);
     expect(queue.dequeue()).toBe(2);
-    expect(queue.length()).toBe(2);
+    expect(queue.length).toBe(2);
     expect(queue.dequeue()).toBe(3);
-    expect(queue.length()).toBe(1);
+    expect(queue.length).toBe(1);
     expect(queue.dequeue()).toBe(4);
-    expect(queue.length()).toBe(0);
+    expect(queue.length).toBe(0);
   });
   test('clear', () => {
     const queue = new Queue();
@@ -166,8 +166,8 @@ describe('Queue', () => {
     queue.enqueue(2);
     queue.enqueue(3);
     queue.clear();
-    expect(queue.length()).toBe(0);
-    expect(queue.empty());
+    expect(queue.length).toBe(0);
+    expect(queue.empty);
     expect(queue.dequeue()).toBeUndefined();
   });
 });
@@ -242,7 +242,7 @@ describe('SelectionSet', () => {
   });
   test('add', () => {
     const selectionSet = new SelectionSet();
-    selectionSet.add('a');
+    expect(selectionSet.add('a')).toBe(false);
     expect(selectionSet.has('a')).toBe(true);
     selectionSet.add('b');
     expect(selectionSet.has('a')).toBe(true);
@@ -251,7 +251,7 @@ describe('SelectionSet', () => {
     expect(selectionSet.empty()).toBe(false);
     expect(selectionSet.lastSelected).toBe('b');
     expect(stringify(selectionSet)).toBe('ba')
-    selectionSet.add('a');
+    expect(selectionSet.add('a')).toBe(true);
     expect(selectionSet.length).toBe(2);
     expect(selectionSet.lastSelected).toBe('a');
     expect(stringify(selectionSet)).toBe('ab')

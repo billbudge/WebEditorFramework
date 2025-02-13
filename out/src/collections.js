@@ -56,7 +56,7 @@ export class LinkedList {
     }
     insertAfter(value, prev) {
         const node = (value instanceof LinkedListNode) ? value : new LinkedListNode(value);
-        if (typeof prev === 'undefined')
+        if (prev === undefined)
             prev = this.back_;
         const next = prev ? prev.next : undefined;
         this.insert_(node, prev, next);
@@ -64,7 +64,7 @@ export class LinkedList {
     }
     insertBefore(value, next) {
         const node = (value instanceof LinkedListNode) ? value : new LinkedListNode(value);
-        if (typeof next === 'undefined')
+        if (next === undefined)
             next = this.front_;
         const prev = next ? next.prev : undefined;
         this.insert_(node, prev, next);
@@ -122,10 +122,10 @@ export class Queue {
         this.head = 0;
         this.sliceMin = sliceMin;
     }
-    empty() {
-        return this.array.length - this.head === 0;
+    get empty() {
+        return this.length === 0;
     }
-    length() {
+    get length() {
         return this.array.length - this.head;
     }
     enqueue(item) {
@@ -135,7 +135,7 @@ export class Queue {
     }
     dequeue() {
         let result = undefined;
-        if (!this.empty()) {
+        if (!this.empty) {
             result = this.array[this.head];
             this.head++;
             this.trySlice();

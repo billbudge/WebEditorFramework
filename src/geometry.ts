@@ -173,7 +173,7 @@ export function hitTestBezier(
   beziers.enqueue([p1, p2, p3, p4, 0, 1]);
   let dMin: number = Number.MAX_VALUE,
       closestX: number = 0, closestY: number = 0, tMin: number = 0;
-  while (beziers.length() > 0) {
+  while (beziers.length > 0) {
     const [b0, b1, b2, b3, t0, t1] = beziers.dequeue() as CurveSegment;
     // Get control point distances from the segment defined by the curve endpoints.
     const d1: number = pointToLineDist(b0, b3, b1),

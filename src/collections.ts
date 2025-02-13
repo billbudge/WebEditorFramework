@@ -150,30 +150,30 @@ export class Queue<T> {
     this.sliceMin = sliceMin;
   }
 
-  empty() {
-    return this.array.length - this.head === 0;
+  get empty() {
+    return this.length === 0;
   }
-  length() : number {
+  get length() : number {
     return this.array.length - this.head;
   }
 
   enqueue(item: T) : Queue<T> {
     this.array.push(item);
-    this.trySlice();
+    this.tryReallocate();
     return this;
   }
 
   dequeue() : T | undefined {
     let result = undefined;
-    if (!this.empty()) {
+    if (!this.empty) {
       result = this.array[this.head];
       this.head++;
-      this.trySlice();
+      this.tryReallocate();
     }
     return result;
   }
 
-  private trySlice() {
+  private tryReallocate() {
     // Slice the array if there is enough empty space at the front.
     if (this.head > this.sliceMin) {
       this.array = this.array.slice(this.head);
@@ -193,7 +193,6 @@ export class Queue<T> {
 // adding an element already in the set makes it the most recently added.
 
 export class SelectionSet<T> {
-  constructor() {}
   private list: LinkedList<T> = new LinkedList<T>();
   private map: Map<T, LinkedListNode<T>> = new Map<T, LinkedListNode<T>>();
   private length_: number = 0;
@@ -220,12 +219,13 @@ export class SelectionSet<T> {
     if (node) {
       this.list.remove(node);
       this.list.pushFront(node);
+      return true;
     } else {
       node = this.list.pushFront(element);
       this.map.set(element, node);
       this.length_ += 1;
+      return false;
     }
-    return true;
   }
 
   delete(element: T) : boolean {
