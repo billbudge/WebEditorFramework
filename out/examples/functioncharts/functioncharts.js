@@ -1855,6 +1855,14 @@ export class FunctionchartContext extends EventBase {
                 outputs.push(new Pin(node.instanceType));
             }
         });
+        outputs.sort((a, b) => {
+            const aType = a.type, bType = b.type, aName = aType.name || '', bName = bType.name || '';
+            // Sort by name, then by fewest number of pins.
+            let result = aName.localeCompare(bName);
+            if (result !== 0)
+                return result;
+            return (bType.inputs.length + bType.outputs.length) - (aType.inputs.length + aType.outputs.length);
+        });
         return Type.fromInfo([], outputs);
     }
     group(items, grandparent, bounds) {

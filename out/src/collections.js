@@ -130,7 +130,7 @@ export class Queue {
     }
     enqueue(item) {
         this.array.push(item);
-        this.trySlice();
+        this.tryReallocate();
         return this;
     }
     dequeue() {
@@ -138,11 +138,11 @@ export class Queue {
         if (!this.empty) {
             result = this.array[this.head];
             this.head++;
-            this.trySlice();
+            this.tryReallocate();
         }
         return result;
     }
-    trySlice() {
+    tryReallocate() {
         // Slice the array if there is enough empty space at the front.
         if (this.head > this.sliceMin) {
             this.array = this.array.slice(this.head);
@@ -181,13 +181,14 @@ export class SelectionSet {
         if (node) {
             this.list.remove(node);
             this.list.pushFront(node);
+            return true;
         }
         else {
             node = this.list.pushFront(element);
             this.map.set(element, node);
             this.length_ += 1;
+            return false;
         }
-        return true;
     }
     delete(element) {
         const node = this.map.get(element);

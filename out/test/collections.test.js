@@ -217,7 +217,7 @@ describe('SelectionSet', () => {
     });
     test('add', () => {
         const selectionSet = new SelectionSet();
-        selectionSet.add('a');
+        expect(selectionSet.add('a')).toBe(false);
         expect(selectionSet.has('a')).toBe(true);
         selectionSet.add('b');
         expect(selectionSet.has('a')).toBe(true);
@@ -226,7 +226,7 @@ describe('SelectionSet', () => {
         expect(selectionSet.empty()).toBe(false);
         expect(selectionSet.lastSelected).toBe('b');
         expect(stringify(selectionSet)).toBe('ba');
-        selectionSet.add('a');
+        expect(selectionSet.add('a')).toBe(true);
         expect(selectionSet.length).toBe(2);
         expect(selectionSet.lastSelected).toBe('a');
         expect(stringify(selectionSet)).toBe('ab');
