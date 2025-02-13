@@ -22,10 +22,10 @@ export class LinkedList {
         return this.length_;
     }
     front() {
-        return this.front_ === undefined ? undefined : this.front_;
+        return this.front_;
     }
     back() {
-        return this.back_ === undefined ? undefined : this.back_;
+        return this.back_;
     }
     pushBack(value) {
         return this.insertAfter(value);

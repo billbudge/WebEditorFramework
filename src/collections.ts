@@ -30,10 +30,10 @@ export class LinkedList<T> {
     return this.length_;
   }
   front() : LinkedListNode<T> | undefined {
-    return this.front_ === undefined ? undefined : this.front_;
+    return this.front_;
   }
   back() : LinkedListNode<T> | undefined {
-    return this.back_ === undefined ? undefined : this.back_;
+    return this.back_;
   }
 
   pushBack(value: T | LinkedListNode<T>) : LinkedListNode<T> {
@@ -71,7 +71,7 @@ export class LinkedList<T> {
 
   insertAfter(value: T | LinkedListNode<T>, prev?: LinkedListNode<T>) : LinkedListNode<T> {
     const node = (value instanceof LinkedListNode) ? value : new LinkedListNode(value);
-    if (typeof prev === 'undefined')
+    if (prev === undefined)
       prev = this.back_;
     const next = prev ? prev.next : undefined;
     this.insert_(node, prev, next);
@@ -80,7 +80,7 @@ export class LinkedList<T> {
 
   insertBefore(value: T | LinkedListNode<T>, next?: LinkedListNode<T>) : LinkedListNode<T> {
     const node = (value instanceof LinkedListNode) ? value : new LinkedListNode(value);
-    if (typeof next === 'undefined')
+    if (next === undefined)
       next = this.front_;
     const prev = next ? next.prev : undefined;
     this.insert_(node, prev, next);
