@@ -1,22 +1,22 @@
 # Functioncharts: A Graphical Programming Language
 Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. This repository contains the source code for a Web application that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs (but that would be a good project!) The emphasis here is on the design of the language. The web application is currently just a very specialized diagram editor.
 
-Functioncharts are inspired by [Statecharts](../statecharts/README.md). "Flowcharts" would have been a great name for these, but that name is taken. (Edit: The Functionchart name is also taken, I need a new name!)
+Functioncharts are inspired by [Statecharts](../statecharts/README.md). "Flowcharts" would have been a great name for these, but that name is taken. (Edit: The Functionchart name is also taken.)
 
-Many "node and wire" programming systems have been built. However, most are either domain-specific, or are intended for non-programmers building small, simple programs. Like Statecharts, Functioncharts use hierarchy and abstraction to increase the power and economy of the notation. The somewhat audacious goal is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages.
+Many "node and wire" programming systems have been built. However, most are either domain-specific, or are targeted at non-programmers. The audacious goal here is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages. Like Statecharts, Functioncharts use hierarchy and abstraction to increase the power and economy of the notation.
 
 The two principal innovations in Functioncharts are:
 
 1. Functions can accept other functions as inputs, and produce new functions as outputs. This gives the diagrams much greater expressive power.
 
-1. Functions define scopes, and a function can be used inside its own scope. This allows recursion, and as a special case, iteration when we can apply the tail call optimization. Function scopes can be nested, and may define complete functions, or partial functions, allowing us to create closures.
+1. Functions define scopes, and a function can be used inside its own scope. This allows us to naturally express recursion and iteration. Function scopes can be nested, and may define complete functions, or partial functions, allowing us to create closures.
 
-Both features help to reduce the visual complexity of the Functionchart diagrams, by making it easy to produce and consume helper functions which can control the routing of wires, and reduce their number.
+These two features can reduce the visual complexity of the Functionchart diagrams, by making it easy to produce and consume  functions. They can also organize the diagram, reducing the number and complexity of the wires.
 
-Here is an example, implementing efficient exponentiation by squaring. It's generic, applying to any type where multiplication can be applied (e.g. numbers, complex numbers, polynomials, matrices).
+Here is an example, implementing the [exponentiation by squaring algorithm](https://en.wikipedia.org/wiki/Exponentiation_by_squaring). This example is generic, applying to any type where multiplication can be applied (e.g. numbers, complex numbers, polynomials, and matrices). A specialization for numbers is on the right.
 
 <figure align="center">
-  <img src="./resources/exp_by_squaring2.svg"  alt="" title="Exponentiation by squaring.">
+  <img src="./resources/example.svg"  alt="" title="Exponentiation by squaring.">
 </figure>
 
 This introduction shows how some illustrative programs can be built and discusses the advantages and potential of this approach.
