@@ -1485,7 +1485,7 @@ class Renderer {
             ctx.moveTo(x, separatorY);
             ctx.lineTo(x + w, separatorY);
             ctx.stroke();
-            ctx.setLineDash([0]);
+            ctx.setLineDash([]);
           }
         }
         // Render knobbies, faintly.
