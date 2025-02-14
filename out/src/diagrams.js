@@ -344,7 +344,7 @@ export class PropertyGridController {
             table: table,
         };
         // TODO better styling
-        const style = 'position:fixed; table-layout: fixed; top:300px; left: 0;   padding: 0; margin: 0; border-collapse: collapse; margin: 25px 0; font-size: 0.9em; font-family: sans-serif; box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);';
+        const style = 'position:fixed; table-layout: fixed; top:300px; left: 0; padding: 0; margin: 0; border-collapse: collapse; margin: 25px 0; font-size: 0.9em; font-family: sans-serif; box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);';
         table.setAttribute('style', style);
         // table.style = 'position:fixed; table-layout: fixed; top:300px; left: 0;   padding: 0; margin: 0;';
         // 'border-collapse: collapse; margin: 25px 0; font-size: 0.9em; font-family: sans-serif; ';

@@ -1865,6 +1865,10 @@ class TransitionDrag {
 
 type DragTypes = StateDrag | TransitionDrag;
 
+export type EditorCommand =
+    'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'selectAll' |
+    'open' | 'save' | 'print';
+
 export class StatechartEditor implements CanvasLayer {
   private theme: StatechartTheme;
   private canvasController: CanvasController;
@@ -2628,6 +2632,30 @@ export class StatechartEditor implements CanvasLayer {
     this.canvasController.draw();
   }
 
+  doCommand(command: EditorCommand) {
+    switch (command) {
+      case 'undo': {
+        if (this.context.getUndo()) {
+          this.context.undo();
+          this.canvasController.draw();
+        }
+        break;
+      }
+      case 'redo': {
+        if (this.context.getRedo()) {
+          this.context.redo();
+          this.canvasController.draw();
+        }
+        break;
+      }
+      case 'delete': {
+        this.context.deleteSelection();
+        this.canvasController.draw();
+        break;
+      }
+    }
+  }
+
   onKeyDown(e: KeyboardEvent) {
     const self = this,
           context = this.context,
@@ -2637,7 +2665,7 @@ export class StatechartEditor implements CanvasLayer {
           shiftKey = e.shiftKey;
 
     if (keyCode === 8) { // 'delete'
-      context.deleteSelection();
+      this.doCommand('delete');
       return true;
     }
     if (cmdKey) {
@@ -2650,9 +2678,14 @@ export class StatechartEditor implements CanvasLayer {
           return true;
         }
         case 90: { // 'z'
-          if (context.getUndo()) {
-            context.undo();
-            self.canvasController.draw();
+          if (shiftKey) {
+            if (context.getRedo()) {
+              this.doCommand('redo');
+            }
+           } else {
+            if (context.getUndo()) {
+              this.doCommand('undo');
+            }
           }
           return true;
         }

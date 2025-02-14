@@ -9,7 +9,25 @@
 
   <p style="position: fixed; right: 0; z-index: 2;">
     <tr>
-      <select name="examples" id="select-example">
+      <button id="undo">undo</button>
+      <button id="redo">redo</button>
+      <button id="delete">delete</button>
+      <select id="edit">
+        <option value="">"-edit-"</option>
+        <option value="cut">cut</option>
+        <option value="copy">copy</option>
+        <option value="paste">paste</option>
+      </select>
+      <select id="modify">
+        <option value="">"-modifier-"</option>
+        <option value="import">import</option>
+        <option value="export">export</option>
+        <option value="new">new</option>
+        <option value="upcast">upcast</option>
+        <option value="downcast">downcast</option>
+      </select>
+      <select id="examples">
+        <option value="">"-examples-"</option>
         <option value="./files/signum">signum</option>
         <option value="./files/signum2">signum2</option>
         <option value="./files/simpleFns">simpleFns</option>
@@ -20,19 +38,23 @@
         <option value="./files/do_while">do_while</option>
         <option value="./files/do_while2">do_while2</option>
         <option value="./files/binary_search">binary_search</option>
+        <option value="./files/binary_search2">binary_search2</option>
+        <option value="./files/binary_search3">binary_search3</option>
         <option value="./files/swap">swap</option>
         <option value="./files/quicksort">quicksort</option>
+        <option value="./files/quicksort2a">quicksort2a</option>
+        <option value="./files/quicksort2b">quicksort2b</option>
+        <option value="./files/quicksort2c">quicksort2c</option>
         <option value="./files/points">points</option>
+        <option value="./files/Array">Array</option>
         <option value="./files/fibonacci">fibonacci</option>
         <option value="./files/exp_by_squaring">exp_by_squaring</option>
         <option value="./files/exp_by_squaring2">exp_by_squaring2</option>
-        <option value="./files/iteration">iteration</option>
-        <option value="./files/iteration2">iteration2</option>
       </select>
     </tr>
   </p>
 
-<canvas id="canvas" style="position: absolute; outline: none" tabindex="0";></canvas>
+<canvas id="canvas" style="position: absolute" tabindex="0";></canvas>
 <canvas id="palette" style="position: fixed; box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);"></canvas>
 
 <script type="module" src="../../out/src/collections.js"></script>

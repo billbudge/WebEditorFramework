@@ -3404,6 +3404,11 @@ interface ItemInfo extends PropertyInfo {
   prop: PropertyTypes;
 }
 
+export type EditorCommand =
+    'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'selectAll' |
+    'export' | 'import' | 'new' | 'upcast' | 'downcast' | 'abstract' |
+    'open' | 'save' | 'print';
+
 export class FunctionchartEditor implements CanvasLayer {
   private theme: FunctionchartTheme;
   private canvasController: CanvasController;
@@ -4518,6 +4523,30 @@ export class FunctionchartEditor implements CanvasLayer {
     this.canvasController.draw();
   }
 
+  doCommand(command: EditorCommand) {
+    switch (command) {
+      case 'undo': {
+        if (this.context.getUndo()) {
+          this.context.undo();
+          this.canvasController.draw();
+        }
+        break;
+      }
+      case 'redo': {
+        if (this.context.getRedo()) {
+          this.context.redo();
+          this.canvasController.draw();
+        }
+        break;
+      }
+      case 'delete': {
+        this.context.deleteSelection();
+        this.canvasController.draw();
+        break;
+      }
+    }
+  }
+
   onKeyDown(e: KeyboardEvent) {
     const self = this,
           context = this.context,
@@ -4527,7 +4556,7 @@ export class FunctionchartEditor implements CanvasLayer {
           shiftKey = e.shiftKey;
 
     if (keyCode === 8) { // 'delete'
-      context.deleteSelection();
+      this.doCommand('delete');
       return true;
     }
     if (cmdKey) {
@@ -4542,15 +4571,9 @@ export class FunctionchartEditor implements CanvasLayer {
         }
         case 90: { // 'z'
           if (shiftKey) {
-            if (context.getRedo()) {
-              context.redo();
-              self.canvasController.draw();
-            }
+            this.doCommand('redo');
           } else {
-            if (context.getUndo()) {
-              context.undo();
-              self.canvasController.draw();
-            }
+            this.doCommand('undo');
           }
           return true;
         }

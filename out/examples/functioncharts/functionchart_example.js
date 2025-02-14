@@ -1,7 +1,7 @@
 import { getDefaultTheme, CanvasController, PropertyGridController } from '../../src/diagrams.js';
 import { FunctionchartEditor } from '../../examples/functioncharts/functioncharts.js';
 (function () {
-    const body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette'), selectExample = document.getElementById('select-example');
+    const body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette');
     if (body && canvas && palette) {
         body.style.overscrollBehaviorY = 'contain';
         body.style.touchAction = 'pinch-zoom';
@@ -29,8 +29,30 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
         document.addEventListener('keyup', function (e) {
             canvasController.onKeyUp(e);
         });
-        selectExample.addEventListener('change', event => {
-            const id = event.target.value, fileName = id + '.txt';
+        function idToCommand(id) {
+            switch (id) {
+                case 'undo': return 'undo';
+                case 'redo': return 'redo';
+                case 'cut': return 'cut';
+                case 'copy': return 'copy';
+                case 'paste': return 'paste';
+                case 'delete': return 'delete';
+                case 'selectAll': return 'selectAll';
+            }
+        }
+        function buttonListener(e) {
+            const target = e.target, command = idToCommand(target.id);
+            if (command) {
+                functionchartEditor.doCommand(command);
+            }
+        }
+        document.getElementById('undo').addEventListener('click', buttonListener);
+        document.getElementById('redo').addEventListener('click', buttonListener);
+        document.getElementById('delete').addEventListener('click', buttonListener);
+        document.getElementById('examples').addEventListener('change', event => {
+            const select = event.target;
+            const id = select.value, fileName = id + '.txt';
+            select.selectedIndex = 0;
             fetch(fileName)
                 .then(response => response.text())
                 .then(text => functionchartEditor.openNewContext(text));

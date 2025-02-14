@@ -3874,11 +3874,34 @@ export class FunctionchartEditor {
         this.updateBounds();
         this.canvasController.draw();
     }
+    doCommand(command) {
+        switch (command) {
+            case 'undo': {
+                if (this.context.getUndo()) {
+                    this.context.undo();
+                    this.canvasController.draw();
+                }
+                break;
+            }
+            case 'redo': {
+                if (this.context.getRedo()) {
+                    this.context.redo();
+                    this.canvasController.draw();
+                }
+                break;
+            }
+            case 'delete': {
+                this.context.deleteSelection();
+                this.canvasController.draw();
+                break;
+            }
+        }
+    }
     onKeyDown(e) {
         const self = this, context = this.context, functionchart = this.functionchart, keyCode = e.keyCode, // TODO fix me.
         cmdKey = e.ctrlKey || e.metaKey, shiftKey = e.shiftKey;
         if (keyCode === 8) { // 'delete'
-            context.deleteSelection();
+            this.doCommand('delete');
             return true;
         }
         if (cmdKey) {
@@ -3893,16 +3916,10 @@ export class FunctionchartEditor {
                 }
                 case 90: { // 'z'
                     if (shiftKey) {
-                        if (context.getRedo()) {
-                            context.redo();
-                            self.canvasController.draw();
-                        }
+                        this.doCommand('redo');
                     }
                     else {
-                        if (context.getUndo()) {
-                            context.undo();
-                            self.canvasController.draw();
-                        }
+                        this.doCommand('undo');
                     }
                     return true;
                 }

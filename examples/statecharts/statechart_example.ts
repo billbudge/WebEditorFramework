@@ -1,12 +1,11 @@
 import { getDefaultTheme, CanvasController, PropertyGridController } from '../../src/diagrams.js'
-import { StatechartEditor } from '../../examples/statecharts/statecharts.js'
+import { StatechartEditor, EditorCommand } from '../../examples/statecharts/statecharts.js'
 
 (function() {
 
   const body = document.getElementById('body'),
         canvas = document.getElementById('canvas'),
-        palette = document.getElementById('palette'),
-        selectExample = document.getElementById('select-example');
+        palette = document.getElementById('palette');
   if (body && canvas && palette) {
 
     body.style.overscrollBehaviorY = 'contain';
@@ -47,9 +46,34 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js'
       canvasController.onKeyUp(e);
     });
 
-    selectExample!.addEventListener('change', event => {
-      const id = (event.target! as HTMLSelectElement).value as string,
+    function idToCommand(id: string) : EditorCommand | undefined {
+      switch (id) {
+        case 'undo': return 'undo';
+        case 'redo': return 'redo';
+        case 'cut': return 'cut';
+        case 'copy': return 'copy';
+        case 'paste': return 'paste';
+        case 'delete': return 'delete';
+        case 'selectAll': return 'selectAll';
+      }
+    }
+
+    function buttonListener(e: Event) {
+      const target = e.target as HTMLElement,
+            command = idToCommand(target.id);
+      if (command) {
+        statechartEditor.doCommand(command);
+      }
+    }
+    document.getElementById('undo')!.addEventListener('click', buttonListener);
+    document.getElementById('redo')!.addEventListener('click', buttonListener);
+    document.getElementById('delete')!.addEventListener('click', buttonListener);
+
+    document.getElementById('examples')!.addEventListener('change', event => {
+      const select = event.target as HTMLSelectElement;
+      const id = select.value,
             fileName = id + '.txt';
+      select.selectedIndex = 0;
       fetch(fileName)
         .then(response => response.text())
         .then(text => statechartEditor.createContext(text));
