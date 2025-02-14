@@ -325,7 +325,6 @@ const idProp = new IdProp('id'),
       yProp = new ScalarProp('y', 0),
       nameProp = new ScalarProp('name', ''),
       typeStringProp = new ScalarProp('typeString', Type.emptyTypeString),
-      defaultValueProp = new ScalarProp('defaultValue'),
       widthProp = new ScalarProp('width', 0),
       heightProp = new ScalarProp('height', 0),
       srcProp = new ReferenceProp('src'),
@@ -387,8 +386,7 @@ export type PseudoelementType = 'input' | 'output' | 'use';
 
 class PseudoelementTemplate extends NodeTemplate {
   readonly typeName: PseudoelementType;
-  readonly defaultValue = defaultValueProp;
-  readonly properties = [this.id, this.typeString, this.x, this.y, this.defaultValue, this.comment];
+  readonly properties = [this.id, this.typeString, this.x, this.y, this.comment];
   constructor(typeName: PseudoelementType) {
     super();
     this.typeName = typeName;
@@ -638,8 +636,6 @@ export class FunctionInstance extends Element<FunctionInstanceTemplate>  {
 }
 
 export class Pseudoelement extends NodeBase<PseudoelementTemplate> {
-  get defaultValue() { return this.template.defaultValue.get(this); }
-  set defaultValue(value: string) { this.template.defaultValue.set(this, value); }
 
   // Derived properties.
   // index: number = -1;
@@ -3561,68 +3557,51 @@ export class FunctionchartEditor implements CanvasLayer {
     }
     function nodeLabelGetter(info: ItemInfo, item: NodeTypes) {
       let result;
-      switch (item.template.typeName) {
-        case 'input':       // [,v(label)]
-          result = item.type.outputs[0].name;
-          break;
-        case 'output':      // [v(label),]
-          result = item.type.inputs[0].name;
-          break;
-        case 'element': {     // [vv,v](label), [v,v](label), [vvv,v](label)
-          const element = item as Element;
-          if (element.name == 'literal') {
-            result = item.type.outputs[0].name;
-          } else {
-            result = item.type.name;
+      if (item instanceof Pseudoelement) {
+        if (info.prop === typeStringProp) {
+          switch (item.template.typeName) {
+            case 'input':       // [,v(label)]
+              result = item.type.outputs[0].name;
+              break;
+            case 'output':      // [v(label),]
+              result = item.type.inputs[0].name;
+              break;
           }
-          break;
         }
-        // case 'importer': {
-        //   const modifier = item as Modifierlement;
-        //   if (modifier.isImporter || modifier.isExporter) {
-        //     result = item.type.outputs[0].name;
-        //   } else if (modifier.isCast) {
-        //     result = item.type.outputs[1].name;
-        //   }
-        //   break;
-        // }
+      } else if (item instanceof Element) {
+        if (item.name == 'literal') {
+          result = item.type.outputs[0].name;
+        } else {
+          result = item.type.name;
+        }
       }
       return result ? result : '';
     }
     function nodeLabelSetter(info: ItemInfo, item: NodeTypes, value: any) {
-      let newType;
-      switch (item.template.typeName) {
-        case 'input':
-          newType = Type.fromInfo([], [new Pin(Type.valueType, value)]);
-          break;
-        case 'output':
-          newType = Type.fromInfo([new Pin(Type.valueType, value)], []);
-          break;
-        case 'element': {
-          const element = item as Element,
-                type = element.type;
-          if (element.name === 'literal') {
-            newType = Type.fromInfo([], [new Pin(type.outputs[0].type, value)]);
-          } else {
-            newType = Type.fromInfo(type.inputs, type.outputs, value);
+      if (info.prop === typeStringProp) {
+        let newType;
+        switch (item.template.typeName) {
+          case 'input':
+            newType = Type.fromInfo([], [new Pin(Type.valueType, value)]);
+            break;
+          case 'output':
+            newType = Type.fromInfo([new Pin(Type.valueType, value)], []);
+            break;
+          case 'element': {
+            const element = item as Element,
+                  type = element.type;
+            if (element.name === 'literal') {
+              newType = Type.fromInfo([], [new Pin(type.outputs[0].type, value)]);
+            } else {
+              newType = Type.fromInfo(type.inputs, type.outputs, value);
+            }
+            break;
           }
-          break;
         }
-        // case 'importer':
-        // case 'exporter': {
-        //   const modifier = item as ModifierElement,
-        //         type = modifier.type;
-        //   if (modifier.isImporter) {
-        //     newType = Type.fromInfo([], [new Pin(type.outputs[0].type, value)]);
-        //   } else if (modifier.isCast) {
-        //     newType = Type.fromInfo([], [new Pin(type.outputs[1].type, value)]);
-        //   }
-        //   break;
-        // }
-      }
-      if (newType) {
-        const newValue = newType.typeString;
-        setter(info, item, newValue);
+        if (newType) {
+          const newValue = newType.typeString;
+          setter(info, item, newValue);
+        }
       }
     }
     this.propertyInfo.set('input', [
@@ -3632,13 +3611,6 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: nodeLabelGetter,
         setter: nodeLabelSetter,
         prop: typeStringProp,
-      },
-      {
-        label: 'defaultValue',
-        type: 'text',
-        getter: getter,
-        setter: setter,
-        prop: defaultValueProp,
       },
       {
         label: 'comment',

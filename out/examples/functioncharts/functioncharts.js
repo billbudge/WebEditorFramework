@@ -262,7 +262,7 @@ export function visitType(type, visitor) {
 }
 //------------------------------------------------------------------------------
 // Properties and templates for the raw data interface for cloning, serialization, etc.
-const idProp = new IdProp('id'), xProp = new ScalarProp('x', 0), yProp = new ScalarProp('y', 0), nameProp = new ScalarProp('name', ''), typeStringProp = new ScalarProp('typeString', Type.emptyTypeString), defaultValueProp = new ScalarProp('defaultValue'), widthProp = new ScalarProp('width', 0), heightProp = new ScalarProp('height', 0), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin', 0), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin', 0), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner'), implicitProp = new ScalarProp('implicit', false), hideLinksProp = new ScalarProp('hideLinks', false), commentProp = new ScalarProp('comment');
+const idProp = new IdProp('id'), xProp = new ScalarProp('x', 0), yProp = new ScalarProp('y', 0), nameProp = new ScalarProp('name', ''), typeStringProp = new ScalarProp('typeString', Type.emptyTypeString), widthProp = new ScalarProp('width', 0), heightProp = new ScalarProp('height', 0), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin', 0), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin', 0), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner'), implicitProp = new ScalarProp('implicit', false), hideLinksProp = new ScalarProp('hideLinks', false), commentProp = new ScalarProp('comment');
 class NodeTemplate {
     constructor() {
         this.id = idProp;
@@ -303,8 +303,7 @@ class FunctionInstanceTemplate extends ElementTemplate {
 class PseudoelementTemplate extends NodeTemplate {
     constructor(typeName) {
         super();
-        this.defaultValue = defaultValueProp;
-        this.properties = [this.id, this.typeString, this.x, this.y, this.defaultValue, this.comment];
+        this.properties = [this.id, this.typeString, this.x, this.y, this.comment];
         this.typeName = typeName;
     }
 }
@@ -507,8 +506,6 @@ export class FunctionInstance extends Element {
     }
 }
 export class Pseudoelement extends NodeBase {
-    get defaultValue() { return this.template.defaultValue.get(this); }
-    set defaultValue(value) { this.template.defaultValue.set(this, value); }
     // Derived properties.
     // index: number = -1;
     constructor(context, template, id) {
@@ -2985,69 +2982,53 @@ export class FunctionchartEditor {
         }
         function nodeLabelGetter(info, item) {
             let result;
-            switch (item.template.typeName) {
-                case 'input': // [,v(label)]
-                    result = item.type.outputs[0].name;
-                    break;
-                case 'output': // [v(label),]
-                    result = item.type.inputs[0].name;
-                    break;
-                case 'element': { // [vv,v](label), [v,v](label), [vvv,v](label)
-                    const element = item;
-                    if (element.name == 'literal') {
-                        result = item.type.outputs[0].name;
+            if (item instanceof Pseudoelement) {
+                if (info.prop === typeStringProp) {
+                    switch (item.template.typeName) {
+                        case 'input': // [,v(label)]
+                            result = item.type.outputs[0].name;
+                            break;
+                        case 'output': // [v(label),]
+                            result = item.type.inputs[0].name;
+                            break;
                     }
-                    else {
-                        result = item.type.name;
-                    }
-                    break;
                 }
-                // case 'importer': {
-                //   const modifier = item as Modifierlement;
-                //   if (modifier.isImporter || modifier.isExporter) {
-                //     result = item.type.outputs[0].name;
-                //   } else if (modifier.isCast) {
-                //     result = item.type.outputs[1].name;
-                //   }
-                //   break;
-                // }
+            }
+            else if (item instanceof Element) {
+                if (item.name == 'literal') {
+                    result = item.type.outputs[0].name;
+                }
+                else {
+                    result = item.type.name;
+                }
             }
             return result ? result : '';
         }
         function nodeLabelSetter(info, item, value) {
-            let newType;
-            switch (item.template.typeName) {
-                case 'input':
-                    newType = Type.fromInfo([], [new Pin(Type.valueType, value)]);
-                    break;
-                case 'output':
-                    newType = Type.fromInfo([new Pin(Type.valueType, value)], []);
-                    break;
-                case 'element': {
-                    const element = item, type = element.type;
-                    if (element.name === 'literal') {
-                        newType = Type.fromInfo([], [new Pin(type.outputs[0].type, value)]);
+            if (info.prop === typeStringProp) {
+                let newType;
+                switch (item.template.typeName) {
+                    case 'input':
+                        newType = Type.fromInfo([], [new Pin(Type.valueType, value)]);
+                        break;
+                    case 'output':
+                        newType = Type.fromInfo([new Pin(Type.valueType, value)], []);
+                        break;
+                    case 'element': {
+                        const element = item, type = element.type;
+                        if (element.name === 'literal') {
+                            newType = Type.fromInfo([], [new Pin(type.outputs[0].type, value)]);
+                        }
+                        else {
+                            newType = Type.fromInfo(type.inputs, type.outputs, value);
+                        }
+                        break;
                     }
-                    else {
-                        newType = Type.fromInfo(type.inputs, type.outputs, value);
-                    }
-                    break;
                 }
-                // case 'importer':
-                // case 'exporter': {
-                //   const modifier = item as ModifierElement,
-                //         type = modifier.type;
-                //   if (modifier.isImporter) {
-                //     newType = Type.fromInfo([], [new Pin(type.outputs[0].type, value)]);
-                //   } else if (modifier.isCast) {
-                //     newType = Type.fromInfo([], [new Pin(type.outputs[1].type, value)]);
-                //   }
-                //   break;
-                // }
-            }
-            if (newType) {
-                const newValue = newType.typeString;
-                setter(info, item, newValue);
+                if (newType) {
+                    const newValue = newType.typeString;
+                    setter(info, item, newValue);
+                }
             }
         }
         this.propertyInfo.set('input', [
@@ -3057,13 +3038,6 @@ export class FunctionchartEditor {
                 getter: nodeLabelGetter,
                 setter: nodeLabelSetter,
                 prop: typeStringProp,
-            },
-            {
-                label: 'defaultValue',
-                type: 'text',
-                getter: getter,
-                setter: setter,
-                prop: defaultValueProp,
             },
             {
                 label: 'comment',
