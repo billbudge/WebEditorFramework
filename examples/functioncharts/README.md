@@ -1,15 +1,15 @@
 # Functioncharts: A Graphical Programming Language
-Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. This repository contains the source code for a Web application that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs (but that will be a fun project!) The emphasis here is on the design of the language. The web application is essentially a fancy diagram editor.
+Functioncharts are a graphical programming language, using a "node and wire" graph to represent programs. This repository contains the source code for a Web application that runs in a browser and can create Functionchart graphs. There is no support yet for compiling, executing and debugging these programs (but that would be a good project!) The emphasis here is on the design of the language. The web application is currently just a very specialized diagram editor.
 
-Functioncharts are inspired by [Statecharts](../statecharts/README.md). "Flowcharts" would have been a great name for these, but that name is taken.
+Functioncharts are inspired by [Statecharts](../statecharts/README.md). "Flowcharts" would have been a great name for these, but that name is taken. (Edit: The Functionchart name is also taken, I need a new name!)
 
-Many "node and wire" programming systems have been built. However, most are either domain-specific, or are intended for non-programmers building small, simple programs. Like Statecharts, Functioncharts use hierarchy and abstraction to increase the power and economy of the notation. The ambitious goal is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages.
+Many "node and wire" programming systems have been built. However, most are either domain-specific, or are intended for non-programmers building small, simple programs. Like Statecharts, Functioncharts use hierarchy and abstraction to increase the power and economy of the notation. The somewhat audacious goal is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages.
 
 The two principal innovations in Functioncharts are:
 
 1. Functions can accept other functions as inputs, and produce new functions as outputs. This gives the diagrams much greater expressive power.
 
-1. Functions define scopes, and a function can be used inside its own scope. This allows recursion, and as a special case, iteration through the tail call optimization. Function scopes can be nested, and may define complete functions, or partial functions, allowing us to create closures.
+1. Functions define scopes, and a function can be used inside its own scope. This allows recursion, and as a special case, iteration when we can apply the tail call optimization. Function scopes can be nested, and may define complete functions, or partial functions, allowing us to create closures.
 
 Both features help to reduce the visual complexity of the Functionchart diagrams, by making it easy to produce and consume helper functions which can control the routing of wires, and reduce their number.
 
@@ -115,14 +115,16 @@ We can use 'reduce' to compute factorial. We use an exporter modifier to pass th
   <figcaption align="center">Somewhat busy abstracted factorial.</figcaption>
 </figure>
 
-This diagram is becoming hard to read. We can refactor to improve the diagram. Note that 'end' and 'f' inputs don't change during the iteration. We can move them out of the functionchart, and put them and the original into an enclosing functionchart. The inner functionchart closes over those external inputs, simplifying its signature. Then we can invoke the inner 'step' function in the parent functionchart to get our desired result.
+This diagram is getting busy. We can refactor to improve the diagram. Note that 'end' and 'f' inputs don't change during the iteration. We can move them out of the functionchart, and put them and the original into an enclosing functionchart. The inner functionchart closes over those external inputs, simplifying its signature. Then we can invoke the inner 'step' function in the parent functionchart to get our desired result.
+
+In the next version, we give the 'acc' and 'f' inputs default values. For a simple value type, the 'input' pseudofunction specifies that "acc = 1". For the function input, we modify the '*' operator to become an import. The semantics of this are that if no function is passed in, we use '*'.
 
 <figure align="center">
   <img src="./resources/factorial3.svg"  alt="" title="Cleaned up reduce function.">
   <figcaption align="center">Refactored abstracted factorial.</figcaption>
 </figure>
 
-We can also use the reduce function to sum the elements of an Array, if we are given a function that somehow contains an array and provides its length and an "indexer" function. We use the Array's indexer function in a small functionchart that uses the "i" parameter to get the i-th element of the array, and the "acc" parameter to add to the accumulator. This function is passed into reduce. This time, we set the initial "acc" to 0.
+We can also use the reduce function to sum the elements of an Array, if we are given a function that somehow contains an array and provides its length and an "indexer" function. We use the Array's indexer function in a small functionchart that uses the "i" parameter to get the i-th element of the array, and the 'acc' parameter to add to the accumulator. This function is passed into reduce and overrides the default '*'. We override the default value of 'acc' to be 0.
 
 <figure align="center">
   <img src="./resources/factorial4.svg"  alt="" title="Array sum function defined with reduce function.">
@@ -450,7 +452,20 @@ TODO up/down, step 1, n, exotic step (binary search)
 </figure> -->
 
 ## Live Demo Editor with Examples
-Our palette contains the built in functions and Pseudofunctions. On the top are the input, output, apply, and pass Pseudofunctions. input and output allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. apply connects to a function output of an function and allows us to instantiate that function in the containing circuit. pass takes its input and passes it on, allowing us to add sequencing ability to our circuits.
+
+This project contains source code for the editor that was used to create the figures. It is definitely a work in progress with many rough edges. It is likely to crash.
+
+There is no code generation, no interpreter, and no debugger.
+
+It has been used by me on MacOS and Chrome. Other platforms and browsers may not work as well.
+
+I have tried it on touch devices. On a Chromebook it works well. On an iPad it works, but without a keyboard there is no undo, redo, etc. TODO add a menu system or buttons.
+
+The palette is a canvas that floats above the main canvas, at the top left. It can be dragged. It contains the built in functions and Pseudofunctions. On the top are the input, output, apply, and pass Pseudofunctions. 'input' and 'output' allow us to explicitly label inputs and outputs and indicate how an input feeds into the circuit. 'use' takes its input and passes it on, allowing us to add sequencing ability to our circuits. It is (currently) the only "var args" function, accepting any number of inputs. TODO add varargs pseudofunction.
+
+TODO describe the other rows in the palette, the property editor, etc.
+
+Command keys:
 
 <!-- <figure align="center">
   <img src="./resources/palette.svg"  alt="" title="Palette (Pseudofunctions and primitive computational functions)">
