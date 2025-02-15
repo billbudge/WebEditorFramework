@@ -3805,7 +3805,8 @@ export class FunctionchartEditor {
             else if (dst === undefined) {
                 const p = wire.pDst, pin = src.type.outputs[wire.srcPin];
                 let output;
-                if (src instanceof Element && !src.isExporter && pin.type !== Type.valueType) {
+                if (src instanceof Functionchart ||
+                    (src instanceof Element && !src.isExporter && pin.type !== Type.valueType)) {
                     output = context.newInstanceForWire(wire, parent, p);
                     if (hitInfo instanceof ElementHitResult && hitInfo.input < 0) {
                         context.dropNodeOnElement(output, hitInfo.item);

@@ -252,11 +252,11 @@
     {
       "type": "functionchart",
       "id": 18,
-      "typeString": "[,[v(end),v](n!)]",
+      "typeString": "[,[v(n),v](n!)]",
       "x": 854.4952545166016,
       "y": 239.52211380004883,
       "width": 238.47698974609375,
-      "height": 123.10143661499023,
+      "height": 133.71862411499023,
       "name": "n!",
       "implicit": true,
       "hideLinks": false,
@@ -265,8 +265,8 @@
           "type": "element",
           "id": 19,
           "typeString": "[,v(1)]",
-          "x": 9.3875732421875,
-          "y": 31.785797119140625,
+          "x": 8.0203857421875,
+          "y": 39.879547119140625,
           "name": "literal",
           "hideLinks": false
         },
@@ -281,15 +281,15 @@
         },
         {
           "type": "exporter",
-          "id": 28,
+          "id": 21,
           "typeString": "[,[vv,v](*)]",
           "x": 9.469963073730469,
-          "y": 57.101436614990234,
+          "y": 67.71862411499023,
           "name": "",
           "hideLinks": false,
           "inner": {
             "type": "element",
-            "id": 27,
+            "id": 22,
             "typeString": "[vv,v](*)",
             "x": 8,
             "y": 4,
@@ -311,11 +311,11 @@
           "src": 19,
           "srcPin": 0,
           "dst": 20,
-          "dstPin": 0
+          "dstPin": 1
         },
         {
           "type": "wire",
-          "src": 28,
+          "src": 21,
           "srcPin": 0,
           "dst": 20,
           "dstPin": 3
