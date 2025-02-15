@@ -132,16 +132,16 @@ export class Type {
     return Type.fromInfo([], [new Pin(this)]);
   }
   toConstructorType() : Type {
-    const inputs = this.inputs.map(pin => new Pin(pin.type, pin.name)),
-          outputs = this.outputs.map(pin => new Pin(pin.type, pin.name));
-    outputs.splice(0, 0, new Pin(Type.valueType));
-    return Type.fromInfo(inputs, outputs, 'new ' + this.name);
+    const inputs = this.inputs.map(pin => new Pin(pin.type, pin.name));
+    return Type.fromInfo(inputs, [new Pin(Type.valueType)], 'new ' + this.name);
   }
   toUpCastType() : Type {
-    return Type.fromInfo([new Pin(Type.valueType)], [new Pin(this)]);
+    const outputs = this.outputs.map(pin => new Pin(pin.type, pin.name));
+    outputs.splice(0, 0, new Pin(Type.valueType));
+    return Type.fromInfo([new Pin(Type.valueType)], outputs, 'to ' + this.name);
   }
   toDownCastType() : Type {
-    return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)]);
+    return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)], 'from ' + this.name);
   }
 
   static outputType(pin: Pin) : Type {
