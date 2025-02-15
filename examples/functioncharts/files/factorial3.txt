@@ -4,7 +4,7 @@
   "typeString": "[,[,]]",
   "x": 0,
   "y": 0,
-  "width": 1308.631362915039,
+  "width": 1390.3299713134766,
   "height": 600.4694023132324,
   "name": "",
   "implicit": false,
@@ -14,8 +14,8 @@
       "type": "functionchart",
       "id": 3,
       "typeString": "[,[v(n),v](n!)]",
-      "x": 364.2781524658203,
-      "y": 278.018985748291,
+      "x": 1141.5437774658203,
+      "y": 138.30414199829102,
       "width": 232.78619384765625,
       "height": 113.59405422210693,
       "name": "n!",
@@ -61,7 +61,7 @@
           "src": 4,
           "srcPin": 0,
           "dst": 5,
-          "dstPin": 2
+          "dstPin": 1
         },
         {
           "type": "wire",
@@ -89,7 +89,7 @@
       "height": 206.4801902770996,
       "name": "reduce",
       "implicit": true,
-      "hideLinks": true,
+      "hideLinks": false,
       "nodes": [
         {
           "type": "functionchart",
@@ -101,7 +101,7 @@
           "height": 166.7131462097168,
           "name": "step",
           "implicit": false,
-          "hideLinks": true,
+          "hideLinks": false,
           "nodes": [
             {
               "type": "element",
@@ -272,8 +272,8 @@
           "type": "instance",
           "id": 21,
           "typeString": "[v(n)v(acc = 1),v](step)",
-          "x": 529.5155050158501,
-          "y": 27.109938621520996,
+          "x": 544.7850362658501,
+          "y": 37.957594871520996,
           "instancer": 9,
           "srcPin": 0
         }

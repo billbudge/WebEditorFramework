@@ -4453,13 +4453,13 @@ export class FunctionchartEditor implements CanvasLayer {
         const p = wire.pDst!,
               pin = src.type.outputs[wire.srcPin];
         let output: ElementTypes;
-        if (src instanceof Element && !src.isExporter && pin.type !== Type.valueType) {
+        if (pin.type === Type.valueType || (src instanceof Element && src.isExporter)) {
+          output = context.newOutputForWire(wire, parent, p);
+        } else {
           output = context.newInstanceForWire(wire, parent, p);
           if (hitInfo instanceof ElementHitResult && hitInfo.input < 0) {
             context.dropNodeOnElement(output, hitInfo.item);
           }
-        } else {
-          output = context.newOutputForWire(wire, parent, p);
         }
         context.select(output);
       } else {
