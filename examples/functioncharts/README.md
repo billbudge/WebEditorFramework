@@ -321,7 +321,7 @@ We create an adapter which adapts the array abstraction to the required 'swap' a
 Key diagram features:
 
 1. The 'adapter' function uses the array indexed getter to implement the comparison functions.
-1. It also uses the getter and setter to create an indexed let-like function, which can be passed to the 'swap' we implemented above. That swap is used to implement the array swap function that quicksort requires. The output isn't needed, but we must 'use' it to drive the side effects.
+1. It also uses the getter and setter to create a function that maps an index into a let-like function, which can be passed to the 'swap' we implemented above. That swap is used to implement the array swap function that quicksort requires. The output isn't needed, but we must 'use' it to drive the side effects.
 
 <figure align="center">
   <img src="./resources/quicksort2b.svg"  alt="" title="Using the adapter to implement different pivot functions.">
@@ -329,7 +329,7 @@ Key diagram features:
 
 1. We use the adpater to implement two pivot selection algorithms.
 1. The adapter is useful since it implements 'swap', and the pivot functions in general swap the selected pivot with the element at 'lo'.
-1. We implement a random pivot, and "median of 3" pivot, intended to make the pathological quicksort behavior much less likely.
+1. We implement a random pivot 'rnd', and "median of 3" pivot 'mO3', intended to make the pathological quicksort behavior much less likely.
 
 Code fragment for Median of the 3 elements at 'lo', 'mid', and 'hi'.
 ```ts
@@ -349,37 +349,12 @@ pivot := A[lo]
 
 1. We call 'quicksort' on our abstracted array, using the adapter, and choosing the "median-of-3" pivot function.
 
-## Stateful Iteration (Iterators)
-The diagram below defines a counter "construction set" by defining some base counters that can be composed. 'counter' is our counter abstraction, returning a value 'c' for the counter's current value, and a function 'n' which advances the counter's state, returning the new value. 'count' is an abstract base counter which contains the variable binding for the counter's value, and defines the next function 'n'. This uses an abstract 'inc' function to modify the counter's value.
-
-This is still abstract, and counter could be a number or a linked list pointer for example. For our purposes, we will only specialize this for numeric counters.
-
-<figure align="center">
-  <img src="./resources/counters.svg"  alt="" title="Counters for iterating integer ranges.">
-  <figcaption align="center">Counter Construction Set.</figcaption>
-</figure>
-<!-- <video src="./resources/functioncharts.mp4" width="1280" height="960" controls></video> -->
-
-Key diagram features:
-
-1. The 'counter' adapter defines the counter API.
-1. 'count' implements the stateful part of a counter. It's abstract until it gets an 'inc' function.
-1. 'countBy' adds the concept of a step. We specialize two functions for the common +1 and -1 cases.
-1. 'countTo' adds the concept of a limit, for counting up or down.
-1. Finally, we construct a counter that counts up by 1 in the range [lo..hi[.
-
 ## Cast Modifiers
 TODO down-casting, up-casting.
 
-## Representing State (Tuples)
+## Object Oriented Programming (Vector types)
 
-<figure align="center">
-  <img src="./resources/tuples.svg"  alt="" title="Const and mutable Tuple types.">
-</figure>
-
-## Representing State (Point types)
-
-Below, we define a function V representing a vector of numbers in 2 dimensions. Using a special 'this' element, we define properties 'x' and 'y' which the function adds to the 'this' object. 'this' functions have a simple value output for the current value of the property, and a setter function which has the side effect of changing the bound value. We don't define how 'this' is created yet. The V function returns two new functions, one to retrieve both properties and the other to set the two properties.
+Below, we define a function V representing a 2 dimensional Vector 'V'. Using a built-in 'this' element, we define properties 'x' and 'y' which the function adds to the 'this' object. 'this' functions have a simple value output for the current value of the property, and a setter function which has the side effect of changing the bound value. We don't define how 'this' is created yet. The V function returns two new functions, one to retrieve both properties and the other to set the two properties.
 
 
 <figure align="center">
@@ -438,7 +413,7 @@ We create some simple helper functions to test for zero and even, and a two cond
   <figcaption align="center">Naive implementation</figcaption>
 </figure>
 
-Messy! This is why node-and-wire gets a bad name. The tangle of wires crossing in the middle makes this difficult to read. Functioncharts can be refactored. Here we do take the core step that computes the new x, y from the inputs and use a functionchart to create a helper function. We also reorder the 'n', 'y', and 'x' inputs to minimize crossings. The use of hierarchy has the effect of removing a part of the circuit and creating an indirection when we instantiate the single instance. The helper function gives a visual explanation of the core multiply step.
+What a mess! The tangle of wires crossing in the middle makes this almost impossible to read. Functioncharts can be refactored to fix this. Here we take the core step that computes the new x, y from the inputs and use a functionchart to create a helper function. We also reorder the 'n', 'y', and 'x' inputs to minimize crossings. The use of hierarchy has the effect of removing a part of the circuit and creating an indirection when we instantiate the single instance. The helper function gives a visual explanation of the core multiply step.
 
 <figure align="center">
   <img src="./resources/exp_by_squaring2.svg"  alt="" title="Simplified implemention of exponentiation by squaring.">
@@ -453,26 +428,32 @@ Messy! This is why node-and-wire gets a bad name. The tangle of wires crossing i
   <img src="./resources/intervals.svg"  alt="" title="">
 </figure>
 
+## Stateful Iteration (Counters)
+The diagram below defines a counter "construction set" by defining some base counters that can be composed. 'counter' is our counter abstraction, returning a value 'c' for the counter's current value, and a function 'n' which advances the counter's state, returning the new value. 'count' is an abstract base counter which contains the variable binding for the counter's value, and defines the next function 'n'. This uses an abstract 'inc' function to modify the counter's value.
+
+This is still abstract, and counter could be a number or a linked list pointer for example. For our purposes, we will only specialize this for numeric counters.
+
+<figure align="center">
+  <img src="./resources/counters.svg"  alt="" title="Counters for iterating integer ranges.">
+  <figcaption align="center">Counter Construction Set.</figcaption>
+</figure>
+
+Key diagram features:
+
+1. The 'counter' adapter defines the counter API.
+1. 'count' implements the stateful part of a counter. It's abstract until it gets an 'inc' function.
+1. 'countBy' adds the concept of a step. We specialize two functions for the common +1 and -1 cases.
+1. 'countTo' adds the concept of a limit, for counting up or down.
+1. Finally, we construct a counter that counts up by 1 in the range [lo..hi[.
+
+## Representing State (Tuples)
+
+<figure align="center">
+  <img src="./resources/tuples.svg"  alt="" title="Const and mutable Tuple types.">
+</figure>
+
 ## Covariance (fewer inputs), Contravariance (more outputs)
 TODO
-
-## Stateful Iteration Protocols
-TODO
-
-## Iteration over a Numeric Range
-We can make iteration more generic. First we define an abstract "body" function, with 1 input and 1 output. The first input is the iteration index, the typical "i" in a for-loop. The output is the result of the body, and is used by the iteration function to break. We choose "undefined" as the sentinel value to break. Then we iterate over the range [0..n[, passing the index to the body function and continuing as long as the body returns a defined value.
-
-We can use the iteration to implement our factorial function. However, since we don't have an accumulator passed as a parameter to our body function, we must instead encapsulate that in the body function as a bit of state. We do this now by using a 'var' element, which has two outputs - the first returns the current value, and the second returns a function which changes the value, and returns the previous value. Then our body function multiplies the current value by the iteration index, then sets the var to the result. We also return the value, so we continue rather than breaking from the iteration.
-<!-- <figure align="center">
-  <img src="./resources/iteration.svg"  alt="" title="Simple iteration over the range [0..n[.">
-</figure> -->
-
-## More General Iteration over a Range
-Generic iteration with start, end, condition, and step configurable.
-TODO up/down, step 1, n, exotic step (binary search)
-<!-- <figure align="center">
-  <img src="./resources/iteration2.svg"  alt="" title="Generic iteration with start, end, condition, and step configurable.">
-</figure> -->
 
 ## Live Demo Editor with Examples
 

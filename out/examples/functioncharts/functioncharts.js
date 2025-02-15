@@ -73,15 +73,16 @@ export class Type {
         return Type.fromInfo([], [new Pin(this)]);
     }
     toConstructorType() {
-        const inputs = this.inputs.map(pin => new Pin(pin.type, pin.name)), outputs = this.outputs.map(pin => new Pin(pin.type, pin.name));
-        outputs.splice(0, 0, new Pin(Type.valueType));
-        return Type.fromInfo(inputs, outputs, 'new ' + this.name);
+        const inputs = this.inputs.map(pin => new Pin(pin.type, pin.name));
+        return Type.fromInfo(inputs, [new Pin(Type.valueType)], 'new ' + this.name);
     }
     toUpCastType() {
-        return Type.fromInfo([new Pin(Type.valueType)], [new Pin(this)]);
+        const outputs = this.outputs.map(pin => new Pin(pin.type, pin.name));
+        outputs.splice(0, 0, new Pin(Type.valueType));
+        return Type.fromInfo([new Pin(Type.valueType)], outputs, 'to ' + this.name);
     }
     toDownCastType() {
-        return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)]);
+        return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)], 'from ' + this.name);
     }
     static outputType(pin) {
         const type = pin.type;
@@ -3805,15 +3806,14 @@ export class FunctionchartEditor {
             else if (dst === undefined) {
                 const p = wire.pDst, pin = src.type.outputs[wire.srcPin];
                 let output;
-                if (src instanceof Functionchart ||
-                    (src instanceof Element && !src.isExporter && pin.type !== Type.valueType)) {
+                if (pin.type === Type.valueType || (src instanceof Element && src.isExporter)) {
+                    output = context.newOutputForWire(wire, parent, p);
+                }
+                else {
                     output = context.newInstanceForWire(wire, parent, p);
                     if (hitInfo instanceof ElementHitResult && hitInfo.input < 0) {
                         context.dropNodeOnElement(output, hitInfo.item);
                     }
-                }
-                else {
-                    output = context.newOutputForWire(wire, parent, p);
                 }
                 context.select(output);
             }
