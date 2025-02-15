@@ -135,7 +135,7 @@ Key diagram features:
 
 ## Closure and Default Values
 
-This diagram is becoming hard to read. We can refactor to improve the diagram. Note that 'end' and 'f' inputs don't change during the iteration. We can move them out of the functionchart, and put them and the original into an enclosing functionchart. The inner functionchart "closes" over those external inputs, simplifying its signature. Then we can invoke the inner 'step' function in the parent functionchart to get our desired result.
+The diagram above is becoming hard to read. We can refactor to improve the diagram. Note that 'end' and 'f' inputs don't change during the iteration. We can move them out of the functionchart, and put them and the original into an enclosing functionchart. The inner functionchart "closes" over those external inputs, simplifying its signature. Then we can invoke the inner 'step' function in the parent functionchart to get our desired result.
 
 In the next version, we give the 'acc' and 'f' inputs default values. For a simple value type, the 'input' pseudofunction specifies that "acc = 1". For the function input, instead of an abstract 'f', we modify the * operator to become an importer. The semantics of this are that if no function is passed in, we use the inner function which in this case is the built-in *.
 
@@ -240,30 +240,33 @@ Side effects introduce a complication. We may want to get the side effect withou
 
 ## Representing State (swap)
 
-The 'let' function is a built-in variable binding that can hold a value. It's single input initializes the value, and it has two outputs, one to return the current value, and a 'setter' function to change the value. This function takes a single input, the new value, and just returns that value.
+The 'let' function is a built-in variable binding that can hold a value. It's single input initializes the value, and it has two outputs, one to return the current value, and a 'setter' function to change the value. This function takes a single input, the new value, and just returns that value. Because it has side effects, it is rendered with a notch at the top right. (TODO render function instances with side effects with the notch.)
 
-We can create an abstract functionchart to represent a "stateful, mutable" binding. We give this the same signature as 'let'. This makes our 'swap' more general.
+To make our swap generic, we can create an abstract 'let' like function to represent a general binding. This function has the same signature as 'let'.
 
-Now we use a single 'let' as a "temp" variable, and create a function that takes two bindings as input, and performs a swap between them. The function initializes the 'let' to the first input's value. It also calls the setters for the inputs to set the first to the second's value, and the second to the "temp" value. Orchestrating all of this is a 'use' pseudo-function, which takes a variable number of inputs. The inputs are evaluated in order, which does two things:
+Now we use an actual 'let' as a "temp" variable, and create a function that takes two bindings as input, and performs a swap between them. Below are two ways it can be implemented.
+
+The 'swap1' function initializes the 'let' to the first input's value. It also calls the setters for the inputs to set the first to the second's value, and the second to the "temp" value. Sequencing all of this is a 'use' pseudo-function, which takes a variable number of inputs. The inputs are evaluated in order, which does two things.
+
+The 'swap2' function doesn't initialize the 'let'. Instead, it calls the setters for the "temp" and inputs in the desired order, again sequenced by the 'use'.
 
 1. 'use' uses the input, which executes the source function - important when there are side-effects.
 2. 'use' evaluates its inputs in order, providing a way to sequence functions that have side-effects.
 
-Swap would be simpler to implement if the semantics of the setter were to return the old value. We might be able to avoid the 'use' pseudo-function. However, the old value is less useful in our function graphs than the new value. Returning input values helps avoid long wires crossing the graph.
+Swap would be simpler to implement if the semantics of the setter were to return the old value. We would be able to avoid the 'use' pseudo-function. However, the old value is less useful in our function graphs than the new value. Forwarding input values is a surprisingly effective way to avoid long wires crossing the graph.
 
 <figure align="center">
   <img src="./resources/swap.svg"  alt="" title="A swap function.">
 </figure>
 
 Key diagram features:
-1. The 'use' drives execution order. It first consumes the 'let' outputs, which causes the "temp" to be set to the first value.
-1. Next, the use consumes the first setter, which sets the first binding to the second's value.
-1. Finally, the use consumes the second setter, which sets the second binding to the "temp" value.
+1. The 'use' guarantees execution in the correct order.
+1. The 'let' can be initialized before use, or left uninitialized.
 
 ## Abstract Functions (Quicksort)
 Here is Typescript source for an implementation of Quicksort which does the partition step in place using Hoare's algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Quicksort)
 
-The code is subtle in places. In particular, it assumes the element used for the pivot is at the 'lo' index. Because of this, the do-while loops in 'partition' don't need to check i, j against lo, hi while iterating.
+The code is subtle. In particular, it requires the element used for the pivot is at the 'lo' index. Because of this, the do-while loops in 'partition' don't need to check i, j against lo, hi while iterating.
 
 ```ts
 function quicksort(A: Array<number>, lo: number, hi: number) {
