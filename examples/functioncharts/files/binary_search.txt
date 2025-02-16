@@ -416,13 +416,6 @@
               "src": 24,
               "srcPin": 0,
               "dst": 29,
-              "dstPin": 3
-            },
-            {
-              "type": "wire",
-              "src": 30,
-              "srcPin": 0,
-              "dst": 29,
               "dstPin": 2
             },
             {
@@ -459,6 +452,13 @@
               "srcPin": 1,
               "dst": 30,
               "dstPin": 1
+            },
+            {
+              "type": "wire",
+              "src": 30,
+              "srcPin": 0,
+              "dst": 29,
+              "dstPin": 3
             }
           ]
         },
@@ -538,16 +538,9 @@
             {
               "type": "wire",
               "src": 36,
-              "srcPin": 1,
-              "dst": 37,
-              "dstPin": 3
-            },
-            {
-              "type": "wire",
-              "src": 36,
               "srcPin": 2,
               "dst": 37,
-              "dstPin": 2
+              "dstPin": 3
             },
             {
               "type": "wire",
@@ -569,6 +562,13 @@
               "srcPin": 0,
               "dst": 37,
               "dstPin": 0
+            },
+            {
+              "type": "wire",
+              "src": 36,
+              "srcPin": 1,
+              "dst": 37,
+              "dstPin": 2
             }
           ]
         },
