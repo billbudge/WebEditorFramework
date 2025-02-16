@@ -354,7 +354,7 @@ TODO down-casting, up-casting.
 
 ## Object Oriented Programming (Vector types)
 
-Below, we define a function V representing a 2 dimensional Vector 'V'. Using a built-in 'this' element, we define properties 'x' and 'y' which the function adds to the 'this' object. 'this' functions have a simple value output for the current value of the property, and a setter function which has the side effect of changing the bound value. We don't define how 'this' is created yet. The V function returns two new functions, one to retrieve both properties and the other to set the two properties.
+Below, we define a function V representing a 2 dimensional Vector 'V'. Using a built-in 'this' element, we define properties 'x' and 'y' which the function adds to the 'this' object. Very similar to 'let', 'this' functions have a simple value output for the current value of the bound property, and a setter function which has the side effect of changing the value. We don't define how 'this' is created yet. The V function returns two new functions, one to retrieve both properties and the other to set the two properties.
 
 
 <figure align="center">

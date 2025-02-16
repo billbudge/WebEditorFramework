@@ -3076,7 +3076,7 @@ export class FunctionchartEditor {
                 prop: typeStringProp,
             },
         ]);
-        const unaryOps = ['!', '~', '-', '√']; // TODO remove sqrt operator in favor of Math.sqrt.
+        const unaryOps = ['!', '~', '-', 'typeof'];
         this.propertyInfo.set('unop', [
             {
                 label: 'operator',
