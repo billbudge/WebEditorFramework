@@ -3129,14 +3129,20 @@ class Renderer implements ILayoutEngine {
           ctx.lineWidth = 1;
           inputs.forEach(input => {
             const element = input.element;
-            if (element instanceof Pseudoelement || element.type.inputs.length === 0) return;
+            if (element instanceof Pseudoelement || element.isAbstract ||
+                element.type.inputs.length === 0) {
+              return;
+            }
             const p = self.inputPinToPoint(element, input.index);
             ctx.moveTo(p.x, p.y);
             ctx.lineTo(p.x - spacing, p.y);
           });
           outputs.forEach(output => {
             const element = output.element;
-            if (element instanceof Pseudoelement || element.type.outputs.length === 0) return;
+            if (element instanceof Pseudoelement ||
+                element.type.outputs.length === 0) {
+              return;
+            }
             const p = self.outputPinToPoint(element, output.index);
             ctx.moveTo(p.x, p.y);
             ctx.lineTo(p.x + spacing, p.y);
