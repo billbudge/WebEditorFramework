@@ -410,7 +410,7 @@
           "height": 200.41849517822266,
           "name": "muls",
           "implicit": false,
-          "hideLinks": true,
+          "hideLinks": false,
           "nodes": [
             {
               "type": "instance",
@@ -643,7 +643,7 @@
         },
         {
           "type": "element",
-          "id": 48,
+          "id": 46,
           "typeString": "[,v(1)]",
           "x": 11.185441493988037,
           "y": 88.04827880859375,
@@ -652,7 +652,7 @@
         },
         {
           "type": "exporter",
-          "id": 50,
+          "id": 47,
           "typeString": "[,[vv,v](*)]",
           "x": 8.205228328704834,
           "y": 31.15548610687256,
@@ -660,7 +660,7 @@
           "hideLinks": false,
           "inner": {
             "type": "element",
-            "id": 49,
+            "id": 48,
             "typeString": "[vv,v](*)",
             "x": 8,
             "y": 4,
@@ -672,14 +672,14 @@
       "wires": [
         {
           "type": "wire",
-          "src": 48,
+          "src": 46,
           "srcPin": 0,
           "dst": 45,
           "dstPin": 3
         },
         {
           "type": "wire",
-          "src": 50,
+          "src": 47,
           "srcPin": 0,
           "dst": 45,
           "dstPin": 2

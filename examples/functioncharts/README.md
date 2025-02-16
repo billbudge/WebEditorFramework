@@ -201,7 +201,6 @@ We can apply our 'binSearch' function to an array-like abstraction. This provide
 
 <figure align="center">
   <img src="./resources/binary_search2.svg"  alt="" title="Binary search of an array.">
-  <figcaption align="center">Applying our 'binSearch' to an abstracted Array of values.</figcaption>
 </figure>
 
 ## More General Iteration
@@ -349,44 +348,65 @@ pivot := A[lo]
 
 1. We call 'quicksort' on our abstracted array, using the adapter, and choosing the "median-of-3" pivot function.
 
-## Cast Modifiers
-TODO down-casting, up-casting.
+## Object Oriented Programming (2D Vectors)
 
-## Object Oriented Programming (Vector types)
+Below we program a 2D Vector type. We would like to pass the "x, y" values with just one wire, so we first define an abstract pair type to represent inputs and outputs on vector operations.
 
-Below, we define a function V representing a 2 dimensional Vector 'V'.
+We also define two adapter functions. The first "1-to-2" converts a pair into the two components. The second "2-to-1" does the opposite. It may be surprising but these adapter functions are not abstract - they perform a real transformation on their inputs.
 
-First we define an abstract "pair" function, with two output values. This will represent input vectors.
+There is a difficulty though. What if we only want to change a single component of a vector? We don't want to always have to pass another value in this case, so we define some helper functions to check for an undefined component before setting. Then we can call the setter with 0, 1, or 2 values and get the desired effect (0 = no effect, 1 = set x or y, 2 = set x and y).
 
-We also define two adapter functions. The first converts a pair into individual outputs. The second does the opposite. It may be surprising but these functions are not abstract - they perform a transformation on their inputs.
+Now to the V2 constructor function.
 
+Using the built-in 'this' function, we define member properties 'x' and 'y' which the function adds to the 'this' object. Similarly to 'let', the 'this' function has a value output for the current value of the property, and a setter function which has the side effect of changing the bound value. It has an input for the property name, and one for the initial value. We'll show where the "this" reference comes from below when we cover object composition.
 
-Using the built-in 'this' function, we define properties 'x' and 'y' which the function adds to the 'this' object. 'this' functions have a value output for the current value of the property, and a setter function which has the side effect of changing the bound value. We don't define how 'this' is created yet. The V function returns two new functions, one to retrieve both properties and the other to set the two properties.
+V2 accepts a pair as input, and passes the values to initialize the 'x' and 'y' member properties.
 
+V2 returns getter and setter functions, like any bound value, but working on pairs. The getter uses our 2-to-1 adapter to pass the bound values as a result function. The setter uses our helper functions to conditionally call the two setters, and the 2-to-1 adapter to combine the results.
+
+We also define some "free" functions to operate on vectors. These aren't member functions - they can be used on anything that looks like a pair of numbers. We define 'V2.dot', 'V2.scale', and 'V2.Norm' in the usual way.
 
 <figure align="center">
   <img src="./resources/points.svg"  alt="" title="A simple 2d point type.">
 </figure>
 
-We create a function VNormal representing a subtype function which represents only normalized (length 1) vectors. This function calls the V function, which initializes the 'x' and 'y' properties. However, VNormal first normalizes the two coordinates before calling the V function so it is initialized properly. It also overrides the V setting function to first normalize the coordinates before calling the base setter function. In other words, it overrides its base type's function.
+## Subclassing (Normalized 2D Vectors)
+
+Subclassing works by embedding the "super" function in the "subclass" function. Below, we create a function 'VNormal' representing normalized (length == 1) vectors. This function contains a call to the V function, which initializes the 'x' and 'y' properties. However, VNormal first uses V2.Norm to normalize the input pair before calling the V function so it is initialized properly. Similarly, it "overrides" the V2 setter by first normalizing the coordinates before calling the base setter function. Thus, V2Normal values are always normalized.
 
 <figure align="center">
   <img src="./resources/points2.svg"  alt="" title="A simple 2d point library.">
 </figure>
 
+## Composition (2D Rectangle from Vectors)
+
+Composition works by binding values of another type in a new constructor function. Below, we define a 2D Rectangle type by using 'this' functions to bind two instances of V2. This is done using the 'new' modifier, which converts a function into an object creation call. The 'new' modifier has the same inputs as the contained constructor function, but just a single output, a reference to the "this" object holding the constructed object. That makes it easy to pass the value to a 'let' or 'this' function to bind it.
+
+The first row below shows a V2 function instance, then modified as 'new V2', and finally a 'cast' modifier, which takes a value input and returns the V2 outputs, so we can use the new bound instance.
+
+Rect2 defines 'position' and 'size' member properties, initializes them with the two input pairs, and returns two getters and two setters. This is a very simple composition, but we could have more complex adaptations and constraints.
+
+<figure align="center">
+  <img src="./resources/points3.svg"  alt="" title="A 2d Rectangle, using 2d Vector.">
+</figure>
+
+## Cast Modifiers
+TODO down-casting, up-casting. There is a lot to explain here.
+
 ## Libraries
+
+Below is an abstract description of an Array library, patterned after Javascript's Array object.
 
 <figure align="center">
   <img src="./resources/Library.svg"  alt="" title="An example of a Javascript built-in library.">
 </figure>
 
-
-## Semantics
+## Semantics TODO
 
 1. To evaluate a function in a context, determine which outputs are consumed.
 1. For each consumed output of the function, trace back to evaluate (cache results, so each function is evaluated only once). If a 'cond' is encountered, evaluate the condition, then evaluate along the branch that will be the result.
 1. This "lazy" evaluation is not for efficiency; it is needed when side-effects are desired only under certain conditions.
-1. 'use' pseudofunctions can be used to pull in side-effects, and to order function evaluation.
+1. 'use' pseudofunctions can be used to pull in side-effects, and to order function evaluation. A 'use' whose output is disconnected is always evaluated. A 'use' whose output is connected is only evaluated if its value is consumed. This allows conditional side effects. The value of this 'use' is the first input. TODO example
 
 # More Examples
 
@@ -417,19 +437,25 @@ We create some simple helper functions to test for zero and even, and a two cond
 
 <figure align="center">
   <img src="./resources/exp_by_squaring.svg"  alt="" title="Tail-recursive implemention of exponentiation by squaring.">
-  <figcaption align="center">Naive implementation</figcaption>
 </figure>
 
-What a mess! The tangle of wires crossing in the middle makes this almost impossible to read. Functioncharts can be refactored to fix this. Here we take the core step that computes the new x, y from the inputs and use a functionchart to create a helper function. We also reorder the 'n', 'y', and 'x' inputs to minimize crossings. The use of hierarchy has the effect of removing a part of the circuit and creating an indirection when we instantiate the single instance. The helper function gives a visual explanation of the core multiply step.
+The tangle of wires crossing in the middle makes this virtually impossible to read. We can refactor to fix this.
+
+Here we take the core step that computes the new x, y from the inputs and use a functionchart to create a helper function. We also reorder the 'n', 'y', and 'x' inputs to minimize crossings. The use of hierarchy has the effect of removing a part of the circuit and creating an indirection when we instantiate the single instance. The helper function gives a visual explanation of the core multiply step.
 
 <figure align="center">
   <img src="./resources/exp_by_squaring2.svg"  alt="" title="Simplified implemention of exponentiation by squaring.">
-  <figcaption align="center">Refactored implementation</figcaption>
 </figure>
+
+## Refactored Binary Search using Intervals
+TODO
 
 <figure align="center">
   <img src="./resources/binary_search3.svg"  alt="" title="">
 </figure>
+
+## Numeric Interval Library
+TODO
 
 <figure align="center">
   <img src="./resources/intervals.svg"  alt="" title="">
@@ -442,7 +468,6 @@ This is still abstract, and counter could be a number or a linked list pointer f
 
 <figure align="center">
   <img src="./resources/counters.svg"  alt="" title="Counters for iterating integer ranges.">
-  <figcaption align="center">Counter Construction Set.</figcaption>
 </figure>
 
 Key diagram features:
