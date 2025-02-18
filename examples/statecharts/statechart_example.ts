@@ -54,7 +54,12 @@ import { StatechartEditor, EditorCommand } from '../../examples/statecharts/stat
         case 'copy': return 'copy';
         case 'paste': return 'paste';
         case 'delete': return 'delete';
+        case 'group': return 'group';
+        case 'extend': return 'extend';
         case 'selectAll': return 'selectAll';
+        case 'open': return 'open';
+        case 'save': return 'save';
+        case 'print': return 'print';
       }
     }
 
@@ -68,6 +73,19 @@ import { StatechartEditor, EditorCommand } from '../../examples/statecharts/stat
     document.getElementById('undo')!.addEventListener('click', buttonListener);
     document.getElementById('redo')!.addEventListener('click', buttonListener);
     document.getElementById('delete')!.addEventListener('click', buttonListener);
+    document.getElementById('extend')!.addEventListener('click', buttonListener);
+
+    function selectListener(e: Event) {
+      const target = e.target as HTMLSelectElement,
+            command = idToCommand(target.value);
+      if (command) {
+        target.selectedIndex = 0;
+        statechartEditor.doCommand(command);
+      }
+    }
+
+    document.getElementById('file')!.addEventListener('change', selectListener);
+    document.getElementById('edit')!.addEventListener('change', selectListener);
 
     document.getElementById('examples')!.addEventListener('change', event => {
       const select = event.target as HTMLSelectElement;

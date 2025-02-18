@@ -37,7 +37,22 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
                 case 'copy': return 'copy';
                 case 'paste': return 'paste';
                 case 'delete': return 'delete';
+                case 'group': return 'group';
+                case 'complete': return 'complete';
+                case 'extend': return 'extend';
                 case 'selectAll': return 'selectAll';
+                case 'import': return 'import';
+                case 'export': return 'export';
+                case 'constructor': return 'constructor';
+                case 'upcast': return 'upCast';
+                case 'downcast': return 'downCast';
+                case 'abstract': return 'abstract';
+                case 'abstractFunctionchart': return 'abstractFunctionchart';
+                case 'new': return 'new';
+                case 'open': return 'open';
+                case 'openImport': return 'openImport';
+                case 'save': return 'save';
+                case 'print': return 'print';
             }
         }
         function buttonListener(e) {
@@ -49,9 +64,20 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
         document.getElementById('undo').addEventListener('click', buttonListener);
         document.getElementById('redo').addEventListener('click', buttonListener);
         document.getElementById('delete').addEventListener('click', buttonListener);
-        document.getElementById('examples').addEventListener('change', event => {
-            const select = event.target;
-            const id = select.value, fileName = id + '.txt';
+        document.getElementById('complete').addEventListener('click', buttonListener);
+        document.getElementById('extend').addEventListener('click', buttonListener);
+        function selectListener(e) {
+            const target = e.target, command = idToCommand(target.value);
+            if (command) {
+                target.selectedIndex = 0;
+                functionchartEditor.doCommand(command);
+            }
+        }
+        document.getElementById('file').addEventListener('change', selectListener);
+        document.getElementById('edit').addEventListener('change', selectListener);
+        document.getElementById('modify').addEventListener('change', selectListener);
+        document.getElementById('examples').addEventListener('change', e => {
+            const select = e.target, id = select.value, fileName = id + '.txt';
             select.selectedIndex = 0;
             fetch(fileName)
                 .then(response => response.text())

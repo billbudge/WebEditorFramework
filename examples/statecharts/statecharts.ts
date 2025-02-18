@@ -1866,8 +1866,8 @@ class TransitionDrag {
 type DragTypes = StateDrag | TransitionDrag;
 
 export type EditorCommand =
-    'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'selectAll' |
-    'open' | 'save' | 'print';
+    'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'group' | 'extend' | 'selectAll' |
+    'new' | 'open' | 'save' | 'print';
 
 export class StatechartEditor implements CanvasLayer {
   private theme: StatechartTheme;
@@ -2633,34 +2633,101 @@ export class StatechartEditor implements CanvasLayer {
   }
 
   doCommand(command: EditorCommand) {
+    const context = this.context,
+          canvasController = this.canvasController;
     switch (command) {
       case 'undo': {
-        if (this.context.getUndo()) {
-          this.context.undo();
-          this.canvasController.draw();
+        if (context.getUndo()) {
+          context.undo();
+          canvasController.draw();
         }
         break;
       }
       case 'redo': {
-        if (this.context.getRedo()) {
-          this.context.redo();
-          this.canvasController.draw();
+        if (context.getRedo()) {
+          context.redo();
+          canvasController.draw();
         }
         break;
       }
       case 'delete': {
-        this.context.deleteSelection();
-        this.canvasController.draw();
+        context.deleteSelection();
+        canvasController.draw();
+        break;
+      }
+      case 'cut': {
+        this.scrap = context.cut()
+        canvasController.draw();
+      break;
+      }
+      case 'copy': {
+        this.scrap = context.copy();
+        break;
+      }
+      case 'paste': {
+        if (this.scrap.length > 0) {
+          context.paste(this.scrap);
+          this.updateBounds();
+          canvasController.draw();
+        }
+        break;
+      }
+      case 'extend': {
+        context.selectConnectedStates(true);
+        canvasController.draw();
+        break;
+      }
+      case 'selectAll': {
+        this.statechart.states.forEach(function (v) {
+          context.selection.add(v);
+        });
+        canvasController.draw();
+        break;
+      }
+      case 'group': {
+        context.reduceSelection();
+        context.selection.set(context.selectedStates());
+        context.selectInteriorTransitions();
+        context.beginTransaction('group items into super state');
+        const theme = this.theme,
+              bounds = this.renderer.sumBounds(context.selectedStates()),
+              contents = context.selectionContents() as Array<NonStatechartTypes>,
+              parent = context.getLowestCommonStatechart(...contents);
+        expandRect(bounds, theme.radius, theme.radius);
+        const group = context.group(contents, parent!, bounds);
+        context.selection.set(group);
+        context.endTransaction();
+        break;
+      }
+      case 'new': {
+        const context = new StatechartContext();
+        this.initializeContext(context);
+        this.setContext(context);
+        this.renderer.begin(canvasController.getCtx());
+        this.updateBounds();
+        canvasController.draw();
+      break;
+      }
+      case 'open': {
+        const self = this;
+        this.fileController.openFile().then(result => self.createContext(result));
+        break;
+      }
+      case 'save': {
+        let text = JSON.stringify(Serialize(this.statechart), undefined, 2);
+        this.fileController.saveUnnamedFile(text, 'statechart.txt').then();
+        // console.log(text);
+      break;
+      }
+      case 'print': {
+        this.print();
         break;
       }
     }
   }
 
   onKeyDown(e: KeyboardEvent) {
-    const self = this,
-          context = this.context,
-          statechart = this.statechart,
-          keyCode = e.keyCode,  // TODO fix
+    const keyCode = e.keyCode,  // TODO fix
           cmdKey = e.ctrlKey || e.metaKey,
           shiftKey = e.shiftKey;
 
@@ -2671,90 +2738,56 @@ export class StatechartEditor implements CanvasLayer {
     if (cmdKey) {
       switch (keyCode) {
         case 65: { // 'a'
-          statechart.states.forEach(function (v) {
-            context.selection.add(v);
-          });
-          self.canvasController.draw();
+          this.doCommand('selectAll');
           return true;
         }
         case 90: { // 'z'
           if (shiftKey) {
-            if (context.getRedo()) {
-              this.doCommand('redo');
-            }
+            this.doCommand('redo');
            } else {
-            if (context.getUndo()) {
-              this.doCommand('undo');
-            }
+            this.doCommand('undo');
           }
           return true;
         }
         case 89: { // 'y'
-          if (context.getRedo()) {
-            context.redo();
-            self.canvasController.draw();
-          }
-          return true;
+          return false;  // TODO new command slot.
         }
         case 88: { // 'x'
-          this.scrap = context.cut()
-          self.canvasController.draw();
+          this.doCommand('cut');
           return true;
         }
         case 67: { // 'c'
-          this.scrap = context.copy();
+          this.doCommand('copy');
           return true;
         }
         case 86: { // 'v'
-          if (this.scrap.length > 0) {
-            context.paste(this.scrap);
-            this.updateBounds();
-            return true;
-          }
-          return false;
+          this.doCommand('paste');
+          return true;
         }
         case 71 : { // 'g'
-          context.reduceSelection();
-          context.selection.set(context.selectedStates());
-          context.selectInteriorTransitions();
-          context.beginTransaction('group items into super state');
-          const theme = this.theme,
-                bounds = this.renderer.sumBounds(context.selectedStates()),
-                contents = context.selectionContents() as Array<NonStatechartTypes>,
-                parent = context.getLowestCommonStatechart(...contents);
-          expandRect(bounds, theme.radius, theme.radius);
-          const group = context.group(contents, parent!, bounds);
-          context.selection.set(group);
-          context.endTransaction();
+          this.doCommand('group');
+          return true;
         }
         case 69: { // 'e'
-          context.selectConnectedStates(true);
-          self.canvasController.draw();
+          this.doCommand('extend');
           return true;
         }
         case 72: // 'h'
           return false;
         case 78: { // ctrl 'n'   // Can't intercept cmd n.
-          const context = new StatechartContext();
-          self.initializeContext(context);
-          self.setContext(context);
-          self.renderer.begin(self.canvasController.getCtx());
-          self.updateBounds();
-          self.canvasController.draw();
+          this.doCommand('new');
           return true;
         }
         case 79: { // 'o'
-          this.fileController.openFile().then(result => self.createContext(result));
+          this.doCommand('open');
           return true;
         }
         case 83: { // 's'
-          let text = JSON.stringify(Serialize(statechart), undefined, 2);
-          this.fileController.saveUnnamedFile(text, 'statechart.txt').then();
-          // console.log(text);
+          this.doCommand('save');
           return true;
         }
         case 80: { // 'p'
-          this.print();
+          this.doCommand('print');
           return true;
         }
       }

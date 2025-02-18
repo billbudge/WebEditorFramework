@@ -1829,7 +1829,7 @@ export class FunctionchartContext extends EventBase {
         const self = this, selection = this.selection;
         elements.forEach(element => {
             selection.delete(element);
-            if (asFunctioncharts) {
+            if (!asFunctioncharts) {
                 const abstractElement = self.abstractElement(element);
                 self.replaceNode(element, abstractElement);
                 selection.add(abstractElement);
@@ -3880,30 +3880,168 @@ export class FunctionchartEditor {
         this.canvasController.draw();
     }
     doCommand(command) {
+        const context = this.context, canvasController = this.canvasController;
         switch (command) {
             case 'undo': {
-                if (this.context.getUndo()) {
-                    this.context.undo();
-                    this.canvasController.draw();
+                if (context.getUndo()) {
+                    context.undo();
+                    canvasController.draw();
                 }
                 break;
             }
             case 'redo': {
-                if (this.context.getRedo()) {
-                    this.context.redo();
-                    this.canvasController.draw();
+                if (context.getRedo()) {
+                    context.redo();
+                    canvasController.draw();
+                }
+                break;
+            }
+            case 'cut': {
+                this.scrap = context.cut();
+                canvasController.draw();
+                break;
+            }
+            case 'copy': {
+                this.scrap = context.copy();
+                break;
+            }
+            case 'paste': {
+                if (this.scrap.length > 0) {
+                    // TODO paste at canvas controller center.
+                    context.paste(this.scrap);
+                    this.updateBounds();
+                    canvasController.draw();
                 }
                 break;
             }
             case 'delete': {
-                this.context.deleteSelection();
-                this.canvasController.draw();
+                context.deleteSelection();
+                canvasController.draw();
+                break;
+            }
+            case 'group': {
+                context.selection.set(context.selectedNodes());
+                context.extendSelectionToWires();
+                context.reduceSelection();
+                context.beginTransaction('group items into functionchart');
+                const bounds = this.renderer.sumBounds(context.selectedNodes()), contents = context.selectedAllTypes();
+                let parent = context.getContainingFunctionchart(contents);
+                expandRect(bounds, Functionchart.radius, Functionchart.radius);
+                context.group(contents, parent, bounds);
+                context.endTransaction();
+                break;
+            }
+            case 'complete': {
+                const renderer = this.renderer;
+                renderer.begin(this.canvasController.getCtx());
+                context.beginTransaction('complete elements');
+                context.completeNode(context.selectedNodes());
+                renderer.end();
+                context.endTransaction();
+                canvasController.draw();
+                break;
+            }
+            case 'extend': {
+                context.selectConnectedNodes(wire => true, wire => true); // TODO finer grained connecting.
+                canvasController.draw();
+                break;
+            }
+            case 'selectAll': {
+                this.functionchart.nodes.forEach(node => {
+                    context.selection.add(node);
+                });
+                canvasController.draw();
+                break;
+            }
+            case 'import': {
+                context.beginTransaction('import element');
+                context.modifyElements(context.selectedElements(), 'importer');
+                context.endTransaction();
+                break;
+            }
+            case 'export': {
+                context.beginTransaction('export element');
+                context.modifyElements(context.selectedElements(), 'exporter');
+                context.endTransaction();
+                break;
+            }
+            case 'constructor': {
+                context.beginTransaction('constructor element');
+                context.modifyElements(context.selectedElements(), 'constructor');
+                context.endTransaction();
+                break;
+            }
+            case 'upCast': {
+                context.beginTransaction('up-cast element');
+                context.modifyElements(context.selectedElements(), 'upCast');
+                context.endTransaction();
+                break;
+            }
+            case 'downCast': {
+                context.beginTransaction('down-cast element');
+                context.modifyElements(context.selectedElements(), 'downCast');
+                context.endTransaction();
+                break;
+            }
+            case 'abstract': {
+                context.beginTransaction('abstract element');
+                context.abstractElements(context.selectedElements(), false);
+                context.endTransaction();
+                break;
+            }
+            case 'abstractFunctionchart': {
+                context.beginTransaction('abstract functionchart for element');
+                context.abstractElements(context.selectedElements(), true);
+                context.endTransaction();
+                canvasController.draw();
+                break;
+            }
+            case 'new': {
+                this.openNewContext();
+                break;
+            }
+            case 'open': {
+                const self = this;
+                this.fileController.openFile().then(result => self.openNewContext(result));
+                break;
+            }
+            case 'openImport': {
+                const self = this;
+                // import the functionchart
+                this.fileController.openFile().then(result => {
+                    const imported = self.newContext(result);
+                    const type = imported.getExportType(imported.root);
+                    const element = context.newElement('element');
+                    element.name = 'external';
+                    element.typeString = type.typeString;
+                    const center = this.canvasController.getViewCenter();
+                    element.x = center.x;
+                    element.y = center.y;
+                    this.renderer.begin(this.canvasController.getCtx());
+                    this.renderer.layoutElement(element);
+                    this.renderer.end();
+                    context.beginTransaction('import functionchart');
+                    context.addItem(element, this.functionchart);
+                    context.select(element);
+                    context.endTransaction();
+                    self.canvasController.draw();
+                });
+                break;
+            }
+            case 'save': {
+                let text = JSON.stringify(Serialize(this.functionchart), undefined, 2);
+                this.fileController.saveUnnamedFile(text, 'functionchart.txt').then();
+                // console.log(text);
+                break;
+            }
+            case 'print': {
+                this.print();
                 break;
             }
         }
     }
     onKeyDown(e) {
-        const self = this, context = this.context, functionchart = this.functionchart, keyCode = e.keyCode, // TODO fix me.
+        const keyCode = e.keyCode, // TODO fix me.
         cmdKey = e.ctrlKey || e.metaKey, shiftKey = e.shiftKey;
         if (keyCode === 8) { // 'delete'
             this.doCommand('delete');
@@ -3912,11 +4050,7 @@ export class FunctionchartEditor {
         if (cmdKey) {
             switch (keyCode) {
                 case 65: { // 'a'
-                    functionchart.nodes.forEach(node => {
-                        context.selection.add(node);
-                    });
-                    self.canvasController.draw();
-                    this.setPropertyGrid();
+                    this.doCommand('selectAll');
                     return true;
                 }
                 case 90: { // 'z'
@@ -3929,118 +4063,77 @@ export class FunctionchartEditor {
                     return true;
                 }
                 case 89: { // 'y'
-                    return true; // TODO new command slot.
+                    return false; // TODO new command slot.
                 }
                 case 88: { // 'x'
-                    this.scrap = context.cut();
-                    self.canvasController.draw();
+                    this.doCommand('cut');
                     return true;
                 }
                 case 67: { // 'c'
-                    this.scrap = context.copy();
+                    this.doCommand('copy');
                     return true;
                 }
                 case 86: { // 'v'
-                    if (this.scrap.length > 0) {
-                        // TODO paste at canvas controller center.
-                        context.paste(this.scrap);
-                        this.updateBounds();
-                        return true;
-                    }
-                    return false;
+                    this.doCommand('paste');
+                    return true;
                 }
                 case 71: { // 'g'
-                    context.selection.set(context.selectedNodes());
-                    context.extendSelectionToWires();
-                    context.reduceSelection();
-                    context.beginTransaction('group items into functionchart');
-                    const bounds = this.renderer.sumBounds(context.selectedNodes()), contents = context.selectedAllTypes();
-                    let parent = context.getContainingFunctionchart(contents);
-                    expandRect(bounds, Functionchart.radius, Functionchart.radius);
-                    context.group(contents, parent, bounds);
-                    context.endTransaction();
+                    this.doCommand('group');
                     return true;
                 }
                 case 69: { // 'e'
-                    context.selectConnectedNodes(wire => true, wire => true); // TODO finer grained connecting.
-                    self.canvasController.draw();
+                    this.doCommand('extend');
                     return true;
                 }
                 case 72: // 'h'
-                    // editingModel.doTogglePalette();
-                    // return true;
                     return false;
                 case 74: { // 'j'
-                    const renderer = this.renderer;
-                    renderer.begin(this.canvasController.getCtx());
-                    context.beginTransaction('complete elements');
-                    context.completeNode(context.selectedNodes());
-                    renderer.end();
-                    context.endTransaction();
+                    this.doCommand('complete');
                     return true;
                 }
                 case 75: { // 'k'
-                    context.beginTransaction('export element');
-                    context.modifyElements(context.selectedElements(), 'exporter');
-                    context.endTransaction();
+                    this.doCommand('export');
                     return true;
                 }
                 case 76: // 'l'
-                    context.beginTransaction('import element');
-                    context.modifyElements(context.selectedElements(), 'importer');
-                    context.endTransaction();
+                    this.doCommand('import');
                     return true;
                 case 73: // 'i'
-                    context.beginTransaction('abstract element');
-                    context.abstractElements(context.selectedElements(), !shiftKey);
-                    context.endTransaction();
+                    if (!shiftKey) {
+                        this.doCommand('abstract');
+                    }
+                    else {
+                        this.doCommand('abstractFunctionchart');
+                    }
                     return true;
                 case 85: // 'u'
-                    context.beginTransaction('cast element');
-                    context.modifyElements(context.selectedElements(), shiftKey ? 'downCast' : 'upCast');
-                    context.endTransaction();
+                    if (shiftKey) {
+                        this.doCommand('upCast');
+                    }
+                    else {
+                        this.doCommand('downCast');
+                    }
                     return true;
                 case 78: { // 'n'
                     // ctrl-n
-                    this.openNewContext();
+                    this.doCommand('new');
                     return true;
                 }
                 case 79: { // 'o'
                     if (shiftKey) {
-                        // import the functionchart
-                        this.fileController.openFile().then(result => {
-                            const imported = self.newContext(result);
-                            const type = imported.getExportType(imported.root);
-                            const element = context.newElement('element');
-                            element.name = 'external';
-                            element.typeString = type.typeString;
-                            const center = this.canvasController.getViewCenter();
-                            element.x = center.x;
-                            element.y = center.y;
-                            this.renderer.begin(this.canvasController.getCtx());
-                            this.renderer.layoutElement(element);
-                            this.renderer.end();
-                            context.beginTransaction('import functionchart');
-                            context.addItem(element, functionchart);
-                            context.select(element);
-                            context.endTransaction();
-                            self.canvasController.draw();
-                        });
+                        this.doCommand('openImport');
                     }
                     else {
-                        // open a new functionchart
-                        this.fileController.openFile().then(result => self.openNewContext(result));
+                        this.doCommand('open');
                     }
                     return true;
                 }
                 case 83: { // 's'
-                    let text = JSON.stringify(Serialize(functionchart), undefined, 2);
-                    this.fileController.saveUnnamedFile(text, 'functionchart.txt').then();
-                    // console.log(text);
+                    this.doCommand('save');
                     return true;
                 }
                 case 80: { // 'p'
-                    this.print();
+                    this.doCommand('print');
                     return true;
                 }
             }

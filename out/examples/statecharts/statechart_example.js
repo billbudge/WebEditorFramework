@@ -37,7 +37,12 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js';
                 case 'copy': return 'copy';
                 case 'paste': return 'paste';
                 case 'delete': return 'delete';
+                case 'group': return 'group';
+                case 'extend': return 'extend';
                 case 'selectAll': return 'selectAll';
+                case 'open': return 'open';
+                case 'save': return 'save';
+                case 'print': return 'print';
             }
         }
         function buttonListener(e) {
@@ -49,6 +54,16 @@ import { StatechartEditor } from '../../examples/statecharts/statecharts.js';
         document.getElementById('undo').addEventListener('click', buttonListener);
         document.getElementById('redo').addEventListener('click', buttonListener);
         document.getElementById('delete').addEventListener('click', buttonListener);
+        document.getElementById('extend').addEventListener('click', buttonListener);
+        function selectListener(e) {
+            const target = e.target, command = idToCommand(target.value);
+            if (command) {
+                target.selectedIndex = 0;
+                statechartEditor.doCommand(command);
+            }
+        }
+        document.getElementById('file').addEventListener('change', selectListener);
+        document.getElementById('edit').addEventListener('change', selectListener);
         document.getElementById('examples').addEventListener('change', event => {
             const select = event.target;
             const id = select.value, fileName = id + '.txt';
