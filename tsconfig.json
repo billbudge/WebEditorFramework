@@ -25,6 +25,7 @@
             "test/functioncharts.test.ts",
             "examples/statecharts/statechart_example.ts",
             "examples/functioncharts/functionchart_example.ts",
+            "examples/functioncharts/execution.ts",
             "third_party/canvas2svg/canvas2svg.js",
             "third_party/FileSaver.min.js"],
 }
