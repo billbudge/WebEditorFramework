@@ -3340,12 +3340,6 @@ class Renderer implements ILayoutEngine {
 //------------------------------------------------------------------------------
 // Execution
 
-export type Scope = {
-  functionchart: Functionchart,
-  inputs: PinInfo[],
-  outputs: PinInfo[],
-}
-
 export interface Emitter {
   emit(code: string): void;
   indentIn(): void;
@@ -3369,182 +3363,212 @@ export class ConsoleEmitter implements Emitter {
 
 export type RefMap = Map<number, string[]>;
 
-export function getRef(node: NodeTypes, pin: number, map: RefMap, scope: Scope, emitter: Emitter) : string {
-  let ref = map.get(node.id);
-  if (ref === undefined) {
-    ref = codegenNode(node, map, scope, emitter);
-  }
-  return ref[pin];
-}
-
-export function codegenLiteral(literal: Element, map: RefMap, scope: Scope, emitter: Emitter) : string[] {
-  const name = 'v' + literal.id;
-  let ref = literal.type.outputs[0].name || 'undefined';
-  // undefined, numeric or string literal?
-  if (isNaN(parseInt(ref))) {
-    ref = `'${ref}'`;  // string literal  TODO 'true', 'false', etc.
-  }
-  const code = `const ${name} = ${ref};`,
-        refs = [ref];
-  emitter.emit(code);
-  map.set(literal.id, refs);
-  return refs;
-}
-
-export function codegenPseudoelement(pseudoelement: Pseudoelement, map: RefMap, scope: Scope) : string[] {
-  const name = 'v' + pseudoelement.id;
-  switch (pseudoelement.template.typeName) {
-    case 'input': {
-      return [name];
-    }
-  }
-  return [];
-}
-
-export function codegenUnop(op: Element, map: RefMap, scope: Scope, emitter: Emitter) : string[] {
-  const name = 'v' + op.id,
-        wire = op.inWires[0];
-  let input = 'undefined';
-  if (wire) {
-    input = getRef(wire.src!, wire.srcPin, map, scope, emitter);
-  }
-  const code = `const ${name} = ${op.type.name}(${input});`,
-        refs = [name];
-  emitter.emit(code);
-  map.set(op.id, refs);
-  return refs;
-}
-
-export function codegenBinop(op: Element, map: RefMap, scope: Scope, emitter: Emitter) : string[] {
-  const name = 'v' + op.id,
-        wire1 = op.inWires[0],
-        wire2 = op.inWires[1];
-  let input1 = 'undefined';
-  if (wire1) {
-    input1 = getRef(wire1.src!, wire1.srcPin, map, scope, emitter);
-  }
-  let input2 = 'undefined';
-  if (wire2) {
-    input2 = getRef(wire2.src!, wire2.srcPin, map, scope, emitter);
-  }
-  const code = `const ${name} = ${input1} ${op.type.name} ${input2};`,
-        refs = [name];
-  emitter.emit(code);
-  map.set(op.id, refs);
-  return refs;
-}
-
-export function codegenCond(op: Element, map: RefMap, scope: Scope, emitter: Emitter) : string[] {
-  const name = 'v' + op.id,
-        cwire = op.inWires[0],
-        wire1 = op.inWires[1],
-        wire2 = op.inWires[2];
-  let cInput = 'undefined';
-  if (cwire) {
-    cInput = getRef(cwire.src!, cwire.srcPin, map, scope, emitter);
-  }
-  let input1 = 'undefined';
-  if (wire1) {
-    input1 = getRef(wire1.src!, wire1.srcPin, map, scope, emitter);
-  }
-  let input2 = 'undefined';
-  if (wire2) {
-    input2 = getRef(wire2.src!, wire2.srcPin, map, scope, emitter);
-  }
-  const code =
-      `let ${name};
-       if (${cInput}) {
-          ${name} = ${input1};
-       } else {
-          ${name} = ${input2};
-       };`;
-  const refs = [name];
-  emitter.emit(code);
-  map.set(op.id, refs);
-  return refs;
-}
-
-export function codegenNode(node: NodeTypes, map: RefMap, scope: Scope, emitter: Emitter) : string[] {
-  if (node instanceof Pseudoelement) {
-    return codegenPseudoelement(node, map, scope);
-  } else if (node instanceof Element) {
-    switch (node.name) {
-      case 'literal': return codegenLiteral(node, map, scope, emitter);
-      case 'unop': return codegenUnop(node, map, scope, emitter);
-      case 'binop': return codegenBinop(node, map, scope, emitter);
-      case 'cond': return codegenCond(node, map, scope, emitter);
-    }
-  }
-  return [];
-}
-
-function inputName(input: PinInfo) : string {
-  const element = input.element,
-        type = element.type;
-  let name : string = 'p_' + element.id.toString();
-  if (type.outputs.length > 1) {
-    name += '_' + input.index.toString();
-  }
-  return name;
-}
-
-export function codegenFunctionchart(functionchart: Functionchart, map: RefMap, emitter: Emitter) {
-  const name = (functionchart.name || 'v') + '_' + functionchart.id,
-        inputs = functionchart.typeInfo.inputs,
-        outputs = functionchart.typeInfo.outputs,
-        scope = { functionchart, inputs, outputs },
-        fnInputs: string[] = [],
-        fnOutputs: string[] = [];
-  for (let i = 0; i < inputs.length; i++) {
-    const input = inputs[i],
-          name = inputName(input);
-    map.set(input.element.id, [name]);
-    fnInputs.push(name);
-  }
-  if (fnInputs.length > 0) {
-    let code;
-    if (fnInputs.length === 1) {
-      code = `function ${name}(${fnInputs[0]}) {`;
-    } else {
-      code = `function ${name}(${fnInputs.join(', ')}) {`;
-    }
-    emitter.emit(code);
-  }
-
-  for (let i = 0; i < outputs.length; i++) {
-    const output = outputs[i],
-          wire = output.element.inWires[0];
-    if (wire) {
-      const src = wire.src!,
-            srcPin = wire.srcPin,
-            ref = getRef(src, srcPin, map, scope, emitter);
-      fnOutputs.push(ref);
-    }
-  }
-
-  if (fnOutputs.length > 0) {
-    let code;
-    if (fnOutputs.length === 1) {
-      code = `return ${fnOutputs[0]};`;
-    } else {
-      code = `return [${fnOutputs.join(', ')}];`;
-    }
-    emitter.emit(code);
-    emitter.emit('}');
-  }
-}
-/*
-      return [y, w];
-    }
-    let [yIn, wIn] = layoutPins(inputs);
-    let [yOut, wOut] = layoutPins(outputs);
-
-*/
-
 export function codegen(functionchart: Functionchart) {
   const map = new Map<number, string[]>(),
-        emitter = new ConsoleEmitter();
-  codegenFunctionchart(functionchart, map, emitter);
+        emitter = new ConsoleEmitter(),
+        scopes = [functionchart];
+
+  function getOperand(node: NodeTypes, pin: number) : string {
+    const wire = node.inWires[pin];
+    let result = 'undefined';
+    if (wire) {
+      result = getRef(wire.src!, wire.srcPin);
+    } else {
+      const functionchart = node.parent as Functionchart;
+      if (functionchart.implicit) {
+        result = inputName(node as Element, pin); //TODO
+      }
+    }
+    return result;
+  }
+  function getRef(node: NodeTypes, pin: number) : string {
+    let ref = map.get(node.id);
+    if (ref === undefined) {
+      ref = codegenNode(node);
+    }
+    return ref[pin];
+  }
+
+  function codegenLiteral(literal: Element) : string[] {
+    const name = 'v' + literal.id;
+    let ref = literal.type.outputs[0].name || 'undefined';
+    // undefined, numeric or string literal?
+    if (isNaN(parseInt(ref))) {
+      ref = `'${ref}'`;  // string literal  TODO 'true', 'false', etc.
+    }
+    const code = `const ${name} = ${ref};`,
+          refs = [ref];
+    emitter.emit(code);
+    map.set(literal.id, refs);
+    return refs;
+  }
+
+  function codegenPseudoelement(pseudoelement: Pseudoelement, map: RefMap, scopes: Functionchart[]) : string[] {
+    const name = 'v' + pseudoelement.id;
+    switch (pseudoelement.template.typeName) {
+      case 'input': {
+        const refs = [name];
+        map.set(pseudoelement.id, refs);
+        return refs;
+      }
+    }
+    return [];
+  }
+
+  function codegenUnop(op: Element) : string[] {
+    const name = 'v' + op.id,
+          input = getOperand(op, 0);
+    const code = `const ${name} = ${op.type.name}(${input});`,
+          refs = [name];
+    emitter.emit(code);
+    map.set(op.id, refs);
+    return refs;
+  }
+
+  function codegenBinop(op: Element) : string[] {
+    const name = 'v' + op.id,
+          input1 = getOperand(op, 0),
+          input2 = getOperand(op, 1);
+    const code = `const ${name} = ${input1} ${op.type.name} ${input2};`,
+          refs = [name];
+    emitter.emit(code);
+    map.set(op.id, refs);
+    return refs;
+  }
+
+  function codegenCond(op: Element) : string[] {
+    const name = 'v' + op.id,
+          cInput = getOperand(op, 0),
+          input1 = getOperand(op, 1),
+          input2 = getOperand(op, 2);
+    emitter.emit(`let ${name};`);
+    emitter.emit(`if (${cInput}) {`);
+    emitter.indentIn();
+    emitter.emit(`${name} = ${input1};`);
+    emitter.indentOut();
+    emitter.emit(`} else {`);
+    emitter.indentIn();
+    emitter.emit(`${name} = ${input2};`);
+    emitter.indentOut();
+    emitter.emit(`};`);
+    const refs = [name];
+    map.set(op.id, refs);
+    return refs;
+  }
+
+  function functionName(src: InstancerTypes, pin: number) : string {
+    if (src instanceof Functionchart) {
+      return (functionchart.name || 'fn') + '_' + functionchart.id.toString();
+    }
+    const type = src.type;
+    let name : string = 'fn_' + src.id.toString();  // TODO base off pin name.
+    if (type.outputs.length > 1) {
+      name += '_' + pin.toString();
+    }
+    return name;
+  }
+
+  function codegenFunctionInstance(instance: FunctionInstance) : string[] {
+    const fn = getRef(instance.src, instance.srcPin),
+          type = instance.type,
+          inputs = type.inputs,
+          outputs = type.outputs,
+          parameters: string[] = [],
+          refs: string[] = [];
+    for (let i = 0; i < inputs.length; i++) {
+      const input = getOperand(instance, i);
+      parameters.push(input);
+    }
+    for (let i = 0; i < outputs.length; i++) {
+      refs.push('r_' + i.toString());
+    }
+    if (refs.length == 1) {
+      emitter.emit(`let ${refs[0]} = ${fn}(${parameters.join(', ')});`);
+    } else if (refs.length > 1) {
+      emitter.emit(`let [${refs.join(', ')}] = ${fn}(${parameters.join(', ')});`);
+    }
+    map.set(instance.id, refs);
+    return refs;
+  }
+
+  function inputName(element: NodeTypes, pin: number) : string {
+    if (element instanceof Pseudoelement) {
+      return 'p_' + element.id.toString();
+    }
+    // implicit input TODO importer, abstract fn input.
+    return 'p_' + element.id.toString() + '_' + pin.toString();
+  }
+
+  function codegenFunctionchart(functionchart: Functionchart) : string[] {
+    const name = functionName(functionchart, 0),
+          inputs = functionchart.typeInfo.inputs,
+          outputs = functionchart.typeInfo.outputs,
+          fnInputs: string[] = [],
+          fnOutputs: string[] = [];
+    // First generate any sub-functions.
+    functionchart.nodes.forEach(node => {
+      if (node instanceof Functionchart) {
+        codegenFunctionchart(node);
+      }
+    })
+    for (let i = 0; i < inputs.length; i++) {
+      const input = inputs[i],
+            name = inputName(input.element, input.index);
+      map.set(input.element.id, [name]);
+      fnInputs.push(name);
+    }
+    if (fnInputs.length > 0) {
+      let code;
+      if (fnInputs.length === 1) {
+        code = `function ${name}(${fnInputs[0]}) {`;
+      } else {
+        code = `function ${name}(${fnInputs.join(', ')}) {`;
+      }
+      emitter.emit(code);
+      emitter.indentIn();
+    }
+
+    for (let i = 0; i < outputs.length; i++) {
+      const output = outputs[i],
+            ref = getOperand(output.element, output.index);
+      fnOutputs.push(ref);
+    }
+
+    if (fnOutputs.length > 0) {
+      let code;
+      if (fnOutputs.length === 1) {
+        code = `return ${fnOutputs[0]};`;
+      } else {
+        code = `return [${fnOutputs.join(', ')}];`;
+      }
+      emitter.emit(code);
+      emitter.indentOut();
+      emitter.emit('}');
+    }
+
+    const refs = [name];
+    map.set(functionchart.id, refs);
+    return refs;
+  }
+
+  function codegenNode(node: NodeTypes) : string[] {
+    if (node instanceof Pseudoelement) {
+      return codegenPseudoelement(node, map, scopes);
+    } else if (node instanceof FunctionInstance) {
+      return codegenFunctionInstance(node);
+    } else if (node instanceof Element) {
+      switch (node.name) {
+        case 'literal': return codegenLiteral(node);
+        case 'unop': return codegenUnop(node);
+        case 'binop': return codegenBinop(node);
+        case 'cond': return codegenCond(node);
+      }
+    } else if (node instanceof Functionchart) {
+      return codegenFunctionchart(node);
+    }
+    return [];
+  }
+  codegenFunctionchart(functionchart);
 }
 
 // --------------------------------------------------------------------------------------------
@@ -4930,9 +4954,9 @@ export class FunctionchartEditor implements CanvasLayer {
           }
           return true;
         }
-        case 89: { // 'y'
+        case 89: { // 'y', code gen experiment.
           codegen(this.functionchart);
-          return false;  // TODO new command slot.
+          return true;
         }
         case 88: { // 'x'
           this.doCommand('cut');
