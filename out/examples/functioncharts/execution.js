@@ -1,12 +1,14 @@
 import { Element, Pseudoelement, ModifierElement, FunctionInstance, Functionchart } from './functioncharts.js';
 export class ConsoleEmitter {
     constructor() {
+        this.lines = [];
         this.indent = 0;
     }
     // private code: string = '';
     emit(code) {
         const line = ' '.repeat(this.indent * 2) + code + '\n';
-        console.log(line);
+        this.lines.push(line);
+        // console.log(line);
     }
     indentIn() {
         this.indent++;
@@ -14,11 +16,15 @@ export class ConsoleEmitter {
     indentOut() {
         this.indent--;
     }
+    flush() {
+        console.log(this.lines.join(''));
+        this.lines = [];
+    }
 }
 export function codegen(functionchart) {
     const map = new Map(), emitter = new ConsoleEmitter(), scopes = [functionchart];
     function parameterName(element, pin) {
-        let name = 'p_' + element.id.toString();
+        let name = 'p_' + element.id.toString() + '_' + pin.toString();
         if (element instanceof Pseudoelement) {
             return name;
         }
@@ -57,7 +63,7 @@ export function codegen(functionchart) {
         return ref[pin];
     }
     function codegenLiteral(literal) {
-        const name = 'p_' + literal.id;
+        const name = 'v_' + literal.id;
         let ref = literal.type.outputs[0].name || 'undefined';
         // undefined, numeric or string literal?
         if (isNaN(parseInt(ref))) {
@@ -69,7 +75,7 @@ export function codegen(functionchart) {
         return refs;
     }
     function codegenPseudoelement(pseudoelement, map, scopes) {
-        const name = 'p_' + pseudoelement.id;
+        const name = 'p_' + pseudoelement.id + '_0'; // TODO better names.
         switch (pseudoelement.template.typeName) {
             case 'input': {
                 const refs = [name];
@@ -80,21 +86,21 @@ export function codegen(functionchart) {
         return [];
     }
     function codegenUnop(op) {
-        const name = 'p_' + op.id, input = getOperand(op, 0);
+        const name = 'v_' + op.id, input = getOperand(op, 0);
         const code = `const ${name} = ${op.type.name}(${input});`, refs = [name];
         emitter.emit(code);
         map.set(op.id, refs);
         return refs;
     }
     function codegenBinop(op) {
-        const name = 'p_' + op.id, input1 = getOperand(op, 0), input2 = getOperand(op, 1);
+        const name = 'v_' + op.id, input1 = getOperand(op, 0), input2 = getOperand(op, 1);
         const code = `const ${name} = ${input1} ${op.type.name} ${input2};`, refs = [name];
         emitter.emit(code);
         map.set(op.id, refs);
         return refs;
     }
     function codegenCond(op) {
-        const name = 'p_' + op.id, cInput = getOperand(op, 0);
+        const name = 'v_' + op.id, cInput = getOperand(op, 0);
         emitter.emit(`let ${name};`);
         emitter.emit(`if (${cInput}) {`);
         emitter.indentIn();
@@ -112,7 +118,7 @@ export function codegen(functionchart) {
         return refs;
     }
     function codegenModifier(modifier) {
-        const name = 'p_' + modifier.id;
+        const name = 'v_' + modifier.id;
         if (modifier.isImporter) {
             // TODO default value.
             const refs = [name];
@@ -131,7 +137,7 @@ export function codegen(functionchart) {
             return 'fn_' + src.id.toString();
         }
         // importer or abstract element.
-        return 'p_' + src.id.toString();
+        return 'p_' + src.id.toString() + '_' + pin.toString();
     }
     function codegenFunctionInstance(instance) {
         const src = instance.src, srcPin = instance.srcPin, type = instance.type, inputs = type.inputs, outputs = type.outputs, parameters = [], refs = [];
@@ -168,15 +174,15 @@ export function codegen(functionchart) {
         for (let i = 0; i < inputs.length; i++) {
             const input = inputs[i], name = parameterName(input.element, input.index);
             // map.set(input.element.id, [name]);
-            fnInputs.push(name);
+            fnInputs.push(name + ': any');
         }
         if (fnInputs.length > 0) {
             let code;
             if (fnInputs.length === 1) {
-                code = `function ${name}(${fnInputs[0]}) {`;
+                code = `function ${name}(${fnInputs[0]}): any {`;
             }
             else {
-                code = `function ${name}(${fnInputs.join(', ')}) {`;
+                code = `function ${name}(${fnInputs.join(', ')}): any {`;
             }
             emitter.emit(code);
             emitter.indentIn();
@@ -227,5 +233,6 @@ export function codegen(functionchart) {
         return [];
     }
     codegenFunctionchart(functionchart);
+    emitter.flush();
 }
 //# sourceMappingURL=execution.js.map

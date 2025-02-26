@@ -1,5 +1,5 @@
 import { getDefaultTheme, CanvasController, PropertyGridController } from '../../src/diagrams.js';
-import { FunctionchartEditor } from '../../examples/functioncharts/functioncharts.js';
+import { FunctionchartEditor } from './functioncharts.js';
 (function () {
     const body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette');
     if (body && canvas && palette) {
@@ -15,6 +15,35 @@ import { FunctionchartEditor } from '../../examples/functioncharts/functionchart
         canvasController.setSize(window.innerWidth, window.innerHeight);
         paletteController.configure([functionchartEditor]);
         paletteController.setSize(324, 128);
+        {
+            function fn_3(p_8_0, p_7_0) {
+                const v_10 = 1;
+                const v_9 = p_8_0 <= 1;
+                let v_4;
+                if (v_9) {
+                    v_4 = p_7_0;
+                }
+                else {
+                    let r_12_0 = fn_13(p_8_0);
+                    const v_6 = p_8_0 * p_7_0;
+                    let r_11_0 = fn_3(r_12_0, v_6);
+                    v_4 = r_11_0;
+                }
+                ;
+                return v_4;
+            }
+            function fn_13(p_14_0) {
+                const v_15 = 1;
+                const v_14 = p_14_0 - 1;
+                return v_14;
+            }
+            function fn_16(p_17_0) {
+                const v_18 = 1;
+                let r_17_0 = fn_3(p_17_0, 1);
+                return r_17_0;
+            }
+            console.log(fn_16(5));
+        }
         window.onbeforeunload = function () {
             return "Confirm unload?";
         };

@@ -1,5 +1,5 @@
 import { getDefaultTheme, CanvasController, PropertyGridController } from '../../src/diagrams.js';
-import { StatechartEditor } from '../../examples/statecharts/statecharts.js';
+import { StatechartEditor } from './statecharts.js';
 (function () {
     const body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette');
     if (body && canvas && palette) {
