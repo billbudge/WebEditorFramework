@@ -1,5 +1,5 @@
 import { getDefaultTheme, CanvasController, PropertyGridController } from '../../src/diagrams.js'
-import { StatechartEditor, EditorCommand } from '../../examples/statecharts/statecharts.js'
+import { StatechartEditor, EditorCommand } from './statecharts.js'
 
 (function() {
 

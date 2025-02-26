@@ -1,5 +1,5 @@
 import { getDefaultTheme, CanvasController, PropertyGridController } from '../../src/diagrams.js'
-import { FunctionchartEditor, EditorCommand } from '../../examples/functioncharts/functioncharts.js'
+import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
 
 (function() {
 
