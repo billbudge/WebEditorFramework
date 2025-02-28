@@ -1,10 +1,10 @@
 {
   "type": "functionchart",
   "id": 2,
-  "typeString": "[,[,]]",
+  "typeString": "[,[,v]]",
   "x": 0,
   "y": 0,
-  "width": 1212.1375732421875,
+  "width": 1278.1484375,
   "height": 586.6293144226074,
   "name": "",
   "implicit": false,
@@ -357,7 +357,47 @@
         }
       ],
       "wires": []
+    },
+    {
+      "type": "instance",
+      "id": 27,
+      "typeString": "[v(n),v](n!)",
+      "x": 1181.046875,
+      "y": 210.1484375,
+      "instancer": 18,
+      "srcPin": 0
+    },
+    {
+      "type": "element",
+      "id": 29,
+      "typeString": "[,v(5)]",
+      "x": 1125.3984375,
+      "y": 212.23046875,
+      "name": "literal",
+      "hideLinks": false
+    },
+    {
+      "type": "output",
+      "id": 30,
+      "typeString": "[v,]",
+      "x": 1245.6796875,
+      "y": 223.953125
     }
   ],
-  "wires": []
+  "wires": [
+    {
+      "type": "wire",
+      "src": 29,
+      "srcPin": 0,
+      "dst": 27,
+      "dstPin": 0
+    },
+    {
+      "type": "wire",
+      "src": 27,
+      "srcPin": 0,
+      "dst": 30,
+      "dstPin": 0
+    }
+  ]
 }
