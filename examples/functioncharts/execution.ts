@@ -30,7 +30,7 @@ export class ConsoleEmitter implements Emitter {
   }
 }
 
-export type RefMap = Map<number, string[]>;
+//------------------------------------------------------------------------------
 
 export function codegen(functionchart: Functionchart) {
   const map = new Map<number, string[]>(),
@@ -93,7 +93,7 @@ export function codegen(functionchart: Functionchart) {
     return refs;
   }
 
-  function codegenPseudoelement(pseudoelement: Pseudoelement, map: RefMap, scopes: Functionchart[]) : string[] {
+  function codegenPseudoelement(pseudoelement: Pseudoelement) : string[] {
     const name = 'p_' + pseudoelement.id + '_0';  // TODO better names.
     switch (pseudoelement.template.typeName) {
       case 'input': {
@@ -149,10 +149,10 @@ export function codegen(functionchart: Functionchart) {
   function elementToTypeInfo(element: ElementTypes) : TypeInfo {
     const type = element.type;
     const inputs = type.inputs.map((pin, i) => {
-      return { element, index: i, type: pin.type, name: undefined, fcIndex: -1}
+      return { element, index: i, type: pin.type, name: undefined }
     });
     const outputs = type.outputs.map((pin, i) => {
-      return { element, index: i, type: pin.type, name: undefined, fcIndex: -1}
+      return { element, index: i, type: pin.type, name: undefined }
     });
 
     return {
@@ -163,16 +163,6 @@ export function codegen(functionchart: Functionchart) {
       inputs: inputs,
       outputs: outputs,
     }
-  }
-
-  function codegenExporter(exporter: ModifierElement) : string[] {
-    const typeInfo = elementToTypeInfo(exporter.innerElement!);
-    const inner = exporter.innerElement,
-          inputs: PinInfo[] = [],
-          outputs: PinInfo[] = [];
-
-    const TypeInfo = { }
-    return [];
   }
 
   function codegenModifier(modifier: ModifierElement) : string[] {
@@ -285,7 +275,7 @@ export function codegen(functionchart: Functionchart) {
 
   function codegenNode(node: NodeTypes) : string[] {
     if (node instanceof Pseudoelement) {
-      return codegenPseudoelement(node, map, scopes);
+      return codegenPseudoelement(node);
     } else if (node instanceof FunctionInstance) {
       return codegenFunctionInstance(node);
     } else if (node instanceof Element) {

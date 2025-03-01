@@ -1480,14 +1480,14 @@ export class FunctionchartContext extends EventBase {
     // pin was added or an old pin was deleted.
     makePinMap(oldTypeInfo, typeInfo) {
         const result = new Array();
-        function find(pins, element, index) {
-            return pins.find(pin => pin.element === element && pin.index === index);
+        function findIndex(pins, element, index) {
+            return pins.findIndex(pin => pin.element === element && pin.index === index);
         }
         function makeMap(oldPins, pins) {
             for (let i = 0; i < oldPins.length; i++) {
-                const oldPin = oldPins[i], newPin = find(pins, oldPin.element, oldPin.index);
-                if (newPin) {
-                    result.push(newPin.fcIndex);
+                const oldPin = oldPins[i], newPin = findIndex(pins, oldPin.element, oldPin.index);
+                if (newPin >= 0) {
+                    result.push(newPin);
                 }
                 else {
                     result.push(-1);
@@ -2002,9 +2002,7 @@ export class FunctionchartContext extends EventBase {
         //   return p1.fcIndex - p2.fcIndex;
         // }
         inputs.sort(compareYs);
-        inputs.forEach((input, i) => { input.fcIndex = i; });
         outputs.sort(compareYs);
-        outputs.forEach((output, i) => { output.fcIndex = i; });
         const inputPins = inputs.map(pinInfo => {
             return new Pin(pinInfo.type, pinInfo.name);
         });

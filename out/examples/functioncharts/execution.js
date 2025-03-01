@@ -22,6 +22,7 @@ export class ConsoleEmitter {
         this.lines = [];
     }
 }
+//------------------------------------------------------------------------------
 export function codegen(functionchart) {
     const map = new Map(), emitter = new ConsoleEmitter(), scopes = [];
     function parameterName(element, pin) {
@@ -75,7 +76,7 @@ export function codegen(functionchart) {
         map.set(literal.id, refs);
         return refs;
     }
-    function codegenPseudoelement(pseudoelement, map, scopes) {
+    function codegenPseudoelement(pseudoelement) {
         const name = 'p_' + pseudoelement.id + '_0'; // TODO better names.
         switch (pseudoelement.template.typeName) {
             case 'input': {
@@ -121,10 +122,10 @@ export function codegen(functionchart) {
     function elementToTypeInfo(element) {
         const type = element.type;
         const inputs = type.inputs.map((pin, i) => {
-            return { element, index: i, type: pin.type, name: undefined, fcIndex: -1 };
+            return { element, index: i, type: pin.type, name: undefined };
         });
         const outputs = type.outputs.map((pin, i) => {
-            return { element, index: i, type: pin.type, name: undefined, fcIndex: -1 };
+            return { element, index: i, type: pin.type, name: undefined };
         });
         return {
             instanceType: type,
@@ -134,12 +135,6 @@ export function codegen(functionchart) {
             inputs: inputs,
             outputs: outputs,
         };
-    }
-    function codegenExporter(exporter) {
-        const typeInfo = elementToTypeInfo(exporter.innerElement);
-        const inner = exporter.innerElement, inputs = [], outputs = [];
-        const TypeInfo = {};
-        return [];
     }
     function codegenModifier(modifier) {
         if (modifier.innerElement) {
@@ -236,7 +231,7 @@ export function codegen(functionchart) {
     }
     function codegenNode(node) {
         if (node instanceof Pseudoelement) {
-            return codegenPseudoelement(node, map, scopes);
+            return codegenPseudoelement(node);
         }
         else if (node instanceof FunctionInstance) {
             return codegenFunctionInstance(node);
