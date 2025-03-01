@@ -188,7 +188,7 @@ export function codegen(functionchart) {
         const name = functionName(functionchart, 0);
         // First generate any sub-functions.
         functionchart.nodes.forEach(node => {
-            if (node instanceof Functionchart && !node.isAbstract) {
+            if (node instanceof Functionchart) {
                 codegenFunctionchart(node);
             }
         });

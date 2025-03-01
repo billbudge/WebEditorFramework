@@ -16,38 +16,6 @@ import { FunctionchartEditor } from './functioncharts.js';
         paletteController.configure([functionchartEditor]);
         paletteController.setSize(324, 128);
         {
-            function fn_3(p_7_0, p_13_0, p_6_0, p_10_0) {
-                const v_8 = p_7_0 <= p_13_0;
-                let v_4;
-                if (v_8) {
-                    v_4 = p_6_0;
-                }
-                else {
-                    let r_9_0 = fn_15(p_7_0);
-                    let r_12_0 = p_10_0(p_7_0, p_6_0);
-                    let r_14_0 = fn_3(r_9_0, p_13_0, r_12_0, p_10_0);
-                    v_4 = r_14_0;
-                }
-                ;
-                return v_4;
-            }
-            function fn_15(p_16_0) {
-                const v_17 = 1;
-                const v_16 = p_16_0 - 1;
-                return v_16;
-            }
-            function fn_18(p_20_0) {
-                const v_19 = 1;
-                function p_21(p_22_0, p_22_1) {
-                    const v_22 = p_22_0 * p_22_1;
-                    return v_22;
-                }
-                let r_20_0 = fn_3(p_20_0, 1, 1, p_21);
-                return r_20_0;
-            }
-            const v_28 = 5;
-            let r_27_0 = fn_18(5);
-            console.log(r_27_0);
         }
         window.onbeforeunload = function () {
             return "Confirm unload?";
