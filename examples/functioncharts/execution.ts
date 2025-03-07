@@ -1,6 +1,8 @@
-import { NodeTypes, Element, Pseudoelement, ModifierElement, FunctionInstance, ElementTypes,
-         Functionchart,  InstancerTypes, Type, TypeInfo, PinInfo
+import { Element, Pseudoelement, ModifierElement, FunctionInstance, NodeTypes, ElementTypes,
+         Wire, Functionchart,  InstancerTypes, Type, TypeInfo, PinInfo
 } from './functioncharts.js'
+
+//------------------------------------------------------------------------------
 
 export interface Emitter {
   emit(code: string): void;
@@ -28,6 +30,83 @@ export class ConsoleEmitter implements Emitter {
     console.log(this.lines.join(''));
     this.lines = [];
   }
+}
+
+//------------------------------------------------------------------------------
+
+export class Node {
+  basis: NodeTypes[];
+  constructor(base: NodeTypes) {
+    this.basis = [base];
+  }
+}
+
+export class Operand {
+  basis: NodeTypes | undefined;
+  pin: number
+  constructor(node: NodeTypes | undefined, pin: number) {
+    this.basis = node;
+    this.pin = pin;
+  }
+  static undefined = new Operand(undefined, -1);
+  static toOperand(wire: Wire | undefined) {
+    if (wire === undefined)
+      return Operand.undefined;
+    if (!(wire.src instanceof Element))
+      return Operand.undefined;
+    return new Operand(wire.src, wire.srcPin);
+  }
+}
+
+export class Function extends Node {
+  operands: Operand[];
+  constructor(element: NodeTypes) {
+    super(element);
+  }
+}
+
+export class FunctionDefinition extends Node {
+  constructor(functionchart: NodeTypes) {
+    super(functionchart);
+  }
+}
+
+export class Unop extends Node {
+  op: string;
+  operand: Operand;
+  constructor(element: Element) {
+    super(element);
+    this.op = element.type.name!;
+    this.operand = Operand.toOperand(element.inWires[0]);
+  }
+}
+
+export class Binop extends Node {
+  op: string;
+  left: Operand;
+  right: Operand;
+  constructor(element: Element) {
+    super(element);
+    this.op = element.type.name!;
+    this.left = Operand.toOperand(element.inWires[0]);
+    this.right = Operand.toOperand(element.inWires[1]);
+  }
+}
+
+export class IfThenElse extends Node {
+  cond: Operand;
+  if: Operand;
+  else: Operand;
+  constructor(element: Element) {
+    super(element);
+    this.cond = Operand.toOperand(element.inWires[0]);
+    this.if = Operand.toOperand(element.inWires[1]);
+    this.else = Operand.toOperand(element.inWires[2]);
+  }
+}
+
+export class CodeGen {
+  private map = new WeakMap<NodeTypes, Node>();
 }
 
 //------------------------------------------------------------------------------

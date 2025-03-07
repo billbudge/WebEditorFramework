@@ -23,6 +23,51 @@ export class ConsoleEmitter {
     }
 }
 //------------------------------------------------------------------------------
+export class Node {
+    constructor(base) {
+        this.basis = [base];
+    }
+}
+export class Operand {
+    constructor(node, pin) {
+        this.basis = node;
+        this.pin = pin;
+    }
+    static toOperand(wire) {
+        if (wire === undefined)
+            return Operand.undefined;
+        if (!(wire.src instanceof Element))
+            return Operand.undefined;
+        return new Operand(wire.src, wire.srcPin);
+    }
+}
+Operand.undefined = new Operand(undefined, -1);
+export class Unop extends Node {
+    constructor(element) {
+        super(element);
+        this.op = element.type.name;
+        this.operand = Operand.toOperand(element.inWires[0]);
+    }
+}
+export class Binop extends Node {
+    constructor(element) {
+        super(element);
+        this.op = element.type.name;
+        this.left = Operand.toOperand(element.inWires[0]);
+        this.right = Operand.toOperand(element.inWires[1]);
+    }
+}
+export class Cond extends Node {
+    constructor(element) {
+        super(element);
+        this.cond = Operand.toOperand(element.inWires[0]);
+        this.if = Operand.toOperand(element.inWires[1]);
+        this.else = Operand.toOperand(element.inWires[2]);
+    }
+}
+export class Function extends Node {
+}
+//------------------------------------------------------------------------------
 export function codegen(functionchart) {
     const map = new Map(), emitter = new ConsoleEmitter(), scopes = [];
     function parameterName(element, pin) {
