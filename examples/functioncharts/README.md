@@ -3,7 +3,7 @@ Functioncharts are a graphical programming language, using a "node and wire" gra
 
 Functioncharts are inspired by [Statecharts](../statecharts/README.md). "Flowcharts" would have been a great name for these, but that name is taken. (Edit: The Functionchart name is also taken.)
 
-Many "node and wire" programming systems have been built. However, most are either domain-specific, or are targeted at non-programmers. The audacious goal here is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages. Like Statecharts, Functioncharts use hierarchy and abstraction to increase the power and economy of the notation.
+Many "node and wire" programming systems have been built. However, most are either domain-specific, or are targeted at non-programmers. The ambitious goal here is for Functioncharts to be equivalent in expressiveness and power to conventional textual programming languages. Like Statecharts, Functioncharts use hierarchy and abstraction to increase the power and economy of the notation.
 
 The two principal innovations in Functioncharts are:
 
@@ -332,7 +332,7 @@ Key diagram features:
 
 Code fragment for Median of the 3 elements at 'lo', 'mid', and 'hi'.
 ```ts
-mid := ⌊(lo + hi) / 2⌋
+mid := Math.floor((lo + hi) / 2)
 if A[mid] < A[hi]
     swap A[hi] with A[mid]
 if A[lo] < A[hi]

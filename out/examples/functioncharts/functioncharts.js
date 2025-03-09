@@ -77,13 +77,15 @@ export class Type {
         const inputs = this.inputs.map(pin => new Pin(pin.type, pin.name));
         return Type.fromInfo(inputs, [new Pin(Type.valueType)], 'new ' + this.name);
     }
+    castName() {
+        return this.name ? ' ' + this.name : '*';
+    }
     toUpCastType() {
-        const outputs = this.outputs.map(pin => new Pin(pin.type, pin.name));
-        outputs.splice(0, 0, new Pin(Type.valueType));
-        return Type.fromInfo([new Pin(Type.valueType)], outputs, 'to ' + this.name);
+        const outputs = [new Pin(Type.valueType), new Pin(this)];
+        return Type.fromInfo([new Pin(Type.valueType)], outputs, 'to' + this.castName());
     }
     toDownCastType() {
-        return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)], 'from ' + this.name);
+        return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)], 'from' + this.castName());
     }
     static outputType(pin) {
         const type = pin.type;
@@ -1938,14 +1940,14 @@ export class FunctionchartContext extends EventBase {
                     const connected = new Multimap(); // TODO move this out
                     const type = self.inferPinType(node, 0, connected);
                     const name = node.type.outputs[0].name;
-                    const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                    const pinInfo = { element: node, index: 0, type, name };
                     inputs.push(pinInfo);
                 }
                 else if (node.template === outputTemplate) {
                     const connected = new Multimap();
                     const type = self.inferPinType(node, 0, connected);
                     const name = node.type.inputs[0].name;
-                    const pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                    const pinInfo = { element: node, index: 0, type, name };
                     outputs.push(pinInfo);
                 }
             }
@@ -1953,17 +1955,17 @@ export class FunctionchartContext extends EventBase {
                 // Special cases of nodes that generate pins.
                 if (node instanceof ModifierElement && node.isImporter) {
                     // Instancers are inputs.
-                    const innerType = node.innerType, name = innerType.name, type = innerType.rename(), pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                    const innerType = node.innerType, name = innerType.name, type = innerType.rename(), pinInfo = { element: node, index: 0, type, name };
                     inputs.push(pinInfo);
                 }
                 else if (node instanceof ModifierElement && node.isExporter && node.isAbstract) {
                     // Abstract exporters are outputs.
-                    const type = node.innerType, name = undefined, pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                    const type = node.innerType, name = undefined, pinInfo = { element: node, index: 0, type, name };
                     outputs.push(pinInfo);
                 }
                 else if (node instanceof Element && node.isAbstract) {
                     // Abstract elements become a single input (and don't implicitly generate other pins).
-                    const type = node.type, name = undefined, pinInfo = { element: node, index: 0, type, name, fcIndex: -1 };
+                    const type = node.type, name = undefined, pinInfo = { element: node, index: 0, type, name };
                     inputs.push(pinInfo);
                 }
                 else {
@@ -1977,7 +1979,7 @@ export class FunctionchartContext extends EventBase {
                             if (node.inWires[i])
                                 continue;
                             const pin = inputPins[i];
-                            const type = pin.type, name = pin.name, pinInfo = { element: node, index: i, type, name, fcIndex: -1 };
+                            const type = pin.type, name = pin.name, pinInfo = { element: node, index: i, type, name };
                             inputs.push(pinInfo);
                         }
                         for (let i = 0; i < outputPins.length; i++) {
@@ -1985,7 +1987,7 @@ export class FunctionchartContext extends EventBase {
                             if (node.outWires[i].length !== 0 || node.instances[i].length !== 0)
                                 continue;
                             const pin = outputPins[i];
-                            const type = pin.type, name = pin.name, pinInfo = { element: node, index: i, type, name, fcIndex: -1 };
+                            const type = pin.type, name = pin.name, pinInfo = { element: node, index: i, type, name };
                             outputs.push(pinInfo);
                         }
                     }
@@ -1998,9 +2000,6 @@ export class FunctionchartContext extends EventBase {
             const element1 = p1.element, element2 = p2.element, pin1 = element1.getPin(p1.index), pin2 = element2.getPin(p2.index), y1 = element1.globalPosition.y + pin1.y, y2 = element2.globalPosition.y + pin2.y;
             return y1 - y2;
         }
-        // function compareIndices(p1: PinInfo, p2: PinInfo) {
-        //   return p1.fcIndex - p2.fcIndex;
-        // }
         inputs.sort(compareYs);
         outputs.sort(compareYs);
         const inputPins = inputs.map(pinInfo => {

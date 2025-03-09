@@ -137,13 +137,15 @@ export class Type {
     const inputs = this.inputs.map(pin => new Pin(pin.type, pin.name));
     return Type.fromInfo(inputs, [new Pin(Type.valueType)], 'new ' + this.name);
   }
+  private castName() : string {
+    return this.name ? ' ' + this.name : '*';
+  }
   toUpCastType() : Type {
-    const outputs = this.outputs.map(pin => new Pin(pin.type, pin.name));
-    outputs.splice(0, 0, new Pin(Type.valueType));
-    return Type.fromInfo([new Pin(Type.valueType)], outputs, 'to ' + this.name);
+    const outputs = [new Pin(Type.valueType), new Pin(this)];
+    return Type.fromInfo([new Pin(Type.valueType)], outputs, 'to' + this.castName());
   }
   toDownCastType() : Type {
-    return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)], 'from ' + this.name);
+    return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)], 'from' + this.castName());
   }
 
   static outputType(pin: Pin) : Type {
