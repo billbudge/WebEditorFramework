@@ -684,6 +684,22 @@ export class CanvasController {
         this.layers.reverse();
     }
 }
+export function openFile(event, callback) {
+    const target = event.target, files = target.files;
+    if (files && files[0]) {
+        const file = files[0], reader = new FileReader();
+        reader.onload = () => {
+            const result = reader.result;
+            if (result === null || result instanceof ArrayBuffer)
+                return;
+            callback(file.name, result);
+        };
+        reader.onerror = () => {
+            // showMessage("Error reading the file.", "error");
+        };
+        reader.readAsText(file);
+    }
+}
 const defaultFileTypes = [
     {
         description: 'Text file',

@@ -860,6 +860,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     this.updateDerivedInfo();
   }
 
+  name: string = 'untitled.txt';
+
   newElement(typeName: ElementType) : Element {
     const nextId = ++this.highestId;
     let result: Element;
@@ -3426,6 +3428,8 @@ export class FunctionchartEditor implements CanvasLayer {
   private changedTopLevelFunctioncharts: Set<Functionchart>;
   private renderer: Renderer;
   private palette: Functionchart;  // Functionchart to simplify layout of palette items.
+  private paletteContext: FunctionchartContext;
+  private paletteFunctionchart: Functionchart;
   private context: FunctionchartContext;
   private functionchart: Functionchart;
   private scrap: AllTypes[] = []
@@ -3482,6 +3486,26 @@ export class FunctionchartEditor implements CanvasLayer {
           importer = context.newElement('importer'),
           exporter = context.newElement('exporter'),
           constructor = context.newElement('constructor');
+
+    this.paletteContext = new FunctionchartContext(renderer);
+    this.paletteFunctionchart = this.paletteContext.newFunctionchart('functionchart');
+
+    const unaryFns = this.paletteContext.newElement('element');
+
+    const unaryOps = ['!', '~', '-', 'typeof'];
+    const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
+      '|', '&', '||', '&&'];
+
+    let unaryTypestring = '';
+    unaryOps.forEach(c => unaryTypestring += '[v,v](' + c + ')');
+    unaryFns.typeString = '[,' + unaryTypestring + ']';
+    unaryFns.x = 100;
+    unaryFns.y = 100;
+    this.paletteFunctionchart.nodes.append(unaryFns);
+
+    renderer.begin(canvasController.getCtx());
+    renderer.layoutElement(unaryFns);
+    renderer.end();
 
     context.root = functionchart;
 
@@ -3647,8 +3671,6 @@ export class FunctionchartEditor implements CanvasLayer {
         prop: commentProp,
       },
     ]);
-    const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
-      '|', '&', '||', '&&'];
     this.propertyInfo.set('binop', [
       {
         label: 'operator',
@@ -3659,7 +3681,6 @@ export class FunctionchartEditor implements CanvasLayer {
         prop: typeStringProp,
       },
     ]);
-    const unaryOps = ['!', '~', '-', 'typeof'];
     this.propertyInfo.set('unop', [
       {
         label: 'operator',
@@ -4033,6 +4054,14 @@ export class FunctionchartEditor implements CanvasLayer {
       if (hoverHitInfo) {
         renderer.drawHoverInfo(hoverHitInfo, this.hoverPoint);
       }
+
+      // Don't draw the root functionchart.
+      const paletteContext = this.paletteContext,
+            paletteFunctionchart = this.paletteFunctionchart;
+      paletteFunctionchart.nodes.forEach(item => {
+        paletteContext.visitNodes(item, item => { renderer.draw(item, RenderMode.Normal); });
+      });
+
       renderer.end();
     } else if (canvasController === this.paletteController) {
       // Palette drawing occurs during drag and drop. If the palette has the drag,
@@ -4507,7 +4536,7 @@ export class FunctionchartEditor implements CanvasLayer {
     this.canvasController.draw();
   }
 
-  newContext(text?: string) : FunctionchartContext{
+  newContext(text?: string, name?: string) : FunctionchartContext{
     const context = new FunctionchartContext(this.renderer);
     let functionchart: Functionchart;
     if (text) {
@@ -4516,17 +4545,59 @@ export class FunctionchartEditor implements CanvasLayer {
     } else {
       functionchart = context.newFunctionchart('functionchart');
     }
+    if (name)
+      context.name = name;
     context.root = functionchart;
     return context;
   }
 
-  openNewContext(text?: string) {
-    const context = this.newContext(text);
+  openNewContext(text?: string, name?: string) {
+    const context = this.newContext(text, name);
     this.initializeContext(context);
     this.setContext(context);
     this.renderer.begin(this.canvasController.getCtx());
     this.updateBounds();
     this.canvasController.draw();
+  }
+
+  openFile(fileName: string, text: string) {
+    this.openNewContext(text, fileName)
+  }
+
+  importFile(fileName: string, text: string) {
+    const context = this.context,
+          imported = this.newContext(text),
+          type = imported.getExportType(imported.root),
+          element = context.newElement('element');
+    element.name = 'external';
+    element.typeString = type.typeString;
+    const center = this.canvasController.getViewCenter();
+    element.x = center.x;
+    element.y = center.y;
+    this.renderer.begin(this.canvasController.getCtx());
+    this.renderer.layoutElement(element);
+    this.renderer.end();
+    context.beginTransaction('import functionchart');
+    context.addItem(element, this.functionchart);
+    context.select(element);
+    context.endTransaction();
+    this.canvasController.draw();
+  }
+
+  saveFile() {
+    const context = this.context,
+          name = context.name,
+          functionchart = context.root;
+    const text = JSON.stringify(Serialize(functionchart), undefined, 2),
+          blob = new Blob([text], {type:'text/plain'}),
+          link = document.createElement('a');
+    link.download = name;
+    link.innerHTML = 'Download File';
+    link.href = URL.createObjectURL(blob);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
   }
 
   doCommand(command: EditorCommand) {
@@ -4681,8 +4752,9 @@ export class FunctionchartEditor implements CanvasLayer {
         break;
       }
       case 'save': {
-        let text = JSON.stringify(Serialize(this.functionchart), undefined, 2);
-        this.fileController.saveUnnamedFile(text, 'functionchart.txt').then();
+        this.saveFile();
+        // let text = JSON.stringify(Serialize(this.functionchart), undefined, 2);
+        // this.fileController.saveUnnamedFile(text, 'functionchart.txt').then();
         // console.log(text);
         break;
       }

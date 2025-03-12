@@ -607,6 +607,7 @@ export class FunctionchartContext extends EventBase {
         this.invalidWires = new Array(); // Wires that violate the fan-in constraint.
         this.instancingGraph = new Map();
         this.selection = new SelectionSet();
+        this.name = 'untitled.txt';
         this.layoutEngine = layoutEngine;
         const self = this;
         this.transactionManager = new TransactionManager();
@@ -2894,6 +2895,21 @@ export class FunctionchartEditor {
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
         const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), use = context.newPseudoelement('use'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), letFn = context.newElement('element'), thisFn = context.newElement('element'), external = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart'), importer = context.newElement('importer'), exporter = context.newElement('exporter'), constructor = context.newElement('constructor');
+        this.paletteContext = new FunctionchartContext(renderer);
+        this.paletteFunctionchart = this.paletteContext.newFunctionchart('functionchart');
+        const unaryFns = this.paletteContext.newElement('element');
+        const unaryOps = ['!', '~', '-', 'typeof'];
+        const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
+            '|', '&', '||', '&&'];
+        let unaryTypestring = '';
+        unaryOps.forEach(c => unaryTypestring += '[v,v](' + c + ')');
+        unaryFns.typeString = '[,' + unaryTypestring + ']';
+        unaryFns.x = 100;
+        unaryFns.y = 100;
+        this.paletteFunctionchart.nodes.append(unaryFns);
+        renderer.begin(canvasController.getCtx());
+        renderer.layoutElement(unaryFns);
+        renderer.end();
         context.root = functionchart;
         input.x = 8;
         input.y = 8;
@@ -3066,8 +3082,6 @@ export class FunctionchartEditor {
                 prop: commentProp,
             },
         ]);
-        const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
-            '|', '&', '||', '&&'];
         this.propertyInfo.set('binop', [
             {
                 label: 'operator',
@@ -3078,7 +3092,6 @@ export class FunctionchartEditor {
                 prop: typeStringProp,
             },
         ]);
-        const unaryOps = ['!', '~', '-', 'typeof'];
         this.propertyInfo.set('unop', [
             {
                 label: 'operator',
@@ -3422,6 +3435,11 @@ export class FunctionchartEditor {
             if (hoverHitInfo) {
                 renderer.drawHoverInfo(hoverHitInfo, this.hoverPoint);
             }
+            // Don't draw the root functionchart.
+            const paletteContext = this.paletteContext, paletteFunctionchart = this.paletteFunctionchart;
+            paletteFunctionchart.nodes.forEach(item => {
+                paletteContext.visitNodes(item, item => { renderer.draw(item, RenderMode.Normal); });
+            });
             renderer.end();
         }
         else if (canvasController === this.paletteController) {
@@ -3856,7 +3874,7 @@ export class FunctionchartEditor {
         this.hotTrackInfo = undefined;
         this.canvasController.draw();
     }
-    newContext(text) {
+    newContext(text, name) {
         const context = new FunctionchartContext(this.renderer);
         let functionchart;
         if (text) {
@@ -3866,16 +3884,48 @@ export class FunctionchartEditor {
         else {
             functionchart = context.newFunctionchart('functionchart');
         }
+        if (name)
+            context.name = name;
         context.root = functionchart;
         return context;
     }
-    openNewContext(text) {
-        const context = this.newContext(text);
+    openNewContext(text, name) {
+        const context = this.newContext(text, name);
         this.initializeContext(context);
         this.setContext(context);
         this.renderer.begin(this.canvasController.getCtx());
         this.updateBounds();
         this.canvasController.draw();
+    }
+    openFile(fileName, text) {
+        this.openNewContext(text, fileName);
+    }
+    importFile(fileName, text) {
+        const context = this.context, imported = this.newContext(text), type = imported.getExportType(imported.root), element = context.newElement('element');
+        element.name = 'external';
+        element.typeString = type.typeString;
+        const center = this.canvasController.getViewCenter();
+        element.x = center.x;
+        element.y = center.y;
+        this.renderer.begin(this.canvasController.getCtx());
+        this.renderer.layoutElement(element);
+        this.renderer.end();
+        context.beginTransaction('import functionchart');
+        context.addItem(element, this.functionchart);
+        context.select(element);
+        context.endTransaction();
+        this.canvasController.draw();
+    }
+    saveFile() {
+        const context = this.context, name = context.name, functionchart = context.root;
+        const text = JSON.stringify(Serialize(functionchart), undefined, 2), blob = new Blob([text], { type: 'text/plain' }), link = document.createElement('a');
+        link.download = name;
+        link.innerHTML = 'Download File';
+        link.href = URL.createObjectURL(blob);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
     }
     doCommand(command) {
         const context = this.context, canvasController = this.canvasController;
@@ -4027,8 +4077,9 @@ export class FunctionchartEditor {
                 break;
             }
             case 'save': {
-                let text = JSON.stringify(Serialize(this.functionchart), undefined, 2);
-                this.fileController.saveUnnamedFile(text, 'functionchart.txt').then();
+                this.saveFile();
+                // let text = JSON.stringify(Serialize(this.functionchart), undefined, 2);
+                // this.fileController.saveUnnamedFile(text, 'functionchart.txt').then();
                 // console.log(text);
                 break;
             }

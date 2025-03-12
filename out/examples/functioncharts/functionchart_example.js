@@ -1,4 +1,4 @@
-import { getDefaultTheme, CanvasController, PropertyGridController } from '../../src/diagrams.js';
+import { getDefaultTheme, CanvasController, PropertyGridController, openFile } from '../../src/diagrams.js';
 import { FunctionchartEditor } from './functioncharts.js';
 (function () {
     const body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette');
@@ -6,14 +6,14 @@ import { FunctionchartEditor } from './functioncharts.js';
         body.style.overscrollBehaviorY = 'contain';
         body.style.touchAction = 'pinch-zoom';
         const theme = getDefaultTheme(), // or getBlueprintTheme
-        canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette, true /* draggable */), propertyGridController = new PropertyGridController(body, theme), functionchartEditor = new FunctionchartEditor(theme, canvasController, paletteController, propertyGridController);
+        canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette, true /* draggable */), propertyGridController = new PropertyGridController(body, theme), editor = new FunctionchartEditor(theme, canvasController, paletteController, propertyGridController);
         palette.style.borderColor = theme.strokeColor;
         palette.style.borderStyle = 'solid';
         palette.style.borderWidth = '0.25px';
         canvas.style.backgroundColor = theme.bgColor;
-        canvasController.configure([functionchartEditor]);
+        canvasController.configure([editor]);
         canvasController.setSize(window.innerWidth, window.innerHeight);
-        paletteController.configure([functionchartEditor]);
+        paletteController.configure([editor]);
         paletteController.setSize(324, 128);
         {
         }
@@ -24,6 +24,18 @@ import { FunctionchartEditor } from './functioncharts.js';
             paletteController.onWindowResize();
             canvasController.onWindowResize();
         };
+        const openFileInput = document.getElementById("open-file-input");
+        if (openFileInput) {
+            openFileInput.addEventListener("change", (event) => {
+                openFile(event, editor.openFile.bind(editor));
+            });
+        }
+        const importFileInput = document.getElementById("import-file-input");
+        if (importFileInput) {
+            importFileInput.addEventListener("change", (event) => {
+                openFile(event, editor.importFile.bind(editor));
+            });
+        }
         document.addEventListener('keydown', function (e) {
             // Handle any keyboard commands for the app window here.
             canvasController.onKeyDown(e);
@@ -56,11 +68,12 @@ import { FunctionchartEditor } from './functioncharts.js';
                 case 'save': return 'save';
                 case 'print': return 'print';
             }
+            // default returns undefined
         }
         function buttonListener(e) {
             const target = e.target, command = idToCommand(target.id);
             if (command) {
-                functionchartEditor.doCommand(command);
+                editor.doCommand(command);
             }
         }
         document.getElementById('undo').addEventListener('click', buttonListener);
@@ -68,22 +81,44 @@ import { FunctionchartEditor } from './functioncharts.js';
         document.getElementById('delete').addEventListener('click', buttonListener);
         document.getElementById('complete').addEventListener('click', buttonListener);
         document.getElementById('extend').addEventListener('click', buttonListener);
+        const fileMenu = document.getElementById('file'), editMenu = document.getElementById('edit'), modifyMenu = document.getElementById('modify'), examplesMenu = document.getElementById('examples');
         function selectListener(e) {
             const target = e.target, command = idToCommand(target.value);
             if (command) {
                 target.selectedIndex = 0;
-                functionchartEditor.doCommand(command);
+                if (target === fileMenu) {
+                    switch (command) {
+                        case 'new':
+                            editor.openNewContext();
+                            break;
+                        case 'open':
+                            openFileInput.click();
+                            break;
+                        case 'openImport':
+                            importFileInput.click();
+                            break;
+                        case 'save':
+                            editor.saveFile();
+                            break;
+                        case 'print':
+                            editor.print();
+                            break;
+                    }
+                }
+                else {
+                    editor.doCommand(command);
+                }
             }
         }
-        document.getElementById('file').addEventListener('change', selectListener);
-        document.getElementById('edit').addEventListener('change', selectListener);
-        document.getElementById('modify').addEventListener('change', selectListener);
-        document.getElementById('examples').addEventListener('change', e => {
+        fileMenu.addEventListener('change', selectListener);
+        editMenu.addEventListener('change', selectListener);
+        modifyMenu.addEventListener('change', selectListener);
+        examplesMenu.addEventListener('change', e => {
             const select = e.target, id = select.value, fileName = id + '.txt';
             select.selectedIndex = 0;
             fetch(fileName)
                 .then(response => response.text())
-                .then(text => functionchartEditor.openNewContext(text));
+                .then(text => editor.openNewContext(text));
         });
     }
 })();

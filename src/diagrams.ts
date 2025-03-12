@@ -869,6 +869,29 @@ export class CanvasController {
 
 //------------------------------------------------------------------------------
 
+export type FileCallback = (name: string, text: string) => void;
+
+export function openFile(event: InputEvent, callback: FileCallback) {
+  const target = event.target as HTMLInputElement,
+        files = target.files;
+  if (files && files[0]) {
+    const file = files[0],
+          reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (result === null || result instanceof ArrayBuffer)
+        return;
+      callback(file.name, result);
+    };
+    reader.onerror = () => {
+      // showMessage("Error reading the file.", "error");
+    };
+    reader.readAsText(file);
+  }
+}
+
+//------------------------------------------------------------------------------
+
 export interface FileType {
   description: string;
   accept: {[mimeType: string]: string[]};

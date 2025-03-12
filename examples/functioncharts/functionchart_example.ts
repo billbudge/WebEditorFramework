@@ -1,4 +1,4 @@
-import { getDefaultTheme, CanvasController, PropertyGridController } from '../../src/diagrams.js'
+import { getDefaultTheme, CanvasController, PropertyGridController, openFile } from '../../src/diagrams.js'
 import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
 
 (function() {
@@ -15,7 +15,7 @@ import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
           canvasController = new CanvasController(canvas as HTMLCanvasElement),
           paletteController = new CanvasController(palette as HTMLCanvasElement, true /* draggable */),
           propertyGridController = new PropertyGridController(body, theme),
-          functionchartEditor = new FunctionchartEditor(
+          editor = new FunctionchartEditor(
               theme, canvasController, paletteController, propertyGridController);
 
     palette.style.borderColor = theme.strokeColor;
@@ -23,9 +23,9 @@ import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
     palette.style.borderWidth = '0.25px';
     canvas.style.backgroundColor = theme.bgColor;
 
-    canvasController.configure([functionchartEditor]);
+    canvasController.configure([editor]);
     canvasController.setSize(window.innerWidth, window.innerHeight);
-    paletteController.configure([functionchartEditor]);
+    paletteController.configure([editor]);
     paletteController.setSize(324, 128);
 
     {
@@ -38,6 +38,20 @@ import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
     window.onresize = function() {
       paletteController.onWindowResize();
       canvasController.onWindowResize();
+    }
+
+    const openFileInput = document.getElementById("open-file-input");
+    if (openFileInput) {
+      openFileInput.addEventListener("change", (event: InputEvent) => {
+        openFile(event, editor.openFile.bind(editor));
+      });
+    }
+
+    const importFileInput = document.getElementById("import-file-input");
+    if (importFileInput) {
+      importFileInput.addEventListener("change", (event: InputEvent) => {
+        openFile(event, editor.importFile.bind(editor));
+      });
     }
 
     document.addEventListener('keydown', function(e) {
@@ -74,13 +88,14 @@ import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
         case 'save': return 'save';
         case 'print': return 'print';
       }
+      // default returns undefined
     }
 
-    function buttonListener(e: Event) {
+    function buttonListener(e: InputEvent) {
       const target = e.target as HTMLElement,
             command = idToCommand(target.id);
       if (command) {
-        functionchartEditor.doCommand(command);
+        editor.doCommand(command);
       }
     }
     document.getElementById('undo')!.addEventListener('click', buttonListener);
@@ -89,27 +104,52 @@ import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
     document.getElementById('complete')!.addEventListener('click', buttonListener);
     document.getElementById('extend')!.addEventListener('click', buttonListener);
 
-    function selectListener(e: Event) {
+    const fileMenu = document.getElementById('file'),
+          editMenu = document.getElementById('edit'),
+          modifyMenu = document.getElementById('modify'),
+          examplesMenu = document.getElementById('examples');
+
+    function selectListener(e: InputEvent) {
       const target = e.target as HTMLSelectElement,
             command = idToCommand(target.value);
       if (command) {
         target.selectedIndex = 0;
-        functionchartEditor.doCommand(command);
+        if (target === fileMenu) {
+          switch (command) {
+            case 'new':
+              editor.openNewContext();
+              break;
+            case 'open':
+              openFileInput!.click();
+              break;
+            case 'openImport':
+              importFileInput!.click();
+              break;
+            case 'save':
+              editor.saveFile();
+              break;
+            case 'print':
+              editor.print();
+              break;
+          }
+        } else {
+          editor.doCommand(command);
+        }
       }
     }
 
-    document.getElementById('file')!.addEventListener('change', selectListener);
-    document.getElementById('edit')!.addEventListener('change', selectListener);
-    document.getElementById('modify')!.addEventListener('change', selectListener);
+    fileMenu!.addEventListener('change', selectListener);
+    editMenu!.addEventListener('change', selectListener);
+    modifyMenu!.addEventListener('change', selectListener);
 
-    document.getElementById('examples')!.addEventListener('change', e => {
+    examplesMenu!.addEventListener('change', e => {
       const select = e.target as HTMLSelectElement,
             id = select.value,
             fileName = id + '.txt';
       select.selectedIndex = 0;
       fetch(fileName)
         .then(response => response.text())
-        .then(text => functionchartEditor.openNewContext(text));
+        .then(text => editor.openNewContext(text));
     });
   }
 })();
