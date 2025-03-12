@@ -684,7 +684,7 @@ export class CanvasController {
         this.layers.reverse();
     }
 }
-export function openFile(event, callback) {
+export function readFile(event, cb) {
     const target = event.target, files = target.files;
     if (files && files[0]) {
         const file = files[0], reader = new FileReader();
@@ -692,13 +692,23 @@ export function openFile(event, callback) {
             const result = reader.result;
             if (result === null || result instanceof ArrayBuffer)
                 return;
-            callback(file.name, result);
+            cb(file.name, result);
         };
         reader.onerror = () => {
             // showMessage("Error reading the file.", "error");
         };
         reader.readAsText(file);
     }
+}
+export function writeFile(name, text) {
+    const blob = new Blob([text], { type: 'text/plain' }), link = document.createElement('a');
+    link.download = name;
+    link.innerHTML = 'Download File';
+    link.href = URL.createObjectURL(blob);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
 }
 const defaultFileTypes = [
     {

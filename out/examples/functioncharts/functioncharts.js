@@ -1,6 +1,6 @@
 var _a;
 import { SelectionSet, Multimap } from '../../src/collections.js';
-import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, notchedRectPath, FileController } from '../../src/diagrams.js';
+import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, notchedRectPath, writeFile } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager, ChildSlotProp } from '../../src/dataModels.js';
 import { codegen } from './execution.js';
@@ -2881,7 +2881,6 @@ export class FunctionchartEditor {
         this.canvasController = canvasController;
         this.paletteController = paletteController;
         this.propertyGridController = propertyGridController;
-        this.fileController = new FileController();
         // This is finely tuned to allow picking in tight areas, such as input/output pins with
         // wires attached, or near the borders of a functionchart, without making it too difficult
         // to pick wires.
@@ -3520,10 +3519,9 @@ export class FunctionchartEditor {
         renderer.end();
         // Write out the SVG file.
         const serializedSVG = ctx.getSerializedSvg();
-        const blob = new Blob([serializedSVG], {
-            type: 'text/plain'
-        });
-        window.saveAs(blob, 'functionchart.svg', true);
+        let name = context.name, pos = name.lastIndexOf(".");
+        name = name.substring(0, pos < 0 ? name.length : pos) + ".svg";
+        writeFile(name, serializedSVG);
     }
     getCanvasPosition(canvasController, p) {
         // When dragging from the palette, convert the position from pointer events
@@ -3917,15 +3915,8 @@ export class FunctionchartEditor {
         this.canvasController.draw();
     }
     saveFile() {
-        const context = this.context, name = context.name, functionchart = context.root;
-        const text = JSON.stringify(Serialize(functionchart), undefined, 2), blob = new Blob([text], { type: 'text/plain' }), link = document.createElement('a');
-        link.download = name;
-        link.innerHTML = 'Download File';
-        link.href = URL.createObjectURL(blob);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
+        const context = this.context, text = JSON.stringify(Serialize(context.root), undefined, 2);
+        writeFile(context.name, text);
     }
     doCommand(command) {
         const context = this.context, canvasController = this.canvasController;
@@ -4048,45 +4039,6 @@ export class FunctionchartEditor {
                 this.openNewContext();
                 break;
             }
-            case 'open': {
-                const self = this;
-                this.fileController.openFile().then(result => self.openNewContext(result));
-                break;
-            }
-            case 'openImport': {
-                const self = this;
-                // import the functionchart
-                this.fileController.openFile().then(result => {
-                    const imported = self.newContext(result);
-                    const type = imported.getExportType(imported.root);
-                    const element = context.newElement('element');
-                    element.name = 'external';
-                    element.typeString = type.typeString;
-                    const center = this.canvasController.getViewCenter();
-                    element.x = center.x;
-                    element.y = center.y;
-                    this.renderer.begin(this.canvasController.getCtx());
-                    this.renderer.layoutElement(element);
-                    this.renderer.end();
-                    context.beginTransaction('import functionchart');
-                    context.addItem(element, this.functionchart);
-                    context.select(element);
-                    context.endTransaction();
-                    self.canvasController.draw();
-                });
-                break;
-            }
-            case 'save': {
-                this.saveFile();
-                // let text = JSON.stringify(Serialize(this.functionchart), undefined, 2);
-                // this.fileController.saveUnnamedFile(text, 'functionchart.txt').then();
-                // console.log(text);
-                break;
-            }
-            case 'print': {
-                this.print();
-                break;
-            }
         }
     }
     onKeyDown(e) {
@@ -4170,13 +4122,8 @@ export class FunctionchartEditor {
                     return true;
                 }
                 case 79: { // 'o'
-                    if (shiftKey) {
-                        this.doCommand('openImport');
-                    }
-                    else {
-                        this.doCommand('open');
-                    }
-                    return true;
+                    // available.
+                    return false;
                 }
                 case 83: { // 's'
                     this.doCommand('save');

@@ -1,4 +1,4 @@
-import { getDefaultTheme, CanvasController, PropertyGridController, openFile } from '../../src/diagrams.js'
+import { getDefaultTheme, CanvasController, PropertyGridController, readFile } from '../../src/diagrams.js'
 import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
 
 (function() {
@@ -43,14 +43,14 @@ import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
     const openFileInput = document.getElementById("open-file-input");
     if (openFileInput) {
       openFileInput.addEventListener("change", (event: InputEvent) => {
-        openFile(event, editor.openFile.bind(editor));
+        readFile(event, editor.openFile.bind(editor));
       });
     }
 
     const importFileInput = document.getElementById("import-file-input");
     if (importFileInput) {
       importFileInput.addEventListener("change", (event: InputEvent) => {
-        openFile(event, editor.importFile.bind(editor));
+        readFile(event, editor.importFile.bind(editor));
       });
     }
 

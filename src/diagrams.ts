@@ -869,9 +869,9 @@ export class CanvasController {
 
 //------------------------------------------------------------------------------
 
-export type FileCallback = (name: string, text: string) => void;
+export type ReadFileCallback = (name: string, text: string) => void;
 
-export function openFile(event: InputEvent, callback: FileCallback) {
+export function readFile(event: InputEvent, cb: ReadFileCallback) {
   const target = event.target as HTMLInputElement,
         files = target.files;
   if (files && files[0]) {
@@ -881,13 +881,25 @@ export function openFile(event: InputEvent, callback: FileCallback) {
       const result = reader.result;
       if (result === null || result instanceof ArrayBuffer)
         return;
-      callback(file.name, result);
+      cb(file.name, result);
     };
     reader.onerror = () => {
       // showMessage("Error reading the file.", "error");
     };
     reader.readAsText(file);
   }
+}
+
+export function writeFile(name: string, text: string) {
+  const blob = new Blob([text], {type:'text/plain'}),
+        link = document.createElement('a');
+  link.download = name;
+  link.innerHTML = 'Download File';
+  link.href = URL.createObjectURL(blob);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
 }
 
 //------------------------------------------------------------------------------
