@@ -1,13 +1,4 @@
 // Useful diagram stuff.
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 import * as geometry from '../src/geometry.js';
 export function roundRectPath(x, y, width, height, r, ctx) {
     r = Math.min(r, width * 0.5, height * 0.5);
@@ -709,58 +700,5 @@ export function writeFile(name, text) {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
-}
-const defaultFileTypes = [
-    {
-        description: 'Text file',
-        accept: { 'text/plain': ['.txt'] },
-    }
-];
-export class FileController {
-    constructor(types = defaultFileTypes, excludeAcceptAllOption = false) {
-        this.types = types;
-        this.excludeAcceptAllOption = excludeAcceptAllOption;
-    }
-    getWriteFileHandle(suggestedName) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const opts = {
-                types: this.types,
-                excludeAcceptAllOption: this.excludeAcceptAllOption,
-                suggestedName: suggestedName,
-            };
-            return yield window.showSaveFilePicker(opts);
-        });
-    }
-    saveFile(fileHandle, contents) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const writable = yield fileHandle.createWritable();
-            yield writable.write(contents);
-            yield writable.close();
-        });
-    }
-    saveUnnamedFile(contents, suggestedName) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const fileHandle = yield this.getWriteFileHandle(suggestedName);
-            yield this.saveFile(fileHandle, contents);
-        });
-    }
-    getReadFileHandle() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const opts = {
-                types: this.types,
-                excludeAcceptAllOption: this.excludeAcceptAllOption,
-                multiple: false,
-            };
-            const [fileHandle] = yield window.showOpenFilePicker(opts);
-            return fileHandle;
-        });
-    }
-    openFile() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const fileHandle = yield this.getReadFileHandle();
-            const fileData = yield fileHandle.getFile();
-            return yield fileData.text();
-        });
-    }
 }
 //# sourceMappingURL=diagrams.js.map
