@@ -118,7 +118,7 @@ import { FunctionchartEditor } from './functioncharts.js';
             select.selectedIndex = 0;
             fetch(fileName)
                 .then(response => response.text())
-                .then(text => editor.openNewContext(text));
+                .then(text => editor.openNewContext(text, fileName));
         });
     }
 })();
