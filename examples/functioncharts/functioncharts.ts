@@ -4500,7 +4500,7 @@ export class FunctionchartEditor implements CanvasLayer {
       } else {
         // The user's new wire takes precedence over any existing wire (fan-in <= 1).
         const current = dst.inWires[wire.dstPin];
-        if (current) {
+        if (current && current !== wire) {
           context.deleteItem(current);
         }
       }
