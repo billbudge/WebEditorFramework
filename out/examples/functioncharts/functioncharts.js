@@ -67,6 +67,9 @@ export class Type {
         }
         return result;
     }
+    static isAtomized(typeString) {
+        return this.atomizedTypes.has(typeString);
+    }
     rename(name) {
         return Type.fromInfo(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()), name);
     }
@@ -3837,8 +3840,7 @@ export class FunctionchartEditor {
         else if (drag instanceof NonWireDrag &&
             (drag.kind == 'copyPalette' || drag.kind === 'moveSelection' ||
                 drag.kind === 'moveCopySelection')) {
-            if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase /*&&  TODO
-                lastSelected.type.canConnectTo(hitInfo.item.type)*/) {
+            if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase) {
                 const target = hitInfo.item;
                 if (!(lastSelected instanceof Functionchart)) {
                     context.dropNodeOnElement(lastSelected, target);

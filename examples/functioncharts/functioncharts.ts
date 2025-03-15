@@ -84,8 +84,7 @@ export class Type {
   static readonly emptyExporterType = new Type(Type.emptyPins, [new Pin(Type.emptyType)]);
 
   // Manually atomize the base types.
-  // TODO make this private.
-  static readonly atomizedTypes = new Map<string, Type>([
+  private static readonly atomizedTypes = new Map<string, Type>([
     [Type.valueTypeString, Type.valueType.initializeBaseType(Type.valueTypeString)],
     [Type.emptyTypeString, Type.emptyType.initializeBaseType(Type.emptyTypeString)],
     [Type.emptyExporterTypeString, Type.emptyExporterType.initializeBaseType(Type.emptyExporterTypeString)],
@@ -123,6 +122,10 @@ export class Type {
       result = parseTypeString(typeString).atomized();
     }
     return result;
+  }
+
+  static isAtomized(typeString: string) : boolean {
+    return this.atomizedTypes.has(typeString);
   }
 
   rename(name?: string) : Type {
@@ -4491,8 +4494,7 @@ export class FunctionchartEditor implements CanvasLayer {
     } else if (drag instanceof NonWireDrag &&
               (drag.kind == 'copyPalette' || drag.kind === 'moveSelection' ||
                drag.kind === 'moveCopySelection')) {
-      if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase /*&&  TODO
-          lastSelected.type.canConnectTo(hitInfo.item.type)*/) {
+      if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase) {
         const target = hitInfo.item;
         if (!(lastSelected instanceof Functionchart)) {
           context.dropNodeOnElement(lastSelected, target);

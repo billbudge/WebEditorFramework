@@ -156,7 +156,7 @@ describe('parseTypeString', () => {
             '[v(p(0))),](p(0))=1)', // labels with ')' in them (escaped).
         ];
         typeStrings.forEach(typeString => expect(FC.Type.fromString(typeString).typeString).toBe(typeString));
-        typeStrings.forEach(typeString => expect(FC.Type.atomizedTypes.has(typeString)).toBe(true));
+        typeStrings.forEach(typeString => expect(FC.Type.isAtomized(typeString)).toBe(true));
         expect(FC.Type.fromString('[v,v]').name).toBeUndefined();
         expect(FC.Type.fromString('[vv,v](+)').name).toBe('+');
         const type1 = FC.Type.fromString('[v(a)v(b),v(c)]');
@@ -172,7 +172,7 @@ describe('parseTypeString', () => {
         expect(type2.outputs[1].toString()).toBe('[v,v]');
         // Make sure some subtypes are atomized.
         const subTypeStrings = ['[v,v]', '[,v]', '[v,vv(q)](a)'];
-        subTypeStrings.forEach(typeString => expect(FC.Type.atomizedTypes.has(typeString)).toBe(true));
+        subTypeStrings.forEach(typeString => expect(FC.Type.isAtomized(typeString)).toBe(true));
     });
     test('pinAndTypeNames', () => {
         expect(FC.Type.fromString('[v,v]()').name).toBeUndefined();
