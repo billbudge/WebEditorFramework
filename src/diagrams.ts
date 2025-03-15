@@ -871,6 +871,30 @@ export class CanvasController {
 
 export type ReadFileCallback = (name: string, text: string) => void;
 
+export class FileInputElement {
+  private input: HTMLInputElement;
+  private callback: ReadFileCallback | undefined;
+
+  private invokeCallback(e: InputEvent) {
+    const callback = this.callback;
+    if (callback) {
+      readFile(e, callback);
+      this.callback = undefined;
+    }
+  }
+
+  // Called during a user gesture.
+  open(callback: ReadFileCallback) {
+    this.callback = callback;
+    this.input.click();
+  }
+
+  constructor(input: HTMLInputElement) {
+    this.input = input;
+    input.addEventListener('click', this.invokeCallback.bind(this));
+  }
+}
+
 export function readFile(event: InputEvent, cb: ReadFileCallback) {
   const target = event.target as HTMLInputElement,
         files = target.files;
@@ -894,7 +918,7 @@ export function writeFile(name: string, text: string) {
   const blob = new Blob([text], {type:'text/plain'}),
         link = document.createElement('a');
   link.download = name;
-  link.innerHTML = 'Download File';
+  link.innerHTML = name;
   link.href = URL.createObjectURL(blob);
   document.body.appendChild(link);
   link.click();

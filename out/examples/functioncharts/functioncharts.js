@@ -2874,7 +2874,7 @@ class WireDrag {
     }
 }
 export class FunctionchartEditor {
-    constructor(baseTheme, canvasController, paletteController, propertyGridController) {
+    constructor(baseTheme, canvasController, paletteController, propertyGridController, fileInput) {
         this.scrap = [];
         this.clickInPalette = false;
         this.propertyInfo = new Map();
@@ -2883,6 +2883,7 @@ export class FunctionchartEditor {
         this.canvasController = canvasController;
         this.paletteController = paletteController;
         this.propertyGridController = propertyGridController;
+        this.fileInput = fileInput;
         // This is finely tuned to allow picking in tight areas, such as input/output pins with
         // wires attached, or near the borders of a functionchart, without making it too difficult
         // to pick wires.
@@ -2896,18 +2897,10 @@ export class FunctionchartEditor {
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
         const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), use = context.newPseudoelement('use'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), letFn = context.newElement('element'), thisFn = context.newElement('element'), external = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart'), importer = context.newElement('importer'), exporter = context.newElement('exporter'), constructor = context.newElement('constructor');
-        this.paletteContext = new FunctionchartContext(renderer);
-        this.paletteFunctionchart = this.paletteContext.newFunctionchart('functionchart');
-        const unaryFns = this.paletteContext.newElement('element');
+        const unaryFns = context.newElement('element');
         const unaryOps = ['!', '~', '-', 'typeof'];
         const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
             '|', '&', '||', '&&'];
-        let unaryTypestring = '';
-        unaryOps.forEach(c => unaryTypestring += '[v,v](' + c + ')');
-        unaryFns.typeString = '[,' + unaryTypestring + ']';
-        unaryFns.x = 100;
-        unaryFns.y = 100;
-        this.paletteFunctionchart.nodes.append(unaryFns);
         renderer.begin(canvasController.getCtx());
         renderer.layoutElement(unaryFns);
         renderer.end();
@@ -3436,11 +3429,6 @@ export class FunctionchartEditor {
             if (hoverHitInfo) {
                 renderer.drawHoverInfo(hoverHitInfo, this.hoverPoint);
             }
-            // Don't draw the root functionchart.
-            const paletteContext = this.paletteContext, paletteFunctionchart = this.paletteFunctionchart;
-            paletteFunctionchart.nodes.forEach(item => {
-                paletteContext.visitNodes(item, item => { renderer.draw(item, RenderMode.Normal); });
-            });
             renderer.end();
         }
         else if (canvasController === this.paletteController) {
@@ -4041,6 +4029,22 @@ export class FunctionchartEditor {
                 this.openNewContext();
                 break;
             }
+            case 'open': {
+                this.fileInput.open(this.openFile.bind(this));
+                break;
+            }
+            case 'openImport': {
+                this.fileInput.open(this.importFile.bind(this));
+                break;
+            }
+            case 'save': {
+                this.saveFile();
+                break;
+            }
+            case 'print': {
+                this.print();
+                break;
+            }
         }
     }
     onKeyDown(e) {
@@ -4124,7 +4128,12 @@ export class FunctionchartEditor {
                     return true;
                 }
                 case 79: { // 'o'
-                    // available.
+                    if (shiftKey) {
+                        this.doCommand('openImport');
+                    }
+                    else {
+                        this.doCommand('open');
+                    }
                     return false;
                 }
                 case 83: { // 's'

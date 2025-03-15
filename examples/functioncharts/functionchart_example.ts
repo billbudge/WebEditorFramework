@@ -1,4 +1,4 @@
-import { getDefaultTheme, CanvasController, PropertyGridController, readFile } from '../../src/diagrams.js'
+import { getDefaultTheme, CanvasController, PropertyGridController, FileInputElement } from '../../src/diagrams.js'
 import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
 
 (function() {
@@ -15,8 +15,10 @@ import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
           canvasController = new CanvasController(canvas as HTMLCanvasElement),
           paletteController = new CanvasController(palette as HTMLCanvasElement, true /* draggable */),
           propertyGridController = new PropertyGridController(body, theme),
+          openFileInput = document.getElementById('open-file-input'),
+          fileInput = new FileInputElement(openFileInput as HTMLInputElement),
           editor = new FunctionchartEditor(
-              theme, canvasController, paletteController, propertyGridController);
+              theme, canvasController, paletteController, propertyGridController, fileInput);
 
     palette.style.borderColor = theme.strokeColor;
     palette.style.borderStyle = 'solid';
@@ -32,26 +34,12 @@ import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
     }
 
     window.onbeforeunload = function() {
-      return "Confirm unload?";
+      return 'Confirm unload?';
     }
 
     window.onresize = function() {
       paletteController.onWindowResize();
       canvasController.onWindowResize();
-    }
-
-    const openFileInput = document.getElementById("open-file-input");
-    if (openFileInput) {
-      openFileInput.addEventListener("change", (event: InputEvent) => {
-        readFile(event, editor.openFile.bind(editor));
-      });
-    }
-
-    const importFileInput = document.getElementById("import-file-input");
-    if (importFileInput) {
-      importFileInput.addEventListener("change", (event: InputEvent) => {
-        readFile(event, editor.importFile.bind(editor));
-      });
     }
 
     document.addEventListener('keydown', function(e) {
@@ -114,27 +102,8 @@ import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
             command = idToCommand(target.value);
       if (command) {
         target.selectedIndex = 0;
-        if (target === fileMenu) {
-          switch (command) {
-            case 'new':
-              editor.openNewContext();
-              break;
-            case 'open':
-              openFileInput!.click();
-              break;
-            case 'openImport':
-              importFileInput!.click();
-              break;
-            case 'save':
-              editor.saveFile();
-              break;
-            case 'print':
-              editor.print();
-              break;
-          }
-        } else {
-          editor.doCommand(command);
-        }
+        e.stopImmediatePropagation();
+        editor.doCommand(command);
       }
     }
 

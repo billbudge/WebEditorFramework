@@ -675,6 +675,24 @@ export class CanvasController {
         this.layers.reverse();
     }
 }
+export class FileInputElement {
+    invokeCallback(e) {
+        const callback = this.callback;
+        if (callback) {
+            readFile(e, callback);
+            this.callback = undefined;
+        }
+    }
+    // Called during a user gesture.
+    open(callback) {
+        this.callback = callback;
+        this.input.click();
+    }
+    constructor(input) {
+        this.input = input;
+        input.addEventListener('click', this.invokeCallback.bind(this));
+    }
+}
 export function readFile(event, cb) {
     const target = event.target, files = target.files;
     if (files && files[0]) {
@@ -694,7 +712,7 @@ export function readFile(event, cb) {
 export function writeFile(name, text) {
     const blob = new Blob([text], { type: 'text/plain' }), link = document.createElement('a');
     link.download = name;
-    link.innerHTML = 'Download File';
+    link.innerHTML = name;
     link.href = URL.createObjectURL(blob);
     document.body.appendChild(link);
     link.click();

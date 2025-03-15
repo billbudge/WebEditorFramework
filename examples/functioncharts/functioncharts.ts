@@ -5,7 +5,7 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          diskPath, hitTestDisk, DiskHitResult, roundRectPath, bezierEdgePath,
          hitTestBezier, inFlagPath, outFlagPath, notchedRectPath, measureNameValuePairs,
          CanvasController, CanvasLayer, PropertyGridController, PropertyInfo,
-         writeFile } from '../../src/diagrams.js'
+         FileInputElement, writeFile } from '../../src/diagrams.js'
 
 import { Point, Rect, PointWithNormal, getExtents, projectPointToCircle,
          BezierCurve, evaluateBezier, CurveHitResult, expandRect } from '../../src/geometry.js'
@@ -3424,13 +3424,12 @@ export class FunctionchartEditor implements CanvasLayer {
   private canvasController: CanvasController;
   private paletteController: CanvasController;
   private propertyGridController: PropertyGridController;
+  private fileInput: FileInputElement;
   private hitTolerance: number;
   private changedItems: Set<AllTypes>;
   private changedTopLevelFunctioncharts: Set<Functionchart>;
   private renderer: Renderer;
   private palette: Functionchart;  // Functionchart to simplify layout of palette items.
-  private paletteContext: FunctionchartContext;
-  private paletteFunctionchart: Functionchart;
   private context: FunctionchartContext;
   private functionchart: Functionchart;
   private scrap: AllTypes[] = []
@@ -3447,13 +3446,15 @@ export class FunctionchartEditor implements CanvasLayer {
   constructor(baseTheme: Theme,
               canvasController: CanvasController,
               paletteController: CanvasController,
-              propertyGridController: PropertyGridController) {
+              propertyGridController: PropertyGridController,
+              fileInput: FileInputElement) {
     const self = this,
           theme = new FunctionchartTheme(baseTheme);
     this.theme = theme;
     this.canvasController = canvasController;
     this.paletteController = paletteController;
     this.propertyGridController = propertyGridController;
+    this.fileInput = fileInput;
 
     // This is finely tuned to allow picking in tight areas, such as input/output pins with
     // wires attached, or near the borders of a functionchart, without making it too difficult
@@ -3487,21 +3488,11 @@ export class FunctionchartEditor implements CanvasLayer {
           exporter = context.newElement('exporter'),
           constructor = context.newElement('constructor');
 
-    this.paletteContext = new FunctionchartContext(renderer);
-    this.paletteFunctionchart = this.paletteContext.newFunctionchart('functionchart');
-
-    const unaryFns = this.paletteContext.newElement('element');
+    const unaryFns = context.newElement('element');
 
     const unaryOps = ['!', '~', '-', 'typeof'];
     const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
       '|', '&', '||', '&&'];
-
-    let unaryTypestring = '';
-    unaryOps.forEach(c => unaryTypestring += '[v,v](' + c + ')');
-    unaryFns.typeString = '[,' + unaryTypestring + ']';
-    unaryFns.x = 100;
-    unaryFns.y = 100;
-    this.paletteFunctionchart.nodes.append(unaryFns);
 
     renderer.begin(canvasController.getCtx());
     renderer.layoutElement(unaryFns);
@@ -4054,14 +4045,6 @@ export class FunctionchartEditor implements CanvasLayer {
       if (hoverHitInfo) {
         renderer.drawHoverInfo(hoverHitInfo, this.hoverPoint);
       }
-
-      // Don't draw the root functionchart.
-      const paletteContext = this.paletteContext,
-            paletteFunctionchart = this.paletteFunctionchart;
-      paletteFunctionchart.nodes.forEach(item => {
-        paletteContext.visitNodes(item, item => { renderer.draw(item, RenderMode.Normal); });
-      });
-
       renderer.end();
     } else if (canvasController === this.paletteController) {
       // Palette drawing occurs during drag and drop. If the palette has the drag,
@@ -4713,6 +4696,22 @@ export class FunctionchartEditor implements CanvasLayer {
         this.openNewContext();
         break;
       }
+      case 'open': {
+        this.fileInput.open(this.openFile.bind(this));
+        break;
+      }
+      case 'openImport': {
+        this.fileInput.open(this.importFile.bind(this));
+        break;
+      }
+      case 'save': {
+        this.saveFile();
+        break;
+      }
+      case 'print': {
+        this.print();
+        break;
+      }
     }
   }
 
@@ -4796,7 +4795,11 @@ export class FunctionchartEditor implements CanvasLayer {
           return true;
         }
         case 79: { // 'o'
-          // available.
+          if (shiftKey) {
+            this.doCommand('openImport');
+          } else {
+            this.doCommand('open');
+          }
           return false;
         }
         case 83: { // 's'
