@@ -5,7 +5,9 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          diskPath, hitTestDisk, DiskHitResult, roundRectPath, bezierEdgePath,
          hitTestBezier, inFlagPath, outFlagPath, notchedRectPath, measureNameValuePairs,
          CanvasController, CanvasLayer, PropertyGridController, PropertyInfo,
-         FileInputElement, writeFile } from '../../src/diagrams.js'
+         FileInputElement, writeFile,
+         ErrorReporter,
+         ConsoleErrorReporter} from '../../src/diagrams.js'
 
 import { Point, Rect, PointWithNormal, getExtents, projectPointToCircle,
          BezierCurve, evaluateBezier, CurveHitResult, expandRect } from '../../src/geometry.js'
@@ -311,7 +313,6 @@ function parseTypeString(s: string) : Type {
       throw new Error('Invalid type string: ' + s);
     }
   }
-  // TODO try catch here?
   return parseFunction();
 }
 
@@ -806,6 +807,7 @@ export interface GraphInfo {
 export class FunctionchartContext extends EventBase<Change, ChangeEvents>
                                   implements DataContext {
   private readonly layoutEngine: ILayoutEngine;
+  private readonly errorReporter: ErrorReporter;
   private highestId: number = 0;  // 0 stands for no id.
   private readonly referentMap = new Map<number, ReferencedObject>();
 
@@ -825,10 +827,13 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   selection = new SelectionSet<AllTypes>();
 
-  constructor(layoutEngine: ILayoutEngine = new Renderer()) {
+  constructor(layoutEngine: ILayoutEngine = new Renderer(),
+              errorReporter: ErrorReporter = new ConsoleErrorReporter()) {
     super();
-    this.layoutEngine = layoutEngine;
     const self = this;
+
+    this.layoutEngine = layoutEngine;
+    this.errorReporter = errorReporter;
     this.transactionManager = new TransactionManager();
     this.addHandler('changed',
         this.transactionManager.onChanged.bind(this.transactionManager));
@@ -1155,18 +1160,20 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
   beginTransaction(name: string) {
     this.transactionManager.beginTransaction(name);
+    this.errorReporter.clear();
   }
   endTransaction() {
     this.makeConsistent();
-    if (!this.isValidFunctionchart()) {
-      // TODO some kind of error message.
-      this.transactionManager.cancelTransaction();
+    const result = this.isValidFunctionchart();
+    if (result !== true) {
+      this.cancelTransaction(result);
     } else {
       this.transactionManager.endTransaction();
     }
   }
-  cancelTransaction(name: string) {
-    this.transactionManager.cancelTransaction();
+  cancelTransaction(reason: string) {
+    this.transactionManager.cancelTransaction(reason);
+    this.errorReporter.report(reason);
   }
   getOldValue(item: any, property: string) : any {
     return this.transactionManager.getOldValue(item, property);
@@ -1751,9 +1758,10 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  isValidFunctionchart() {
-    if (this.invalidWires.length !== 0 || this.sorted.length !== this.nodes.size)
-      return false;
+  isValidFunctionchart(): true | string {
+    if (this.sorted.length !== this.nodes.size) {
+      return 'Elements and wires form a cycle';
+    }
 
     const self = this,
           invalidWires = new Array<Wire>(),
@@ -1766,7 +1774,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
     });
     if (invalidWires.length !== 0)
-      return false;
+      return 'Invalid wire';
 
     // Check functioncharts and functioninstances.
     this.nodes.forEach(node => {
@@ -1786,7 +1794,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       }
     });
 
-    return invalidFunctioncharts.length === 0 && invalidInstances.length === 0;
+    if (invalidFunctioncharts.length)
+      return 'Invalid functionchart';
+    if (invalidInstances.length)
+      return 'Invalid instance';
+    return true;
   }
 
   // Makes an array that maps old inputs and outputs to new ones based on the TypeInfo.
@@ -3428,6 +3440,7 @@ export class FunctionchartEditor implements CanvasLayer {
   private paletteController: CanvasController;
   private propertyGridController: PropertyGridController;
   private fileInput: FileInputElement;
+  private errorReporter: ErrorReporter;
   private hitTolerance: number;
   private changedItems: Set<AllTypes>;
   private changedTopLevelFunctioncharts: Set<Functionchart>;
@@ -3450,14 +3463,15 @@ export class FunctionchartEditor implements CanvasLayer {
               canvasController: CanvasController,
               paletteController: CanvasController,
               propertyGridController: PropertyGridController,
-              fileInput: FileInputElement) {
-    const self = this,
-          theme = new FunctionchartTheme(baseTheme);
+              fileInput: FileInputElement,
+              errorReporter: ErrorReporter) {
+    const theme = new FunctionchartTheme(baseTheme);
     this.theme = theme;
     this.canvasController = canvasController;
     this.paletteController = paletteController;
     this.propertyGridController = propertyGridController;
     this.fileInput = fileInput;
+    this.errorReporter = errorReporter;
 
     // This is finely tuned to allow picking in tight areas, such as input/output pins with
     // wires attached, or near the borders of a functionchart, without making it too difficult
@@ -3474,24 +3488,24 @@ export class FunctionchartEditor implements CanvasLayer {
     this.renderer = renderer;
 
     // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-    const context = new FunctionchartContext(renderer),
-          functionchart = context.newFunctionchart('functionchart'),
-          input = context.newPseudoelement('input'),
-          output = context.newPseudoelement('output'),
-          use = context.newPseudoelement('use'),
-          literal = context.newElement('element'),
-          binop = context.newElement('element'),
-          unop = context.newElement('element'),
-          cond = context.newElement('element'),
-          letFn = context.newElement('element'),
-          thisFn = context.newElement('element'),
-          external = context.newElement('element'),
-          newFunctionchart = context.newFunctionchart('functionchart'),
-          importer = context.newElement('importer'),
-          exporter = context.newElement('exporter'),
-          constructor = context.newElement('constructor');
+    const paletteContext = new FunctionchartContext(renderer),
+          functionchart = paletteContext.newFunctionchart('functionchart'),
+          input = paletteContext.newPseudoelement('input'),
+          output = paletteContext.newPseudoelement('output'),
+          use = paletteContext.newPseudoelement('use'),
+          literal = paletteContext.newElement('element'),
+          binop = paletteContext.newElement('element'),
+          unop = paletteContext.newElement('element'),
+          cond = paletteContext.newElement('element'),
+          letFn = paletteContext.newElement('element'),
+          thisFn = paletteContext.newElement('element'),
+          external = paletteContext.newElement('element'),
+          newFunctionchart = paletteContext.newFunctionchart('functionchart'),
+          importer = paletteContext.newElement('importer'),
+          exporter = paletteContext.newElement('exporter'),
+          constructor = paletteContext.newElement('constructor');
 
-    const unaryFns = context.newElement('element');
+    const unaryFns = paletteContext.newElement('element');
 
     const unaryOps = ['!', '~', '-', 'typeof'];
     const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
@@ -3501,7 +3515,7 @@ export class FunctionchartEditor implements CanvasLayer {
     renderer.layoutElement(unaryFns);
     renderer.end();
 
-    context.root = functionchart;
+    paletteContext.root = functionchart;
 
     input.x = 8;  input.y = 8;
     output.x = 40; output.y = 8;
@@ -3554,13 +3568,14 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nodes.append(exporter);
     functionchart.nodes.append(constructor);
 
-    context.root = functionchart;
+    paletteContext.root = functionchart;
     this.palette = functionchart;
 
     // Default Functionchart.
-    this.context = new FunctionchartContext(renderer);
-    this.initializeContext(this.context);
-    this.functionchart = this.context.root;
+    const context = new FunctionchartContext(renderer, errorReporter);
+    this.context = context;
+    this.initializeContext(context);
+    this.functionchart = context.root;
 
     // Register property grid layouts.
     function getter(info: ItemInfo, item: AllTypes) {
@@ -3569,20 +3584,16 @@ export class FunctionchartEditor implements CanvasLayer {
     }
     function setter(info: ItemInfo, item: AllTypes, value: any) {
       if (item && (info.prop instanceof ScalarProp || info.prop instanceof ReferenceProp)) {
-        const description = 'change ' + info.label,
-              context = self.context;
+        const description = 'change ' + info;
         context.beginTransaction(description);
-        info.prop.set(item, value);
+        try {
+          info.prop.set(item, value);
+        } catch (error) {
+          errorReporter.report(error.message);
+        }
         context.endTransaction();
-        self.canvasController.draw();
+        canvasController.draw();
       }
-    }
-    function boolSetter(info: ItemInfo, item: AllTypes, value: any) {
-      if (value === 'true')
-        value = true;
-      else if (value === 'false')
-        value = false;
-      setter(info, item, value);
     }
     function nodeLabelGetter(info: ItemInfo, item: NodeTypes) {
       let result;
@@ -4522,7 +4533,7 @@ export class FunctionchartEditor implements CanvasLayer {
   }
 
   newContext(text?: string, name?: string) : FunctionchartContext{
-    const context = new FunctionchartContext(this.renderer);
+    const context = new FunctionchartContext(this.renderer, this.errorReporter);
     let functionchart: Functionchart;
     if (text) {
       const raw = JSON.parse(text);

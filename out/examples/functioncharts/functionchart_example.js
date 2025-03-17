@@ -1,4 +1,4 @@
-import { getDefaultTheme, CanvasController, PropertyGridController, FileInputElement } from '../../src/diagrams.js';
+import { getDefaultTheme, CanvasController, PropertyGridController, FileInputElement, UIErrorReporter, ConsoleErrorReporter } from '../../src/diagrams.js';
 import { FunctionchartEditor } from './functioncharts.js';
 (function () {
     const body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette');
@@ -6,7 +6,9 @@ import { FunctionchartEditor } from './functioncharts.js';
         body.style.overscrollBehaviorY = 'contain';
         body.style.touchAction = 'pinch-zoom';
         const theme = getDefaultTheme(), // or getBlueprintTheme
-        canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette, true /* draggable */), propertyGridController = new PropertyGridController(body, theme), openFileInput = document.getElementById('open-file-input'), fileInput = new FileInputElement(openFileInput), editor = new FunctionchartEditor(theme, canvasController, paletteController, propertyGridController, fileInput);
+        canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette, true /* draggable */), propertyGridController = new PropertyGridController(body, theme), openFileInput = document.getElementById('open-file-input'), fileInput = new FileInputElement(openFileInput), errorBox = document.getElementById('errors');
+        const errorReporter = (errorBox) ? new UIErrorReporter(errorBox) : new ConsoleErrorReporter();
+        const editor = new FunctionchartEditor(theme, canvasController, paletteController, propertyGridController, fileInput, errorReporter);
         palette.style.borderColor = theme.strokeColor;
         palette.style.borderStyle = 'solid';
         palette.style.borderWidth = '0.25px';

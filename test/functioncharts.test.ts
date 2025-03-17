@@ -416,7 +416,7 @@ describe('FunctionchartContext', () => {
     const wire = addWire(functionchart, elem1, 0, elem2, 0);
     expect(context.isValidFunctionchart()).toBe(true);
     const cycleWire = addWire(functionchart, elem2, 0, elem1, 0);
-    expect(context.isValidFunctionchart()).toBe(false);
+    expect(context.isValidFunctionchart()).toBe('Elements and wires form a cycle');
     functionchart.wires.remove(cycleWire);
     context.updateDerivedInfo();
     expect(context.isValidFunctionchart()).toBe(true);

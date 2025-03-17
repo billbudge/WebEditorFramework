@@ -1,4 +1,4 @@
-import { getDefaultTheme, CanvasController, PropertyGridController, FileInputElement } from '../../src/diagrams.js'
+import { getDefaultTheme, CanvasController, PropertyGridController, FileInputElement, UIErrorReporter, ConsoleErrorReporter } from '../../src/diagrams.js'
 import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
 
 (function() {
@@ -17,8 +17,11 @@ import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
           propertyGridController = new PropertyGridController(body, theme),
           openFileInput = document.getElementById('open-file-input'),
           fileInput = new FileInputElement(openFileInput as HTMLInputElement),
-          editor = new FunctionchartEditor(
-              theme, canvasController, paletteController, propertyGridController, fileInput);
+          errorBox = document.getElementById('errors');
+
+          const errorReporter = (errorBox) ? new UIErrorReporter(errorBox) : new ConsoleErrorReporter();
+          const editor = new FunctionchartEditor(
+              theme, canvasController, paletteController, propertyGridController, fileInput, errorReporter);
 
     palette.style.borderColor = theme.strokeColor;
     palette.style.borderStyle = 'solid';

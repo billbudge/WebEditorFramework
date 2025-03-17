@@ -638,7 +638,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.makeConsistent();
     // Check validity and cancel before ending transaction.
     if (!this.isValidStatechart(this.statechart)) {
-      this.transactionManager.cancelTransaction();
+      this.cancelTransaction();
     } else {
       this.transactionManager.endTransaction();
     }

@@ -675,6 +675,23 @@ export class CanvasController {
         this.layers.reverse();
     }
 }
+export class ConsoleErrorReporter {
+    report(error) {
+        console.log(error);
+    }
+    clear() { }
+}
+export class UIErrorReporter {
+    report(error) {
+        this.element.textContent = error;
+    }
+    clear() {
+        this.element.textContent = '';
+    }
+    constructor(element) {
+        this.element = element;
+    }
+}
 export class FileInputElement {
     invokeCallback(e) {
         const callback = this.callback;

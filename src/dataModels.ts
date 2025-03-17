@@ -710,6 +710,7 @@ class ChangeOp implements Operation {
 export class CompoundOp implements Operation {
   readonly name: string;
   readonly ops: Operation[];
+  cancelReason: string | undefined;
 
   add(op: Operation) {
     this.ops.push(op);
@@ -769,7 +770,7 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
 
   // Notifies observers that a transaction was canceled and its operations
   // rolled back. At this point the transaction can't be ended.
-  cancelTransaction() {
+  cancelTransaction(reason?: string) {
     const transaction = this.transaction;
     if (!transaction)
       throw new Error('Transaction ended or canceled');
@@ -777,6 +778,7 @@ export class TransactionManager extends EventBase<CompoundOp, TransactionEvent> 
     this.endingOrCanceling = true;
     this.undo(transaction);
     this.snapshots.clear();
+    transaction.cancelReason = reason;
     super.onEvent('transactionCanceled', transaction);
     this.endingOrCanceling = false;
   }

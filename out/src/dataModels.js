@@ -586,7 +586,7 @@ export class TransactionManager extends EventBase {
     }
     // Notifies observers that a transaction was canceled and its operations
     // rolled back. At this point the transaction can't be ended.
-    cancelTransaction() {
+    cancelTransaction(reason) {
         const transaction = this.transaction;
         if (!transaction)
             throw new Error('Transaction ended or canceled');
@@ -594,6 +594,7 @@ export class TransactionManager extends EventBase {
         this.endingOrCanceling = true;
         this.undo(transaction);
         this.snapshots.clear();
+        transaction.cancelReason = reason;
         super.onEvent('transactionCanceled', transaction);
         this.endingOrCanceling = false;
     }

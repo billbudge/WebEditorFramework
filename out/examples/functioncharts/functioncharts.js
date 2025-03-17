@@ -1,6 +1,6 @@
 var _a;
 import { SelectionSet, Multimap } from '../../src/collections.js';
-import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, notchedRectPath, writeFile } from '../../src/diagrams.js';
+import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, notchedRectPath, writeFile, ConsoleErrorReporter } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager, ChildSlotProp } from '../../src/dataModels.js';
 import { codegen } from './execution.js';
@@ -174,7 +174,6 @@ Type.emptyType = new Type(Type.emptyPins, Type.emptyPins);
 Type.emptyExporterTypeString = '[,' + _a.emptyTypeString + ']'; // export the empty type
 Type.emptyExporterType = new Type(Type.emptyPins, [new Pin(Type.emptyType)]);
 // Manually atomize the base types.
-// TODO make this private.
 Type.atomizedTypes = new Map([
     [Type.valueTypeString, Type.valueType.initializeBaseType(Type.valueTypeString)],
     [Type.emptyTypeString, Type.emptyType.initializeBaseType(Type.emptyTypeString)],
@@ -259,7 +258,6 @@ function parseTypeString(s) {
             throw new Error('Invalid type string: ' + s);
         }
     }
-    // TODO try catch here?
     return parseFunction();
 }
 export function visitType(type, visitor) {
@@ -597,7 +595,7 @@ export class Functionchart extends NodeBase {
 // Radius of rounded corners. This isn't themeable, as it's conceptually part of the notation.
 Functionchart.radius = 8;
 export class FunctionchartContext extends EventBase {
-    constructor(layoutEngine = new Renderer()) {
+    constructor(layoutEngine = new Renderer(), errorReporter = new ConsoleErrorReporter()) {
         super();
         this.highestId = 0; // 0 stands for no id.
         this.referentMap = new Map();
@@ -611,8 +609,9 @@ export class FunctionchartContext extends EventBase {
         this.instancingGraph = new Map();
         this.selection = new SelectionSet();
         this.name = 'untitled.txt';
-        this.layoutEngine = layoutEngine;
         const self = this;
+        this.layoutEngine = layoutEngine;
+        this.errorReporter = errorReporter;
         this.transactionManager = new TransactionManager();
         this.addHandler('changed', this.transactionManager.onChanged.bind(this.transactionManager));
         function update() {
@@ -920,19 +919,21 @@ export class FunctionchartContext extends EventBase {
     }
     beginTransaction(name) {
         this.transactionManager.beginTransaction(name);
+        this.errorReporter.clear();
     }
     endTransaction() {
         this.makeConsistent();
-        if (!this.isValidFunctionchart()) {
-            // TODO some kind of error message.
-            this.transactionManager.cancelTransaction();
+        const result = this.isValidFunctionchart();
+        if (result !== true) {
+            this.cancelTransaction(result);
         }
         else {
             this.transactionManager.endTransaction();
         }
     }
-    cancelTransaction(name) {
-        this.transactionManager.cancelTransaction();
+    cancelTransaction(reason) {
+        this.transactionManager.cancelTransaction(reason);
+        this.errorReporter.report(reason);
     }
     getOldValue(item, property) {
         return this.transactionManager.getOldValue(item, property);
@@ -1449,8 +1450,9 @@ export class FunctionchartContext extends EventBase {
         }
     }
     isValidFunctionchart() {
-        if (this.invalidWires.length !== 0 || this.sorted.length !== this.nodes.size)
-            return false;
+        if (this.sorted.length !== this.nodes.size) {
+            return 'Elements and wires form a cycle';
+        }
         const self = this, invalidWires = new Array(), invalidInstances = new Array(), invalidFunctioncharts = new Array();
         // Check wires.
         this.wires.forEach(wire => {
@@ -1459,7 +1461,7 @@ export class FunctionchartContext extends EventBase {
             }
         });
         if (invalidWires.length !== 0)
-            return false;
+            return 'invalid wire';
         // Check functioncharts and functioninstances.
         this.nodes.forEach(node => {
             if (node instanceof Functionchart) {
@@ -1478,7 +1480,11 @@ export class FunctionchartContext extends EventBase {
                 }
             }
         });
-        return invalidFunctioncharts.length === 0 && invalidInstances.length === 0;
+        if (invalidFunctioncharts.length)
+            return 'Invalid functionchart';
+        if (invalidInstances.length)
+            return 'Invalid instance';
+        return true;
     }
     // Makes an array that maps old inputs and outputs to new ones based on the TypeInfo.
     // The input mapping and output mapping are concatenated in the final array. The array
@@ -2877,16 +2883,17 @@ class WireDrag {
     }
 }
 export class FunctionchartEditor {
-    constructor(baseTheme, canvasController, paletteController, propertyGridController, fileInput) {
+    constructor(baseTheme, canvasController, paletteController, propertyGridController, fileInput, errorReporter) {
         this.scrap = [];
         this.clickInPalette = false;
         this.propertyInfo = new Map();
-        const self = this, theme = new FunctionchartTheme(baseTheme);
+        const theme = new FunctionchartTheme(baseTheme);
         this.theme = theme;
         this.canvasController = canvasController;
         this.paletteController = paletteController;
         this.propertyGridController = propertyGridController;
         this.fileInput = fileInput;
+        this.errorReporter = errorReporter;
         // This is finely tuned to allow picking in tight areas, such as input/output pins with
         // wires attached, or near the borders of a functionchart, without making it too difficult
         // to pick wires.
@@ -2899,15 +2906,15 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), use = context.newPseudoelement('use'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), letFn = context.newElement('element'), thisFn = context.newElement('element'), external = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart'), importer = context.newElement('importer'), exporter = context.newElement('exporter'), constructor = context.newElement('constructor');
-        const unaryFns = context.newElement('element');
+        const paletteContext = new FunctionchartContext(renderer), functionchart = paletteContext.newFunctionchart('functionchart'), input = paletteContext.newPseudoelement('input'), output = paletteContext.newPseudoelement('output'), use = paletteContext.newPseudoelement('use'), literal = paletteContext.newElement('element'), binop = paletteContext.newElement('element'), unop = paletteContext.newElement('element'), cond = paletteContext.newElement('element'), letFn = paletteContext.newElement('element'), thisFn = paletteContext.newElement('element'), external = paletteContext.newElement('element'), newFunctionchart = paletteContext.newFunctionchart('functionchart'), importer = paletteContext.newElement('importer'), exporter = paletteContext.newElement('exporter'), constructor = paletteContext.newElement('constructor');
+        const unaryFns = paletteContext.newElement('element');
         const unaryOps = ['!', '~', '-', 'typeof'];
         const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
             '|', '&', '||', '&&'];
         renderer.begin(canvasController.getCtx());
         renderer.layoutElement(unaryFns);
         renderer.end();
-        context.root = functionchart;
+        paletteContext.root = functionchart;
         input.x = 8;
         input.y = 8;
         output.x = 40;
@@ -2969,12 +2976,13 @@ export class FunctionchartEditor {
         functionchart.nodes.append(importer);
         functionchart.nodes.append(exporter);
         functionchart.nodes.append(constructor);
-        context.root = functionchart;
+        paletteContext.root = functionchart;
         this.palette = functionchart;
         // Default Functionchart.
-        this.context = new FunctionchartContext(renderer);
-        this.initializeContext(this.context);
-        this.functionchart = this.context.root;
+        const context = new FunctionchartContext(renderer, errorReporter);
+        this.context = context;
+        this.initializeContext(context);
+        this.functionchart = context.root;
         // Register property grid layouts.
         function getter(info, item) {
             if (item)
@@ -2982,19 +2990,17 @@ export class FunctionchartEditor {
         }
         function setter(info, item, value) {
             if (item && (info.prop instanceof ScalarProp || info.prop instanceof ReferenceProp)) {
-                const description = 'change ' + info.label, context = self.context;
+                const description = 'change ' + info;
                 context.beginTransaction(description);
-                info.prop.set(item, value);
+                try {
+                    info.prop.set(item, value);
+                }
+                catch (error) {
+                    errorReporter.report(error.message);
+                }
                 context.endTransaction();
-                self.canvasController.draw();
+                canvasController.draw();
             }
-        }
-        function boolSetter(info, item, value) {
-            if (value === 'true')
-                value = true;
-            else if (value === 'false')
-                value = false;
-            setter(info, item, value);
         }
         function nodeLabelGetter(info, item) {
             let result;
@@ -3865,7 +3871,7 @@ export class FunctionchartEditor {
         this.canvasController.draw();
     }
     newContext(text, name) {
-        const context = new FunctionchartContext(this.renderer);
+        const context = new FunctionchartContext(this.renderer, this.errorReporter);
         let functionchart;
         if (text) {
             const raw = JSON.parse(text);

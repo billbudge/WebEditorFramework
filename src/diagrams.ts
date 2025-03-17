@@ -869,6 +869,35 @@ export class CanvasController {
 
 //------------------------------------------------------------------------------
 
+export interface ErrorReporter {
+  report(error: string) : void;
+  clear() : void;
+}
+
+export class ConsoleErrorReporter implements ErrorReporter {
+  report(error: string) {
+    console.log(error);
+  }
+  clear(): void {}
+}
+
+export class UIErrorReporter implements ErrorReporter {
+  private element: HTMLElement;
+
+  report(error: string) : void {
+    this.element.textContent = error;
+  }
+  clear() : void {
+    this.element.textContent = '';
+  }
+
+  constructor(element: HTMLElement) {
+    this.element = element;
+  }
+}
+
+//------------------------------------------------------------------------------
+
 export type ReadFileCallback = (name: string, text: string) => void;
 
 export class FileInputElement {
