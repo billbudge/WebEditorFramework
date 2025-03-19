@@ -904,7 +904,7 @@ export class FileInputElement {
   private input: HTMLInputElement;
   private callback: ReadFileCallback | undefined;
 
-  private invokeCallback(e: InputEvent) {
+  private invokeCallback(e: Event) {
     const callback = this.callback;
     if (callback) {
       readFile(e, callback);
@@ -920,11 +920,11 @@ export class FileInputElement {
 
   constructor(input: HTMLInputElement) {
     this.input = input;
-    input.addEventListener('click', this.invokeCallback.bind(this));
+    input.addEventListener('change', this.invokeCallback.bind(this));
   }
 }
 
-export function readFile(event: InputEvent, cb: ReadFileCallback) {
+export function readFile(event: Event, cb: ReadFileCallback) {
   const target = event.target as HTMLInputElement,
         files = target.files;
   if (files && files[0]) {

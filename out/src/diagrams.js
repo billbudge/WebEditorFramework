@@ -707,7 +707,7 @@ export class FileInputElement {
     }
     constructor(input) {
         this.input = input;
-        input.addEventListener('click', this.invokeCallback.bind(this));
+        input.addEventListener('change', this.invokeCallback.bind(this));
     }
 }
 export function readFile(event, cb) {

@@ -1461,7 +1461,7 @@ export class FunctionchartContext extends EventBase {
             }
         });
         if (invalidWires.length !== 0)
-            return 'invalid wire';
+            return 'Invalid wire';
         // Check functioncharts and functioninstances.
         this.nodes.forEach(node => {
             if (node instanceof Functionchart) {
