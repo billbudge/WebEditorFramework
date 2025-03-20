@@ -1989,7 +1989,7 @@ export class FunctionchartContext extends EventBase {
                             if (node.inWires[i])
                                 continue;
                             const pin = inputPins[i];
-                            const type = pin.type, name = pin.name, pinInfo = { element: node, index: i, type, name };
+                            const type = pin.type, pinInfo = { element: node, index: i, type, name: undefined };
                             inputs.push(pinInfo);
                         }
                         for (let i = 0; i < outputPins.length; i++) {
@@ -1997,7 +1997,7 @@ export class FunctionchartContext extends EventBase {
                             if (node.outWires[i].length !== 0 || node.instances[i].length !== 0)
                                 continue;
                             const pin = outputPins[i];
-                            const type = pin.type, name = pin.name, pinInfo = { element: node, index: i, type, name };
+                            const type = pin.type, pinInfo = { element: node, index: i, type, name: undefined };
                             outputs.push(pinInfo);
                         }
                     }

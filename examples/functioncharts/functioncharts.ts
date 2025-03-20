@@ -2360,8 +2360,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
                 continue;
               const pin = inputPins[i];
               const type = pin.type,
-                    name = pin.name,
-                    pinInfo = { element: node, index: i, type, name };
+                    pinInfo = { element: node, index: i, type, name: undefined };
               inputs.push(pinInfo);
             }
             for (let i = 0; i < outputPins.length; i++) {
@@ -2370,8 +2369,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
                 continue;
               const pin = outputPins[i];
               const type = pin.type,
-                    name = pin.name,
-                    pinInfo = { element: node, index: i, type, name };
+                    pinInfo = { element: node, index: i, type, name: undefined };
               outputs.push(pinInfo);
             }
           }
@@ -4308,7 +4306,7 @@ export class FunctionchartEditor implements CanvasLayer {
         newWire = context.newWire(src, pointerHitInfo.output, undefined, -1);
         newWire.pDst = { x: cp0.x, y: cp0.y, nx: 0, ny: 0 };
         drag = new WireDrag(newWire, 'connectWireDst', 'Add new wire');
-      } else if (pointerHitInfo instanceof WireHitResult) {
+    } else if (pointerHitInfo instanceof WireHitResult) {
       if (pointerHitInfo.inner.t === 0) {
         drag = new WireDrag(dragItem as Wire, 'connectWireSrc', 'Edit wire');
       } else if (pointerHitInfo.inner.t === 1) {

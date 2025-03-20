@@ -915,11 +915,13 @@ export class FileInputElement {
   // Called during a user gesture.
   open(callback: ReadFileCallback) {
     this.callback = callback;
+    // Click the input element to trigger the open file dialog.
     this.input.click();
   }
 
   constructor(input: HTMLInputElement) {
     this.input = input;
+    // Change event signals file(s) picked.
     input.addEventListener('change', this.invokeCallback.bind(this));
   }
 }
