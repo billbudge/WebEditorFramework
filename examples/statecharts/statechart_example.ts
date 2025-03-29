@@ -1,4 +1,4 @@
-import { getDefaultTheme, CanvasController, PropertyGridController } from '../../src/diagrams.js'
+import { getDefaultTheme, CanvasController, PropertyGridController, readFile } from '../../src/diagrams.js'
 import { StatechartEditor, EditorCommand } from './statecharts.js'
 
 (function() {
@@ -15,7 +15,7 @@ import { StatechartEditor, EditorCommand } from './statecharts.js'
           canvasController = new CanvasController(canvas as HTMLCanvasElement),
           paletteController = new CanvasController(palette as HTMLCanvasElement, true /* draggable */),
           propertyGridController = new PropertyGridController(body, theme),
-          statechartEditor = new StatechartEditor(
+          editor = new StatechartEditor(
               theme, canvasController, paletteController, propertyGridController);
 
     palette.style.borderColor = theme.strokeColor;
@@ -23,9 +23,9 @@ import { StatechartEditor, EditorCommand } from './statecharts.js'
     palette.style.borderWidth = '0.25px';
     canvas.style.backgroundColor = theme.bgColor;
 
-    canvasController.configure([statechartEditor]);
+    canvasController.configure([editor]);
     canvasController.setSize(window.innerWidth, window.innerHeight);
-    paletteController.configure([statechartEditor]);
+    paletteController.configure([editor]);
     paletteController.setSize(150, 100);
 
     window.onbeforeunload = function() {
@@ -37,6 +37,13 @@ import { StatechartEditor, EditorCommand } from './statecharts.js'
       canvasController.onWindowResize();
     }
 
+    const openFileInput = document.getElementById("open-file-input");
+    if (openFileInput) {
+      openFileInput.addEventListener("change", (event: InputEvent) => {
+        readFile(event, editor.openFile.bind(editor));
+      });
+    }
+
     document.addEventListener('keydown', function(e) {
       // Handle any keyboard commands for the app window here.
       canvasController.onKeyDown(e);
@@ -45,6 +52,36 @@ import { StatechartEditor, EditorCommand } from './statecharts.js'
     document.addEventListener('keyup', function(e) {
       canvasController.onKeyUp(e);
     });
+
+    const fileMenu = document.getElementById('file'),
+          editMenu = document.getElementById('edit'),
+          examplesMenu = document.getElementById('examples');
+
+    function selectListener(e: InputEvent) {
+      const target = e.target as HTMLSelectElement,
+            command = idToCommand(target.value);
+      if (command) {
+        target.selectedIndex = 0;
+        if (target === fileMenu) {
+          switch (command) {
+            case 'new':
+              editor.openNewContext();
+              break;
+            case 'open':
+              openFileInput!.click();
+              break;
+            case 'save':
+              editor.saveFile();
+              break;
+            case 'print':
+              editor.print();
+              break;
+          }
+        } else {
+          editor.doCommand(command);
+        }
+      }
+    }
 
     function idToCommand(id: string) : EditorCommand | undefined {
       switch (id) {
@@ -57,6 +94,7 @@ import { StatechartEditor, EditorCommand } from './statecharts.js'
         case 'group': return 'group';
         case 'extend': return 'extend';
         case 'selectAll': return 'selectAll';
+        case 'new': return 'new';
         case 'open': return 'open';
         case 'save': return 'save';
         case 'print': return 'print';
@@ -67,7 +105,7 @@ import { StatechartEditor, EditorCommand } from './statecharts.js'
       const target = e.target as HTMLElement,
             command = idToCommand(target.id);
       if (command) {
-        statechartEditor.doCommand(command);
+        editor.doCommand(command);
       }
     }
     document.getElementById('undo')!.addEventListener('click', buttonListener);
@@ -75,26 +113,17 @@ import { StatechartEditor, EditorCommand } from './statecharts.js'
     document.getElementById('delete')!.addEventListener('click', buttonListener);
     document.getElementById('extend')!.addEventListener('click', buttonListener);
 
-    function selectListener(e: Event) {
-      const target = e.target as HTMLSelectElement,
-            command = idToCommand(target.value);
-      if (command) {
-        target.selectedIndex = 0;
-        statechartEditor.doCommand(command);
-      }
-    }
+    fileMenu!.addEventListener('change', selectListener);
+    editMenu!.addEventListener('change', selectListener);
 
-    document.getElementById('file')!.addEventListener('change', selectListener);
-    document.getElementById('edit')!.addEventListener('change', selectListener);
-
-    document.getElementById('examples')!.addEventListener('change', event => {
+    examplesMenu!.addEventListener('change', event => {
       const select = event.target as HTMLSelectElement;
       const id = select.value,
             fileName = id + '.txt';
       select.selectedIndex = 0;
       fetch(fileName)
         .then(response => response.text())
-        .then(text => statechartEditor.createContext(text));
+        .then(text => editor.openNewContext(text, fileName));
     });
   }
 })();

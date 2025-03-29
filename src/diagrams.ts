@@ -869,55 +869,91 @@ export class CanvasController {
 
 //------------------------------------------------------------------------------
 
-export interface FileType {
-  description: string;
-  accept: {[mimeType: string]: string[]};
+export interface ErrorReporter {
+  report(error: string) : void;
+  clear() : void;
 }
 
-const defaultFileTypes: FileType[] = [
-  {
-    description: 'Text file',
-    accept: {'text/plain': ['.txt']},
-  }];
+export class ConsoleErrorReporter implements ErrorReporter {
+  report(error: string) {
+    console.log(error);
+  }
+  clear(): void {}
+}
 
-export class FileController {
-  private types: FileType[];
-  private excludeAcceptAllOption: boolean;
+export class UIErrorReporter implements ErrorReporter {
+  private element: HTMLElement;
 
-  constructor(types: FileType[] = defaultFileTypes, excludeAcceptAllOption: boolean = false) {
-    this.types = types;
-    this.excludeAcceptAllOption = excludeAcceptAllOption;
+  report(error: string) : void {
+    this.element.textContent = error;
   }
-  async getWriteFileHandle(suggestedName: string) {
-    const opts = {
-      types: this.types,
-      excludeAcceptAllOption: this.excludeAcceptAllOption,
-      suggestedName: suggestedName,
+  clear() : void {
+    this.element.textContent = '';
+  }
+
+  constructor(element: HTMLElement) {
+    this.element = element;
+  }
+}
+
+//------------------------------------------------------------------------------
+
+export type ReadFileCallback = (name: string, text: string) => void;
+
+export class FileInputElement {
+  private input: HTMLInputElement;
+  private callback: ReadFileCallback | undefined;
+
+  private invokeCallback(e: Event) {
+    const callback = this.callback;
+    if (callback) {
+      readFile(e, callback);
+      this.callback = undefined;
     }
-    return await window.showSaveFilePicker(opts);
   }
-  async saveFile(fileHandle: FileSystemFileHandle, contents: string) {
-    const writable = await fileHandle.createWritable();
-    await writable.write(contents);
-    await writable.close();
+
+  // Called during a user gesture.
+  open(callback: ReadFileCallback) {
+    this.callback = callback;
+    // Click the input element to trigger the open file dialog.
+    this.input.click();
   }
-  async saveUnnamedFile(contents: string, suggestedName: string) {
-    const fileHandle = await this.getWriteFileHandle(suggestedName);
-    await this.saveFile(fileHandle, contents);
+
+  constructor(input: HTMLInputElement) {
+    this.input = input;
+    // Change event signals file(s) picked.
+    input.addEventListener('change', this.invokeCallback.bind(this));
   }
-  async getReadFileHandle() {
-    const opts = {
-      types: this.types,
-      excludeAcceptAllOption: this.excludeAcceptAllOption,
-      multiple: false,
-    }
-    const [fileHandle] = await window.showOpenFilePicker(opts);
-    return fileHandle;
+}
+
+export function readFile(event: Event, cb: ReadFileCallback) {
+  const target = event.target as HTMLInputElement,
+        files = target.files;
+  if (files && files[0]) {
+    const file = files[0],
+          reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (result === null || result instanceof ArrayBuffer)
+        return;
+      cb(file.name, result);
+    };
+    reader.onerror = () => {
+      // showMessage("Error reading the file.", "error");
+    };
+    reader.readAsText(file);
   }
-  async openFile() {
-    const fileHandle = await this.getReadFileHandle();
-    const fileData = await fileHandle.getFile();
-    return await fileData.text();
-  }
+}
+
+export function writeFile(name: string, text: string) {
+  const blob = new Blob([text], {type:'text/plain'}),
+        link = document.createElement('a');
+  link.download = name;
+  link.innerHTML = name;
+  link.href = URL.createObjectURL(blob);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
 }
 

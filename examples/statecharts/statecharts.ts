@@ -5,7 +5,7 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, RectHitResult,
          diskPath, hitTestDisk, DiskHitResult, roundRectPath, bezierEdgePath,
          hitTestBezier, measureNameValuePairs, CanvasController, CanvasLayer,
-         PropertyGridController, PropertyInfo, FileController } from '../../src/diagrams.js'
+         PropertyGridController, PropertyInfo, writeFile } from '../../src/diagrams.js'
 
 import { Point, Rect, PointWithNormal, getExtents, projectPointToCircle,
          BezierCurve, evaluateBezier, CurveHitResult, expandRect } from '../../src/geometry.js'
@@ -298,6 +298,8 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.insertStatechart(root, undefined);
     this.statechart = root;
   }
+
+  name: string;
 
   newState() : State {
     const nextId = ++this.highestId,
@@ -636,7 +638,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.makeConsistent();
     // Check validity and cancel before ending transaction.
     if (!this.isValidStatechart(this.statechart)) {
-      this.transactionManager.cancelTransaction();
+      this.cancelTransaction();
     } else {
       this.transactionManager.endTransaction();
     }
@@ -1796,22 +1798,6 @@ function readStatechart(
   return statechart;
 }
 
-function readRaw(raw: any, context: StatechartContext) : void {
-  let statechart: Statechart | undefined = undefined;
-  if (raw.items === undefined) {
-    // new format.
-    statechart = Deserialize(raw, context) as Statechart;
-  } else {
-    // old format.
-    // TODO eliminate this.
-    const map = new Map<number, StateTypes>();
-    statechart = readStatechart(raw, context, map);
-  }
-  if (statechart) {
-    context.root = statechart;
-  }
-}
-
 //------------------------------------------------------------------------------
 
 function isStateBorder(hitInfo: HitResultTypes) : boolean {
@@ -1874,7 +1860,6 @@ export class StatechartEditor implements CanvasLayer {
   private canvasController: CanvasController;
   private paletteController: CanvasController;
   private propertyGridController: PropertyGridController;
-  private fileController: FileController;
   private hitTolerance: number;
   private changedItems: Set<AllTypes>;
   private changedTopLevelStates: Set<State>;
@@ -1903,7 +1888,6 @@ export class StatechartEditor implements CanvasLayer {
     this.canvasController = canvasController;
     this.paletteController = paletteController;
     this.propertyGridController = propertyGridController;
-    this.fileController = new FileController();
 
     this.hitTolerance = 8;
 
@@ -2284,10 +2268,10 @@ export class StatechartEditor implements CanvasLayer {
 
     // Write out the SVG file.
     const serializedSVG = ctx.getSerializedSvg();
-    const blob = new Blob([serializedSVG], {
-      type: 'text/plain'
-    });
-    (window as any).saveAs(blob, 'statechart.svg', true);
+    let name = context.name,
+        pos = name.lastIndexOf(".");
+    name = name.substring(0, pos < 0 ? name.length : pos) + ".svg";
+    writeFile(name, serializedSVG);
   }
   getCanvasPosition(canvasController: CanvasController, p: Point) {
     // When dragging from the palette, convert the position from pointer events
@@ -2621,16 +2605,40 @@ export class StatechartEditor implements CanvasLayer {
     this.canvasController.draw();
   }
 
-  createContext(text: string) {
-    const raw = JSON.parse(text),
-          context = new StatechartContext();
-    const statechart = readRaw(raw, context);
+  newContext(text?: string, name?: string) : StatechartContext{
+    const context = new StatechartContext();
+    let statechart: Statechart;
+    if (text) {
+      const raw = JSON.parse(text);
+      statechart = Deserialize(raw, context) as Statechart;
+    } else {
+      statechart = context.newStatechart();
+    }
+    if (name)
+      context.name = name;
+    context.root = statechart;
+    return context;
+  }
+
+  openNewContext(text?: string, name?: string) {
+    const context = this.newContext(text, name);
     this.initializeContext(context);
     this.setContext(context);
     this.renderer.begin(this.canvasController.getCtx());
     this.updateBounds();
     this.canvasController.draw();
   }
+
+  openFile(fileName: string, text: string) {
+    this.openNewContext(text, fileName)
+  }
+
+  saveFile() {
+    const context = this.context,
+          text = JSON.stringify(Serialize(context.root), undefined, 2);
+    writeFile(context.name, text);
+  }
+
 
   doCommand(command: EditorCommand) {
     const context = this.context,
@@ -2700,27 +2708,7 @@ export class StatechartEditor implements CanvasLayer {
         break;
       }
       case 'new': {
-        const context = new StatechartContext();
-        this.initializeContext(context);
-        this.setContext(context);
-        this.renderer.begin(canvasController.getCtx());
-        this.updateBounds();
-        canvasController.draw();
-      break;
-      }
-      case 'open': {
-        const self = this;
-        this.fileController.openFile().then(result => self.createContext(result));
-        break;
-      }
-      case 'save': {
-        let text = JSON.stringify(Serialize(this.statechart), undefined, 2);
-        this.fileController.saveUnnamedFile(text, 'statechart.txt').then();
-        // console.log(text);
-      break;
-      }
-      case 'print': {
-        this.print();
+        this.openNewContext();
         break;
       }
     }

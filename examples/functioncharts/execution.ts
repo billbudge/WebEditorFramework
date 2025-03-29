@@ -93,15 +93,15 @@ export class Binop extends Node {
   }
 }
 
-export class IfThenElse extends Node {
+export class Cond extends Node {
   cond: Operand;
-  if: Operand;
-  else: Operand;
+  trueBranch: Operand;
+  falseBranch: Operand;
   constructor(element: Element) {
     super(element);
     this.cond = Operand.toOperand(element.inWires[0]);
-    this.if = Operand.toOperand(element.inWires[1]);
-    this.else = Operand.toOperand(element.inWires[2]);
+    this.trueBranch = Operand.toOperand(element.inWires[1]);
+    this.falseBranch = Operand.toOperand(element.inWires[2]);
   }
 }
 

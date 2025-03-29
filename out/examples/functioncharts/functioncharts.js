@@ -1,6 +1,6 @@
 var _a;
 import { SelectionSet, Multimap } from '../../src/collections.js';
-import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, notchedRectPath, FileController } from '../../src/diagrams.js';
+import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, notchedRectPath, writeFile, ConsoleErrorReporter } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager, ChildSlotProp } from '../../src/dataModels.js';
 import { codegen } from './execution.js';
@@ -67,6 +67,9 @@ export class Type {
         }
         return result;
     }
+    static isAtomized(typeString) {
+        return this.atomizedTypes.has(typeString);
+    }
     rename(name) {
         return Type.fromInfo(this.inputs.map(pin => pin.copy()), this.outputs.map(pin => pin.copy()), name);
     }
@@ -77,13 +80,15 @@ export class Type {
         const inputs = this.inputs.map(pin => new Pin(pin.type, pin.name));
         return Type.fromInfo(inputs, [new Pin(Type.valueType)], 'new ' + this.name);
     }
+    castName() {
+        return this.name ? ' ' + this.name : '*';
+    }
     toUpCastType() {
-        const outputs = this.outputs.map(pin => new Pin(pin.type, pin.name));
-        outputs.splice(0, 0, new Pin(Type.valueType));
-        return Type.fromInfo([new Pin(Type.valueType)], outputs, 'to ' + this.name);
+        const outputs = [new Pin(Type.valueType), new Pin(this)];
+        return Type.fromInfo([new Pin(Type.valueType)], outputs, 'to' + this.castName());
     }
     toDownCastType() {
-        return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)], 'from ' + this.name);
+        return Type.fromInfo([new Pin(this)], [new Pin(Type.valueType)], 'from' + this.castName());
     }
     static outputType(pin) {
         const type = pin.type;
@@ -169,7 +174,6 @@ Type.emptyType = new Type(Type.emptyPins, Type.emptyPins);
 Type.emptyExporterTypeString = '[,' + _a.emptyTypeString + ']'; // export the empty type
 Type.emptyExporterType = new Type(Type.emptyPins, [new Pin(Type.emptyType)]);
 // Manually atomize the base types.
-// TODO make this private.
 Type.atomizedTypes = new Map([
     [Type.valueTypeString, Type.valueType.initializeBaseType(Type.valueTypeString)],
     [Type.emptyTypeString, Type.emptyType.initializeBaseType(Type.emptyTypeString)],
@@ -254,7 +258,6 @@ function parseTypeString(s) {
             throw new Error('Invalid type string: ' + s);
         }
     }
-    // TODO try catch here?
     return parseFunction();
 }
 export function visitType(type, visitor) {
@@ -592,7 +595,7 @@ export class Functionchart extends NodeBase {
 // Radius of rounded corners. This isn't themeable, as it's conceptually part of the notation.
 Functionchart.radius = 8;
 export class FunctionchartContext extends EventBase {
-    constructor(layoutEngine = new Renderer()) {
+    constructor(layoutEngine = new Renderer(), errorReporter = new ConsoleErrorReporter()) {
         super();
         this.highestId = 0; // 0 stands for no id.
         this.referentMap = new Map();
@@ -605,8 +608,10 @@ export class FunctionchartContext extends EventBase {
         this.invalidWires = new Array(); // Wires that violate the fan-in constraint.
         this.instancingGraph = new Map();
         this.selection = new SelectionSet();
-        this.layoutEngine = layoutEngine;
+        this.name = 'untitled.txt';
         const self = this;
+        this.layoutEngine = layoutEngine;
+        this.errorReporter = errorReporter;
         this.transactionManager = new TransactionManager();
         this.addHandler('changed', this.transactionManager.onChanged.bind(this.transactionManager));
         function update() {
@@ -914,19 +919,21 @@ export class FunctionchartContext extends EventBase {
     }
     beginTransaction(name) {
         this.transactionManager.beginTransaction(name);
+        this.errorReporter.clear();
     }
     endTransaction() {
         this.makeConsistent();
-        if (!this.isValidFunctionchart()) {
-            // TODO some kind of error message.
-            this.transactionManager.cancelTransaction();
+        const result = this.isValidFunctionchart();
+        if (result !== true) {
+            this.cancelTransaction(result);
         }
         else {
             this.transactionManager.endTransaction();
         }
     }
-    cancelTransaction(name) {
-        this.transactionManager.cancelTransaction();
+    cancelTransaction(reason) {
+        this.transactionManager.cancelTransaction(reason);
+        this.errorReporter.report(reason);
     }
     getOldValue(item, property) {
         return this.transactionManager.getOldValue(item, property);
@@ -1443,8 +1450,9 @@ export class FunctionchartContext extends EventBase {
         }
     }
     isValidFunctionchart() {
-        if (this.invalidWires.length !== 0 || this.sorted.length !== this.nodes.size)
-            return false;
+        if (this.sorted.length !== this.nodes.size) {
+            return 'Elements and wires form a cycle';
+        }
         const self = this, invalidWires = new Array(), invalidInstances = new Array(), invalidFunctioncharts = new Array();
         // Check wires.
         this.wires.forEach(wire => {
@@ -1453,7 +1461,7 @@ export class FunctionchartContext extends EventBase {
             }
         });
         if (invalidWires.length !== 0)
-            return false;
+            return 'Invalid wire';
         // Check functioncharts and functioninstances.
         this.nodes.forEach(node => {
             if (node instanceof Functionchart) {
@@ -1472,7 +1480,11 @@ export class FunctionchartContext extends EventBase {
                 }
             }
         });
-        return invalidFunctioncharts.length === 0 && invalidInstances.length === 0;
+        if (invalidFunctioncharts.length)
+            return 'Invalid functionchart';
+        if (invalidInstances.length)
+            return 'Invalid instance';
+        return true;
     }
     // Makes an array that maps old inputs and outputs to new ones based on the TypeInfo.
     // The input mapping and output mapping are concatenated in the final array. The array
@@ -1977,7 +1989,7 @@ export class FunctionchartContext extends EventBase {
                             if (node.inWires[i])
                                 continue;
                             const pin = inputPins[i];
-                            const type = pin.type, name = pin.name, pinInfo = { element: node, index: i, type, name };
+                            const type = pin.type, pinInfo = { element: node, index: i, type, name: undefined };
                             inputs.push(pinInfo);
                         }
                         for (let i = 0; i < outputPins.length; i++) {
@@ -1985,7 +1997,7 @@ export class FunctionchartContext extends EventBase {
                             if (node.outWires[i].length !== 0 || node.instances[i].length !== 0)
                                 continue;
                             const pin = outputPins[i];
-                            const type = pin.type, name = pin.name, pinInfo = { element: node, index: i, type, name };
+                            const type = pin.type, pinInfo = { element: node, index: i, type, name: undefined };
                             outputs.push(pinInfo);
                         }
                     }
@@ -2675,13 +2687,15 @@ class Renderer {
         if (mode !== RenderMode.Palette) {
             for (let i = 0; i < type.inputs.length; i++) {
                 const pinPt = self.inputPinToPoint(element, i), rect = self.pinToRect(type.inputs[i], pinPt);
-                if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
+                // Hit test with tolerance adjustment along top, right, and bottom.
+                if (hitTestRect(rect.x, rect.y - tol, rect.width + tol, rect.height + 2 * tol, p, 0)) {
                     result.input = i;
                 }
             }
             for (let i = 0; i < type.outputs.length; i++) {
                 const pinPt = self.outputPinToPoint(element, i), rect = self.pinToRect(type.outputs[i], pinPt);
-                if (hitTestRect(rect.x, rect.y, rect.width, rect.height, p, 0)) {
+                // Hit test with tolerance adjustment along top, left, and bottom.
+                if (hitTestRect(rect.x - tol, rect.y - tol, rect.width + tol, rect.height + 2 * tol, p, 0)) {
                     result.output = i;
                 }
             }
@@ -2869,16 +2883,17 @@ class WireDrag {
     }
 }
 export class FunctionchartEditor {
-    constructor(baseTheme, canvasController, paletteController, propertyGridController) {
+    constructor(baseTheme, canvasController, paletteController, propertyGridController, fileInput, errorReporter) {
         this.scrap = [];
         this.clickInPalette = false;
         this.propertyInfo = new Map();
-        const self = this, theme = new FunctionchartTheme(baseTheme);
+        const theme = new FunctionchartTheme(baseTheme);
         this.theme = theme;
         this.canvasController = canvasController;
         this.paletteController = paletteController;
         this.propertyGridController = propertyGridController;
-        this.fileController = new FileController();
+        this.fileInput = fileInput;
+        this.errorReporter = errorReporter;
         // This is finely tuned to allow picking in tight areas, such as input/output pins with
         // wires attached, or near the borders of a functionchart, without making it too difficult
         // to pick wires.
@@ -2891,8 +2906,15 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const context = new FunctionchartContext(renderer), functionchart = context.newFunctionchart('functionchart'), input = context.newPseudoelement('input'), output = context.newPseudoelement('output'), use = context.newPseudoelement('use'), literal = context.newElement('element'), binop = context.newElement('element'), unop = context.newElement('element'), cond = context.newElement('element'), letFn = context.newElement('element'), thisFn = context.newElement('element'), external = context.newElement('element'), newFunctionchart = context.newFunctionchart('functionchart'), importer = context.newElement('importer'), exporter = context.newElement('exporter'), constructor = context.newElement('constructor');
-        context.root = functionchart;
+        const paletteContext = new FunctionchartContext(renderer), functionchart = paletteContext.newFunctionchart('functionchart'), input = paletteContext.newPseudoelement('input'), output = paletteContext.newPseudoelement('output'), use = paletteContext.newPseudoelement('use'), literal = paletteContext.newElement('element'), binop = paletteContext.newElement('element'), unop = paletteContext.newElement('element'), cond = paletteContext.newElement('element'), letFn = paletteContext.newElement('element'), thisFn = paletteContext.newElement('element'), external = paletteContext.newElement('element'), newFunctionchart = paletteContext.newFunctionchart('functionchart'), importer = paletteContext.newElement('importer'), exporter = paletteContext.newElement('exporter'), constructor = paletteContext.newElement('constructor');
+        const unaryFns = paletteContext.newElement('element');
+        const unaryOps = ['!', '~', '-', 'typeof'];
+        const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
+            '|', '&', '||', '&&'];
+        renderer.begin(canvasController.getCtx());
+        renderer.layoutElement(unaryFns);
+        renderer.end();
+        paletteContext.root = functionchart;
         input.x = 8;
         input.y = 8;
         output.x = 40;
@@ -2954,12 +2976,13 @@ export class FunctionchartEditor {
         functionchart.nodes.append(importer);
         functionchart.nodes.append(exporter);
         functionchart.nodes.append(constructor);
-        context.root = functionchart;
+        paletteContext.root = functionchart;
         this.palette = functionchart;
         // Default Functionchart.
-        this.context = new FunctionchartContext(renderer);
-        this.initializeContext(this.context);
-        this.functionchart = this.context.root;
+        const context = new FunctionchartContext(renderer, errorReporter);
+        this.context = context;
+        this.initializeContext(context);
+        this.functionchart = context.root;
         // Register property grid layouts.
         function getter(info, item) {
             if (item)
@@ -2967,19 +2990,17 @@ export class FunctionchartEditor {
         }
         function setter(info, item, value) {
             if (item && (info.prop instanceof ScalarProp || info.prop instanceof ReferenceProp)) {
-                const description = 'change ' + info.label, context = self.context;
+                const description = 'change ' + info;
                 context.beginTransaction(description);
-                info.prop.set(item, value);
+                try {
+                    info.prop.set(item, value);
+                }
+                catch (error) {
+                    errorReporter.report(error.message);
+                }
                 context.endTransaction();
-                self.canvasController.draw();
+                canvasController.draw();
             }
-        }
-        function boolSetter(info, item, value) {
-            if (value === 'true')
-                value = true;
-            else if (value === 'false')
-                value = false;
-            setter(info, item, value);
         }
         function nodeLabelGetter(info, item) {
             let result;
@@ -3064,8 +3085,6 @@ export class FunctionchartEditor {
                 prop: commentProp,
             },
         ]);
-        const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
-            '|', '&', '||', '&&'];
         this.propertyInfo.set('binop', [
             {
                 label: 'operator',
@@ -3076,7 +3095,6 @@ export class FunctionchartEditor {
                 prop: typeStringProp,
             },
         ]);
-        const unaryOps = ['!', '~', '-', 'typeof'];
         this.propertyInfo.set('unop', [
             {
                 label: 'operator',
@@ -3500,10 +3518,9 @@ export class FunctionchartEditor {
         renderer.end();
         // Write out the SVG file.
         const serializedSVG = ctx.getSerializedSvg();
-        const blob = new Blob([serializedSVG], {
-            type: 'text/plain'
-        });
-        window.saveAs(blob, 'functionchart.svg', true);
+        let name = context.name, pos = name.lastIndexOf(".");
+        name = name.substring(0, pos < 0 ? name.length : pos) + ".svg";
+        writeFile(name, serializedSVG);
     }
     getCanvasPosition(canvasController, p) {
         // When dragging from the palette, convert the position from pointer events
@@ -3820,7 +3837,7 @@ export class FunctionchartEditor {
             else {
                 // The user's new wire takes precedence over any existing wire (fan-in <= 1).
                 const current = dst.inWires[wire.dstPin];
-                if (current) {
+                if (current && current !== wire) {
                     context.deleteItem(current);
                 }
             }
@@ -3829,8 +3846,7 @@ export class FunctionchartEditor {
         else if (drag instanceof NonWireDrag &&
             (drag.kind == 'copyPalette' || drag.kind === 'moveSelection' ||
                 drag.kind === 'moveCopySelection')) {
-            if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase /*&&  TODO
-                lastSelected.type.canConnectTo(hitInfo.item.type)*/) {
+            if (hitInfo instanceof ElementHitResult && lastSelected instanceof NodeBase) {
                 const target = hitInfo.item;
                 if (!(lastSelected instanceof Functionchart)) {
                     context.dropNodeOnElement(lastSelected, target);
@@ -3854,8 +3870,8 @@ export class FunctionchartEditor {
         this.hotTrackInfo = undefined;
         this.canvasController.draw();
     }
-    newContext(text) {
-        const context = new FunctionchartContext(this.renderer);
+    newContext(text, name) {
+        const context = new FunctionchartContext(this.renderer, this.errorReporter);
         let functionchart;
         if (text) {
             const raw = JSON.parse(text);
@@ -3864,16 +3880,41 @@ export class FunctionchartEditor {
         else {
             functionchart = context.newFunctionchart('functionchart');
         }
+        if (name)
+            context.name = name;
         context.root = functionchart;
         return context;
     }
-    openNewContext(text) {
-        const context = this.newContext(text);
+    openNewContext(text, name) {
+        const context = this.newContext(text, name);
         this.initializeContext(context);
         this.setContext(context);
         this.renderer.begin(this.canvasController.getCtx());
         this.updateBounds();
         this.canvasController.draw();
+    }
+    openFile(fileName, text) {
+        this.openNewContext(text, fileName);
+    }
+    importFile(fileName, text) {
+        const context = this.context, imported = this.newContext(text), type = imported.getExportType(imported.root), element = context.newElement('element');
+        element.name = 'external';
+        element.typeString = type.typeString;
+        const center = this.canvasController.getViewCenter();
+        element.x = center.x;
+        element.y = center.y;
+        this.renderer.begin(this.canvasController.getCtx());
+        this.renderer.layoutElement(element);
+        this.renderer.end();
+        context.beginTransaction('import functionchart');
+        context.addItem(element, this.functionchart);
+        context.select(element);
+        context.endTransaction();
+        this.canvasController.draw();
+    }
+    saveFile() {
+        const context = this.context, text = JSON.stringify(Serialize(context.root), undefined, 2);
+        writeFile(context.name, text);
     }
     doCommand(command) {
         const context = this.context, canvasController = this.canvasController;
@@ -3997,37 +4038,15 @@ export class FunctionchartEditor {
                 break;
             }
             case 'open': {
-                const self = this;
-                this.fileController.openFile().then(result => self.openNewContext(result));
+                this.fileInput.open(this.openFile.bind(this));
                 break;
             }
             case 'openImport': {
-                const self = this;
-                // import the functionchart
-                this.fileController.openFile().then(result => {
-                    const imported = self.newContext(result);
-                    const type = imported.getExportType(imported.root);
-                    const element = context.newElement('element');
-                    element.name = 'external';
-                    element.typeString = type.typeString;
-                    const center = this.canvasController.getViewCenter();
-                    element.x = center.x;
-                    element.y = center.y;
-                    this.renderer.begin(this.canvasController.getCtx());
-                    this.renderer.layoutElement(element);
-                    this.renderer.end();
-                    context.beginTransaction('import functionchart');
-                    context.addItem(element, this.functionchart);
-                    context.select(element);
-                    context.endTransaction();
-                    self.canvasController.draw();
-                });
+                this.fileInput.open(this.importFile.bind(this));
                 break;
             }
             case 'save': {
-                let text = JSON.stringify(Serialize(this.functionchart), undefined, 2);
-                this.fileController.saveUnnamedFile(text, 'functionchart.txt').then();
-                // console.log(text);
+                this.saveFile();
                 break;
             }
             case 'print': {
@@ -4123,7 +4142,7 @@ export class FunctionchartEditor {
                     else {
                         this.doCommand('open');
                     }
-                    return true;
+                    return false;
                 }
                 case 83: { // 's'
                     this.doCommand('save');

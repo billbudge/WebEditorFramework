@@ -9,6 +9,9 @@
 
   <p style="position: fixed; right: 0; z-index: 2;">
     <tr>
+      <input type="file" id="open-file-input" accept="text/plain, application/json" style="display:none"/>
+      <input type="file" id="import-file-input" accept="text/plain, application/json" style="display:none"/>
+
       <button id="undo">undo</button>
       <button id="redo">redo</button>
       <button id="delete">delete</button>
@@ -65,6 +68,7 @@
         <option value="./files/points">points</option>
         <option value="./files/points2">points2</option>
         <option value="./files/points3">points3</option>
+        <option value="./files/cond">cond</option>
         <option value="./files/counters">counters</option>
         <option value="./files/Array">Array</option>
         <option value="./files/fibonacci">fibonacci</option>
@@ -72,6 +76,8 @@
         <option value="./files/exp_by_squaring2">exp_by_squaring2</option>
       </select>
     </tr>
+  </p>
+  <p  id="errors" style="color: Red; position: fixed; left: 8px; bottom: 0; z-index: 2;">
   </p>
 
 <canvas id="canvas" style="position: absolute; outline: none" tabindex="0";></canvas>

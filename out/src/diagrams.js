@@ -1,13 +1,4 @@
 // Useful diagram stuff.
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 import * as geometry from '../src/geometry.js';
 export function roundRectPath(x, y, width, height, r, ctx) {
     r = Math.min(r, width * 0.5, height * 0.5);
@@ -684,57 +675,67 @@ export class CanvasController {
         this.layers.reverse();
     }
 }
-const defaultFileTypes = [
-    {
-        description: 'Text file',
-        accept: { 'text/plain': ['.txt'] },
+export class ConsoleErrorReporter {
+    report(error) {
+        console.log(error);
     }
-];
-export class FileController {
-    constructor(types = defaultFileTypes, excludeAcceptAllOption = false) {
-        this.types = types;
-        this.excludeAcceptAllOption = excludeAcceptAllOption;
+    clear() { }
+}
+export class UIErrorReporter {
+    report(error) {
+        this.element.textContent = error;
     }
-    getWriteFileHandle(suggestedName) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const opts = {
-                types: this.types,
-                excludeAcceptAllOption: this.excludeAcceptAllOption,
-                suggestedName: suggestedName,
-            };
-            return yield window.showSaveFilePicker(opts);
-        });
+    clear() {
+        this.element.textContent = '';
     }
-    saveFile(fileHandle, contents) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const writable = yield fileHandle.createWritable();
-            yield writable.write(contents);
-            yield writable.close();
-        });
+    constructor(element) {
+        this.element = element;
     }
-    saveUnnamedFile(contents, suggestedName) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const fileHandle = yield this.getWriteFileHandle(suggestedName);
-            yield this.saveFile(fileHandle, contents);
-        });
+}
+export class FileInputElement {
+    invokeCallback(e) {
+        const callback = this.callback;
+        if (callback) {
+            readFile(e, callback);
+            this.callback = undefined;
+        }
     }
-    getReadFileHandle() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const opts = {
-                types: this.types,
-                excludeAcceptAllOption: this.excludeAcceptAllOption,
-                multiple: false,
-            };
-            const [fileHandle] = yield window.showOpenFilePicker(opts);
-            return fileHandle;
-        });
+    // Called during a user gesture.
+    open(callback) {
+        this.callback = callback;
+        // Click the input element to trigger the open file dialog.
+        this.input.click();
     }
-    openFile() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const fileHandle = yield this.getReadFileHandle();
-            const fileData = yield fileHandle.getFile();
-            return yield fileData.text();
-        });
+    constructor(input) {
+        this.input = input;
+        // Change event signals file(s) picked.
+        input.addEventListener('change', this.invokeCallback.bind(this));
     }
+}
+export function readFile(event, cb) {
+    const target = event.target, files = target.files;
+    if (files && files[0]) {
+        const file = files[0], reader = new FileReader();
+        reader.onload = () => {
+            const result = reader.result;
+            if (result === null || result instanceof ArrayBuffer)
+                return;
+            cb(file.name, result);
+        };
+        reader.onerror = () => {
+            // showMessage("Error reading the file.", "error");
+        };
+        reader.readAsText(file);
+    }
+}
+export function writeFile(name, text) {
+    const blob = new Blob([text], { type: 'text/plain' }), link = document.createElement('a');
+    link.download = name;
+    link.innerHTML = name;
+    link.href = URL.createObjectURL(blob);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
 }
 //# sourceMappingURL=diagrams.js.map

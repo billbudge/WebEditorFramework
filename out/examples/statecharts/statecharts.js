@@ -1,5 +1,5 @@
 import { SelectionSet } from '../../src/collections.js';
-import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam, circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, diskPath, hitTestDisk, roundRectPath, bezierEdgePath, hitTestBezier, measureNameValuePairs, FileController } from '../../src/diagrams.js';
+import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam, circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, diskPath, hitTestDisk, roundRectPath, bezierEdgePath, hitTestBezier, measureNameValuePairs, writeFile } from '../../src/diagrams.js';
 import { getExtents, projectPointToCircle, evaluateBezier, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager } from '../../src/dataModels.js';
 //------------------------------------------------------------------------------
@@ -511,7 +511,7 @@ export class StatechartContext extends EventBase {
         this.makeConsistent();
         // Check validity and cancel before ending transaction.
         if (!this.isValidStatechart(this.statechart)) {
-            this.transactionManager.cancelTransaction();
+            this.cancelTransaction();
         }
         else {
             this.transactionManager.endTransaction();
@@ -1498,22 +1498,6 @@ function readStatechart(raw, context, map) {
     });
     return statechart;
 }
-function readRaw(raw, context) {
-    let statechart = undefined;
-    if (raw.items === undefined) {
-        // new format.
-        statechart = Deserialize(raw, context);
-    }
-    else {
-        // old format.
-        // TODO eliminate this.
-        const map = new Map();
-        statechart = readStatechart(raw, context, map);
-    }
-    if (statechart) {
-        context.root = statechart;
-    }
-}
 //------------------------------------------------------------------------------
 function isStateBorder(hitInfo) {
     return (hitInfo instanceof StateHitResult || hitInfo instanceof PseudostateHitResult)
@@ -1558,7 +1542,6 @@ export class StatechartEditor {
         this.canvasController = canvasController;
         this.paletteController = paletteController;
         this.propertyGridController = propertyGridController;
-        this.fileController = new FileController();
         this.hitTolerance = 8;
         // Change tracking for layout.
         // Changed items that must be updated before drawing and hit testing.
@@ -1887,10 +1870,9 @@ export class StatechartEditor {
         renderer.end();
         // Write out the SVG file.
         const serializedSVG = ctx.getSerializedSvg();
-        const blob = new Blob([serializedSVG], {
-            type: 'text/plain'
-        });
-        window.saveAs(blob, 'statechart.svg', true);
+        let name = context.name, pos = name.lastIndexOf(".");
+        name = name.substring(0, pos < 0 ? name.length : pos) + ".svg";
+        writeFile(name, serializedSVG);
     }
     getCanvasPosition(canvasController, p) {
         // When dragging from the palette, convert the position from pointer events
@@ -2186,14 +2168,35 @@ export class StatechartEditor {
         this.hotTrackInfo = undefined;
         this.canvasController.draw();
     }
-    createContext(text) {
-        const raw = JSON.parse(text), context = new StatechartContext();
-        const statechart = readRaw(raw, context);
+    newContext(text, name) {
+        const context = new StatechartContext();
+        let statechart;
+        if (text) {
+            const raw = JSON.parse(text);
+            statechart = Deserialize(raw, context);
+        }
+        else {
+            statechart = context.newStatechart();
+        }
+        if (name)
+            context.name = name;
+        context.root = statechart;
+        return context;
+    }
+    openNewContext(text, name) {
+        const context = this.newContext(text, name);
         this.initializeContext(context);
         this.setContext(context);
         this.renderer.begin(this.canvasController.getCtx());
         this.updateBounds();
         this.canvasController.draw();
+    }
+    openFile(fileName, text) {
+        this.openNewContext(text, fileName);
+    }
+    saveFile() {
+        const context = this.context, text = JSON.stringify(Serialize(context.root), undefined, 2);
+        writeFile(context.name, text);
     }
     doCommand(command) {
         const context = this.context, canvasController = this.canvasController;
@@ -2259,27 +2262,7 @@ export class StatechartEditor {
                 break;
             }
             case 'new': {
-                const context = new StatechartContext();
-                this.initializeContext(context);
-                this.setContext(context);
-                this.renderer.begin(canvasController.getCtx());
-                this.updateBounds();
-                canvasController.draw();
-                break;
-            }
-            case 'open': {
-                const self = this;
-                this.fileController.openFile().then(result => self.createContext(result));
-                break;
-            }
-            case 'save': {
-                let text = JSON.stringify(Serialize(this.statechart), undefined, 2);
-                this.fileController.saveUnnamedFile(text, 'statechart.txt').then();
-                // console.log(text);
-                break;
-            }
-            case 'print': {
-                this.print();
+                this.openNewContext();
                 break;
             }
         }

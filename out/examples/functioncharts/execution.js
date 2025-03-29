@@ -42,6 +42,16 @@ export class Operand {
     }
 }
 Operand.undefined = new Operand(undefined, -1);
+export class Function extends Node {
+    constructor(element) {
+        super(element);
+    }
+}
+export class FunctionDefinition extends Node {
+    constructor(functionchart) {
+        super(functionchart);
+    }
+}
 export class Unop extends Node {
     constructor(element) {
         super(element);
@@ -57,7 +67,7 @@ export class Binop extends Node {
         this.right = Operand.toOperand(element.inWires[1]);
     }
 }
-export class Cond extends Node {
+export class IfThenElse extends Node {
     constructor(element) {
         super(element);
         this.cond = Operand.toOperand(element.inWires[0]);
@@ -65,7 +75,10 @@ export class Cond extends Node {
         this.else = Operand.toOperand(element.inWires[2]);
     }
 }
-export class Function extends Node {
+export class CodeGen {
+    constructor() {
+        this.map = new WeakMap();
+    }
 }
 //------------------------------------------------------------------------------
 export function codegen(functionchart) {
