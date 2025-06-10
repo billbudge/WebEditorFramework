@@ -140,25 +140,27 @@ describe('Queue', () => {
   test('constructor', () => {
     const queue = new Queue();
     expect(queue.length).toBe(0);
-    expect(queue.empty);
+    expect(queue.isEmpty);
+    expect(queue.peek()).toBeUndefined();
     expect(queue.dequeue()).toBeUndefined();
   });
   test('enqueue and dequeue', () => {
-    const queue = new Queue(3);
-    expect(queue.enqueue(1)).toBe(queue);
-    expect(queue.enqueue(2)).toBe(queue);
-    expect(queue.enqueue(3)).toBe(queue);
-    expect(queue.length).toBe(3);
-    expect(queue.dequeue()).toBe(1);
-    expect(queue.length).toBe(2);
-    expect(queue.enqueue(4)).toBe(queue);
-    expect(queue.length).toBe(3);
-    expect(queue.dequeue()).toBe(2);
-    expect(queue.length).toBe(2);
-    expect(queue.dequeue()).toBe(3);
+    const queue = new Queue();
+    queue.enqueue(1);
     expect(queue.length).toBe(1);
-    expect(queue.dequeue()).toBe(4);
+    expect(queue.isEmpty).toBe(false);
+    expect(queue.peek()).toBe(1);
+    queue.enqueue(2);
+    expect(queue.length).toBe(2);
+    expect(queue.peek()).toBe(1);
+    expect(queue.dequeue()).toBe(1);
+    expect(queue.length).toBe(1);
+    expect(queue.peek()).toBe(2);
+    expect(queue.dequeue()).toBe(2);
     expect(queue.length).toBe(0);
+    expect(queue.isEmpty).toBe(true);
+    expect(queue.peek()).toBeUndefined();
+    expect(queue.dequeue()).toBeUndefined();
   });
   test('clear', () => {
     const queue = new Queue();
@@ -167,7 +169,7 @@ describe('Queue', () => {
     queue.enqueue(3);
     queue.clear();
     expect(queue.length).toBe(0);
-    expect(queue.empty);
+    expect(queue.isEmpty).toBe(true);
     expect(queue.dequeue()).toBeUndefined();
   });
 });

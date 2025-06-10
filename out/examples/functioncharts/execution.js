@@ -67,12 +67,12 @@ export class Binop extends Node {
         this.right = Operand.toOperand(element.inWires[1]);
     }
 }
-export class IfThenElse extends Node {
+export class Cond extends Node {
     constructor(element) {
         super(element);
         this.cond = Operand.toOperand(element.inWires[0]);
-        this.if = Operand.toOperand(element.inWires[1]);
-        this.else = Operand.toOperand(element.inWires[2]);
+        this.trueBranch = Operand.toOperand(element.inWires[1]);
+        this.falseBranch = Operand.toOperand(element.inWires[2]);
     }
 }
 export class CodeGen {

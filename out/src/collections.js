@@ -117,41 +117,68 @@ export class LinkedList {
 // The head of the queue is indicated by head_, limited by
 // headLimit.
 export class Queue {
-    constructor(sliceMin = 1000) {
-        this.array = new Array();
-        this.head = 0;
-        this.sliceMin = sliceMin;
+    constructor() {
+        this.elements = [];
+        this.headIndex = 0;
+        // No longer need sliceMin as we're simplifying the reallocation strategy.
     }
-    get empty() {
+    /**
+     * Returns true if the queue is empty, false otherwise.
+     */
+    get isEmpty() {
         return this.length === 0;
     }
+    /**
+     * Returns the number of elements in the queue.
+     */
     get length() {
-        return this.array.length - this.head;
+        return this.elements.length - this.headIndex;
     }
+    /**
+     * Adds an element to the back of the queue.
+     * @param item The item to add to the queue.
+     */
     enqueue(item) {
-        this.array.push(item);
-        this.tryReallocate();
-        return this;
+        this.elements.push(item);
     }
+    /**
+     * Removes and returns the element at the front of the queue.
+     * Returns undefined if the queue is empty.
+     */
     dequeue() {
-        let result = undefined;
-        if (!this.empty) {
-            result = this.array[this.head];
-            this.head++;
-            this.tryReallocate();
+        if (this.isEmpty) {
+            return undefined;
         }
-        return result;
-    }
-    tryReallocate() {
-        // Slice the array if there is enough empty space at the front.
-        if (this.head > this.sliceMin) {
-            this.array = this.array.slice(this.head);
-            this.head = 0;
+        const item = this.elements[this.headIndex];
+        this.headIndex++;
+        // Optional: Reallocate array to free up memory if a significant portion
+        // of the beginning is unused. This helps prevent the array from growing
+        // indefinitely if many elements are dequeued. The threshold (e.g., half the array)
+        // can be adjusted based on expected usage patterns and performance needs.
+        // For most common cases, relying on JavaScript engine's optimizations is sufficient.
+        const REALLOCATION_THRESHOLD = 1000; // Example threshold
+        if (this.headIndex > REALLOCATION_THRESHOLD && this.headIndex > this.elements.length / 2) {
+            this.elements = this.elements.slice(this.headIndex);
+            this.headIndex = 0;
         }
+        return item;
     }
+    /**
+     * Returns the element at the front of the queue without removing it.
+     * Returns undefined if the queue is empty.
+     */
+    peek() {
+        if (this.isEmpty) {
+            return undefined;
+        }
+        return this.elements[this.headIndex];
+    }
+    /**
+     * Clears all elements from the queue.
+     */
     clear() {
-        this.array = new Array();
-        this.head = 0;
+        this.elements = [];
+        this.headIndex = 0;
     }
 }
 //------------------------------------------------------------------------------
