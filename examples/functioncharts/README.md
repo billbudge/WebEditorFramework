@@ -13,7 +13,7 @@ The two principal innovations in Functioncharts are:
 
 These two features can reduce the visual complexity of the Functionchart diagrams, by making it easy to produce and consume  functions. They can also organize the diagram, reducing the number and complexity of the wires.
 
-Here is an example, implementing the [exponentiation by squaring algorithm](https://en.wikipedia.org/wiki/Exponentiation_by_squaring). This example is generic, applying to any type where multiplication can be applied (e.g. numbers, complex numbers, polynomials, and matrices). A specialization of the generic function for numbers is on the right.
+Here is an example, implementing the [exponentiation by squaring algorithm](https://en.wikipedia.org/wiki/Exponentiation_by_squaring). Exponentiation by squaring raises a number to an integer power n efficiently, squaring intermediate results to get the product with log(n) multiplications. This example diagram is generic, applying to any type where multiplication can be done (e.g. numbers, complex numbers, polynomials, and matrices). A specialization of this generic function for numbers is on the right side of the diagram.
 
 <figure align="center">
   <img src="./resources/example.svg"  alt="" title="Exponentiation by squaring.">
