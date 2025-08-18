@@ -211,6 +211,16 @@ export function bezierEdgePath(
     arrowPath(p2, ctx, arrowSize);
 }
 
+// Draw a rectangle with no left edge.
+export function inPath(
+    x: number, y: number, width: number, height: number, indent: number,
+    ctx: CanvasRenderingContext2D) {
+  let right = x + width;
+  ctx.beginPath();
+  ctx.moveTo(x, y); ctx.lineTo(right, y);
+  ctx.lineTo(right, y + height); ctx.lineTo(x, y + height);
+}
+
 export function inFlagPath(
     x: number, y: number, width: number, height: number, indent: number,
     ctx: CanvasRenderingContext2D) {
@@ -219,6 +229,16 @@ export function inFlagPath(
   ctx.moveTo(x, y); ctx.lineTo(right, y);
   ctx.lineTo(right, y + height); ctx.lineTo(x, y + height);
   ctx.lineTo(x + indent, y + height / 2); ctx.lineTo(x, y);
+}
+
+// Draw a rectangle with no right edge.
+export function outPath(
+  x: number, y: number, width: number, height: number, indent: number,
+  ctx: CanvasRenderingContext2D) {
+  let right = x + width;
+  ctx.beginPath();
+  ctx.moveTo(right, y); ctx.lineTo(x, y);
+  ctx.lineTo(x, y + height); ctx.lineTo(right, y + height);
 }
 
 export function outFlagPath(

@@ -13,15 +13,27 @@ The two principal innovations in Functioncharts are:
 
 These two features can reduce the visual complexity of the Functionchart diagrams, by making it easy to produce and consume  functions. They can also organize the diagram, reducing the number and complexity of the wires.
 
-Here is an example, implementing the [exponentiation by squaring algorithm](https://en.wikipedia.org/wiki/Exponentiation_by_squaring). Exponentiation by squaring raises a number to an integer power n efficiently, squaring intermediate results to get the product with log(n) multiplications. This example diagram is generic, applying to any type where multiplication can be done (e.g. numbers, complex numbers, polynomials, and matrices). A specialization of this generic function for numbers is on the right side of the diagram.
+## A Quick Example
+Here is an example, implementing [binary search](https://en.wikipedia.org/wiki/Binary_search) on a sorted array-like object. The example defines in vertical order:
+
+1. An increment function.
+1. An abstract pair function taking two values and returning a function that returns the input values.
+1. Using the abstract function, adapters to convert pairs to and from ranges.
+1. A 'mid' function to robustly compute the midpoint of a range.
+1. A 'split' function, which divides a range into two contiguous ranges at the midpoint.
+1. The 'search' function, using our helper functions, which takes a function to test the sorted array at index 'i', and return a value indicating whether to continue to search below this index. This function defines internal helpers:
+    1. A 'select' function which uses the 'test' function parameter to select the next range to search.
+    2. A search' function which splits and selects the next range, or returns the input range if it can't be split.
+    3. A single call to search' which performs the search and returns the index where splitting stopped.
 
 <figure align="center">
-  <img src="./resources/example.svg"  alt="" title="Exponentiation by squaring.">
+  <img src="./resources/binary_search3.svg"  alt="" title="Binary search.">
 </figure>
 
-This introduction shows how some illustrative programs can be built and discusses the advantages and potential of this approach.
+## Introduction
+This document shows how some illustrative programs can be built and discusses how this improves on the state of the art in graphical programming languages.
 
-For our purposes here, we implement a simple uni-type language which looks a lot like Javascript. We have primitive values (numbers, strings, etc.) and Functions. This simplifies this diagrams since we only have one kind of value and then functions flowing on our wires. However, we could extend these diagrams to include distinct primtive types with stronger typing to model languages like C, C++, Java, or Go.
+For our purposes here, we implement a simple uni-type language which looks a little like Javascript. We have primitive values (numbers, strings, etc.) and functions. This simplifies the diagrams since we only have one kind of value and then functions flowing on our wires. However, we could extend these diagrams to include distinct primtive types with stronger typing to model languages like C or WebAssembly.
 
 ## Simple Functions
 We start by using some of the built-in functions provided by the language to create a new function.
@@ -420,8 +432,8 @@ Similarly to the recursion example, we can define a Fibonacci function. We defin
 
 ## Exponentiation by Squaring
 
-We can define an efficient exponentiation function. [Wikipedia](https://en.wikipedia.org/wiki/Exponentiation_by_squaring)
-
+We can define an efficient exponentiation function using the exponentiation-by-squaring algorithm. [Wikipedia](https://en.wikipedia.org/wiki/Exponentiation_by_squaring)
+Exponentiation by squaring raises a number to an integer power n, squaring intermediate results to get the product with log(n) multiplications. This example diagram is generic, applying to any type where multiplication can be done (e.g. numbers, complex numbers, polynomials, and matrices).
 ```ts
 function exp_by_squaring(x: number, n: number) {
   return exp_by_squaring2(1, x, n)
@@ -445,13 +457,6 @@ Here we take the core step that computes the new x, y from the inputs and use a 
 
 <figure align="center">
   <img src="./resources/exp_by_squaring2.svg"  alt="" title="Simplified implemention of exponentiation by squaring.">
-</figure>
-
-## Refactored Binary Search using Intervals
-TODO
-
-<figure align="center">
-  <img src="./resources/binary_search3.svg"  alt="" title="">
 </figure>
 
 ## Numeric Interval Library
