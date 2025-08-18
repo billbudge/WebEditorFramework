@@ -176,6 +176,15 @@ export function bezierEdgePath(bezier, ctx, arrowSize) {
     if (arrowSize)
         arrowPath(p2, ctx, arrowSize);
 }
+// Draw a rectangle with no left edge.
+export function inPath(x, y, width, height, indent, ctx) {
+    let right = x + width;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(right, y);
+    ctx.lineTo(right, y + height);
+    ctx.lineTo(x, y + height);
+}
 export function inFlagPath(x, y, width, height, indent, ctx) {
     let right = x + width;
     ctx.beginPath();
@@ -185,6 +194,15 @@ export function inFlagPath(x, y, width, height, indent, ctx) {
     ctx.lineTo(x, y + height);
     ctx.lineTo(x + indent, y + height / 2);
     ctx.lineTo(x, y);
+}
+// Draw a rectangle with no right edge.
+export function outPath(x, y, width, height, indent, ctx) {
+    let right = x + width;
+    ctx.beginPath();
+    ctx.moveTo(right, y);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x, y + height);
+    ctx.lineTo(right, y + height);
 }
 export function outFlagPath(x, y, width, height, indent, ctx) {
     let right = x + width;
