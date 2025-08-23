@@ -13,27 +13,54 @@ The two principal innovations in Functioncharts are:
 
 These two features can reduce the visual complexity of the Functionchart diagrams, by making it easy to produce and consume  functions. They can also organize the diagram, reducing the number and complexity of the wires.
 
-## A Quick Example
-Here is an example, implementing [binary search](https://en.wikipedia.org/wiki/Binary_search) on a sorted array-like object. The example defines in vertical order:
+This document shows how some illustrative programs can be built and discusses how this improves on the state of the art in graphical programming languages.
 
-1. An increment function.
-1. An abstract pair function taking two values and returning a function that returns the input values.
-1. Using the abstract function, adapters to convert pairs to and from ranges.
-1. A 'mid' function to robustly compute the midpoint of a range.
-1. A 'split' function, which divides a range into two contiguous ranges at the midpoint.
-1. The 'search' function, using our helper functions, which takes a function to test the sorted array at index 'i', and return a value indicating whether to continue to search below this index. This function defines internal helpers:
-    1. A 'select' function which uses the 'test' function parameter to select the next range to search.
-    2. A search' function which splits and selects the next range, or returns the input range if it can't be split.
-    3. A single call to search' which performs the search and returns the index where splitting stopped.
+For our purposes here, we implement a simple uni-type language which looks a little like Javascript. We have primitive values (numbers, strings, etc.) and functions. This simplifies the diagrams since we only have one kind of value and then functions flowing on our wires. However, we could extend these diagrams to include distinct primtive types with stronger typing to model languages like C or WebAssembly.
+
+## A Quick Example
+Here is an example, implementing [binary search](https://en.wikipedia.org/wiki/Binary_search) on a sorted array-like object.
 
 <figure align="center">
   <img src="./resources/binary_search3.svg"  alt="" title="Binary search.">
 </figure>
 
-## Introduction
-This document shows how some illustrative programs can be built and discusses how this improves on the state of the art in graphical programming languages.
+#### Simple Functions in the Example
+1. An increment function.
+1. A 'mid' function to robustly compute the midpoint of a range.
+<figure align="center">
+  <img src="./resources/example1.svg"  alt="" title="Simple increment, and a robust midpoint function.">
+</figure>
 
-For our purposes here, we implement a simple uni-type language which looks a little like Javascript. We have primitive values (numbers, strings, etc.) and functions. This simplifies the diagrams since we only have one kind of value and then functions flowing on our wires. However, we could extend these diagrams to include distinct primtive types with stronger typing to model languages like C or WebAssembly.
+
+#### Abstraction and Structure in the Example
+1. An abstract pair function taking two values and returning a function that returns the input values.
+1. Using the abstract function, adapters to convert pairs to and from ranges.
+<figure align="center">
+  <img src="./resources/example2.svg"  alt="" title="Binary search.">
+</figure>
+
+#### A Helper Function in the Example
+1. A 'split' function, which divides a range into two contiguous ranges at the midpoint.
+<figure align="center">
+  <img src="./resources/example3.svg"  alt="" title="Binary search.">
+</figure>
+
+#### Putting Together the Example
+The 'search' function, using our helper functions, which takes a function to test the sorted array at index 'i', and return a value indicating whether to continue to search below this index. This function defines internal helpers:
+1. A 'select' function which uses the 'test' function parameter to select the next range to search.
+2. A search' function which splits and selects the next range, or returns the input range if it can't be split.
+3. A single call to search' which performs the search and returns the index where splitting stopped.
+<figure align="center">
+  <img src="./resources/example3.svg"  alt="" title="Binary search.">
+</figure>
+
+
+## Simple Functions
+An increment function can be defined using the '+' operator, with the second operand a constant '1'.
+
+<figure align="center">
+  <img src="./resources/simple.svg"  alt="" title="Increment by 1, and midpoint between two numeric values.">
+</figure>
 
 ## Simple Functions
 We start by using some of the built-in functions provided by the language to create a new function.
