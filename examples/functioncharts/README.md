@@ -18,51 +18,48 @@ This document shows how some illustrative programs can be built and discusses ho
 For our purposes here, we implement a simple uni-type language which looks a little like Javascript. We have primitive values (numbers, strings, etc.) and functions. This simplifies the diagrams since we only have one kind of value and then functions flowing on our wires. However, we could extend these diagrams to include distinct primtive types with stronger typing to model languages like C or WebAssembly.
 
 ## A Quick Example
-Here is an example, implementing [binary search](https://en.wikipedia.org/wiki/Binary_search) on a sorted array-like object.
+Here is an example, implementing [binary search](https://en.wikipedia.org/wiki/Binary_search) on a sorted array-like object. We develop some simple helper functions, and define an abstract 'pair' function to represent integral ranges. These are explained below.
 
 <figure align="center">
   <img src="./resources/binary_search3.svg"  alt="" title="Binary search.">
 </figure>
 
-#### Simple Functions in the Example
-1. An increment function.
-1. A 'mid' function to robustly compute the midpoint of a range.
-<figure align="center">
-  <img src="./resources/example1.svg"  alt="" title="Simple increment, and a robust midpoint function.">
-</figure>
+#### Simple Functions
+Functions are defined by grouping circuit elements in a function definition, drawn as a container with rounded corners. The first function '+' uses the built-in '+' operator, and a constant '1' which is wired to the + operator's second input. The first input and output are left disconnected, and implicitly become the input and output for the defined function, which increments its single input and returns the result.
 
+The second function 'mid' computes the midpoint between the first and second argument by the formula (hi - lo) / 2 + lo in order to avoid integer overflow. In order to name the inputs, we label them with input tags 'lo' and 'hi' which become the inputs for the defined function. A built-in Math.floor function truncates the result to be integral, and its output is left disconnected, implicitly becoming the defined function's single output.
+<figure align="center">
+  <img src="./resources/example1.svg"  alt="" title="Simple Functions">
+</figure>
 
 #### Abstraction and Structure in the Example
-1. An abstract pair function taking two values and returning a function that returns the input values.
-1. Using the abstract function, adapters to convert pairs to and from ranges.
+Function definitions which contain only input and output tags define abstractions. For our pair, we define a function with two outputs and no inputs.
+
+Next, we define adapters. The first unwraps a pair and returns its two elements. It's defined by using the abstract pair, and connecting its outputs to two output tags. This function is not abstract.
+
+The second does the opposite, taking two inputs and defining an internal function that wraps them into a pair, and returning a function with two outputs.
+
 <figure align="center">
-  <img src="./resources/example2.svg"  alt="" title="Binary search.">
+  <img src="./resources/example2.svg"  alt="" title="Abstraction and Structure in the Example">
 </figure>
 
-#### A Helper Function in the Example
-1. A 'split' function, which divides a range into two contiguous ranges at the midpoint.
+#### A Helper Function to Split Ranges
+We can use these adapters to create another helper function 'split', which takes a range [lo,hi] and splits it at the midpoint, returning the two sub-ranges [lo,mid] and [mid+1,hi]. We use the 'mid' function and '+' increment function.
 <figure align="center">
-  <img src="./resources/example3.svg"  alt="" title="Binary search.">
+  <img src="./resources/example3.svg"  alt="" title="A Helper Function to Split Ranges">
 </figure>
 
-#### Putting Together the Example
+#### Putting It All Together
+TODO rewrite
 The 'search' function, using our helper functions, which takes a function to test the sorted array at index 'i', and return a value indicating whether to continue to search below this index. This function defines internal helpers:
 1. A 'select' function which uses the 'test' function parameter to select the next range to search.
 2. A search' function which splits and selects the next range, or returns the input range if it can't be split.
 3. A single call to search' which performs the search and returns the index where splitting stopped.
 <figure align="center">
-  <img src="./resources/example3.svg"  alt="" title="Binary search.">
+  <img src="./resources/example4.svg"  alt="" title="Putting It All Together">
 </figure>
 
-
-## Simple Functions
-An increment function can be defined using the '+' operator, with the second operand a constant '1'.
-
-<figure align="center">
-  <img src="./resources/simple.svg"  alt="" title="Increment by 1, and midpoint between two numeric values.">
-</figure>
-
-## Simple Functions
+## Simple Functions in Depth
 We start by using some of the built-in functions provided by the language to create a new function.
 
 Functions have input and output pins that can be wired to other functions. Input pins can only accept one wire at a time, while an output pin may fan out to multiple functions.
