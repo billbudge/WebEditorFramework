@@ -49,12 +49,12 @@ We can use these adapters to create another helper function 'split', which takes
   <img src="./resources/example3.svg"  alt="" title="A Helper Function to Split Ranges">
 </figure>
 
-#### Putting It All Together
-TODO rewrite
-The 'search' function, using our helper functions, which takes a function to test the sorted array at index 'i', and return a value indicating whether to continue to search below this index. This function defines internal helpers:
-1. A 'select' function which uses the 'test' function parameter to select the next range to search.
-2. A search' function which splits and selects the next range, or returns the input range if it can't be split.
-3. A single call to search' which performs the search and returns the index where splitting stopped.
+#### Putting It All Togetherd
+We first create a helper function 'select' to divide a range into two using 'split', and to test which sub-range to continue to search. This function uses a caller-provided function 'test', a predicate which, given an index, returns whether to search the low or high sub-range. Usually this predicate would just test the array value at the given index and return the boolean 'a[i] < t'.
+
+Next we define another helper function, search', which splits and selects the next range, or returns the input range if it can't be split.
+
+Finally, we define the outer function to just call search' which performs the search and returns the index where splitting stopped.
 <figure align="center">
   <img src="./resources/example4.svg"  alt="" title="Putting It All Together">
 </figure>

@@ -1174,16 +1174,9 @@ export class FunctionchartContext extends EventBase {
         return output;
     }
     newInstanceForWire(wire, parent, p) {
-        const src = wire.src, type = src.type.outputs[wire.srcPin].type;
-        let element;
-        if (src instanceof Element && src.name === 'external') {
-            element = this.newElement('element');
-        }
-        else {
-            element = this.newElement('instance');
-            element.src = src;
-            element.srcPin = wire.srcPin;
-        }
+        const src = wire.src, type = src.type.outputs[wire.srcPin].type, element = this.newElement('instance');
+        element.src = src;
+        element.srcPin = wire.srcPin;
         element.typeString = type.typeString;
         element.x = p.x;
         element.y = p.y - type.height / 2;
