@@ -1,4 +1,4 @@
-import { getDefaultTheme, CanvasController, PropertyGridController, readFile } from '../../src/diagrams.js'
+import { getDefaultTheme, CanvasController, PropertyGridController, FileInputElement } from '../../src/diagrams.js'
 import { StatechartEditor, EditorCommand } from './statecharts.js'
 
 (function() {
@@ -15,8 +15,10 @@ import { StatechartEditor, EditorCommand } from './statecharts.js'
           canvasController = new CanvasController(canvas as HTMLCanvasElement),
           paletteController = new CanvasController(palette as HTMLCanvasElement, true /* draggable */),
           propertyGridController = new PropertyGridController(body, theme),
+          openFileInput = document.getElementById('open-file-input'),
+          fileInput = new FileInputElement(openFileInput as HTMLInputElement),
           editor = new StatechartEditor(
-              theme, canvasController, paletteController, propertyGridController);
+              theme, canvasController, paletteController, propertyGridController, fileInput);
 
     palette.style.borderColor = theme.strokeColor;
     palette.style.borderStyle = 'solid';
@@ -37,13 +39,6 @@ import { StatechartEditor, EditorCommand } from './statecharts.js'
       canvasController.onWindowResize();
     }
 
-    const openFileInput = document.getElementById("open-file-input");
-    if (openFileInput) {
-      openFileInput.addEventListener("change", (event: InputEvent) => {
-        readFile(event, editor.openFile.bind(editor));
-      });
-    }
-
     document.addEventListener('keydown', function(e) {
       // Handle any keyboard commands for the app window here.
       canvasController.onKeyDown(e);
@@ -62,24 +57,7 @@ import { StatechartEditor, EditorCommand } from './statecharts.js'
             command = idToCommand(target.value);
       if (command) {
         target.selectedIndex = 0;
-        if (target === fileMenu) {
-          switch (command) {
-            case 'new':
-              editor.openNewContext();
-              break;
-            case 'open':
-              openFileInput!.click();
-              break;
-            case 'save':
-              editor.saveFile();
-              break;
-            case 'print':
-              editor.print();
-              break;
-          }
-        } else {
-          editor.doCommand(command);
-        }
+        editor.doCommand(command);
       }
     }
 

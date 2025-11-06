@@ -5,7 +5,7 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          circleParamToPoint, getEdgeBezier, arrowPath, hitTestRect, RectHitResult,
          diskPath, hitTestDisk, DiskHitResult, roundRectPath, bezierEdgePath,
          hitTestBezier, measureNameValuePairs, CanvasController, CanvasLayer,
-         PropertyGridController, PropertyInfo, writeFile } from '../../src/diagrams.js'
+         PropertyGridController, PropertyInfo, FileInputElement, writeFile } from '../../src/diagrams.js'
 
 import { Point, Rect, PointWithNormal, getExtents, projectPointToCircle,
          BezierCurve, evaluateBezier, CurveHitResult, expandRect } from '../../src/geometry.js'
@@ -1860,6 +1860,7 @@ export class StatechartEditor implements CanvasLayer {
   private canvasController: CanvasController;
   private paletteController: CanvasController;
   private propertyGridController: PropertyGridController;
+  private fileInput: FileInputElement;
   private hitTolerance: number;
   private changedItems: Set<AllTypes>;
   private changedTopLevelStates: Set<State>;
@@ -1882,12 +1883,15 @@ export class StatechartEditor implements CanvasLayer {
   constructor(baseTheme: Theme,
               canvasController: CanvasController,
               paletteController: CanvasController,
-              propertyGridController: PropertyGridController) {
+              propertyGridController: PropertyGridController,
+              fileInput: FileInputElement)
+  {
     const self = this;
     this.theme = new StatechartTheme(baseTheme);
     this.canvasController = canvasController;
     this.paletteController = paletteController;
     this.propertyGridController = propertyGridController;
+    this.fileInput = fileInput;
 
     this.hitTolerance = 8;
 
@@ -2711,6 +2715,19 @@ export class StatechartEditor implements CanvasLayer {
         this.openNewContext();
         break;
       }
+      case 'open': {
+        this.fileInput.open(this.openFile.bind(this));
+        break;
+      }
+      case 'save': {
+        this.saveFile();
+        break;
+      }
+      case 'print': {
+        this.print();
+        break;
+      }
+
     }
   }
 
