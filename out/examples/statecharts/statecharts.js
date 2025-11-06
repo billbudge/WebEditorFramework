@@ -1532,7 +1532,7 @@ class TransitionDrag {
     }
 }
 export class StatechartEditor {
-    constructor(baseTheme, canvasController, paletteController, propertyGridController) {
+    constructor(baseTheme, canvasController, paletteController, propertyGridController, fileInput) {
         this.scrap = [];
         this.clickInPalette = false;
         this.moveCopy = false;
@@ -1542,6 +1542,7 @@ export class StatechartEditor {
         this.canvasController = canvasController;
         this.paletteController = paletteController;
         this.propertyGridController = propertyGridController;
+        this.fileInput = fileInput;
         this.hitTolerance = 8;
         // Change tracking for layout.
         // Changed items that must be updated before drawing and hit testing.
@@ -2263,6 +2264,18 @@ export class StatechartEditor {
             }
             case 'new': {
                 this.openNewContext();
+                break;
+            }
+            case 'open': {
+                this.fileInput.open(this.openFile.bind(this));
+                break;
+            }
+            case 'save': {
+                this.saveFile();
+                break;
+            }
+            case 'print': {
+                this.print();
                 break;
             }
         }

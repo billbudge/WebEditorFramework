@@ -1,4 +1,4 @@
-import { getDefaultTheme, CanvasController, PropertyGridController, readFile } from '../../src/diagrams.js';
+import { getDefaultTheme, CanvasController, PropertyGridController, FileInputElement } from '../../src/diagrams.js';
 import { StatechartEditor } from './statecharts.js';
 (function () {
     const body = document.getElementById('body'), canvas = document.getElementById('canvas'), palette = document.getElementById('palette');
@@ -6,7 +6,7 @@ import { StatechartEditor } from './statecharts.js';
         body.style.overscrollBehaviorY = 'contain';
         body.style.touchAction = 'pinch-zoom';
         const theme = getDefaultTheme(), // or getBlueprintTheme
-        canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette, true /* draggable */), propertyGridController = new PropertyGridController(body, theme), editor = new StatechartEditor(theme, canvasController, paletteController, propertyGridController);
+        canvasController = new CanvasController(canvas), paletteController = new CanvasController(palette, true /* draggable */), propertyGridController = new PropertyGridController(body, theme), openFileInput = document.getElementById('open-file-input'), fileInput = new FileInputElement(openFileInput), editor = new StatechartEditor(theme, canvasController, paletteController, propertyGridController, fileInput);
         palette.style.borderColor = theme.strokeColor;
         palette.style.borderStyle = 'solid';
         palette.style.borderWidth = '0.25px';
@@ -22,12 +22,6 @@ import { StatechartEditor } from './statecharts.js';
             paletteController.onWindowResize();
             canvasController.onWindowResize();
         };
-        const openFileInput = document.getElementById("open-file-input");
-        if (openFileInput) {
-            openFileInput.addEventListener("change", (event) => {
-                readFile(event, editor.openFile.bind(editor));
-            });
-        }
         document.addEventListener('keydown', function (e) {
             // Handle any keyboard commands for the app window here.
             canvasController.onKeyDown(e);
@@ -40,25 +34,7 @@ import { StatechartEditor } from './statecharts.js';
             const target = e.target, command = idToCommand(target.value);
             if (command) {
                 target.selectedIndex = 0;
-                if (target === fileMenu) {
-                    switch (command) {
-                        case 'new':
-                            editor.openNewContext();
-                            break;
-                        case 'open':
-                            openFileInput.click();
-                            break;
-                        case 'save':
-                            editor.saveFile();
-                            break;
-                        case 'print':
-                            editor.print();
-                            break;
-                    }
-                }
-                else {
-                    editor.doCommand(command);
-                }
+                editor.doCommand(command);
             }
         }
         function idToCommand(id) {

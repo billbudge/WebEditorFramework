@@ -69,14 +69,11 @@ import { FunctionchartEditor } from './functioncharts.js';
         document.getElementById('undo').addEventListener('click', buttonListener);
         document.getElementById('redo').addEventListener('click', buttonListener);
         document.getElementById('delete').addEventListener('click', buttonListener);
-        document.getElementById('complete').addEventListener('click', buttonListener);
-        document.getElementById('extend').addEventListener('click', buttonListener);
         const fileMenu = document.getElementById('file'), editMenu = document.getElementById('edit'), modifyMenu = document.getElementById('modify'), examplesMenu = document.getElementById('examples');
         function selectListener(e) {
             const target = e.target, command = idToCommand(target.value);
             if (command) {
                 target.selectedIndex = 0;
-                e.stopImmediatePropagation();
                 editor.doCommand(command);
             }
         }
