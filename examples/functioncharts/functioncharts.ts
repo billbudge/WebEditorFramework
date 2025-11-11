@@ -135,11 +135,6 @@ export class Type {
                          this.outputs.map(pin => pin.copy()), name);
   }
 
-  toCondType() : Type {
-    const inputs = [new Pin(Type.valueType), new Pin(this), new Pin(this)],
-          outputs = [new Pin(this)];
-    return Type.fromInfo(inputs, outputs, '?');
-  }
   toImportExportType() : Type {
     return Type.fromInfo([], [new Pin(this)]);
   }
@@ -364,7 +359,7 @@ abstract class NodeTemplate {
   readonly properties: PropertyTypes[] = [];
 }
 
-export type ModifierElementType = 'cond' | 'importer' | 'exporter' | 'constructor' | 'upCast' | 'downCast';
+export type ModifierElementType = 'importer' | 'exporter' | 'constructor' | 'upCast' | 'downCast';
 export type ElementType = 'element' | 'instance' | ModifierElementType;
 
 class ElementTemplate extends NodeTemplate {
@@ -436,8 +431,7 @@ class FunctionchartTemplate extends NodeTemplate {
 }
 
 const elementTemplate = new ElementTemplate('element'),        // built-in elements
-      condTemplate = new ModifierElementTemplate('cond'),      // modifier elements
-      importerTemplate = new ModifierElementTemplate('importer'),
+      importerTemplate = new ModifierElementTemplate('importer'),  // modifier elements
       exporterTemplate = new ModifierElementTemplate('exporter'),
       constructorTemplate = new ModifierElementTemplate('constructor'),
       upCastTemplate = new ModifierElementTemplate('upCast'),
@@ -544,6 +538,9 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
   get isBinop() : boolean {
     return this.name === 'binop';
   }
+  get isCond() : boolean {
+    return this.name === 'cond';
+  }
   get isLet() : boolean {
     return this.name === 'let';
   }
@@ -558,9 +555,6 @@ export class Element<T extends ElementTemplate = ElementTemplate> extends NodeBa
   }
   get hasSideEffects() : boolean {
     return false;
-  }
-  get isCond() : boolean {
-    return this.template.typeName === 'cond';
   }
   get isImporter() : boolean {
     return this.template.typeName === 'importer';
@@ -603,9 +597,7 @@ export class ModifierElement extends Element<ModifierElementTemplate> {
     if (this.innerElement) {
       const innerType = this.innerType;
       let modifierType;
-      if (this.isCond) {
-        modifierType = innerType.toCondType()
-      } else if (this.isUpCast) {
+      if (this.isUpCast) {
         modifierType = innerType.toUpCastType();
       } else if (this.isDownCast) {
         modifierType = innerType.toDownCastType();
@@ -887,9 +879,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         break;
       case 'instance':
         result = new FunctionInstance(this, nextId);
-        break;
-      case 'cond':
-        result = new ModifierElement(this, condTemplate, nextId);
         break;
       case 'importer':
         result = new ModifierElement(this, importerTemplate, nextId);
@@ -2140,9 +2129,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const modifier = this.newElement(modifierType) as ModifierElement;
     let typeString;
     switch (modifierType) {
-      case 'cond':
-        typeString = element.type.toCondType().typeString;
-        break;
       case 'importer':
       case 'exporter':
         typeString = element.type.toImportExportType().typeString;
@@ -2539,7 +2525,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   construct(typeName: string) : AllTypes {
     switch (typeName) {
       case 'element':
-      case 'cond':
       case 'importer':
       case 'exporter':
       case 'constructor':
@@ -3439,7 +3424,7 @@ export type EditorCommand =
     'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'group' | 'complete' |
     'abstract' | 'abstractFunctionchart' |
     'extend' | 'selectAll' |
-    'cond' | 'import' | 'export' | 'constructor' | 'upCast' | 'downCast' |
+    'export' | 'import' | 'constructor' | 'upCast' | 'downCast' |
     'new' | 'open' | 'openImport' | 'save' | 'print';
 
 export class FunctionchartEditor implements CanvasLayer {
@@ -3504,7 +3489,7 @@ export class FunctionchartEditor implements CanvasLayer {
           literal = paletteContext.newElement('element'),
           binop = paletteContext.newElement('element'),
           unop = paletteContext.newElement('element'),
-          cond = paletteContext.newElement('cond'),
+          cond = paletteContext.newElement('element'),
           letFn = paletteContext.newElement('element'),
           thisFn = paletteContext.newElement('element'),
           external = paletteContext.newElement('element'),
@@ -4237,7 +4222,7 @@ export class FunctionchartEditor implements CanvasLayer {
       if (item instanceof ModifierElement) {
         type = item.template.typeName;  // 'importer', 'exporter', ...
       } else {
-        type = item.name;  // 'binop', 'unop', 'literal', 'let', 'const'
+        type = item.name;  // 'binop', 'unop', 'cond', 'literal', 'let', 'const'
       }
     } else if (item) {
       type = item.template.typeName;
@@ -4670,12 +4655,6 @@ export class FunctionchartEditor implements CanvasLayer {
         canvasController.draw();
         break;
       }
-      case 'cond': {
-        context.beginTransaction('import element');
-        context.modifyElements(context.selectedElements(), 'cond');
-        context.endTransaction();
-        break;
-      }
       case 'import': {
         context.beginTransaction('import element');
         context.modifyElements(context.selectedElements(), 'importer');
@@ -4790,8 +4769,7 @@ export class FunctionchartEditor implements CanvasLayer {
           return true;
         }
         case 72: // 'h'
-          this.doCommand('cond');
-          return true;
+          return false;
         case 74: { // 'j'
           this.doCommand('complete');
           return true;
