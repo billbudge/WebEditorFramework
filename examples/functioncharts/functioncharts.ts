@@ -80,6 +80,8 @@ export class Type {
   static readonly emptyPins = [];
   static readonly valueTypeString = 'v';
   static readonly valueType = new Type(Type.emptyPins, Type.emptyPins);
+  static readonly anyTypeString = '*';
+  static readonly anyType = new Type(Type.emptyPins, Type.emptyPins);
   static readonly emptyTypeString = '[,]';
   static readonly emptyType = new Type(Type.emptyPins, Type.emptyPins);
   static readonly emptyExporterTypeString = '[,' + this.emptyTypeString + ']';  // export the empty type
@@ -88,6 +90,7 @@ export class Type {
   // Manually atomize the base types.
   private static readonly atomizedTypes = new Map<string, Type>([
     [Type.valueTypeString, Type.valueType.initializeBaseType(Type.valueTypeString)],
+    [Type.anyTypeString, Type.anyType.initializeBaseType(Type.anyTypeString)],
     [Type.emptyTypeString, Type.emptyType.initializeBaseType(Type.emptyTypeString)],
     [Type.emptyExporterTypeString, Type.emptyExporterType.initializeBaseType(Type.emptyExporterTypeString)],
   ]);
@@ -170,6 +173,9 @@ export class Type {
   private toString() : string {
     if (this === Type.valueType)
       return Type.valueTypeString;
+    else if (this === Type.anyType)
+      return Type.anyTypeString;
+
     let s = '[';
     const inputs = this.inputs,
           length = inputs.length;
@@ -261,6 +267,10 @@ function parseTypeString(s: string) : Type {
       // value type
       j++;
       result = new Pin(Type.valueType, parseName());
+    } else if (s[j] === Type.anyTypeString) {
+      // any type
+      j++;
+      result = new Pin(Type.anyType, parseName());
     } else {
       // function types
       const type = parseFunction(),
@@ -286,6 +296,8 @@ function parseTypeString(s: string) : Type {
   function parseFunction() : Type {
     if (s[j] === Type.valueTypeString) {
       return Type.valueType;
+    } else if (s[j] === Type.anyTypeString) {
+      return Type.anyType;
     } else if (s[j] === '[') {
       j++;
       let inputs = new Array<Pin>, outputs = new Array<Pin>;
@@ -653,13 +665,13 @@ export class Pseudoelement extends NodeBase<PseudoelementTemplate> {
 
     switch (this.template.typeName) {
       case 'input':
-        this.typeString = '[,v]';
+        this.typeString = '[,*]';
         break;
       case 'output':
-        this.typeString = '[v,]';
+        this.typeString = '[*,]';
         break;
       case 'use':
-        this.typeString = '[v{1},v]';
+        this.typeString = '[*{1},*]';
         break;
       }
   }
@@ -691,7 +703,7 @@ export class Wire implements DataContextObject {
     if (this.dst) {
       return this.dst.type.inputs[this.dstPin].type;
     }
-    return Type.valueType;
+    return Type.anyType;
   }
 
   constructor(context: FunctionchartContext) {
@@ -1924,7 +1936,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           // The type has to change.
           const inputs = new Array<Pin>(newLength);
           for (let i = 0; i < newLength; i++) {
-            inputs[i] = new Pin(Type.valueType);
+            inputs[i] = new Pin(Type.anyType);
             inputs[i].varArgs = i + 1;
           }
           const newType = Type.fromInfo(inputs, [new Pin(Type.valueType)]);
@@ -2052,7 +2064,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       y = 8;
       type.inputs.forEach(pin => {
         const pinType = pin.type;
-        if (pinType === Type.valueType) {
+        if (pinType === Type.valueType || pinType === Type.anyType) {
           const input = self.newPseudoelement('input'),
                 name = pin.name || '';;
           input.x = 8;
@@ -2080,7 +2092,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       y = 8;
       type.outputs.forEach(pin => {
         const pinType = pin.type;
-        if (pinType === Type.valueType) {
+        if (pinType === Type.valueType || pinType === Type.anyType) {
           const output = self.newPseudoelement('output'),
                 name = pin.name || '';
           output.x = 40;
@@ -2278,11 +2290,11 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   // Visits the pin, all pins wired to it, and returns the type of the first non-value
   // pin it finds.
   inferPinType(element: NodeTypes, index: number,  visited = new Multimap<NodeTypes, number>()) : Type {
-    let type: Type = Type.valueType;
+    let type: Type = Type.anyType;
     function visit(element: NodeTypes, index: number) : boolean {
       const pin = element.getPin(index);
       // |pin| may be undefined if the instance doesn't has its type yet.
-      if (pin && pin.type !== Type.valueType) {
+      if (pin && pin.type !== Type.anyType) {
         type = pin.type;
       }
       return true;
@@ -2594,6 +2606,8 @@ class FunctionchartTheme extends Theme {
     const pinSize = 2 * this.knobbyRadius;
     Type.valueType.width = pinSize;
     Type.valueType.height = pinSize;
+    Type.anyType.width = pinSize;
+    Type.anyType.height = pinSize;
   }
 }
 
@@ -2910,17 +2924,19 @@ class Renderer implements ILayoutEngine {
           theme = this.theme;
     ctx.strokeStyle = theme.strokeColor;
     ctx.lineWidth = 0.5;
-    if (pin.type === Type.valueType) {
+    ctx.beginPath();
+    if (pin.type === Type.valueType || pin.type === Type.anyType) {
       const r = theme.knobbyRadius;
-      ctx.beginPath();
-      const d = 2 * r;
-      ctx.rect(x, y, d, d);
-      // ctx.arc(x + r, y + r, r, 0, Math.PI * 2, true);
+      if (pin.type === Type.valueType) {
+        const d = 2 * r;
+        ctx.rect(x, y, d, d);
+      } else {
+        ctx.arc(x + r, y + r, r, 0, Math.PI * 2, true);
+      }
       ctx.stroke();
     } else {
       const type = pin.type,
             width = type.width, height = type.height;
-      ctx.beginPath();
       ctx.rect(x, y, width, height);
       ctx.stroke();
       this.drawType(type, x, y);
@@ -3010,7 +3026,7 @@ class Renderer implements ILayoutEngine {
           const right = x + w;
           element.type.outputs.forEach(pin => {
             const type = pin.type;
-            if (type !== Type.valueType) {
+            if (type !== Type.valueType && type !== Type.anyType) {  // TODO add 'isBaseType' fn or somesuch
               ctx.rect(right - type.width, y + pin.y, type.width, type.height);
             }
           });
@@ -3315,7 +3331,7 @@ class Renderer implements ILayoutEngine {
         const pinIndex = info.output,
               pin = type.outputs[pinIndex];
         // Show link to instances.
-        if (pin.type !== Type.valueType) {
+        if (pin.type !== Type.valueType && pin.type !== Type.anyType) {  // TODO add 'isBaseType' fn or somesuch
           element.instances[pinIndex].forEach(instance => this.drawFunctionInstanceLink(instance, strokeColor));
         }
       }
@@ -3524,7 +3540,7 @@ export class FunctionchartEditor implements CanvasLayer {
     unop.typeString = '[v,v](-)';  // unary negation
     cond.x = 134; cond.y = 32;
     cond.name = 'cond';
-    cond.typeString = '[vvv,v](?)';  // conditional
+    cond.typeString = '[v**,*](?)';  // conditional
     letFn.x = 172; letFn.y = 32;
     letFn.name = 'let';
     letFn.typeString = '[v,v[v,v]](let)';
@@ -3615,10 +3631,10 @@ export class FunctionchartEditor implements CanvasLayer {
         let newType;
         switch (item.template.typeName) {
           case 'input':
-            newType = Type.fromInfo([], [new Pin(Type.valueType, value)]);
+            newType = Type.fromInfo([], [new Pin(Type.anyType, value)]);
             break;
           case 'output':
-            newType = Type.fromInfo([new Pin(Type.valueType, value)], []);
+            newType = Type.fromInfo([new Pin(Type.anyType, value)], []);
             break;
           case 'element': {
             const element = item as Element,
@@ -4478,7 +4494,8 @@ export class FunctionchartEditor implements CanvasLayer {
         const p = wire.pDst!,
               pin = src.type.outputs[wire.srcPin];
         let output: ElementTypes;
-        if (pin.type === Type.valueType || (src instanceof Element && src.isExporter)) {
+        if (pin.type === Type.valueType || pin.type === Type.anyType ||  // TODO
+            (src instanceof Element && src.isExporter)) {
           output = context.newOutputForWire(wire, parent, p);
         } else {
           output = context.newInstanceForWire(wire, parent, p);
@@ -4531,6 +4548,24 @@ export class FunctionchartEditor implements CanvasLayer {
     if (text) {
       const raw = JSON.parse(text);
       functionchart = Deserialize(raw, context) as Functionchart;
+      // TODO remove when all files are converted to use 'any' type.
+      const inputType = Type.fromString('[,*]'),
+            outputType = Type.fromString('[*,]'),
+            condType = Type.fromString('[v**,*]'),
+            useType = Type.fromString('[*{1},*]')
+      context.visitNodes(functionchart, node => {
+        if (node.template === inputTemplate) {
+          node.typeString = inputType.typeString;
+        } else if (node.template === outputTemplate) {
+          node.typeString = outputType.typeString;
+        } else if (node.template === useTemplate) {
+          node.typeString = useType.typeString;
+        } else if (node.template === elementTemplate) {
+          if  (((node as Element)).name === 'cond')
+            node.typeString = condType.typeString;
+        }
+      });
+      // End TODO
     } else {
       functionchart = context.newFunctionchart('functionchart');
     }

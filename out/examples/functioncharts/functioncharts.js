@@ -107,6 +107,8 @@ export class Type {
     toString() {
         if (this === Type.valueType)
             return Type.valueTypeString;
+        else if (this === Type.anyType)
+            return Type.anyTypeString;
         let s = '[';
         const inputs = this.inputs, length = inputs.length;
         for (let i = 0; i < length; i++) {
@@ -169,6 +171,8 @@ _a = Type;
 Type.emptyPins = [];
 Type.valueTypeString = 'v';
 Type.valueType = new Type(Type.emptyPins, Type.emptyPins);
+Type.anyTypeString = '*';
+Type.anyType = new Type(Type.emptyPins, Type.emptyPins);
 Type.emptyTypeString = '[,]';
 Type.emptyType = new Type(Type.emptyPins, Type.emptyPins);
 Type.emptyExporterTypeString = '[,' + _a.emptyTypeString + ']'; // export the empty type
@@ -176,6 +180,7 @@ Type.emptyExporterType = new Type(Type.emptyPins, [new Pin(Type.emptyType)]);
 // Manually atomize the base types.
 Type.atomizedTypes = new Map([
     [Type.valueTypeString, Type.valueType.initializeBaseType(Type.valueTypeString)],
+    [Type.anyTypeString, Type.anyType.initializeBaseType(Type.anyTypeString)],
     [Type.emptyTypeString, Type.emptyType.initializeBaseType(Type.emptyTypeString)],
     [Type.emptyExporterTypeString, Type.emptyExporterType.initializeBaseType(Type.emptyExporterTypeString)],
 ]);
@@ -206,6 +211,11 @@ function parseTypeString(s) {
             j++;
             result = new Pin(Type.valueType, parseName());
         }
+        else if (s[j] === Type.anyTypeString) {
+            // any type
+            j++;
+            result = new Pin(Type.anyType, parseName());
+        }
         else {
             // function types
             const type = parseFunction(), name = parseName();
@@ -230,6 +240,9 @@ function parseTypeString(s) {
     function parseFunction() {
         if (s[j] === Type.valueTypeString) {
             return Type.valueType;
+        }
+        else if (s[j] === Type.anyTypeString) {
+            return Type.anyType;
         }
         else if (s[j] === '[') {
             j++;
@@ -517,13 +530,13 @@ export class Pseudoelement extends NodeBase {
         super(template, context, id);
         switch (this.template.typeName) {
             case 'input':
-                this.typeString = '[,v]';
+                this.typeString = '[,*]';
                 break;
             case 'output':
-                this.typeString = '[v,]';
+                this.typeString = '[*,]';
                 break;
             case 'use':
-                this.typeString = '[v{1},v]';
+                this.typeString = '[*{1},*]';
                 break;
         }
     }
@@ -544,7 +557,7 @@ export class Wire {
         if (this.dst) {
             return this.dst.type.inputs[this.dstPin].type;
         }
-        return Type.valueType;
+        return Type.anyType;
     }
     constructor(context) {
         this.template = wireTemplate;
@@ -1595,7 +1608,7 @@ export class FunctionchartContext extends EventBase {
                     // The type has to change.
                     const inputs = new Array(newLength);
                     for (let i = 0; i < newLength; i++) {
-                        inputs[i] = new Pin(Type.valueType);
+                        inputs[i] = new Pin(Type.anyType);
                         inputs[i].varArgs = i + 1;
                     }
                     const newType = Type.fromInfo(inputs, [new Pin(Type.valueType)]);
@@ -1713,7 +1726,7 @@ export class FunctionchartContext extends EventBase {
             y = 8;
             type.inputs.forEach(pin => {
                 const pinType = pin.type;
-                if (pinType === Type.valueType) {
+                if (pinType === Type.valueType || pinType === Type.anyType) {
                     const input = self.newPseudoelement('input'), name = pin.name || '';
                     ;
                     input.x = 8;
@@ -1742,7 +1755,7 @@ export class FunctionchartContext extends EventBase {
             y = 8;
             type.outputs.forEach(pin => {
                 const pinType = pin.type;
-                if (pinType === Type.valueType) {
+                if (pinType === Type.valueType || pinType === Type.anyType) {
                     const output = self.newPseudoelement('output'), name = pin.name || '';
                     output.x = 40;
                     output.y = y;
@@ -1918,11 +1931,11 @@ export class FunctionchartContext extends EventBase {
     // Visits the pin, all pins wired to it, and returns the type of the first non-value
     // pin it finds.
     inferPinType(element, index, visited = new Multimap()) {
-        let type = Type.valueType;
+        let type = Type.anyType;
         function visit(element, index) {
             const pin = element.getPin(index);
             // |pin| may be undefined if the instance doesn't has its type yet.
-            if (pin && pin.type !== Type.valueType) {
+            if (pin && pin.type !== Type.anyType) {
                 type = pin.type;
             }
             return true;
@@ -2190,6 +2203,8 @@ class FunctionchartTheme extends Theme {
         const pinSize = 2 * this.knobbyRadius;
         Type.valueType.width = pinSize;
         Type.valueType.height = pinSize;
+        Type.anyType.width = pinSize;
+        Type.anyType.height = pinSize;
     }
 }
 class ElementHitResult {
@@ -2441,17 +2456,20 @@ class Renderer {
         const ctx = this.ctx, theme = this.theme;
         ctx.strokeStyle = theme.strokeColor;
         ctx.lineWidth = 0.5;
-        if (pin.type === Type.valueType) {
+        ctx.beginPath();
+        if (pin.type === Type.valueType || pin.type === Type.anyType) {
             const r = theme.knobbyRadius;
-            ctx.beginPath();
-            const d = 2 * r;
-            ctx.rect(x, y, d, d);
-            // ctx.arc(x + r, y + r, r, 0, Math.PI * 2, true);
+            if (pin.type === Type.valueType) {
+                const d = 2 * r;
+                ctx.rect(x, y, d, d);
+            }
+            else {
+                ctx.arc(x + r, y + r, r, 0, Math.PI * 2, true);
+            }
             ctx.stroke();
         }
         else {
             const type = pin.type, width = type.width, height = type.height;
-            ctx.beginPath();
             ctx.rect(x, y, width, height);
             ctx.stroke();
             this.drawType(type, x, y);
@@ -2529,7 +2547,7 @@ class Renderer {
                     const right = x + w;
                     element.type.outputs.forEach(pin => {
                         const type = pin.type;
-                        if (type !== Type.valueType) {
+                        if (type !== Type.valueType && type !== Type.anyType) { // TODO add 'isBaseType' fn or somesuch
                             ctx.rect(right - type.width, y + pin.y, type.width, type.height);
                         }
                     });
@@ -2797,7 +2815,7 @@ class Renderer {
             else if (info.output >= 0) {
                 const pinIndex = info.output, pin = type.outputs[pinIndex];
                 // Show link to instances.
-                if (pin.type !== Type.valueType) {
+                if (pin.type !== Type.valueType && pin.type !== Type.anyType) { // TODO add 'isBaseType' fn or somesuch
                     element.instances[pinIndex].forEach(instance => this.drawFunctionInstanceLink(instance, strokeColor));
                 }
             }
@@ -2929,7 +2947,7 @@ export class FunctionchartEditor {
         cond.x = 134;
         cond.y = 32;
         cond.name = 'cond';
-        cond.typeString = '[vvv,v](?)'; // conditional
+        cond.typeString = '[v**,*](?)'; // conditional
         letFn.x = 172;
         letFn.y = 32;
         letFn.name = 'let';
@@ -3024,10 +3042,10 @@ export class FunctionchartEditor {
                 let newType;
                 switch (item.template.typeName) {
                     case 'input':
-                        newType = Type.fromInfo([], [new Pin(Type.valueType, value)]);
+                        newType = Type.fromInfo([], [new Pin(Type.anyType, value)]);
                         break;
                     case 'output':
-                        newType = Type.fromInfo([new Pin(Type.valueType, value)], []);
+                        newType = Type.fromInfo([new Pin(Type.anyType, value)], []);
                         break;
                     case 'element': {
                         const element = item, type = element.type;
@@ -3816,7 +3834,8 @@ export class FunctionchartEditor {
             else if (dst === undefined) {
                 const p = wire.pDst, pin = src.type.outputs[wire.srcPin];
                 let output;
-                if (pin.type === Type.valueType || (src instanceof Element && src.isExporter)) {
+                if (pin.type === Type.valueType || pin.type === Type.anyType || // TODO
+                    (src instanceof Element && src.isExporter)) {
                     output = context.newOutputForWire(wire, parent, p);
                 }
                 else {
@@ -3869,6 +3888,24 @@ export class FunctionchartEditor {
         if (text) {
             const raw = JSON.parse(text);
             functionchart = Deserialize(raw, context);
+            // TODO remove when all files are converted to use 'any' type.
+            const inputType = Type.fromString('[,*]'), outputType = Type.fromString('[*,]'), condType = Type.fromString('[v**,*]'), useType = Type.fromString('[*{1},*]');
+            context.visitNodes(functionchart, node => {
+                if (node.template === inputTemplate) {
+                    node.typeString = inputType.typeString;
+                }
+                else if (node.template === outputTemplate) {
+                    node.typeString = outputType.typeString;
+                }
+                else if (node.template === useTemplate) {
+                    node.typeString = useType.typeString;
+                }
+                else if (node.template === elementTemplate) {
+                    if (node.name === 'cond')
+                        node.typeString = condType.typeString;
+                }
+            });
+            // End TODO
         }
         else {
             functionchart = context.newFunctionchart('functionchart');
