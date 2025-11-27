@@ -443,10 +443,10 @@ describe('Multimap', () => {
 describe('DisjointSet', () => {
   test('constructor', () => {
     const disjointSet = new DisjointSet();
-    const a = disjointSet.makeSet('a'),
-          b = disjointSet.makeSet('b'),
-          c = disjointSet.makeSet('c'),
-          d = disjointSet.makeSet('d');
+    const a = disjointSet.makeSubset('a'),
+          b = disjointSet.makeSubset('b'),
+          c = disjointSet.makeSubset('c'),
+          d = disjointSet.makeSubset('d');
     expect(disjointSet.find(a)).toBe(a);
     expect(disjointSet.find(a)).not.toBe(b);
     disjointSet.union(a, a);
@@ -460,6 +460,23 @@ describe('DisjointSet', () => {
     expect(disjointSet.find(d)).not.toBe(a);
     expect(disjointSet.find(d)).not.toBe(b);
     expect(disjointSet.find(d)).not.toBe(c);
+  });
+  test('union-find', () => {
+    const disjointSet = new DisjointSet();
+    const a = disjointSet.makeSubset('a'),
+          b = disjointSet.makeSubset('b'),
+          c = disjointSet.makeSubset('c'),
+          d = disjointSet.makeSubset('d');
+    disjointSet.union(a, b);
+    expect(disjointSet.find(a)).toBe(disjointSet.find(b));
+    disjointSet.union(c, d);
+    expect(disjointSet.find(c)).toBe(disjointSet.find(d));
+    // expect(stringify(disjointSet.getPartition()) == (stringify([[a, b], [c, d]])));  // TODO fix tostring or rework test.
+    disjointSet.union(b, c);
+    expect(disjointSet.find(a)).toBe(disjointSet.find(b));
+    expect(disjointSet.find(a)).toBe(disjointSet.find(c));
+    expect(disjointSet.find(a)).toBe(disjointSet.find(d));
+    // expect(stringify(disjointSet.getPartition()) == (stringify([[a, b, c, d]])));
   });
   // test('makeSets', () => {
   //   const disjointSet = new DisjointSet();

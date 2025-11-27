@@ -228,10 +228,10 @@ export function codegen(functionchart: Functionchart) {
   function elementToTypeInfo(element: ElementTypes) : TypeInfo {
     const type = element.type;
     const inputs = type.inputs.map((pin, i) => {
-      return { element, index: i, type: pin.type, name: undefined }
+      return { element, index: i, type: pin.type, name: undefined, connected: [], ptIndex: -1  }
     });
     const outputs = type.outputs.map((pin, i) => {
-      return { element, index: i, type: pin.type, name: undefined }
+      return { element, index: i, type: pin.type, name: undefined, connected: [], ptIndex: -1 }
     });
 
     return {
