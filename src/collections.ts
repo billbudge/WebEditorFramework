@@ -431,6 +431,66 @@ export class PairSet<T, U> implements Iterable<[T, U]> {
 }
 
 //------------------------------------------------------------------------------
+// PairSet.
+
+export class PairMap<T, U, V> implements Iterable<[[T, U], V]> {
+  private map: Map<T, Map<U, V>> = new Map();
+  private size_: number = 0;
+
+  get size() : number {
+    return this.size_;
+  }
+  has(t: T, u: U) : boolean {
+    const submap = this.map.get(t);
+    if (!submap) return false;
+    return submap.has(u);
+  }
+  get(t: T, u: U) : V | undefined {
+    const submap = this.map.get(t);
+    if (!submap) return undefined;
+    return submap.get(u);
+  }
+  set(t: T, u: U, v: V) : void {
+    let submap = this.map.get(t);
+    if (!submap) {
+      submap = new Map<U, V>();
+      this.map.set(t, submap);
+    }
+    const size = submap.size;
+    submap.set(u, v);
+    if (size !== submap.size)
+      this.size_++;
+  }
+  delete(t: T, u: U) : boolean {
+    const submap = this.map.get(t);
+    if (!submap) return false;
+    const result = submap.delete(u);
+    if (result)
+      this.size_--;
+    if (!submap.size)
+      this.map.delete(t);
+    return result;
+  }
+  clear() : void {
+    this.map.clear();
+    this.size_ = 0;
+  }
+  *[Symbol.iterator]() : Iterator<[[T, U], V]> {
+    function* gen(value: [T, U]) {
+      yield value;
+    }
+    this.forEach((t: T, u: U) => gen([t, u]));
+  }
+  forEach(fn: (t: T, u: U, v: V) => void) : void {
+    this.map.forEach((submap, t) => {
+      submap.forEach((v, u) => {
+        fn(t, u, v);
+      });
+    });
+  }
+}
+
+//------------------------------------------------------------------------------
 // Multimap associates multiple values with a single key. Use it when you want
 // to associate a small number of values with each key.
 
@@ -493,50 +553,74 @@ export class Multimap<T, U> implements Iterable<[T, U]> {
 //------------------------------------------------------------------------------
 // DisjointSet, a simple Union-Find implementation.
 
-export class DisjointSetSubset<T> {
+export class DisjointSubset<T> {
   constructor(item: T) {
     this.item = item;
     this.parent = this;
     this.rank = 0;
   }
   item: T;
-  parent: DisjointSetSubset<T>;
+  parent: DisjointSubset<T>;
   rank: number;
 }
 
 export class DisjointSet<T> {
-  private sets: Array<DisjointSetSubset<T>> = new Array();
+  private _subsets: Array<DisjointSubset<T>> = new Array();
 
-  makeSet(item: T) : DisjointSetSubset<T> {
-    const subset = new DisjointSetSubset<T>(item);
-    this.sets.push(subset);
+  makeSubset(item: T) : DisjointSubset<T> {
+    const subset = new DisjointSubset<T>(item);
+    this._subsets.push(subset);
+    return subset;
+  }
+  getPartition(): Array<Array<DisjointSubset<T>>> {
+    const reps = new Map<DisjointSubset<T>, Array<DisjointSubset<T>>>();
+    for (let subset of this._subsets) {
+      const rep = this.find(subset);
+      let partition = reps.get(rep);
+      if (!partition) {
+        partition = new Array<DisjointSubset<T>>();
+        reps.set(rep, partition);
+      }
+      partition.push(subset);
+    }
+    return Array.from(reps.values());
+  }
+  // makeSets(items: Array<T>) : Array<DisjointSetSubset<T>> {
+  //   const subsets = new Array<DisjointSetSubset<T>>();
+  //   for (let item of items) {
+  //     subsets.push(this.makeSet(item));
+  //   }
+  //   return subsets;
+  // }
+
+  // Find the representative subset for the given item.
+  find(subset: DisjointSubset<T>) : DisjointSubset<T> {
+    // Path splitting rather than path compression for simplicity.
+    while (subset.parent != subset) {
+      const next = subset.parent;
+      subset.parent = next.parent;
+      subset = next;
+    }
     return subset;
   }
 
-  find(set: DisjointSetSubset<T>) {
-    // Path splitting rather than path compression for simplicity.
-    while (set.parent != set) {
-      const next = set.parent;
-      set.parent = next.parent;
-      set = next;
+  // Union the two given subsets. Returns the new representative subset.
+  union(set1: DisjointSubset<T>, set2: DisjointSubset<T>) : DisjointSubset<T> {
+    let root1 = this.find(set1),
+        root2 = this.find(set2);
+
+    if (root1 === root2)
+      return root1;
+
+    if (root1.rank < root2.rank) {
+      // swap
+      [root1, root2] = [root2, root1];
     }
-    return set;
-  }
 
-  union(set1: DisjointSetSubset<T>, set2: DisjointSetSubset<T>) {
-   let root1 = this.find(set1),
-       root2 = this.find(set2);
+    root2.parent = root1;
+    if (root1.rank === root2.rank)
+      root1.rank += 1;
 
-   if (root1 === root2)
-       return;
-
-   if (root1.rank < root2.rank) {
-    // swap
-    const temp = root1; root1 = root2; root2 = temp;
-   }
-
-   root2.parent = root1;
-   if (root1.rank === root2.rank)
-     root1.rank += 1;
+    return root1;
   }
 }

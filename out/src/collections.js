@@ -373,6 +373,68 @@ export class PairSet {
     }
 }
 //------------------------------------------------------------------------------
+// PairSet.
+export class PairMap {
+    constructor() {
+        this.map = new Map();
+        this.size_ = 0;
+    }
+    get size() {
+        return this.size_;
+    }
+    has(t, u) {
+        const submap = this.map.get(t);
+        if (!submap)
+            return false;
+        return submap.has(u);
+    }
+    get(t, u) {
+        const submap = this.map.get(t);
+        if (!submap)
+            return undefined;
+        return submap.get(u);
+    }
+    set(t, u, v) {
+        let submap = this.map.get(t);
+        if (!submap) {
+            submap = new Map();
+            this.map.set(t, submap);
+        }
+        const size = submap.size;
+        submap.set(u, v);
+        if (size !== submap.size)
+            this.size_++;
+    }
+    delete(t, u) {
+        const submap = this.map.get(t);
+        if (!submap)
+            return false;
+        const result = submap.delete(u);
+        if (result)
+            this.size_--;
+        if (!submap.size)
+            this.map.delete(t);
+        return result;
+    }
+    clear() {
+        this.map.clear();
+        this.size_ = 0;
+    }
+    *[Symbol.iterator]() {
+        function* gen(value) {
+            yield value;
+        }
+        this.forEach((t, u) => gen([t, u]));
+    }
+    forEach(fn) {
+        this.map.forEach((submap, t) => {
+            submap.forEach((v, u) => {
+                fn(t, u, v);
+            });
+        });
+    }
+}
+//------------------------------------------------------------------------------
 // Multimap associates multiple values with a single key. Use it when you want
 // to associate a small number of values with each key.
 export class Multimap {
@@ -437,7 +499,7 @@ export class Multimap {
 }
 //------------------------------------------------------------------------------
 // DisjointSet, a simple Union-Find implementation.
-export class DisjointSetSubset {
+export class DisjointSubset {
     constructor(item) {
         this.item = item;
         this.parent = this;
@@ -446,35 +508,56 @@ export class DisjointSetSubset {
 }
 export class DisjointSet {
     constructor() {
-        this.sets = new Array();
+        this._subsets = new Array();
     }
-    makeSet(item) {
-        const subset = new DisjointSetSubset(item);
-        this.sets.push(subset);
+    makeSubset(item) {
+        const subset = new DisjointSubset(item);
+        this._subsets.push(subset);
         return subset;
     }
-    find(set) {
-        // Path splitting rather than path compression for simplicity.
-        while (set.parent != set) {
-            const next = set.parent;
-            set.parent = next.parent;
-            set = next;
+    getPartition() {
+        const reps = new Map();
+        for (let subset of this._subsets) {
+            const rep = this.find(subset);
+            let partition = reps.get(rep);
+            if (!partition) {
+                partition = new Array();
+                reps.set(rep, partition);
+            }
+            partition.push(subset);
         }
-        return set;
+        return Array.from(reps.values());
     }
+    // makeSets(items: Array<T>) : Array<DisjointSetSubset<T>> {
+    //   const subsets = new Array<DisjointSetSubset<T>>();
+    //   for (let item of items) {
+    //     subsets.push(this.makeSet(item));
+    //   }
+    //   return subsets;
+    // }
+    // Find the representative subset for the given item.
+    find(subset) {
+        // Path splitting rather than path compression for simplicity.
+        while (subset.parent != subset) {
+            const next = subset.parent;
+            subset.parent = next.parent;
+            subset = next;
+        }
+        return subset;
+    }
+    // Union the two given subsets. Returns the new representative subset.
     union(set1, set2) {
         let root1 = this.find(set1), root2 = this.find(set2);
         if (root1 === root2)
-            return;
+            return root1;
         if (root1.rank < root2.rank) {
             // swap
-            const temp = root1;
-            root1 = root2;
-            root2 = temp;
+            [root1, root2] = [root2, root1];
         }
         root2.parent = root1;
         if (root1.rank === root2.rank)
             root1.rank += 1;
+        return root1;
     }
 }
 //# sourceMappingURL=collections.js.map

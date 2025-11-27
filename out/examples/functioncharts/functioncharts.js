@@ -1,5 +1,5 @@
 var _a;
-import { SelectionSet, Multimap } from '../../src/collections.js';
+import { SelectionSet, PairSet, PairMap } from '../../src/collections.js';
 import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, notchedRectPath, writeFile, ConsoleErrorReporter } from '../../src/diagrams.js';
 import { getExtents, expandRect } from '../../src/geometry.js';
 import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager, ChildSlotProp } from '../../src/dataModels.js';
@@ -397,6 +397,29 @@ class NodeBase {
             type.outputs[index - firstOutput];
         return pin;
     }
+    get passThroughs() {
+        if (this instanceof FunctionInstance) {
+            return this.src.passThroughs;
+        }
+        else if (this instanceof Element && this.template.typeName === 'element') {
+            switch (this.name) {
+                case 'cond':
+                    return [[1, 2, 3]]; // '0' is the boolean value gating the condition.
+                // case 'store':
+                //   return [[0, 1]];
+            }
+        }
+        else if (this instanceof Pseudoelement) {
+            switch (this.template.typeName) {
+                case 'use':
+                    const output = this.type.inputs.length;
+                    return [[0, output]];
+            }
+        }
+        else if (this instanceof Functionchart) {
+            return this.typeInfo.passThroughs;
+        }
+    }
     constructor(template, context, id) {
         this.globalPosition = defaultPoint;
         this.inWires = new Array(); // one input per pin (no fan in).
@@ -566,6 +589,13 @@ export class Wire {
         this.srcPin = -1;
         this.dstPin = -1;
     }
+}
+function makeInputPinRef(node, index) {
+    return [node, index];
+}
+function makeOutputPinRef(node, index) {
+    const firstOutput = node.type.inputs.length;
+    return [node, index + firstOutput];
 }
 // This TypeInfo instance signals that the functionchart hasn't been initialized yet.
 const emptyTypeInfo = {
@@ -1895,7 +1925,8 @@ export class FunctionchartContext extends EventBase {
         });
         selection.add(parent);
     }
-    // Visit the given pin, then follow wires from the parent element.
+    // Visit the given pin, then follow wires to visit any connected pins, then any other
+    // pins linked by passthroughs.
     visitPin(node, index, visitor, visited) {
         if (visited.has(node, index))
             return;
@@ -1906,7 +1937,7 @@ export class FunctionchartContext extends EventBase {
             const wire = node.inWires[index];
             if (wire) {
                 const src = wire.src;
-                if (src) {
+                if (src && !(src instanceof Functionchart)) { //
                     const srcPin = wire.srcPin, index = src.type.inputs.length + srcPin;
                     this.visitPin(src, index, visitor, visited);
                 }
@@ -1914,12 +1945,12 @@ export class FunctionchartContext extends EventBase {
         }
         else {
             const wires = node.outWires[index - firstOutput];
-            if (wires) { // |wires| may be undefined if the instance doesn't has its type yet.
+            if (wires) { // |wires| may be undefined if the instance doesn't has its type yet.  TODO can we fix this?
                 for (let i = 0; i < wires.length; i++) {
                     const wire = wires[i];
                     if (wire) {
                         const dst = wire.dst;
-                        if (dst) {
+                        if (dst instanceof Element || dst instanceof Pseudoelement) {
                             const dstPin = wire.dstPin;
                             this.visitPin(dst, dstPin, visitor, visited);
                         }
@@ -1927,43 +1958,72 @@ export class FunctionchartContext extends EventBase {
                 }
             }
         }
+        this.visitPassthroughs(node, index, visitor, visited);
     }
-    // Visits the pin, all pins wired to it, and returns the type of the first non-value
-    // pin it finds.
-    inferPinType(element, index, visited = new Multimap()) {
+    // Visit pins along the first passthrough containing the given pin.
+    visitPassthroughs(node, index, visitor, visited) {
+        const passThroughs = node.passThroughs;
+        if (passThroughs) {
+            for (let passThrough of passThroughs) {
+                if (passThrough.includes(index)) {
+                    for (let i of passThrough) {
+                        this.visitPin(node, i, visitor, visited);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    // Visits the pin and all pins wired or linked to it. Returns any types not defined as 'any'. (TODO)
+    inferPinType(node, index) {
         let type = Type.anyType;
-        function visit(element, index) {
+        function visitor(element, index) {
             const pin = element.getPin(index);
-            // |pin| may be undefined if the instance doesn't has its type yet.
+            // |pin| may be undefined if the instance doesn't has its type yet.  TODO can we fix this?
             if (pin && pin.type !== Type.anyType) {
                 type = pin.type;
             }
-            return true;
         }
-        this.visitPin(element, index, visit, visited);
+        const visited = new PairSet();
+        this.visitPin(node, index, visitor, visited);
         // As a side effect, 'visited' is populated.
-        return type;
+        const connected = new Array();
+        visited.forEach((element, index) => {
+            connected.push([element, index]);
+        });
+        // type = type.rename();
+        return [type, connected];
     }
     getFunctionchartTypeInfo(functionchart) {
         const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name, implicit = functionchart.implicit, subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()), closed = subgraphInfo.inWires.size == 0;
         // A functionchart is abstract if it has no wires.
-        let abstract = subgraphInfo.wires.size === 0 && subgraphInfo.inWires.size === 0;
-        let sideEffects = false;
+        let abstract = subgraphInfo.wires.size === 0 && subgraphInfo.inWires.size === 0, sideEffects = false;
+        // Memoize inferred pin types.
+        const inferredMap = new PairMap();
+        function inferPinType(node, index) {
+            let inferred = inferredMap.get(node, index);
+            if (!inferred) {
+                inferred = self.inferPinType(node, index);
+                for (let pinRef of inferred[1]) {
+                    const [element, index] = pinRef;
+                    inferredMap.set(element, index, inferred);
+                }
+            }
+            return inferred;
+        }
         // Collect the functionchart's input and output pseudoelements.
         subgraphInfo.nodes.forEach(node => {
             if (node instanceof Pseudoelement) {
                 if (node.template === inputTemplate) {
-                    const connected = new Multimap(); // TODO move this out
-                    const type = self.inferPinType(node, 0, connected);
+                    const [type, connected] = inferPinType(node, 0);
                     const name = node.type.outputs[0].name;
-                    const pinInfo = { element: node, index: 0, type, name };
+                    const pinInfo = { element: node, index: 0, type, name, connected, ptIndex: -1 };
                     inputs.push(pinInfo);
                 }
                 else if (node.template === outputTemplate) {
-                    const connected = new Multimap();
-                    const type = self.inferPinType(node, 0, connected);
+                    const [type, connected] = inferPinType(node, 0);
                     const name = node.type.inputs[0].name;
-                    const pinInfo = { element: node, index: 0, type, name };
+                    const pinInfo = { element: node, index: 0, type, name, connected, ptIndex: -1 };
                     outputs.push(pinInfo);
                 }
             }
@@ -1971,17 +2031,17 @@ export class FunctionchartContext extends EventBase {
                 // Special cases of nodes that generate pins.
                 if (node instanceof ModifierElement && node.isImporter) {
                     // Instancers are inputs.
-                    const innerType = node.innerType, name = innerType.name, type = innerType.rename(), pinInfo = { element: node, index: 0, type, name };
+                    const innerType = node.innerType, name = innerType.name, type = innerType.rename(), pinInfo = { element: node, index: 0, type, name, connected: [], ptIndex: -1 };
                     inputs.push(pinInfo);
                 }
                 else if (node instanceof ModifierElement && node.isExporter && node.isAbstract) {
-                    // Abstract exporters are outputs.
-                    const type = node.innerType, name = undefined, pinInfo = { element: node, index: 0, type, name };
+                    // Abstract exporters are (abstract) outputs.
+                    const type = node.innerType, name = undefined, pinInfo = { element: node, index: 0, type, name, connected: [], ptIndex: -1 };
                     outputs.push(pinInfo);
                 }
                 else if (node instanceof Element && node.isAbstract) {
                     // Abstract elements become a single input (and don't implicitly generate other pins).
-                    const type = node.type, name = undefined, pinInfo = { element: node, index: 0, type, name };
+                    const type = node.type, name = undefined, pinInfo = { element: node, index: 0, type, name, connected: [], ptIndex: -1 };
                     inputs.push(pinInfo);
                 }
                 else {
@@ -1990,42 +2050,75 @@ export class FunctionchartContext extends EventBase {
                     sideEffects = sideEffects || node.hasSideEffects;
                     if (implicit && (node instanceof Element || node instanceof Functionchart)) {
                         // In implicit mode, empty pins of nodes become pins for the functionchart type.
-                        const type = node.type, inputPins = type.inputs, outputPins = type.outputs;
+                        const type = node.type, inputPins = type.inputs, firstOutput = inputPins.length, outputPins = type.outputs;
                         for (let i = 0; i < inputPins.length; i++) {
+                            if (node instanceof Functionchart)
+                                continue; // Functioncharts don't have input pins.
                             if (node.inWires[i])
                                 continue;
-                            const pin = inputPins[i];
-                            const type = pin.type, pinInfo = { element: node, index: i, type, name: undefined };
+                            const [type, connected] = inferPinType(node, i);
+                            const pinInfo = { element: node, index: i, type, name: undefined, connected, ptIndex: -1 };
                             inputs.push(pinInfo);
                         }
                         for (let i = 0; i < outputPins.length; i++) {
                             // If output is used or instanced from.
                             if (node.outWires[i].length !== 0 || node.instances[i].length !== 0)
                                 continue;
-                            const pin = outputPins[i];
-                            const type = pin.type, pinInfo = { element: node, index: i, type, name: undefined };
-                            outputs.push(pinInfo);
+                            if (node instanceof Functionchart) {
+                                const pin = outputPins[i];
+                                const type = pin.type, pinInfo = { element: node, index: i, type, name: undefined, connected: [], ptIndex: -1 };
+                                outputs.push(pinInfo);
+                            }
+                            else {
+                                const [type, connected] = inferPinType(node, i + firstOutput);
+                                const pinInfo = { element: node, index: i, type, name: undefined, connected, ptIndex: -1 };
+                                outputs.push(pinInfo);
+                            }
                         }
                     }
                 }
             }
         });
-        // Sort pins in increasing y-order. This lets users arrange the pins of the
-        // new type in an intuitive way.
+        // Sort pins in increasing y-order. This corresponds to the order they appear on instances.
         function compareYs(p1, p2) {
             const element1 = p1.element, element2 = p2.element, pin1 = element1.getPin(p1.index), pin2 = element2.getPin(p2.index), y1 = element1.globalPosition.y + pin1.y, y2 = element2.globalPosition.y + pin2.y;
             return y1 - y2;
         }
         inputs.sort(compareYs);
         outputs.sort(compareYs);
-        const inputPins = inputs.map(pinInfo => {
-            return new Pin(pinInfo.type, pinInfo.name);
+        // Map input and output PinRefs to PinInfos.
+        const firstOutput = inputs.length, inputPinMap = new PairMap(), outputPinMap = new PairMap();
+        inputs.forEach((pinInfo, i) => {
+            pinInfo.ptIndex = i;
+            inputPinMap.set(pinInfo.element, pinInfo.index, pinInfo);
         });
-        const outputPins = outputs.map(pinInfo => {
-            return new Pin(pinInfo.type, pinInfo.name);
+        outputs.forEach((pinInfo, i) => {
+            pinInfo.ptIndex = firstOutput + i;
+            outputPinMap.set(pinInfo.element, pinInfo.index + pinInfo.element.type.inputs.length, pinInfo);
         });
+        // Identify passthroughs starting from each input pin.
+        const inPassthrough = new Set(), passThroughs = new Array();
+        inputs.forEach(pinInfo => {
+            if (pinInfo.type === Type.anyType && !inPassthrough.has(pinInfo.ptIndex)) {
+                const passThrough = new Array();
+                pinInfo.connected.forEach(pinRef => {
+                    const [node, index] = pinRef, ioPin = inputPinMap.get(node, index) || outputPinMap.get(node, index);
+                    if (ioPin) {
+                        const ptIndex = ioPin.ptIndex;
+                        passThrough.push(ptIndex);
+                        inPassthrough.add(ptIndex);
+                    }
+                });
+                if (passThrough.length > 1) {
+                    passThrough.sort((a, b) => a - b);
+                    passThroughs.push(passThrough);
+                }
+            }
+        });
+        const inputPins = inputs.map(pinInfo => new Pin(pinInfo.type, pinInfo.name));
+        const outputPins = outputs.map(pinInfo => new Pin(pinInfo.type, pinInfo.name));
         const type = Type.fromInfo(inputPins, outputPins, name);
-        return { instanceType: type, closed, abstract, sideEffects, inputs, outputs };
+        return { instanceType: type, closed, abstract, sideEffects, inputs, outputs, passThroughs };
     }
     updateGlobalPosition(node) {
         if (node instanceof NodeBase) {
@@ -3889,7 +3982,7 @@ export class FunctionchartEditor {
             const raw = JSON.parse(text);
             functionchart = Deserialize(raw, context);
             // TODO remove when all files are converted to use 'any' type.
-            const inputType = Type.fromString('[,*]'), outputType = Type.fromString('[*,]'), condType = Type.fromString('[v**,*]'), useType = Type.fromString('[*{1},*]');
+            const inputType = Type.fromString('[,*]'), outputType = Type.fromString('[*,]'), condType = Type.fromString('[v**,*](?)'), useType = Type.fromString('[*{1},*]');
             context.visitNodes(functionchart, node => {
                 if (node.template === inputTemplate) {
                     node.typeString = inputType.typeString;
