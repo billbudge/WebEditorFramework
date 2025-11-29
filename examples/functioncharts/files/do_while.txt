@@ -13,7 +13,7 @@
     {
       "type": "functionchart",
       "id": 3,
-      "typeString": "[,[[v,v]()(body)[v,v]()(test)v(p),v(p)](while-do)]",
+      "typeString": "[,[[v,v]()(body)[v,v]()(test)v,v](while-do)]",
       "x": 338.10870361328125,
       "y": 311.25850677490234,
       "width": 357.0030517578125,
@@ -25,21 +25,21 @@
         {
           "type": "input",
           "id": 4,
-          "typeString": "[,v(p)]",
+          "typeString": "[,*]",
           "x": 8.98126220703125,
           "y": 147.16876983642578
         },
         {
           "type": "output",
           "id": 5,
-          "typeString": "[v(p),]",
+          "typeString": "[*,]",
           "x": 286.91558837890625,
           "y": 123.93429565429688
         },
         {
           "type": "element",
           "id": 6,
-          "typeString": "[vvv,v](?)",
+          "typeString": "[v**,*](?)",
           "x": 252.2437286376953,
           "y": 110.23743057250977,
           "name": "cond",
@@ -178,7 +178,7 @@
     {
       "type": "functionchart",
       "id": 14,
-      "typeString": "[,[[v,v]()(body)[v,v]()(test)v(p),v(p)](do-while)]",
+      "typeString": "[,[[v,v]()(body)[v,v]()(test)v,v](do-while)]",
       "x": 339.5262756347656,
       "y": 107.70095443725586,
       "width": 320.0968017578125,
@@ -190,21 +190,21 @@
         {
           "type": "input",
           "id": 15,
-          "typeString": "[,v(p)]",
+          "typeString": "[,*]",
           "x": 8.40313720703125,
           "y": 145.11249542236328
         },
         {
           "type": "output",
           "id": 16,
-          "typeString": "[v(p),]",
+          "typeString": "[*,]",
           "x": 251.58428955078125,
           "y": 124.44366455078125
         },
         {
           "type": "element",
           "id": 17,
-          "typeString": "[vvv,v](?)",
+          "typeString": "[v**,*](?)",
           "x": 216.9124298095703,
           "y": 110.74679946899414,
           "name": "cond",
@@ -343,7 +343,7 @@
     {
       "type": "functionchart",
       "id": 25,
-      "typeString": "[,[v,v](body)]",
+      "typeString": "[,[*,*](body)]",
       "x": 342.16258573532104,
       "y": 38.29899787902832,
       "width": 100.40555572509766,
@@ -355,14 +355,14 @@
         {
           "type": "output",
           "id": 26,
-          "typeString": "[v,]",
+          "typeString": "[*,]",
           "x": 35.834571838378906,
           "y": 6.700288772583008
         },
         {
           "type": "input",
           "id": 27,
-          "typeString": "[,v]",
+          "typeString": "[,*]",
           "x": 8,
           "y": 8
         }
@@ -372,7 +372,7 @@
     {
       "type": "functionchart",
       "id": 28,
-      "typeString": "[,[v,v](test)]",
+      "typeString": "[,[*,*](test)]",
       "x": 468.2315249443054,
       "y": 38.39133644104004,
       "width": 100.40555572509766,
@@ -384,14 +384,14 @@
         {
           "type": "output",
           "id": 29,
-          "typeString": "[v,]",
+          "typeString": "[*,]",
           "x": 35.834571838378906,
           "y": 6.700288772583008
         },
         {
           "type": "input",
           "id": 30,
-          "typeString": "[,v]",
+          "typeString": "[,*]",
           "x": 8,
           "y": 8
         }

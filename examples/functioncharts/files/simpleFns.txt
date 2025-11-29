@@ -198,21 +198,21 @@
         {
           "type": "input",
           "id": 17,
-          "typeString": "[,v]",
+          "typeString": "[,*]",
           "x": 4.3861083984375,
           "y": 38.522315979003906
         },
         {
           "type": "input",
           "id": 18,
-          "typeString": "[,v]",
+          "typeString": "[,*]",
           "x": 4.85174560546875,
           "y": 61.259796142578125
         },
         {
           "type": "element",
           "id": 19,
-          "typeString": "[vvv,v](?)",
+          "typeString": "[v**,*](?)",
           "x": 78.79548645019531,
           "y": 19.381736755371094,
           "name": "cond",
@@ -281,21 +281,21 @@
         {
           "type": "input",
           "id": 22,
-          "typeString": "[,v]",
+          "typeString": "[,*]",
           "x": 5.19219970703125,
           "y": 40.93354034423828
         },
         {
           "type": "input",
           "id": 23,
-          "typeString": "[,v]",
+          "typeString": "[,*]",
           "x": 5.6578369140625,
           "y": 63.6710205078125
         },
         {
           "type": "element",
           "id": 24,
-          "typeString": "[vvv,v](?)",
+          "typeString": "[v**,*](?)",
           "x": 80.94221496582031,
           "y": 23.72106170654297,
           "name": "cond",
@@ -355,14 +355,14 @@
         {
           "type": "input",
           "id": 26,
-          "typeString": "[,v]",
+          "typeString": "[,*]",
           "x": 6.434356689453125,
           "y": 42.462486267089844
         },
         {
           "type": "element",
           "id": 27,
-          "typeString": "[vvv,v](?)",
+          "typeString": "[v**,*](?)",
           "x": 93.04055786132812,
           "y": 27.94998636841774,
           "name": "cond",

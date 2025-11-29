@@ -2338,7 +2338,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  // Visits the pin and all pins wired or linked to it. Returns any types not defined as 'any'. (TODO)
+  // Visits the pin and all pins wired or pass-throughed to it.
+  // TODO Returns any types not defined as 'any'.
   inferPinType(node: NodeTypes, index: number) : [Type, Array<PinRef>] {
 
     let type: Type = Type.anyType;

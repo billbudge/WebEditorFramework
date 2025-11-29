@@ -13,7 +13,7 @@
     {
       "type": "functionchart",
       "id": 3,
-      "typeString": "[,[vvvvv,v](?)]",
+      "typeString": "[,[v*v**,*](?)]",
       "x": 363.75929260253906,
       "y": 235.69388055801392,
       "width": 112.89202880859375,
@@ -25,7 +25,7 @@
         {
           "type": "element",
           "id": 4,
-          "typeString": "[vvv,v](?)",
+          "typeString": "[v**,*](?)",
           "x": 14.0218505859375,
           "y": 31.482284545898438,
           "name": "cond",
@@ -34,7 +34,7 @@
         {
           "type": "element",
           "id": 5,
-          "typeString": "[vvv,v](?)",
+          "typeString": "[v**,*](?)",
           "x": 51.59814453125,
           "y": 7.193756103515625,
           "name": "cond",
@@ -139,7 +139,7 @@
       "typeString": "[,[v,v](signum)]",
       "x": 541.8785133361816,
       "y": 117.73862218856812,
-      "width": 221.35296535491943,
+      "width": 240.94457912445068,
       "height": 139.74218845367432,
       "name": "signum",
       "implicit": true,
@@ -148,7 +148,7 @@
         {
           "type": "instance",
           "id": 13,
-          "typeString": "[vvvvv,v](?)",
+          "typeString": "[v*v**,*](?)",
           "x": 133.19958400726318,
           "y": 16.20880889892578,
           "instancer": 3,
@@ -184,7 +184,7 @@
         {
           "type": "input",
           "id": 17,
-          "typeString": "[,v]",
+          "typeString": "[,*]",
           "x": 8.13140869140625,
           "y": 36.26989269256592
         },

@@ -13,7 +13,7 @@
     {
       "type": "functionchart",
       "id": 3,
-      "typeString": "[,[v(n),v](n!)]",
+      "typeString": "[,[v,v](n!)]",
       "x": 1141.5437774658203,
       "y": 138.30414199829102,
       "width": 232.78619384765625,
@@ -43,14 +43,14 @@
         {
           "type": "input",
           "id": 6,
-          "typeString": "[,v(n)]",
+          "typeString": "[,*]",
           "x": 10.343485057353973,
           "y": 14.081575393676758
         },
         {
           "type": "output",
           "id": 7,
-          "typeString": "[v,]",
+          "typeString": "[*,]",
           "x": 163.9562225341797,
           "y": 19.383358001708984
         }
@@ -82,7 +82,7 @@
     {
       "type": "functionchart",
       "id": 8,
-      "typeString": "[,[v(n)v(end)v(acc = 1)[vv,v]()(*),v](reduce)]",
+      "typeString": "[,[vvv[vv,v]()(*),v](reduce)]",
       "x": 364.2252731323242,
       "y": 51.01827621459961,
       "width": 737.630241394043,
@@ -94,7 +94,7 @@
         {
           "type": "functionchart",
           "id": 9,
-          "typeString": "[,[v(n)v(acc = 1),v](step)]",
+          "typeString": "[,[vv,v](step)]",
           "x": 97.27909088134766,
           "y": 23.767044067382812,
           "width": 416.34751892089844,
@@ -106,7 +106,7 @@
             {
               "type": "element",
               "id": 10,
-              "typeString": "[vvv,v](?)",
+              "typeString": "[v**,*](?)",
               "x": 350.1475067138672,
               "y": 60.53006362915039,
               "name": "cond",
@@ -115,21 +115,21 @@
             {
               "type": "output",
               "id": 11,
-              "typeString": "[v,]",
+              "typeString": "[*,]",
               "x": 384.34751892089844,
               "y": 74.74436569213867
             },
             {
               "type": "input",
               "id": 12,
-              "typeString": "[,v(acc = 1)]",
+              "typeString": "[,*]",
               "x": 2.801849365234375,
               "y": 51.72287178039551
             },
             {
               "type": "input",
               "id": 13,
-              "typeString": "[,v(n)]",
+              "typeString": "[,*]",
               "x": 49.028350830078125,
               "y": 13.330270767211914
             },
@@ -264,7 +264,7 @@
         {
           "type": "input",
           "id": 20,
-          "typeString": "[,v(end)]",
+          "typeString": "[,*]",
           "x": 31.074207305908203,
           "y": 53.97593307495117
         },
