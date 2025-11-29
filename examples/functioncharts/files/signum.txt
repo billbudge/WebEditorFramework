@@ -7,23 +7,25 @@
   "width": 884.53125,
   "height": 356.50390625,
   "name": "",
+  "implicit": false,
   "hideLinks": false,
   "nodes": [
     {
       "type": "functionchart",
       "id": 3,
-      "typeString": "[,[v(a),v(b)](signum)]",
+      "typeString": "[,[v,v](signum)]",
       "x": 349.3577880859375,
       "y": 94.19139099121094,
       "width": 371.17889404296875,
       "height": 162.26014709472656,
       "name": "signum",
+      "implicit": false,
       "hideLinks": false,
       "nodes": [
         {
           "type": "element",
           "id": 4,
-          "typeString": "[vvv,v](?)",
+          "typeString": "[v**,*](?)",
           "x": 230.8046875,
           "y": 17.709381103515625,
           "name": "cond",
@@ -32,14 +34,14 @@
         {
           "type": "output",
           "id": 5,
-          "typeString": "[v(b),]",
+          "typeString": "[*,]",
           "x": 272.96014404296875,
           "y": 30.580459594726562
         },
         {
           "type": "element",
           "id": 6,
-          "typeString": "[vvv,v](?)",
+          "typeString": "[v**,*](?)",
           "x": 188.015625,
           "y": 80,
           "name": "cond",
@@ -66,7 +68,7 @@
         {
           "type": "input",
           "id": 9,
-          "typeString": "[,v(a)]",
+          "typeString": "[,*]",
           "x": 13.84765625,
           "y": 22.1640625
         },

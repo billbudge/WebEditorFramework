@@ -13,7 +13,7 @@
     {
       "type": "functionchart",
       "id": 3,
-      "typeString": "[,[v(n)v(acc),v](step)]",
+      "typeString": "[,[vv,v](step)]",
       "x": 404.58135986328125,
       "y": 179.01877212524414,
       "width": 378.52894592285156,
@@ -25,7 +25,7 @@
         {
           "type": "element",
           "id": 4,
-          "typeString": "[vvv,v](?)",
+          "typeString": "[v**,*](?)",
           "x": 280.3529815673828,
           "y": 55.29176712036133,
           "name": "cond",
@@ -34,7 +34,7 @@
         {
           "type": "output",
           "id": 5,
-          "typeString": "[v,]",
+          "typeString": "[*,]",
           "x": 315.1518096923828,
           "y": 69.07967758178711
         },
@@ -50,14 +50,14 @@
         {
           "type": "input",
           "id": 7,
-          "typeString": "[,v(acc)]",
+          "typeString": "[,*]",
           "x": 11.6324462890625,
           "y": 83.33650398254395
         },
         {
           "type": "input",
           "id": 8,
-          "typeString": "[,v(n)]",
+          "typeString": "[,*]",
           "x": 17.128173828125,
           "y": 51.87500190734863
         },
@@ -222,7 +222,7 @@
     {
       "type": "functionchart",
       "id": 16,
-      "typeString": "[,[v(n),v](n!)]",
+      "typeString": "[,[v,v](n!)]",
       "x": 820.2394561767578,
       "y": 272.9835090637207,
       "width": 181.63055419921875,
