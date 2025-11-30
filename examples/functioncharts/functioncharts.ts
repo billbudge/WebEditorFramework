@@ -65,8 +65,9 @@ export class Pin {
     const type = this.type;
     let s = type.typeString;
     if (this.name) {
-      // Insert an empty name, so the pin name doesn't get parsed as the type name.
-      if (type !== Type.valueType && type.name === undefined)
+      // If the pin type is a function type with no name, add '()' to prevent the pin name
+      // from being parsed as the function type name.
+      if (type.isFunctionType && type.name === undefined)
         s += '()';
       s += '(' + escapeName(this.name) + ')';
     }
@@ -158,7 +159,7 @@ export class Type {
 
   static outputType(pin: Pin) : Type {
     const type = pin.type;
-    if (type === Type.valueType)
+    if (!type.isFunctionType)
       return pin.type
     return Type.fromInfo(type.inputs, type.outputs, pin.name);
   }
@@ -230,6 +231,10 @@ export class Type {
   // equals(dst: Type) : boolean {
   //   return Type.equals(this, dst);
   // }
+
+  get isFunctionType() : boolean {
+    return this !== Type.valueType && this !== Type.anyType;
+  }
 
   get isGeneric() : boolean {
     return this === Type.anyType ||
@@ -2106,7 +2111,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       y = 8;
       type.inputs.forEach(pin => {
         const pinType = pin.type;
-        if (pinType === Type.valueType || pinType === Type.anyType) {
+        if (!pinType.isFunctionType) {
           const input = self.newPseudoelement('input'),
                 name = pin.name || '';;
           input.x = 8;
@@ -2134,7 +2139,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
       y = 8;
       type.outputs.forEach(pin => {
         const pinType = pin.type;
-        if (pinType === Type.valueType || pinType === Type.anyType) {
+        if (!pinType.isFunctionType) {
           const output = self.newPseudoelement('output'),
                 name = pin.name || '';
           output.x = 40;
@@ -2346,7 +2351,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     }
   }
 
-  // Visits the pin and all pins wired or pass-throughed to it.
+  // Visits the pin and all pins whose type is related to it.
   // TODO Returns any types not defined as 'any'.
   inferPinType(node: NodeTypes, index: number) : [Type, Array<PinRef>] {
 
@@ -3040,7 +3045,7 @@ class Renderer implements ILayoutEngine {
     ctx.strokeStyle = theme.strokeColor;
     ctx.lineWidth = 0.5;
     ctx.beginPath();
-    if (pin.type === Type.valueType || pin.type === Type.anyType) {
+    if (!pin.type.isFunctionType) {
       const r = theme.knobbyRadius;
       if (pin.type === Type.valueType) {
         const d = 2 * r;
@@ -3141,7 +3146,7 @@ class Renderer implements ILayoutEngine {
           const right = x + w;
           element.type.outputs.forEach(pin => {
             const type = pin.type;
-            if (type !== Type.valueType && type !== Type.anyType) {  // TODO add 'isBaseType' fn or somesuch
+            if (type.isFunctionType) {
               ctx.rect(right - type.width, y + pin.y, type.width, type.height);
             }
           });
@@ -3446,7 +3451,7 @@ class Renderer implements ILayoutEngine {
         const pinIndex = info.output,
               pin = type.outputs[pinIndex];
         // Show link to instances.
-        if (pin.type !== Type.valueType && pin.type !== Type.anyType) {  // TODO add 'isBaseType' fn or somesuch
+        if (pin.type.isFunctionType) {
           element.instances[pinIndex].forEach(instance => this.drawFunctionInstanceLink(instance, strokeColor));
         }
       }
@@ -4609,7 +4614,7 @@ export class FunctionchartEditor implements CanvasLayer {
         const p = wire.pDst!,
               pin = src.type.outputs[wire.srcPin];
         let output: ElementTypes;
-        if (pin.type === Type.valueType || pin.type === Type.anyType ||  // TODO
+        if (!pin.type.isFunctionType ||
             (src instanceof Element && src.isExporter)) {
           output = context.newOutputForWire(wire, parent, p);
         } else {
@@ -4663,24 +4668,6 @@ export class FunctionchartEditor implements CanvasLayer {
     if (text) {
       const raw = JSON.parse(text);
       functionchart = Deserialize(raw, context) as Functionchart;
-      // TODO remove when all files are converted to use 'any' type.
-      const inputType = Type.fromString('[,*]'),
-            outputType = Type.fromString('[*,]'),
-            condType = Type.fromString('[v**,*](?)'),
-            useType = Type.fromString('[*{1},*]')
-      context.visitNodes(functionchart, node => {
-        if (node.template === inputTemplate) {
-          node.typeString = inputType.typeString;
-        } else if (node.template === outputTemplate) {
-          node.typeString = outputType.typeString;
-        } else if (node.template === useTemplate) {
-          node.typeString = useType.typeString;
-        } else if (node.template === elementTemplate) {
-          if  (((node as Element)).name === 'cond')
-            node.typeString = condType.typeString;
-        }
-      });
-      // End TODO
     } else {
       functionchart = context.newFunctionchart('functionchart');
     }
