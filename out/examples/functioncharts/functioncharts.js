@@ -160,6 +160,11 @@ export class Type {
     // equals(dst: Type) : boolean {
     //   return Type.equals(this, dst);
     // }
+    get isGeneric() {
+        return this === Type.anyType ||
+            this.inputs.some(input => input.type.isGeneric) ||
+            this.outputs.some(output => output.type.isGeneric);
+    }
     static canConnect(src, dst) {
         return true;
     }
@@ -1974,7 +1979,8 @@ export class FunctionchartContext extends EventBase {
             }
         }
     }
-    // Visits the pin and all pins wired or linked to it. Returns any types not defined as 'any'. (TODO)
+    // Visits the pin and all pins wired or pass-throughed to it.
+    // TODO Returns any types not defined as 'any'.
     inferPinType(node, index) {
         let type = Type.anyType;
         function visitor(element, index) {

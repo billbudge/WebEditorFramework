@@ -110,11 +110,25 @@ describe('Type', () => {
     });
     test('canConnect', () => {
         expect(FC.Type.valueType.canConnectTo(FC.Type.valueType)).toBe(true);
-        // const type1 = FC.Type.typeFromString('[v,v]'),
-        //       type2 = FC.Type.typeFromString('[vv,v]');
+        // const type1 = FC.Type.fromString('[v,v]'),
+        //       type2 = FC.Type.fromString('[vv,v]');
         // expect (type1.canConnectTo(FC.Type.valueType)).toBe(false);
         // expect(type1.canConnectTo(type2)).toBe(false);
         // expect(type2.canConnectTo(type1)).toBe(true);
+    });
+    test('isGeneric', () => {
+        expect(FC.Type.anyType.isGeneric).toBe(true);
+        expect(FC.Type.valueType.isGeneric).toBe(false);
+        expect(FC.Type.emptyType.isGeneric).toBe(false);
+        const type1 = FC.Type.fromString('[v*,v]'), type2 = FC.Type.fromString('[vv,*v]');
+        expect(type1.isGeneric).toBe(true);
+        expect(type2.isGeneric).toBe(true);
+        const type3 = FC.Type.fromString('[v,v]');
+        expect(type3.isGeneric).toBe(false);
+        const type4 = FC.Type.fromString('[*,*]v,*');
+        expect(type4.isGeneric).toBe(true);
+        const type5 = FC.Type.fromString('[v[v,v]v,v[v,[*,v]]v]');
+        expect(type5.isGeneric).toBe(true);
     });
     test('varArgs', () => {
         let t;

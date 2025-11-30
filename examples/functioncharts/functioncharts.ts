@@ -231,13 +231,21 @@ export class Type {
   //   return Type.equals(this, dst);
   // }
 
-  private static canConnect(src: Type, dst: Type) : boolean {
+  get isGeneric() : boolean {
+    return this === Type.anyType ||
+           this.inputs.some(input => input.type.isGeneric) ||
+           this.outputs.some(output => output.type.isGeneric);
+  }
+
+  static canConnect(src: Type, dst: Type) : boolean {
     return true;
   }
 
   canConnectTo(dst: Type) : boolean {
     return Type.canConnect(this, dst);
   }
+
+
 }
 
 // not exported
