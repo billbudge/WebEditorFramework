@@ -2387,21 +2387,40 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         sideEffects = false;
 
     // Memoize inferred pin types.
-    const inferredMap = new PairMap<NodeTypes, number, [Type, Array<PinRef>]>();
+    const inferred = new PairMap<NodeTypes, number, [Type, Array<PinRef>]>();
     function inferPinType(node: NodeTypes, index: number) : [Type, Array<PinRef>] {
-      let inferred = inferredMap.get(node, index);
-      if (!inferred) {
-        inferred = self.inferPinType(node, index);
-        for (let pinRef of inferred[1]) {
+      let result = inferred.get(node, index);
+      if (!result) {
+        result = self.inferPinType(node, index);
+        for (let pinRef of result[1]) {
           const [element, index] = pinRef;
-          inferredMap.set(element, index, inferred);
+          inferred.set(element, index, result);
         }
       }
-      return inferred;
+      return result;
     }
-    // Collect the functionchart's input and output pseudoelements.
+    // Infer the type of an element by inferring the types of its pins.
+    function inferElementType(element: ElementTypes) : Type {
+      const type = element.type,
+            inputPins = type.inputs,
+            firstOutput = inputPins.length,
+            outputPins = type.outputs;
+      const inputs = new Array<Pin>(),
+            outputs = new Array<Pin>();
+      for (let i = 0; i < inputPins.length; i++) {
+        const [type, connected] = inferPinType(element, i);
+        inputs.push(new Pin(type));
+      }
+      for (let i = 0; i < outputPins.length; i++) {
+        const [type, connected] = inferPinType(element, i + firstOutput);
+        outputs.push(new Pin(type));
+      }
+      return Type.fromInfo(inputs, outputs);
+    }
+    // Collect the functionchart's inputs and outputs.
     subgraphInfo.nodes.forEach(node => {
       if (node instanceof Pseudoelement) {
+        // Input and output pseudoelements generate pins.
         if (node.template === inputTemplate) {
           const [type, connected] = inferPinType(node, 0);
           const name = node.type.outputs[0].name;
@@ -2430,8 +2449,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           outputs.push(pinInfo);
         } else if (node instanceof Element && node.isAbstract) {
           // Abstract elements become a single input (and don't implicitly generate other pins).
-          const type = node.type,
-                name = undefined,
+          const name = undefined,
+                type = inferElementType(node),
                 pinInfo = { element: node, index: 0, type, name, connected: [], ptIndex: -1 };
           inputs.push(pinInfo);
         } else {
