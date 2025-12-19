@@ -1063,31 +1063,21 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     functionchart.wires.forEach(t => visitor(t));
   }
 
-  getContainingFunctionchart(items: AllTypes[]) : Functionchart {
-    let owner = getLowestCommonAncestor<AllTypes>(...items);
-    while (owner && !(owner instanceof Functionchart))
-      owner = owner.parent;
-    if (owner instanceof Functionchart)
-      return owner;
-
-    return this.functionchart;
-  }
-
-  getToFunctionchart(node: NodeTypes) : Functionchart | undefined {
-    if (node instanceof Functionchart)
-      return node;
-    let result = node.parent;
+  // The scope is the lowest enclosing functionchart.
+  getScope(node: NodeTypes) : Functionchart {
+    let result : NodeTypes | undefined = node.parent;
     while (result && !(result instanceof Functionchart))
       result = result.parent;
-    return result;
+    return result || this.functionchart;
   }
 
-  // getToUncontainedNode(node: NodeTypes) : NodeTypes {
-  //   let result = node;
-  //   while (result.parent instanceof ModifierElement)
-  //     result = result.parent;
-  //   return result;
-  // }
+  // The lowest common scope enclosing all items.
+  getLowestScope(nodes: NodeTypes[]) : Functionchart {
+    let ancestor = getLowestCommonAncestor<NodeTypes>(...nodes);
+    if (ancestor instanceof Functionchart)
+      return ancestor;
+    return this.functionchart;
+  }
 
   forInWires(dst: NodeTypes, visitor: WireVisitor) {
     dst.inWires.forEach(wire => {
@@ -1147,24 +1137,34 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   getSubgraphInfo(items: NodeTypes[]) : GraphInfo {
     const self = this,
           nodes = new Set<NodeTypes>(),
+          nodesAndSubnodes = new Set<NodeTypes>(),
           wires = new Set<Wire>(),
           interiorWires = new Set<Wire>(),
           inWires = new Set<Wire>(),
           outWires = new Set<Wire>();
-    // First collect nodes.
+    function addNode(node: NodeTypes) {
+      nodesAndSubnodes.add(node);
+      if (node instanceof Functionchart) {
+        node.nodes.forEach(addNode);
+      }
+    }
+    // First collect top level nodes.
     items.forEach(item => {
-      nodes.add(item);
+      if (item instanceof NodeBase) {
+        nodes.add(item);
+        addNode(item);
+    }
     });
     // Now collect and classify wires that connect to them.
-    items.forEach(item => {
+    nodesAndSubnodes.forEach(node => {
       function addWire(wire: Wire) {
-        // Stop if we've already processed this transtion (handle transitions from a element to itself.)
+        // Stop if we've already processed this wire.
         if (wires.has(wire)) return;
         wires.add(wire);
         const src: NodeTypes = wire.src!,
               dst: NodeTypes = wire.dst!,
-              srcInside = nodes.has(src),
-              dstInside = nodes.has(dst);
+              srcInside = nodesAndSubnodes.has(src),
+              dstInside = nodesAndSubnodes.has(dst);
         if (srcInside) {
           if (dstInside) {
             interiorWires.add(wire);
@@ -1178,10 +1178,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           }
         }
       }
-      if (item instanceof NodeBase) {
-        self.forInWires(item, addWire);
-        self.forOutWires(item, addWire);
-      }
+      self.forInWires(node, addWire);
+      self.forOutWires(node, addWire);
     });
 
     return {
@@ -1557,18 +1555,17 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     });
   }
 
-  isValidWire(wire: Wire) {
+  // A valid wire doesn't connect a node with itself, or exit its containing scope,
+  // which is the scope of the functionchart that contains |src|.
+  isValidWire(wire: Wire) : boolean {
     if (wire.pSrc || wire.pDst)
-      return true;  // Return valid for wires that are being dragged.
+      return true;  // Return true for wires that are being dragged.
     const src = wire.src,
           dst = wire.dst;
-    if (!src || !dst)
+    if (!src || !dst || src === dst)
       return false;
-    if (src === dst)
-      return false;
-    // Wires must be within the functionchart or from a source in an enclosing functionchart.
-    const lca = getLowestCommonAncestor<AllTypes>(src, dst);
-    if (!lca || lca !== this.getToFunctionchart(src.parent!))  // TODO test
+    const lca = getLowestCommonAncestor<NodeTypes>(src, dst);
+    if (lca === undefined || lca !== this.getScope(src))  // TODO test
       return false;
     const srcPin = wire.srcPin,
           dstPin = wire.dstPin;
@@ -1584,7 +1581,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   canAddNode(node: NodeTypes, parent: ElementParentTypes) : boolean {
     if (node instanceof FunctionInstance) {
       const definition = node.src,
-            definitionScope = definition.parent,
+            definitionScope = this.getScope(definition),
             scope = getLowestCommonAncestor<NodeTypes>(node, definition, parent);
       if (definition instanceof Functionchart) {
         // Closed functioncharts can be instantiated anywhere.
@@ -1602,7 +1599,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
         return scope === definitionScope;
       }
     } else if (node instanceof ModifierElement) {
-      return !(parent instanceof ModifierElement);  // A modifier can't modify another modifier.
+      return !(parent instanceof ModifierElement);  // A modifier can't modify another modifier. // TODO allow composed modifiers?
     }
     return true;
   }
@@ -1654,11 +1651,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   }
 
   isValidFunctionInstance(instance: FunctionInstance) : boolean {
-    let parent = instance.parent;
-    // To be able to export an instance, the inner element must be valid in the containing functionchart.
-    if (parent instanceof ModifierElement)
-      parent = parent.parent;
-    return parent instanceof Functionchart && this.canAddNode(instance, parent);
+    const scope = this.getScope(instance);
+    return this.canAddNode(instance, scope);
   }
 
   // Update wire lists. Returns true iff wires don't fan-in to any input pins.
@@ -4777,15 +4771,15 @@ export class FunctionchartEditor implements CanvasLayer {
         break;
       }
       case 'group': {
-        context.selection.set(context.selectedNodes());
+        const nodes = context.selectedNodes();
+        context.selection.set(nodes);
         context.extendSelectionToWires();
         context.reduceSelection();
         context.beginTransaction('group items into functionchart');
-        const bounds = this.renderer.sumBounds(context.selectedNodes()),
-              contents = context.selectedAllTypes();
-        let parent = context.getContainingFunctionchart(contents);
+        const bounds = this.renderer.sumBounds(nodes),
+              parent = context.getLowestScope(nodes);
         expandRect(bounds, Functionchart.radius, Functionchart.radius);
-        context.group(contents, parent, bounds);
+        context.group(nodes, parent, bounds);
         context.endTransaction();
         break;
       }
