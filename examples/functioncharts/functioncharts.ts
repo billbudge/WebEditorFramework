@@ -3332,17 +3332,17 @@ class Renderer implements ILayoutEngine {
     if (mode !== RenderMode.Palette) {
       for (let i = 0; i < type.inputs.length; i++) {
         const pinPt = self.inputPinToPoint(element, i),
-              rect = self.pinToRect(type.inputs[i], pinPt);
+              r = self.pinToRect(type.inputs[i], pinPt);
         // Hit test with tolerance adjustment along top, right, and bottom.
-        if (hitTestRect(rect.x, rect.y - tol, rect.width + tol, rect.height + 2 * tol, p, 0)) {
+        if (hitTestRect(r.x, r.y, r.width, r.height, p, 0)) {
           result.input = i;
         }
       }
       for (let i = 0; i < type.outputs.length; i++) {
         const pinPt = self.outputPinToPoint(element, i),
-              rect = self.pinToRect(type.outputs[i], pinPt);
+              r = self.pinToRect(type.outputs[i], pinPt);
         // Hit test with tolerance adjustment along top, left, and bottom.
-        if (hitTestRect(rect.x - tol, rect.y - tol, rect.width + tol, rect.height + 2 * tol, p, 0)) {
+        if (hitTestRect(r.x, r.y, r.width, r.height, p, 0)) {
           result.output = i;
         }
       }
