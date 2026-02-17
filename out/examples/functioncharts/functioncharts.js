@@ -839,7 +839,9 @@ export class FunctionchartContext extends EventBase {
         let result = node.parent;
         while (result && !(result instanceof Functionchart))
             result = result.parent;
-        return result || this.functionchart;
+        if (result instanceof Functionchart)
+            return result;
+        return this.functionchart;
     }
     // The lowest common scope enclosing all items.
     getLowestScope(nodes) {
@@ -2002,7 +2004,8 @@ export class FunctionchartContext extends EventBase {
     getFunctionchartTypeInfo(functionchart) {
         const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name, implicit = functionchart.implicit, subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()), closed = subgraphInfo.inWires.size == 0;
         // A functionchart is abstract if it has no wires.
-        let abstract = subgraphInfo.wires.size === 0 && subgraphInfo.inWires.size === 0, sideEffects = false;
+        let abstract = subgraphInfo.wires.size === 0, // no wires in abstract functionchart.
+        sideEffects = false;
         // Memoize inferred pin types.
         const inferred = new PairMap();
         function inferPinType(node, index) {

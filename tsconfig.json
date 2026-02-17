@@ -8,7 +8,7 @@
    // "strict": true,  // TODO fix
     "strictNullChecks": true,
     "allowJs": true,
-    "moduleResolution": "node",
+    "moduleResolution": "node",  // TODO update to node16, and es2022.
     "esModuleInterop": true,
   },
 

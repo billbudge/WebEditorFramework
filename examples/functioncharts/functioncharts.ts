@@ -1068,7 +1068,9 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     let result : NodeTypes | undefined = node.parent;
     while (result && !(result instanceof Functionchart))
       result = result.parent;
-    return result || this.functionchart;
+    if (result instanceof Functionchart)
+      return result;
+    return this.functionchart;
   }
 
   // The lowest common scope enclosing all items.
@@ -2376,7 +2378,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           implicit = functionchart.implicit,
           subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()),
           closed = subgraphInfo.inWires.size == 0;
-    // A functionchart is abstract if it has no wires.
+    // A functionchart is abstract if it has no local or incoming wires (there are no outgoing wires).
     let abstract = subgraphInfo.wires.size === 0 && subgraphInfo.inWires.size === 0,
         sideEffects = false;
 

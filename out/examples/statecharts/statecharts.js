@@ -432,7 +432,9 @@ export class StatechartContext extends EventBase {
     getLowestCommonStatechart(...items) {
         const lca = getLowestCommonAncestor(...items);
         let result;
-        if (!lca || lca instanceof Statechart)
+        if (lca === undefined)
+            result = undefined;
+        else if (lca instanceof Statechart)
             result = lca;
         else
             result = lca.parent;
