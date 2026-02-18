@@ -3788,12 +3788,49 @@ export class FunctionchartEditor implements CanvasLayer {
         }
       }
     }
+    function ioTypeGetter(info: ItemInfo, item: NodeTypes) {
+      let result;
+      switch (item.template.typeName) {
+        case 'input':       // [,v(label)]
+          result = item.type.outputs[0].type.typeString;
+          break;
+        case 'output':      // [v(label),]
+          result = item.type.inputs[0].type.typeString;
+          break;
+      }
+      return result ? result : '';
+    }
+    function ioTypeSetter(info: ItemInfo, item: NodeTypes, value: any) {
+      if (info.prop === typeStringProp) {
+        let newType;
+        switch (item.template.typeName) {
+          case 'input':
+            newType = Type.fromInfo([], [new Pin(Type.fromString(value), item.type.outputs[0].name)]);
+            break;
+          case 'output':
+            newType = Type.fromInfo([new Pin(Type.fromString(value), item.type.inputs[0].name)], []);
+            break;
+        }
+        if (newType) {
+          const newValue = newType.typeString;
+          setter(info, item, newValue);
+        }
+      }
+    }
     this.propertyInfo.set('input', [
       {
         label: 'label',
         type: 'text',
         getter: nodeLabelGetter,
         setter: nodeLabelSetter,
+        prop: typeStringProp,
+      },
+      {
+        label: 'type',
+        type: 'enum',
+        values: 'v,*',
+        getter: ioTypeGetter,
+        setter: ioTypeSetter,
         prop: typeStringProp,
       },
       {
@@ -3810,6 +3847,14 @@ export class FunctionchartEditor implements CanvasLayer {
         type: 'text',
         getter: nodeLabelGetter,
         setter: nodeLabelSetter,
+        prop: typeStringProp,
+      },
+      {
+        label: 'type',
+        type: 'enum',
+        values: 'v,*',
+        getter: ioTypeGetter,
+        setter: ioTypeSetter,
         prop: typeStringProp,
       },
       {

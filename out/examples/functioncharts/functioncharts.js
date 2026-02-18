@@ -2003,9 +2003,8 @@ export class FunctionchartContext extends EventBase {
     }
     getFunctionchartTypeInfo(functionchart) {
         const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name, implicit = functionchart.implicit, subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()), closed = subgraphInfo.inWires.size == 0;
-        // A functionchart is abstract if it has no wires.
-        let abstract = subgraphInfo.wires.size === 0, // no wires in abstract functionchart.
-        sideEffects = false;
+        // A functionchart is abstract if it has no local or incoming wires (there are no outgoing wires).
+        let abstract = subgraphInfo.wires.size === 0 && subgraphInfo.inWires.size === 0, sideEffects = false;
         // Memoize inferred pin types.
         const inferred = new PairMap();
         function inferPinType(node, index) {
@@ -3180,12 +3179,49 @@ export class FunctionchartEditor {
                 }
             }
         }
+        function ioTypeGetter(info, item) {
+            let result;
+            switch (item.template.typeName) {
+                case 'input': // [,v(label)]
+                    result = item.type.outputs[0].type.typeString;
+                    break;
+                case 'output': // [v(label),]
+                    result = item.type.inputs[0].type.typeString;
+                    break;
+            }
+            return result ? result : '';
+        }
+        function ioTypeSetter(info, item, value) {
+            if (info.prop === typeStringProp) {
+                let newType;
+                switch (item.template.typeName) {
+                    case 'input':
+                        newType = Type.fromInfo([], [new Pin(Type.fromString(value), item.type.outputs[0].name)]);
+                        break;
+                    case 'output':
+                        newType = Type.fromInfo([new Pin(Type.fromString(value), item.type.inputs[0].name)], []);
+                        break;
+                }
+                if (newType) {
+                    const newValue = newType.typeString;
+                    setter(info, item, newValue);
+                }
+            }
+        }
         this.propertyInfo.set('input', [
             {
                 label: 'label',
                 type: 'text',
                 getter: nodeLabelGetter,
                 setter: nodeLabelSetter,
+                prop: typeStringProp,
+            },
+            {
+                label: 'type',
+                type: 'enum',
+                values: 'v,*',
+                getter: ioTypeGetter,
+                setter: ioTypeSetter,
                 prop: typeStringProp,
             },
             {
@@ -3202,6 +3238,14 @@ export class FunctionchartEditor {
                 type: 'text',
                 getter: nodeLabelGetter,
                 setter: nodeLabelSetter,
+                prop: typeStringProp,
+            },
+            {
+                label: 'type',
+                type: 'enum',
+                values: 'v,*',
+                getter: ioTypeGetter,
+                setter: ioTypeSetter,
                 prop: typeStringProp,
             },
             {
