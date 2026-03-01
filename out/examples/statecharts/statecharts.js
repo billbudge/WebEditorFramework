@@ -167,6 +167,7 @@ export class StatechartContext extends EventBase {
         this.statecharts = new Set;
         this.transitions = new Set;
         this.selection = new SelectionSet();
+        this.name = '';
         this.transactionManager = new TransactionManager();
         this.addHandler('changed', this.transactionManager.onChanged.bind(this.transactionManager));
         this.historyManager = new HistoryManager(this.transactionManager, this.selection);
@@ -953,6 +954,7 @@ var RenderMode;
 })(RenderMode || (RenderMode = {}));
 class Renderer {
     constructor(theme = new StatechartTheme()) {
+        this.ctx = undefined; // Set in begin(). TODO fixme
         this.theme = theme;
     }
     begin(ctx) {
@@ -1538,6 +1540,7 @@ export class StatechartEditor {
         this.scrap = [];
         this.clickInPalette = false;
         this.moveCopy = false;
+        this.hoverPoint = { x: 0, y: 0 };
         this.propertyInfo = new Map();
         const self = this;
         this.theme = new StatechartTheme(baseTheme);

@@ -1,4 +1,5 @@
 import { getDefaultTheme, CanvasController, PropertyGridController, FileInputElement, UIErrorReporter, ConsoleErrorReporter } from '../../src/diagrams.js'
+import { Point } from '../../src/geometry.js';
 import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
 
 (function() {
@@ -82,7 +83,7 @@ import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
       // default returns undefined
     }
 
-    function buttonListener(e: InputEvent) {
+    function buttonListener(e: PointerEvent) {
       const target = e.target as HTMLElement,
             command = idToCommand(target.id);
       if (command) {
@@ -98,7 +99,7 @@ import { FunctionchartEditor, EditorCommand } from './functioncharts.js'
           modifyMenu = document.getElementById('modify'),
           examplesMenu = document.getElementById('examples');
 
-    function selectListener(e: InputEvent) {
+    function selectListener(e: Event) {
       const target = e.target as HTMLSelectElement,
             command = idToCommand(target.value);
       if (command) {

@@ -299,7 +299,7 @@ export class StatechartContext extends EventBase<Change, ChangeEvents>
     this.statechart = root;
   }
 
-  name: string;
+  name: string = '';
 
   newState() : State {
     const nextId = ++this.highestId,
@@ -1165,7 +1165,7 @@ enum RenderMode {
 
 class Renderer {
   private theme: StatechartTheme;
-  private ctx: CanvasRenderingContext2D;
+  private ctx: CanvasRenderingContext2D = undefined as any;  // Set in begin(). TODO fixme
 
   constructor(theme: StatechartTheme = new StatechartTheme()) {
     this.theme = theme;
@@ -1879,7 +1879,7 @@ export class StatechartEditor implements CanvasLayer {
   private dragInfo: DragTypes | undefined;
   private hotTrackInfo: HitResultTypes | undefined;
   private hoverHitInfo: HitResultTypes | undefined;
-  private hoverPoint: Point;
+  private hoverPoint: Point = { x: 0, y: 0 };
   private propertyInfo = new Map<string, PropertyInfo[]>();
 
   constructor(baseTheme: Theme,

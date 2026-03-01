@@ -104,6 +104,7 @@ export class Type {
         this.outputs = outputs;
         this.name = name;
         this.varArgs = inputs.some(input => (input.varArgs > 0));
+        this._typeString = this.toString();
     }
     toString() {
         if (this === Type.valueType)
@@ -291,23 +292,23 @@ export function visitType(type, visitor) {
 // Properties and templates for the raw data interface for cloning, serialization, etc.
 const idProp = new IdProp('id'), xProp = new ScalarProp('x', 0), yProp = new ScalarProp('y', 0), nameProp = new ScalarProp('name', ''), typeStringProp = new ScalarProp('typeString', Type.emptyTypeString), widthProp = new ScalarProp('width', 0), heightProp = new ScalarProp('height', 0), srcProp = new ReferenceProp('src'), srcPinProp = new ScalarProp('srcPin', 0), dstProp = new ReferenceProp('dst'), dstPinProp = new ScalarProp('dstPin', 0), nodesProp = new ChildListProp('nodes'), wiresProp = new ChildListProp('wires'), instancerProp = new ReferenceProp('instancer'), innerElementProp = new ChildSlotProp('inner'), implicitProp = new ScalarProp('implicit', false), hideLinksProp = new ScalarProp('hideLinks', false), commentProp = new ScalarProp('comment');
 class NodeTemplate {
-    constructor() {
+    constructor(typeName) {
         this.id = idProp;
         this.typeString = typeStringProp;
         this.x = xProp;
         this.y = yProp;
         this.comment = commentProp;
         this.properties = [];
+        this.typeName = typeName;
     }
 }
 class ElementTemplate extends NodeTemplate {
     constructor(typeName) {
-        super();
+        super(typeName);
         this.name = nameProp;
         this.hideLinks = hideLinksProp;
         this.properties = [this.id, this.typeString, this.x, this.y, this.name, this.hideLinks,
             this.comment];
-        this.typeName = typeName;
     }
 }
 class ModifierElementTemplate extends ElementTemplate {
@@ -329,9 +330,8 @@ class FunctionInstanceTemplate extends ElementTemplate {
 }
 class PseudoelementTemplate extends NodeTemplate {
     constructor(typeName) {
-        super();
+        super(typeName);
         this.properties = [this.id, this.typeString, this.x, this.y, this.comment];
-        this.typeName = typeName;
     }
 }
 class WireTemplate {
@@ -346,7 +346,7 @@ class WireTemplate {
 }
 class FunctionchartTemplate extends NodeTemplate {
     constructor(typeName) {
-        super();
+        super(typeName);
         this.width = widthProp;
         this.height = heightProp;
         this.name = nameProp;
@@ -357,7 +357,6 @@ class FunctionchartTemplate extends NodeTemplate {
         this.properties = [this.id, this.typeString, this.x, this.y, this.width, this.height,
             this.name, this.implicit, this.hideLinks, this.nodes, this.wires,
             this.comment];
-        this.typeName = typeName;
     }
 }
 const elementTemplate = new ElementTemplate('element'), // built-in elements
@@ -431,6 +430,7 @@ class NodeBase {
     }
     constructor(template, context, id) {
         this.globalPosition = defaultPoint;
+        this._type = Type.emptyType;
         this.inWires = new Array(); // one input per pin (no fan in).
         this.outWires = new Array(); // multiple outputs per pin (fan out).
         this.instances = new Array(); // each output pin potentially has multiple instances.
@@ -1984,8 +1984,8 @@ export class FunctionchartContext extends EventBase {
     // TODO Returns any types not defined as 'any'.
     inferPinType(node, index) {
         let type = Type.anyType;
-        function visitor(element, index) {
-            const pin = element.getPin(index);
+        function visitor(node, index) {
+            const pin = node.getPin(index);
             // |pin| may be undefined if the instance doesn't has its type yet.  TODO can we fix this?
             if (pin && pin.type !== Type.anyType) {
                 type = pin.type;
@@ -2355,6 +2355,7 @@ var RenderMode;
 })(RenderMode || (RenderMode = {}));
 class Renderer {
     constructor(theme = new FunctionchartTheme()) {
+        this.ctx = undefined; // Set in begin(). TODO fixme
         this.theme = theme;
     }
     begin(ctx) {
@@ -3012,6 +3013,7 @@ export class FunctionchartEditor {
     constructor(baseTheme, canvasController, paletteController, propertyGridController, fileInput, errorReporter) {
         this.scrap = [];
         this.clickInPalette = false;
+        this.hoverPoint = { x: 0, y: 0 };
         this.propertyInfo = new Map();
         const theme = new FunctionchartTheme(baseTheme);
         this.theme = theme;
@@ -3122,7 +3124,7 @@ export class FunctionchartEditor {
                     info.prop.set(item, value);
                 }
                 catch (error) {
-                    errorReporter.report(error.message);
+                    // errorReporter.report(error.message); // TODO fixme
                 }
                 context.endTransaction();
                 canvasController.draw();

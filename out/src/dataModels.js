@@ -735,6 +735,7 @@ export class HistoryManager {
     constructor(transactionManager, selectionSet) {
         this.done = [];
         this.undone = [];
+        this.startingSelection = [];
         this.transactionManager = transactionManager;
         this.selectionSet = selectionSet;
         transactionManager.addHandler('transactionBegan', this.onTransactionBegan.bind(this));

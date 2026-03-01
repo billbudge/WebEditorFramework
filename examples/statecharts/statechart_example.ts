@@ -52,7 +52,7 @@ import { StatechartEditor, EditorCommand } from './statecharts.js'
           editMenu = document.getElementById('edit'),
           examplesMenu = document.getElementById('examples');
 
-    function selectListener(e: InputEvent) {
+    function selectListener(e: Event) {
       const target = e.target as HTMLSelectElement,
             command = idToCommand(target.value);
       if (command) {
@@ -79,7 +79,7 @@ import { StatechartEditor, EditorCommand } from './statecharts.js'
       }
     }
 
-    function buttonListener(e: Event) {
+    function buttonListener(e: PointerEvent) {
       const target = e.target as HTMLElement,
             command = idToCommand(target.id);
       if (command) {

@@ -45,6 +45,7 @@ Operand.undefined = new Operand(undefined, -1);
 export class Function extends Node {
     constructor(element) {
         super(element);
+        this.operands = []; // TODO fixme
     }
 }
 export class FunctionDefinition extends Node {

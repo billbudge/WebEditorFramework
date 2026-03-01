@@ -59,7 +59,7 @@ export class Operand {
 }
 
 export class Function extends Node {
-  operands: Operand[];
+  operands: Operand[] = [];  // TODO fixme
   constructor(element: NodeTypes) {
     super(element);
   }

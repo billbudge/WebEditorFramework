@@ -85,7 +85,7 @@ class TestDataObjectTemplate implements Data.DataObjectTemplate {
   id: Data.IdProp;
   x: Data.ScalarProp;
   array: Data.ChildListProp;
-  child: Data.ChildSlotProp;
+  child: Data.ChildSlotProp<Data.DataContextObject>;
   reference: Data.ReferenceProp;
   properties: Data.PropertyTypes[];
   constructor() {

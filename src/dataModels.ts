@@ -35,7 +35,7 @@ export interface ReferencedObject extends DataContextObject {
 // Simple property descriptors.
 
 export type ScalarPropertyTypes = ScalarProp | ReferenceProp;
-export type ChildPropertyTypes = ChildListProp | ChildSlotProp;
+export type ChildPropertyTypes = ChildListProp | ChildSlotProp<any>;
 export type PropertyTypes = ScalarPropertyTypes | ChildPropertyTypes | IdProp;
 
 export class ScalarProp {
@@ -165,9 +165,9 @@ export interface Slot<T = any> {
 // Internal implementation of ChildSlot<T>.
 // We notify changes using the elementInserted and elementRemoved methods of DataContext,
 // so make slot look like a single element array.
-class DataSlot<T extends DataContextObject = DataContextObject> implements Slot<T> {
+class DataSlot<T extends DataContextObject> implements Slot<T> {
   private owner: DataContextObject;
-  private prop: ChildSlotProp;
+  private prop: ChildSlotProp<T>;
   private slot: T | undefined;
 
   get(index: number) : T | undefined {
@@ -191,13 +191,13 @@ class DataSlot<T extends DataContextObject = DataContextObject> implements Slot<
     return oldValue;
   }
 
-  constructor(owner: DataContextObject, prop: ChildSlotProp) {
+  constructor(owner: DataContextObject, prop: ChildSlotProp<T>) {
     this.owner = owner;
     this.prop = prop;
   }
 }
 
-export class ChildSlotProp<T extends DataContextObject = DataContextObject> {
+export class ChildSlotProp<T extends DataContextObject> {
   readonly name: string;
   readonly internalName: string;
   readonly cacheKey: symbol;
@@ -882,7 +882,7 @@ export class HistoryManager {
   private undone: CompoundOp[] = [];
   private transactionManager: TransactionManager;
   private selectionSet: SelectionSet<DataContextObject>;
-  private startingSelection: DataContextObject[];
+  private startingSelection: DataContextObject[] = [];
 
   getRedo() {
     const length = this.undone.length;

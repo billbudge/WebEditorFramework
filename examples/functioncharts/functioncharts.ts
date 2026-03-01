@@ -169,6 +169,7 @@ export class Type {
     this.outputs = outputs;
     this.name = name;
     this.varArgs = inputs.some(input => (input.varArgs > 0));
+    this._typeString = this.toString();
   }
 
   private toString() : string {
@@ -249,8 +250,6 @@ export class Type {
   canConnectTo(dst: Type) : boolean {
     return Type.canConnect(this, dst);
   }
-
-
 }
 
 // not exported
@@ -382,20 +381,22 @@ abstract class NodeTemplate {
   readonly y = yProp;
   readonly comment = commentProp;
   readonly properties: PropertyTypes[] = [];
+
+  constructor(typeName: NodeType) {
+    this.typeName = typeName;
+  }
 }
 
 export type ModifierElementType = 'importer' | 'exporter' | 'constructor' | 'upCast' | 'downCast';
 export type ElementType = 'element' | 'instance' | ModifierElementType;
 
 class ElementTemplate extends NodeTemplate {
-  readonly typeName: ElementType;
   readonly name = nameProp;
   readonly hideLinks = hideLinksProp;
   readonly properties: PropertyTypes[] = [this.id, this.typeString, this.x, this.y, this.name, this.hideLinks,
                                           this.comment];
   constructor(typeName: ElementType) {
-    super();
-    this.typeName = typeName;
+    super(typeName);
   }
 }
 
@@ -418,11 +419,9 @@ class FunctionInstanceTemplate extends ElementTemplate {
 export type PseudoelementType = 'input' | 'output' | 'use';
 
 class PseudoelementTemplate extends NodeTemplate {
-  readonly typeName: PseudoelementType;
   readonly properties = [this.id, this.typeString, this.x, this.y, this.comment];
   constructor(typeName: PseudoelementType) {
-    super();
-    this.typeName = typeName;
+    super(typeName);
   }
 }
 
@@ -438,7 +437,6 @@ class WireTemplate {
 export type FunctionchartType = 'functionchart';
 
 class FunctionchartTemplate extends NodeTemplate {
-  readonly typeName : FunctionchartType;
   readonly width = widthProp;
   readonly height = heightProp;
   readonly name = nameProp;
@@ -450,8 +448,7 @@ class FunctionchartTemplate extends NodeTemplate {
                          this.name, this.implicit, this.hideLinks, this.nodes, this.wires,
                          this.comment];
     constructor(typeName: FunctionchartType) {
-      super();
-      this.typeName = typeName;
+      super(typeName);
   }
 }
 
@@ -496,7 +493,7 @@ abstract class NodeBase<T extends NodeTemplate> implements DataContextObject, Re
   parent: ElementParentTypes | undefined;
   globalPosition = defaultPoint;
 
-  private _type: Type;
+  private _type: Type = Type.emptyType;
   get type() {
     if (!this._type) {
       this._type = Type.fromString(this.typeString);
@@ -2352,8 +2349,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
   inferPinType(node: NodeTypes, index: number) : [Type, Array<PinRef>] {
 
     let type: Type = Type.anyType;
-    function visitor(element: ElementTypes, index: number) {
-      const pin = element.getPin(index);
+    function visitor(node: NodeTypes, index: number) {
+      const pin = node.getPin(index);
       // |pin| may be undefined if the instance doesn't has its type yet.  TODO can we fix this?
       if (pin && pin.type !== Type.anyType) {
         type = pin.type;
@@ -2790,7 +2787,7 @@ enum RenderMode {
 
 class Renderer implements ILayoutEngine {
   private theme: FunctionchartTheme;
-  private ctx: CanvasRenderingContext2D;
+  private ctx: CanvasRenderingContext2D = undefined as any;  // Set in begin(). TODO fixme
 
   constructor(theme: FunctionchartTheme = new FunctionchartTheme()) {
     this.theme = theme;
@@ -3600,7 +3597,7 @@ export class FunctionchartEditor implements CanvasLayer {
   private dragInfo: DragTypes | undefined;
   private hotTrackInfo: HitResultTypes | undefined;
   private hoverHitInfo: HitResultTypes | undefined;
-  private hoverPoint: Point;
+  private hoverPoint: Point = { x: 0, y: 0 };
   private propertyInfo = new Map<string, ItemInfo[]>();
 
   constructor(baseTheme: Theme,
@@ -3733,7 +3730,7 @@ export class FunctionchartEditor implements CanvasLayer {
         try {
           info.prop.set(item, value);
         } catch (error) {
-          errorReporter.report(error.message);
+          // errorReporter.report(error.message); // TODO fixme
         }
         context.endTransaction();
         canvasController.draw();
@@ -3824,7 +3821,7 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: nodeLabelGetter,
         setter: nodeLabelSetter,
         prop: typeStringProp,
-      },
+      } as ItemInfo,
       {
         label: 'type',
         type: 'enum',
@@ -3832,14 +3829,14 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: ioTypeGetter,
         setter: ioTypeSetter,
         prop: typeStringProp,
-      },
+      } as ItemInfo,
       {
         label: 'comment',
         type: 'text',
         getter: getter,
         setter: setter,
         prop: commentProp,
-      },
+      } as ItemInfo,
     ]);
     this.propertyInfo.set('output', [
       {
@@ -3848,7 +3845,7 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: nodeLabelGetter,
         setter: nodeLabelSetter,
         prop: typeStringProp,
-      },
+      } as ItemInfo,
       {
         label: 'type',
         type: 'enum',
@@ -3856,14 +3853,14 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: ioTypeGetter,
         setter: ioTypeSetter,
         prop: typeStringProp,
-      },
+      } as ItemInfo,
       {
         label: 'comment',
         type: 'text',
         getter: getter,
         setter: setter,
         prop: commentProp,
-      },
+      } as ItemInfo,
     ]);
     this.propertyInfo.set('binop', [
       {
@@ -3873,7 +3870,7 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: nodeLabelGetter,
         setter: nodeLabelSetter,
         prop: typeStringProp,
-      },
+      } as ItemInfo,
     ]);
     this.propertyInfo.set('unop', [
       {
@@ -3883,7 +3880,7 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: nodeLabelGetter,
         setter: nodeLabelSetter,
         prop: typeStringProp,
-      },
+      } as ItemInfo,
     ]);
     this.propertyInfo.set('literal', [
       {
@@ -3892,14 +3889,14 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: nodeLabelGetter,
         setter: nodeLabelSetter,
         prop: typeStringProp,
-      },
+      } as ItemInfo ,
       {
         label: 'comment',
         type: 'text',
         getter: getter,
         setter: setter,
         prop: commentProp,
-      },
+      } as ItemInfo,
     ]);
     this.propertyInfo.set('let', [
       {
@@ -3908,7 +3905,7 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
         prop: commentProp,
-      },
+      } as ItemInfo,
     ]);
     this.propertyInfo.set('external', [
       {
@@ -3917,21 +3914,21 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
         prop: typeStringProp,
-      },
+      } as ItemInfo ,
       {
         label: 'comment',
         type: 'text',
         getter: getter,
         setter: setter,
         prop: commentProp,
-      },
+      } as ItemInfo,
       {
         label: 'hideLinks',
         type: 'boolean',
         getter: getter,
         setter: setter,
         prop: hideLinksProp,
-      },
+      } as ItemInfo,
     ]);
     this.propertyInfo.set('abstract', [
       {
@@ -3940,14 +3937,14 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: nodeLabelGetter,
         setter: nodeLabelSetter,
         prop: typeStringProp,
-      },
+      } as ItemInfo,
       {
         label: 'comment',
         type: 'text',
         getter: getter,
         setter: setter,
         prop: commentProp,
-      },
+      } as ItemInfo,
     ]);
     this.propertyInfo.set('importer', [
       // {
@@ -3963,14 +3960,14 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
         prop: hideLinksProp,
-      },
+      } as ItemInfo,
       {
         label: 'comment',
         type: 'text',
         getter: getter,
         setter: setter,
         prop: commentProp,
-      },
+      } as ItemInfo,
     ]);
     this.propertyInfo.set('exporter', [
       // {
@@ -3986,7 +3983,7 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
         prop: commentProp,
-      },
+      } as ItemInfo,
     ]);
     this.propertyInfo.set('upCast', [
       {
@@ -3995,7 +3992,7 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
         prop: commentProp,
-      },
+      } as ItemInfo,
     ]);
     this.propertyInfo.set('downCast', [
       {
@@ -4004,7 +4001,7 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
         prop: commentProp,
-      },
+      } as ItemInfo,
     ]);
     this.propertyInfo.set('functionchart', [
       {
@@ -4013,28 +4010,28 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
         prop: nameProp,
-      },
+      } as ItemInfo,
       {
         label: 'implicit',
         type: 'boolean',
         getter: getter,
         setter: setter,
         prop: implicitProp,
-      },
+      } as ItemInfo,
       {
         label: 'hideLinks',
         type: 'boolean',
         getter: getter,
         setter: setter,
         prop: hideLinksProp,
-      },
+      } as ItemInfo,
       {
         label: 'comment',
         type: 'text',
         getter: getter,
         setter: setter,
         prop: commentProp,
-      },
+      } as ItemInfo,
     ]);
 
     this.propertyInfo.forEach((info, key) => {
