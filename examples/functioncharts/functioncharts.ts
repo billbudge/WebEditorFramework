@@ -434,7 +434,7 @@ class WireTemplate {
   readonly properties = [this.src, this.srcPin, this.dst, this.dstPin];
 }
 
-export type FunctionchartType = 'functionchart';
+export type FunctionchartType = 'functionchart' | 'signature';
 
 class FunctionchartTemplate extends NodeTemplate {
   readonly width = widthProp;
@@ -447,8 +447,8 @@ class FunctionchartTemplate extends NodeTemplate {
   readonly properties = [this.id, this.typeString, this.x, this.y, this.width, this.height,
                          this.name, this.implicit, this.hideLinks, this.nodes, this.wires,
                          this.comment];
-    constructor(typeName: FunctionchartType) {
-      super(typeName);
+  constructor(typeName: FunctionchartType) {
+    super(typeName);
   }
 }
 
@@ -463,6 +463,7 @@ const elementTemplate = new ElementTemplate('element'),        // built-in eleme
       useTemplate = new PseudoelementTemplate('use'),
       wireTemplate = new WireTemplate(),
       functionchartTemplate = new FunctionchartTemplate('functionchart'),
+      signatureTemplate = new FunctionchartTemplate('signature'),
       functionInstanceTemplate = new FunctionInstanceTemplate('instance');
 
 const defaultPoint = { x: 0, y: 0 },
@@ -768,7 +769,6 @@ export type PinInfo = {
 export type TypeInfo = {
   instanceType: Type;
   closed: boolean;
-  abstract: boolean;
   sideEffects: boolean;
   inputs: Array<PinInfo>;
   outputs: Array<PinInfo>;
@@ -779,7 +779,6 @@ export type TypeInfo = {
 const emptyTypeInfo : TypeInfo = {
   instanceType: Type.emptyExporterType,
   closed: true,
-  abstract: false,
   sideEffects: false,
   inputs: [],
   outputs: [],
@@ -809,7 +808,7 @@ export class Functionchart extends NodeBase<FunctionchartTemplate> {
   get wires() { return this.template.wires.get(this) as List<Wire>; }
 
   // Derived properties.
-  get isAbstract() : boolean { return this.typeInfo.abstract; }
+  get isAbstract() : boolean { return this.template.typeName === 'signature'; }
   get hasSideEffects() : boolean { return this.typeInfo.sideEffects; }
   get isClosed() { return this.typeInfo.closed; }
 
@@ -984,6 +983,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     let template: FunctionchartTemplate;
     switch (typeName) {
       case 'functionchart': template = functionchartTemplate; break;
+      case 'signature': template = signatureTemplate; break;
       default: throw new Error('Unknown functionchart type: ' + typeName);
     }
     const result: Functionchart = new Functionchart(this, template, nextId);
@@ -2375,9 +2375,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           implicit = functionchart.implicit,
           subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()),
           closed = subgraphInfo.inWires.size == 0;
-    // A functionchart is abstract if it has no local or incoming wires (there are no outgoing wires).
-    let abstract = subgraphInfo.wires.size === 0 && subgraphInfo.inWires.size === 0,
-        sideEffects = false;
+    let sideEffects = false;
 
     // Memoize inferred pin types.
     const inferred = new PairMap<NodeTypes, number, [Type, Array<PinRef>]>();
@@ -2448,7 +2446,6 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
           inputs.push(pinInfo);
         } else {
           // The general case node...
-          abstract = abstract && node.isAbstract;
           sideEffects = sideEffects || node.hasSideEffects;
 
           if (implicit && (node instanceof Element || node instanceof Functionchart)) {
@@ -2538,7 +2535,7 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
     const outputPins = outputs.map(pinInfo => new Pin(pinInfo.type, pinInfo.name));
 
     const type = Type.fromInfo(inputPins, outputPins, name);
-    return { instanceType: type, closed, abstract, sideEffects, inputs, outputs, passThroughs };
+    return { instanceType: type, closed, sideEffects, inputs, outputs, passThroughs };
   }
 
   private updateGlobalPosition(node: NodeTypes) {
@@ -2682,7 +2679,8 @@ export class FunctionchartContext extends EventBase<Change, ChangeEvents>
 
       case 'wire': return this.newWire(undefined, -1, undefined, -1);
 
-      case 'functionchart': return this.newFunctionchart(typeName);
+      case 'functionchart':
+      case 'signature': return this.newFunctionchart(typeName);
 
     }
     throw new Error('Unknown type');
@@ -3642,6 +3640,7 @@ export class FunctionchartEditor implements CanvasLayer {
           thisFn = paletteContext.newElement('element'),
           external = paletteContext.newElement('element'),
           newFunctionchart = paletteContext.newFunctionchart('functionchart'),
+          newSignature = paletteContext.newFunctionchart('signature'),
           importer = paletteContext.newElement('importer'),
           exporter = paletteContext.newElement('exporter'),
           constructor = paletteContext.newElement('constructor');
@@ -3687,11 +3686,15 @@ export class FunctionchartEditor implements CanvasLayer {
     newFunctionchart.width = this.theme.minFunctionchartWidth;
     newFunctionchart.height = this.theme.minFunctionchartHeight;
 
-    importer.x = 80; importer.y = 96;
+    newSignature.x = 72; newSignature.y = 90;
+    newSignature.width = this.theme.minFunctionchartWidth;
+    newSignature.height = this.theme.minFunctionchartHeight;
+
+    importer.x = 150; importer.y = 96;
     importer.typeString = '[,[,]]';
-    exporter.x = 104; exporter.y = 96;
+    exporter.x = 174; exporter.y = 96;
     exporter.typeString = '[,[,]]';
-    constructor.x = 136; constructor.y = 96;
+    constructor.x = 206; constructor.y = 96;
     constructor.typeString = '[,[,]]';
 
     functionchart.nodes.append(input);
@@ -3705,6 +3708,7 @@ export class FunctionchartEditor implements CanvasLayer {
     functionchart.nodes.append(thisFn);
     functionchart.nodes.append(external);
     functionchart.nodes.append(newFunctionchart);
+    functionchart.nodes.append(newSignature);
     functionchart.nodes.append(importer);
     functionchart.nodes.append(exporter);
     functionchart.nodes.append(constructor);
@@ -4017,6 +4021,29 @@ export class FunctionchartEditor implements CanvasLayer {
         getter: getter,
         setter: setter,
         prop: implicitProp,
+      } as ItemInfo,
+      {
+        label: 'hideLinks',
+        type: 'boolean',
+        getter: getter,
+        setter: setter,
+        prop: hideLinksProp,
+      } as ItemInfo,
+      {
+        label: 'comment',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+        prop: commentProp,
+      } as ItemInfo,
+    ]);
+    this.propertyInfo.set('signature', [
+      {
+        label: 'name',
+        type: 'text',
+        getter: getter,
+        setter: setter,
+        prop: nameProp,
       } as ItemInfo,
       {
         label: 'hideLinks',

@@ -363,7 +363,7 @@ const elementTemplate = new ElementTemplate('element'), // built-in elements
 importerTemplate = new ModifierElementTemplate('importer'), // modifier elements
 exporterTemplate = new ModifierElementTemplate('exporter'), constructorTemplate = new ModifierElementTemplate('constructor'), upCastTemplate = new ModifierElementTemplate('upCast'), downCastTemplate = new ModifierElementTemplate('downCast'), inputTemplate = new PseudoelementTemplate('input'), // input pseudoelement
 outputTemplate = new PseudoelementTemplate('output'), // output pseudoelement
-useTemplate = new PseudoelementTemplate('use'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate('functionchart'), functionInstanceTemplate = new FunctionInstanceTemplate('instance');
+useTemplate = new PseudoelementTemplate('use'), wireTemplate = new WireTemplate(), functionchartTemplate = new FunctionchartTemplate('functionchart'), signatureTemplate = new FunctionchartTemplate('signature'), functionInstanceTemplate = new FunctionInstanceTemplate('instance');
 const defaultPoint = { x: 0, y: 0 }, defaultPointWithNormal = { x: 0, y: 0, nx: 0, ny: 0 }, defaultBezierCurve = [
     defaultPointWithNormal, defaultPoint, defaultPoint, defaultPointWithNormal
 ];
@@ -610,7 +610,6 @@ function makeOutputPinRef(node, index) {
 const emptyTypeInfo = {
     instanceType: Type.emptyExporterType,
     closed: true,
-    abstract: false,
     sideEffects: false,
     inputs: [],
     outputs: [],
@@ -634,7 +633,7 @@ export class Functionchart extends NodeBase {
     get nodes() { return this.template.nodes.get(this); }
     get wires() { return this.template.wires.get(this); }
     // Derived properties.
-    get isAbstract() { return this.typeInfo.abstract; }
+    get isAbstract() { return this.template.typeName === 'signature'; }
     get hasSideEffects() { return this.typeInfo.sideEffects; }
     get isClosed() { return this.typeInfo.closed; }
     constructor(context, template, id) {
@@ -755,6 +754,9 @@ export class FunctionchartContext extends EventBase {
         switch (typeName) {
             case 'functionchart':
                 template = functionchartTemplate;
+                break;
+            case 'signature':
+                template = signatureTemplate;
                 break;
             default: throw new Error('Unknown functionchart type: ' + typeName);
         }
@@ -2003,8 +2005,7 @@ export class FunctionchartContext extends EventBase {
     }
     getFunctionchartTypeInfo(functionchart) {
         const self = this, inputs = new Array(), outputs = new Array(), name = functionchart.name, implicit = functionchart.implicit, subgraphInfo = self.getSubgraphInfo(functionchart.nodes.asArray()), closed = subgraphInfo.inWires.size == 0;
-        // A functionchart is abstract if it has no local or incoming wires (there are no outgoing wires).
-        let abstract = subgraphInfo.wires.size === 0 && subgraphInfo.inWires.size === 0, sideEffects = false;
+        let sideEffects = false;
         // Memoize inferred pin types.
         const inferred = new PairMap();
         function inferPinType(node, index) {
@@ -2068,7 +2069,6 @@ export class FunctionchartContext extends EventBase {
                 }
                 else {
                     // The general case node...
-                    abstract = abstract && node.isAbstract;
                     sideEffects = sideEffects || node.hasSideEffects;
                     if (implicit && (node instanceof Element || node instanceof Functionchart)) {
                         // In implicit mode, empty pins of nodes become pins for the functionchart type.
@@ -2140,7 +2140,7 @@ export class FunctionchartContext extends EventBase {
         const inputPins = inputs.map(pinInfo => new Pin(pinInfo.type, pinInfo.name));
         const outputPins = outputs.map(pinInfo => new Pin(pinInfo.type, pinInfo.name));
         const type = Type.fromInfo(inputPins, outputPins, name);
-        return { instanceType: type, closed, abstract, sideEffects, inputs, outputs, passThroughs };
+        return { instanceType: type, closed, sideEffects, inputs, outputs, passThroughs };
     }
     updateGlobalPosition(node) {
         if (node instanceof NodeBase) {
@@ -2275,7 +2275,8 @@ export class FunctionchartContext extends EventBase {
             case 'output':
             case 'use': return this.newPseudoelement(typeName);
             case 'wire': return this.newWire(undefined, -1, undefined, -1);
-            case 'functionchart': return this.newFunctionchart(typeName);
+            case 'functionchart':
+            case 'signature': return this.newFunctionchart(typeName);
         }
         throw new Error('Unknown type');
     }
@@ -3034,7 +3035,7 @@ export class FunctionchartEditor {
         const renderer = new Renderer(theme);
         this.renderer = renderer;
         // Embed the palette items in a Functionchart so the renderer can do layout and drawing.
-        const paletteContext = new FunctionchartContext(renderer), functionchart = paletteContext.newFunctionchart('functionchart'), input = paletteContext.newPseudoelement('input'), output = paletteContext.newPseudoelement('output'), use = paletteContext.newPseudoelement('use'), literal = paletteContext.newElement('element'), binop = paletteContext.newElement('element'), unop = paletteContext.newElement('element'), cond = paletteContext.newElement('element'), letFn = paletteContext.newElement('element'), thisFn = paletteContext.newElement('element'), external = paletteContext.newElement('element'), newFunctionchart = paletteContext.newFunctionchart('functionchart'), importer = paletteContext.newElement('importer'), exporter = paletteContext.newElement('exporter'), constructor = paletteContext.newElement('constructor');
+        const paletteContext = new FunctionchartContext(renderer), functionchart = paletteContext.newFunctionchart('functionchart'), input = paletteContext.newPseudoelement('input'), output = paletteContext.newPseudoelement('output'), use = paletteContext.newPseudoelement('use'), literal = paletteContext.newElement('element'), binop = paletteContext.newElement('element'), unop = paletteContext.newElement('element'), cond = paletteContext.newElement('element'), letFn = paletteContext.newElement('element'), thisFn = paletteContext.newElement('element'), external = paletteContext.newElement('element'), newFunctionchart = paletteContext.newFunctionchart('functionchart'), newSignature = paletteContext.newFunctionchart('signature'), importer = paletteContext.newElement('importer'), exporter = paletteContext.newElement('exporter'), constructor = paletteContext.newElement('constructor');
         const unaryFns = paletteContext.newElement('element');
         const unaryOps = ['!', '~', '-', 'typeof'];
         const binaryOps = ['+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
@@ -3081,13 +3082,17 @@ export class FunctionchartEditor {
         newFunctionchart.y = 90;
         newFunctionchart.width = this.theme.minFunctionchartWidth;
         newFunctionchart.height = this.theme.minFunctionchartHeight;
-        importer.x = 80;
+        newSignature.x = 72;
+        newSignature.y = 90;
+        newSignature.width = this.theme.minFunctionchartWidth;
+        newSignature.height = this.theme.minFunctionchartHeight;
+        importer.x = 150;
         importer.y = 96;
         importer.typeString = '[,[,]]';
-        exporter.x = 104;
+        exporter.x = 174;
         exporter.y = 96;
         exporter.typeString = '[,[,]]';
-        constructor.x = 136;
+        constructor.x = 206;
         constructor.y = 96;
         constructor.typeString = '[,[,]]';
         functionchart.nodes.append(input);
@@ -3101,6 +3106,7 @@ export class FunctionchartEditor {
         functionchart.nodes.append(thisFn);
         functionchart.nodes.append(external);
         functionchart.nodes.append(newFunctionchart);
+        functionchart.nodes.append(newSignature);
         functionchart.nodes.append(importer);
         functionchart.nodes.append(exporter);
         functionchart.nodes.append(constructor);
@@ -3413,6 +3419,29 @@ export class FunctionchartEditor {
                 getter: getter,
                 setter: setter,
                 prop: implicitProp,
+            },
+            {
+                label: 'hideLinks',
+                type: 'boolean',
+                getter: getter,
+                setter: setter,
+                prop: hideLinksProp,
+            },
+            {
+                label: 'comment',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: commentProp,
+            },
+        ]);
+        this.propertyInfo.set('signature', [
+            {
+                label: 'name',
+                type: 'text',
+                getter: getter,
+                setter: setter,
+                prop: nameProp,
             },
             {
                 label: 'hideLinks',

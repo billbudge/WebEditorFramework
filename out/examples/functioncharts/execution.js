@@ -189,7 +189,6 @@ export function codegen(functionchart) {
         return {
             instanceType: type,
             closed: true,
-            abstract: false,
             sideEffects: false,
             inputs: inputs,
             outputs: outputs,

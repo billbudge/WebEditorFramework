@@ -237,7 +237,6 @@ export function codegen(functionchart: Functionchart) {
     return {
       instanceType: type,
       closed: true,
-      abstract: false,
       sideEffects: false, // TODO
       inputs: inputs,
       outputs: outputs,
