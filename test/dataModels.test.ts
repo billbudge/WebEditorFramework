@@ -571,6 +571,25 @@ describe('HistoryManager', () => {
     expect(selectionSet.has(child2)).toBe(true);
     expect(selectionSet.lastSelected).toBe(child2);
   });
+  test('no history when transaction is cancelled', () => {
+    const context = new TestDataContext(),
+          item = new TestDataContextObject(context),
+          transactionManager = new Data.TransactionManager(),
+          selectionSet = new Collections.SelectionSet<TestDataContextObject>(),
+          historyManager = new Data.HistoryManager(transactionManager, selectionSet);
+
+    context.addHandler('changed', transactionManager.onChanged.bind(transactionManager));
+
+    selectionSet.add(item);
+
+    const transaction = transactionManager.beginTransaction('test');
+    item.x = 1;
+    transactionManager.cancelTransaction();
+    expect(historyManager.getUndo()).toBeUndefined();
+    expect(historyManager.getRedo()).toBeUndefined();
+    expect(selectionSet.length).toBe(1);
+    expect(selectionSet.lastSelected).toBe(item);
+  });
   test('no SelectionOp when selection is unchanged', () => {
     const context = new TestDataContext(),
           item = new TestDataContextObject(context),

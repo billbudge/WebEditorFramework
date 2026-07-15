@@ -876,7 +876,6 @@ class SelectionOp implements Operation {
   }
 }
 
-// TODO handle canceling transactions. Currently, invalid transactions are left on the stack.
 export class HistoryManager {
   private done: CompoundOp[] = [];
   private undone: CompoundOp[] = [];

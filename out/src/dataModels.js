@@ -678,7 +678,6 @@ class SelectionOp {
         this.endingSelection = selectionSet.contents();
     }
 }
-// TODO handle canceling transactions. Currently, invalid transactions are left on the stack.
 export class HistoryManager {
     getRedo() {
         const length = this.undone.length;
