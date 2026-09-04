@@ -2423,8 +2423,8 @@ class Renderer {
         const rect = this.getBounds(node), type = node.type, pin = type.outputs[index];
         // Handle special case of functionchart's output.
         if (node instanceof Functionchart) {
-            const type = node.instanceType, r = Functionchart.radius, right = rect.x + rect.width;
-            return { x: right, y: rect.y + r + type.height / 2, nx: 1, ny: 0 };
+            const type = node.instanceType, r = Functionchart.radius, right = rect.x + rect.width, bottom = rect.y + rect.height;
+            return { x: right, y: bottom - r - type.height / 2, nx: 1, ny: 0 };
         }
         return { x: rect.x + rect.width, y: rect.y + pin.y + pin.type.height / 2, nx: 1, ny: 0 };
     }
@@ -2768,7 +2768,7 @@ class Renderer {
                     ctx.stroke();
                 }
                 const instanceType = functionchart.instanceType;
-                this.drawType(instanceType, x + w - instanceType.width, y + r);
+                this.drawType(instanceType, pinRect.x, pinRect.y);
                 if (implicit) {
                     // Draw tick marks indicating the auto-generated pins.
                     const self = this, spacing = theme.spacing, typeInfo = functionchart.typeInfo, inputs = typeInfo.inputs, outputs = typeInfo.outputs;
