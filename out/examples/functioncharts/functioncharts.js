@@ -1,7 +1,7 @@
 var _a;
 import { SelectionSet, PairSet, PairMap } from '../../src/collections.js';
 import { Theme, getEdgeBezier, hitTestRect, roundRectPath, bezierEdgePath, hitTestBezier, inFlagPath, outFlagPath, notchedRectPath, writeFile, ConsoleErrorReporter } from '../../src/diagrams.js';
-import { getExtents, expandRect } from '../../src/geometry.js';
+import { getExtents, expandRect, clipCenterLine } from '../../src/geometry.js';
 import { ScalarProp, ChildListProp, ReferenceProp, IdProp, EventBase, copyItems, Serialize, Deserialize, getLowestCommonAncestor, ancestorInSet, reduceToRoots, TransactionManager, HistoryManager, ChildSlotProp } from '../../src/dataModels.js';
 import { codegen } from './execution.js';
 // import * as Canvas2SVG from '../../third_party/canvas2svg/canvas2svg.js'
@@ -2592,16 +2592,36 @@ class Renderer {
             this.drawType(type, x, y);
         }
     }
+    // drawFunctionInstanceLink(instance: FunctionInstance, color: string) {
+    //   const ctx = this.ctx,
+    //         theme = this.theme,
+    //         offset = theme.spacing / 2,
+    //         rect = this.getBounds(instance),
+    //         x = rect.x, y = rect.y, w = rect.width, h = rect.height,
+    //         p1 = this.outputPinToPoint(instance.src, instance.srcPin),
+    //         p2 = { x, y: y + h - 1, nx : -1, ny: 0 };  // 2 = linewidth
+    //   ctx.strokeStyle = color;
+    //   p1.x += offset;
+    //   p2.x -= offset;
+    //   const bezier = getEdgeBezier(p1, p2, 0);
+    //   ctx.beginPath();
+    //   bezierEdgePath(bezier, ctx, 0);
+    //   ctx.lineWidth = 2;
+    //   ctx.stroke();
+    // }
     drawFunctionInstanceLink(instance, color) {
-        const ctx = this.ctx, theme = this.theme, offset = theme.spacing / 2, rect = this.getBounds(instance), x = rect.x, y = rect.y, w = rect.width, h = rect.height, p1 = this.outputPinToPoint(instance.src, instance.srcPin), p2 = { x, y: y + h - 1, nx: -1, ny: 0 }; // 2 = linewidth
-        ctx.strokeStyle = color;
-        p1.x += offset;
-        p2.x -= offset;
-        const bezier = getEdgeBezier(p1, p2, 0);
-        ctx.beginPath();
-        bezierEdgePath(bezier, ctx, 0);
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        const ctx = this.ctx, src = instance.src, srcRect = this.instancerBounds(src, instance.srcPin), dstRect = this.getBounds(instance);
+        const segment = clipCenterLine(srcRect, dstRect);
+        if (segment) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(segment.p1.x, segment.p1.y);
+            ctx.lineTo(segment.p2.x, segment.p2.y);
+            ctx.setLineDash([6, 3]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
     }
     abstractStroke(ctx) {
         ctx.setLineDash([6, 3]);

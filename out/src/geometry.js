@@ -115,4 +115,38 @@ export function hitTestBezier(p1, p2, p3, p4, p, tolerance) {
     if (dMin < tolerance)
         return { x: closestX, y: closestY, d: dMin, t: tMin };
 }
+export function clipCenterLine(rectA, rectB) {
+    const dx = rectB.x - rectA.x;
+    const dy = rectB.y - rectA.y;
+    if (dx === 0 && dy === 0) {
+        return null; // Concentric centers
+    }
+    const halfWA = rectA.width / 2;
+    const halfHA = rectA.height / 2;
+    const halfWB = rectB.width / 2;
+    const halfHB = rectB.height / 2;
+    // Scale factor to exit rectA
+    const txA = dx !== 0 ? halfWA / Math.abs(dx) : Infinity;
+    const tyA = dy !== 0 ? halfHA / Math.abs(dy) : Infinity;
+    const t1 = Math.min(txA, tyA);
+    // Scale factor from rectB's center backwards
+    const txB = dx !== 0 ? halfWB / Math.abs(dx) : Infinity;
+    const tyB = dy !== 0 ? halfHB / Math.abs(dy) : Infinity;
+    const tOffsetB = Math.min(txB, tyB);
+    const t2 = 1 - tOffsetB;
+    // No visible line segment between the outer boundaries
+    if (t1 >= t2) {
+        return null;
+    }
+    return {
+        p1: {
+            x: rectA.x + halfWA + t1 * dx,
+            y: rectA.y + halfHA + t1 * dy,
+        },
+        p2: {
+            x: rectB.x + halfWB - tOffsetB * dx,
+            y: rectB.y + halfHB - tOffsetB * dy,
+        },
+    };
+}
 //# sourceMappingURL=geometry.js.map

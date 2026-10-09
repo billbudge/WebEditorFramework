@@ -10,7 +10,7 @@ import { Theme, rectPointToParam, roundRectParamToPoint, circlePointToParam,
          ConsoleErrorReporter} from '../../src/diagrams.js'
 
 import { Point, Rect, PointWithNormal, getExtents, projectPointToCircle,
-         BezierCurve, evaluateBezier, CurveHitResult, expandRect } from '../../src/geometry.js'
+         BezierCurve, evaluateBezier, CurveHitResult, expandRect, clipCenterLine } from '../../src/geometry.js'
 
 import { ScalarProp, ChildListProp, ReferenceProp, IdProp, PropertyTypes,
          ReferencedObject, DataContext, DataContextObject, EventBase, EventHandler,
@@ -3074,23 +3074,42 @@ class Renderer implements ILayoutEngine {
     }
   }
 
+  // drawFunctionInstanceLink(instance: FunctionInstance, color: string) {
+  //   const ctx = this.ctx,
+  //         theme = this.theme,
+  //         offset = theme.spacing / 2,
+  //         rect = this.getBounds(instance),
+  //         x = rect.x, y = rect.y, w = rect.width, h = rect.height,
+  //         p1 = this.outputPinToPoint(instance.src, instance.srcPin),
+  //         p2 = { x, y: y + h - 1, nx : -1, ny: 0 };  // 2 = linewidth
+  //   ctx.strokeStyle = color;
+  //   p1.x += offset;
+  //   p2.x -= offset;
+
+  //   const bezier = getEdgeBezier(p1, p2, 0);
+  //   ctx.beginPath();
+  //   bezierEdgePath(bezier, ctx, 0);
+  //   ctx.lineWidth = 2;
+  //   ctx.stroke();
+  // }
+
   drawFunctionInstanceLink(instance: FunctionInstance, color: string) {
     const ctx = this.ctx,
-          theme = this.theme,
-          offset = theme.spacing / 2,
-          rect = this.getBounds(instance),
-          x = rect.x, y = rect.y, w = rect.width, h = rect.height,
-          p1 = this.outputPinToPoint(instance.src, instance.srcPin),
-          p2 = { x, y: y + h - 1, nx : -1, ny: 0 };  // 2 = linewidth
-    ctx.strokeStyle = color;
-    p1.x += offset;
-    p2.x -= offset;
+          src = instance.src,
+          srcRect = this.instancerBounds(src, instance.srcPin),
+          dstRect = this.getBounds(instance);
 
-    const bezier = getEdgeBezier(p1, p2, 0);
-    ctx.beginPath();
-    bezierEdgePath(bezier, ctx, 0);
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    const segment = clipCenterLine(srcRect, dstRect);
+    if (segment) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(segment.p1.x, segment.p1.y);
+      ctx.lineTo(segment.p2.x, segment.p2.y);
+      ctx.setLineDash([6, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }
 
   abstractStroke(ctx: CanvasRenderingContext2D) {
